@@ -1,0 +1,87 @@
+{:paths   ["src/lib"]
+ :deps    {camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
+           cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
+           com.cemerick/url                    {:mvn/version "0.1.1"}
+           com.taoensso/timbre                 {:mvn/version "6.1.0"}
+           com.wsscode/pathom3                 {:mvn/version "2023.01.31-alpha"}
+           dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
+           funcool/promesa                     {:mvn/version "11.0.671"}
+           io.replikativ/datahike              {:mvn/version "0.6.1538"}
+           mount/mount                         {:mvn/version "0.1.17"}
+           net.clojars.wkok/openai-clojure     {:mvn/version "0.6.0"}
+           org.apache.logging.log4j/log4j-api  {:mvn/version "2.20.0"} ; ToDo: Move logging to :dev.
+           org.apache.logging.log4j/log4j-core {:mvn/version "2.20.0"} ; ToDo: Move logging to :dev.
+           org.slf4j/slf4j-nop                 {:mvn/version "2.0.7"}  ; Stop spurious logging!
+           org.clojure/data.codec              {:mvn/version "0.1.1"}
+           org.clojure/data.json               {:mvn/version "2.4.0"}
+           org.clojure/data.xml                {:mvn/version "0.2.0-alpha8"}
+           org.clojure/data.zip                {:mvn/version "1.0.0"}}
+
+ ;; See .dir-locals.el for some defaults on CIDER C-c M-j
+ :aliases {:dev          {:extra-paths    ["src/server" "test" "env/dev" "resources"]
+                          :jvm-opts       ["-XX:-OmitStackTraceInFastThrow"] ; https://www.metosin.fi/blog/missing-stacktraces/
+                          ;; :dev includes src/server (for use with exerciser) thus much of this stuff.
+                          :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
+                                           cider/cider-nrepl               {:mvn/version "0.30.0"}
+                                           com.lambdaisland/classpath      {:mvn/version "0.4.44"}
+                                           ;criterium/criterium            {:mvn/version "0.4.6"}
+                                           expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
+                                           lilactown/helix                 {:mvn/version "0.1.10"}
+                                           org.clojure/java.classpath      {:mvn/version "1.0.0"}
+                                           ;;pjstadig/humane-test-output   {:mvn/version "0.11.0"}
+                                           metosin/muuntaja                {:mvn/version "0.6.8"}
+                                           nrepl/nrepl                     {:mvn/version "1.0.0"}
+                                           org.clojure/tools.namespace     {:mvn/version "1.4.4"}
+                                           metosin/reitit                  {:mvn/version "0.6.0"}
+                                           metosin/ring-http-response      {:mvn/version "0.9.3"}
+                                           ring/ring-defaults              {:mvn/version "0.3.4"}
+                                           ring/ring-jetty-adapter         {:mvn/version "1.10.0"}
+                                           ring/ring-core                  {:mvn/version "1.10.0"}
+                                           ring/ring-devel                 {:mvn/version "1.10.0"}
+                                           ring-cors/ring-cors             {:mvn/version "0.1.13"}
+                                           selmer/selmer                   {:mvn/version "1.12.58"}}} ; Used for home.html.
+
+           :test      {:extra-paths    ["test" "env/dev"] ; clojure -X:dev:test
+                       :extra-deps
+                       {io.github.cognitect-labs/test-runner
+                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+                       ;; :main-opts ["-m" "cognitect.test-runner"]
+                       :exec-fn cognitect.test-runner.api/test
+                       :exec-args {:patterns [".*-test.*"]}}
+
+           :exerciser {:extra-paths ["src/app" "test"]
+                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.23.3"}
+                                     lilactown/helix                {:mvn/version "0.1.10"}
+                                     cljs-ajax/cljs-ajax            {:mvn/version "0.8.4"}
+                                     applied-science/js-interop     {:mvn/version "0.4.2"}}}
+
+           :kaochaRM {:extra-paths    ["test" "env/dev"]
+                      :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.23.3"}
+                                       lambdaisland/kaocha       {:mvn/version "1.84.1335"}
+                                       lambdaisland/kaocha-cljs2 {:mvn/version "0.1.58"}
+                                       com.lambdaisland/glogi    {:mvn/version "1.3.169"}
+                                       nrepl/nrepl               {:mvn/version "1.0.0"}
+                                       cider/cider-nrepl         {:mvn/version "0.30.0"}}}
+
+           :deploy    {:replace-deps   {slipset/deps-deploy {:mvn/version "0.2.1"}}
+                       :exec-fn        deps-deploy.deps-deploy/deploy
+                       :exec-args      {:installer :remote
+                                        :sign-releases? false ; signing problem (see mznp deps.edn)
+                                        :artifact "RADmapper-1.0.29.jar"}}
+
+           :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.9.4"} #_{:git/tag "v0.9.4" :git/sha "76b78fe"}}
+                      :ns-default build}
+
+           ;; clj -M:morpheus -d graphs -f svg -e 'clojure.core/.*|:clj-kondo/unknown-namespace/.*|:cljs.core/.*' src
+           :var-deps-graph {:extra-deps      {thomasa/morpheus {:git/url "https://github.com/benedekfazekas/morpheus.git"
+                                                                :git/sha "9d6f2c1ede8be7ab4508065fe6b7e40e0c099ab6"}}
+                            :main-opts       ["-m" "thomasa.morpheus.main"]}}}
+
+;;; clj -T:search/outdated
+;;; |    :file |                                           :name |  :current |   :latest |
+;;; |----------+-------------------------------------------------+-----------+-----------|
+;;; | deps.edn |                                     aleph/aleph |     0.6.1 |     0.6.2 | not used anymore
+;;; |          | com.google.javascript/closure-compiler-unshaded | v20230206 | v20230502 | not updated
+;;; |          |                                 funcool/promesa |  10.0.663 |  11.0.671 |
+;;; |          |                          io.replikativ/datahike |  0.6.1538 |  0.6.1541 | not changed
+;;; |          |                             lambdaisland/kaocha | 1.83.1314 | 1.84.1335 |

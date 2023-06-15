@@ -1,0 +1,48 @@
+{
+  "name": "radmapper",
+  "version": "1.0.0",
+  "description": "RADmapper mapping engine",
+  "main": "index.js",
+  "dependencies": {
+    "@codemirror/autocomplete": "6.1.1",
+    "@codemirror/commands": "6.1.0",
+    "@codemirror/lang-markdown": "6.0.0",
+    "@codemirror/language": "6.2.1",
+    "@codemirror/lint": "6.0.0",
+    "@codemirror/search": "6.2.0",
+    "@codemirror/state": "6.1.1",
+    "@codemirror/view": "6.2.3",
+    "@emotion/react": "^11.10.5",
+    "@emotion/styled": "^11.10.5",
+    "@lezer/common": "1.0.1",
+    "@lezer/generator": "1.1.1",
+    "@lezer/highlight": "1.0.0",
+    "@lezer/lr": "1.2.3",
+    "@mui/icons-material": "^5.11.0",
+    "@mui/material": "^5.11.3",
+    "codemirror": "^6.0.1",
+    "lezer-clojure": "1.0.0-rc.2",
+    "nata-borrowed": "^1.0.5",
+    "npm": "^9.6.7",
+    "platform": "1.3.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-refresh": "^0.14.0",
+    "react-router-dom": "^6.8.2",
+    "stack-trace": "0.0.10",
+    "stacktrace-js": "^2.0.2",
+    "ws": "^7.5.9"
+  },
+  "scripts": {
+    "exer-client": "shadow-cljs -d nrepl/nrepl:1.0.0 -d cider/piggieback:0.5.3 -d cider/cider-nrepl:0.30.0 watch frontend",
+    "release": "shadow-cljs release frontend",
+    "kaochaRM":    "shadow-cljs -d nrepl/nrepl:1.0.0 -d cider/piggieback:0.5.3 -d cider/cider-nrepl:0.30.0 watch kaochaRM",
+    "CLJRM": "clj -A:dev -Sdeps '{:deps {nrepl/nrepl {:mvn/version \"1.0.0\"} cider/cider-nrepl {:mvn/version \"0.30.0\"}} :aliases {:cider/nrepl {:main-opts [\"-m\" \"nrepl.cmdline\" \"--middleware\" \"[cider.nrepl/cider-middleware]\"]}}}' -M:cider/nrepl",
+    "build-repl": "clj -A:build -Sdeps '{:deps {nrepl/nrepl {:mvn/version \"1.0.0\"} cider/cider-nrepl {:mvn/version \"0.30.0\"}} :aliases {:cider/nrepl {:main-opts [\"-m\" \"nrepl.cmdline\" \"--middleware\" \"[cider.nrepl/cider-middleware]\"]}}}' -M:cider/nrepl"
+  },
+  "author": "Peter Denno",
+  "license": "ISC",
+  "devDependencies": {
+    "shadow-cljs": "^2.22.8"
+  }
+}

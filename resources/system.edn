@@ -1,0 +1,24 @@
+{:dev {:server/http {:port 3300 :host "0.0.0.0"}
+       :handler/ring {:api-path "/api"
+                      :cookie-secret "FQVUNCJMVERCFICT" ; Exactly 16 bytes
+                      ;; from ring.middleware.defaults. anti-forgery `false` by default because services may not require it
+                      :site-defaults-config {:params {:urlencoded true
+                                                      :multipart true
+                                                      :nested true
+                                                      :keywordize true}
+                                             :cookies true
+                                             :session {:flash true
+                                                       :cookie-name "stdb-server"
+                                                       :cookie-attrs {:max-age 86400
+                                                                      :http-only true
+                                                                      :same-site :strict}}
+                                             :security {:anti-forgery false
+                                                        :xss-protection {:enable? true,
+                                                                         :mode :block}
+                                                        :frame-options :sameorigin
+                                                        :content-type-options :nosniff}
+                                             :static {:resources "public"}
+                                             :responses {:not-modified-responses true
+                                                         :absolute-redirects true
+                                                         :content-types true
+                                                         :default-charset "utf-8"}}}}}
