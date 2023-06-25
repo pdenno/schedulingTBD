@@ -12,7 +12,7 @@
    ["@mui/material/styles" :as styles]
    ["@mui/material/Typography$default" :as Typography]
    [promesa.core :as p]
-   [scheduling-tbd.util :as util]
+   [stbd-app.util :as util]
    [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text SelectExample]]
    [stbd-app.components.examples :as examples :refer [rm-examples]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
@@ -94,7 +94,6 @@
                    (-> e str on-result-fn)))
         (p/finally (fn [_]
                      (progress-bool-fn false)
-                     (invalidate-timeout-info)
                      (log/info "clear handler")
                      (js/window.clearInterval @progress-handle)))))
   nil)
@@ -149,18 +148,12 @@
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")
                   :on-stop-drag-dn (partial editor/resize-finish "result")}})
 
+;;; ToDo: Needs work.
 (defn compute-progress
   "Use either progress-atm or timeout-info to return a percent done."
   []
-  (let [now (.getTime (js/Date.))
-        info @timeout-info
-        timeout-at (:timeout-at info)
-        res (if (:valid? info)
-              (if (> now timeout-at)
-                100
-                (int (* 100.0  (- 1.0 (double (/ (- timeout-at now) (:max-millis info)))))))
-              (+ @progress-atm 2))]
-    res))
+  (let [#_#_now (.getTime (js/Date.))]
+    (+ @progress-atm 2)))
 
 (defnc Top [{:keys [rm-example width height]}]
   (let [[result set-result] (hooks/use-state "Ctrl-Enter above to execute.")
@@ -197,7 +190,7 @@
            :noWrap false
            :height banner-height}
           ($ Stack {:direction "row"}
-             "RADmapper"
+             "schedulingTBD"
              ($ Box {:minWidth (- width 320)}) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
              ($ ButtonGroup
                 ($ SaveModal {:code-fn #(get-user-code)
@@ -222,7 +215,7 @@
                                         :text result}))
                       :share-fns (:right-share top-share-fns)})
            :share-fns (:left-share top-share-fns)
-           :lf-pct 0.20 #_0.55 ; <=================================
+           :lf-pct 0.50 ; <=================================
            :init-width width}))))
 
 (defnc app []

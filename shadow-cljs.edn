@@ -1,4 +1,4 @@
-{:deps {:aliases [:exerciser]}
+{:deps {:aliases [:app]}
  :nrepl {:port 7002}
  :http  {:port 9631}
  :builds ; Only :frontend :kaochaRM have been used much.
@@ -7,11 +7,11 @@
    :output-dir       "resources/public/js"
    :asset-path       "/js"
    :compiler-options {:externs ["datascript/externs.js"]}
-   :modules          {:app {:entries [exerciser-app.core] ; creates app.js owing to key :app.
-                            :init-fn exerciser-app.core/mount-root}}
-   :devtools         {:after-load exerciser-app.core/mount-root}}
+   :modules          {:app {:entries [stbd-app.core] ; creates app.js owing to key :app.
+                            :init-fn stbd-app.core/mount-root}}
+   :devtools         {:after-load stbd-app.core/mount-root}}
 
-  :kaochaRM ;-------------- Testing cljs ------------------------------
+  :kaochaSTBD ;-------------- Testing cljs ------------------------------
   {:target           :browser-test
    :test-dir         "target/kaocha-test"
    :runner-ns        kaocha.cljs2.shadow-runner
@@ -20,17 +20,4 @@
    :devtools         {:http-port 1818
                       :http-root "target/kaocha-test"
                       :after-load dev.kaocha/reload ; dev.kaocha/reload is an attempt to suppress useless log output.
-                      :preloads [lambdaisland.chui.remote #_dev.kaocha/reload]}}
-
-  :lib    ;----------------- Creating a NodeJS library -----------------
-  {:target           :node-library
-   :output-to        "lib.js"
-   :exports-vars     rad-mapper.rewrite/processRad
-   :compiler-options {:externs ["datascript/externs.js"]}}
-
-  :lib-dev ;------------------ I'm not too sure! ------------------------
-  {:target           :browser
-   :output-dir       "resources/public/js"
-   :compiler-options {:externs ["datascript/externs.js"]}
-   :modules          {:app {:init-fn dev.dutil/start}} ; Ideally would be rad-mapper.evaluate/start, but then dev.dutil isn't loaded!...
-   :devtools         {:after-load dev.dutil/reload}}}} ; ... LATER: Even with these, sometimes it doesn't load  dev.dutil NS.
+                      :preloads [lambdaisland.chui.remote #_dev.kaocha/reload]}}}}

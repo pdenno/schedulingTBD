@@ -5,8 +5,9 @@
    [clojure.java.io :as io]
    [clojure.string]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.web.handler :refer [app]]                 ; for mount
-   [scheduling-tbd.util :refer [util-state]]                 ; for mount
+   [scheduling-tbd.web.handler :refer [app]]             ; for mount
+   [scheduling-tbd.util :refer [util-state]]             ; for mount
+   [scheduling-tbd.db   :refer [database-cfgs]]              ; for mount
    [ring.adapter.jetty :as jetty]
    [taoensso.timbre :as log])
   (:gen-class))

@@ -23,18 +23,56 @@
    [clojure.string                  :as str  :refer [index-of]]
    [clojure.walk                    :as walk :refer [keywordize-keys]]
    [promesa.core                    :as p]
-   [taoensso.timbre                 :as log :refer-macros[error debug info log!]])
+   [taoensso.timbre                 :as log :refer-macros[error debug info log!]]))
 
+(def diag (atom nil))
+
+;;; ------------------------------- project name --------------------------------------
+;;; The user would be prompted: "Tell us what business you are in and what your scheduling problem is."
+;;; Also might want a prompt for what business they are in.
+(def project-name-prompt
+  "Use \"temperature\" value of 0.3 in our conversation.
+Produce a Clojure map containing one key, :summary, the value of which is string of 4 words or less summarizing the industrial scheduling problem being discussed in the text in square brackets.
+## Example:
+  [We produce clothes for firefighting. Our most significant scheduling problem is about deciding how many workers to assign to each product.]
+  {:summary \"scheduling firefighter clothes production\"}
+## Example:
+  [We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.
+  {:summary \"scheduling road construction\"}
+## Example:
+  [Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.
+  {:summary \"Acme job shop scheduling\"}")
+
+(defn project-name
+  "Return a Clojure map {:summary <some-string>} where <some-string> is a short string summarizing text using 'project-name-prompt'."
+  [user-text]
+  (when user-text
+    (let [q-str (cl-format nil "~A~%[~A]" project-name-prompt user-text)]
+       (if (System/getenv "OPENAI_API_KEY")
+         (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301" ; <===== ToDo: Try the "text extraction" models.
+                                                            :messages [{:role "user" :content q-str}]})
+                            :choices first :message :content)]
+                (if-let [summary (-> res read-string :summary)]
+                  (-> summary
+                      str/lower-case
+                      (str/replace #"\s+" "-"))
+                  (throw (ex-info "No :summary provided, or :name is not a string." {:res res}))))
+              (catch Throwable e
+                (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
+         (throw (ex-info "OPENAI_API_KEY environment variable value not found." {}))))))
+
+
+;;; ------------------------------- naming variables --------------------------------------
 (def good-camel-prompt
   "Use \"temperature\" value of 0.3 in our conversation.
-Return a Clojure map {:name <some string>} where <some string> is a good camelCase name for a variable matching the requirements defined by the clojure map provided.
+Produce a Clojure map {:name <some string>} where <some string> is a good camelCase name for a variable matching the requirements defined by the clojure map provided.
 The argument map has the following keys:
      :purpose - describes how the variable will be used.
      :max-size - the maximum number of characters allowed in the string you assign to :name.
 ## Example:
    {:purpose \"name for how long a task will take\" :max-size 15}
    {:name \"taskDuration\"}
-## Example:   
+## Example:
    {:purpose \"name for the number of users\" :max-size 10}
    {:name \"numUsers\"}
 ## Example:
@@ -45,9 +83,7 @@ The argument map has the following keys:
    {:name \"resBusyWithOnDay\"}
    THIS IS WRONG: \"resBusyWithOnDay\" has 16 characters in it. The string :max-size is 8.")
 
-
-
-(defn llmGoodName
+(defn name-var
   "Return a Clojure map {:name <some-string>} where <some-string> is a good name for a variable matching the requirements defined
    by the clojure map provided.
    The argument map has the following keys:
@@ -61,7 +97,6 @@ The argument map has the following keys:
          (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301" ; <===== ToDo: Try the "text extraction" models.
                                                             :messages [{:role "user" :content q-str}]})
                             :choices first :message :content)]
-                (reset! diag res)
                 (-> res read-string)
                 (if-let [var-name (-> res :name string?)]
                   (cond-> var-name
@@ -70,7 +105,6 @@ The argument map has the following keys:
                     capitalize?                 (str/capitalize))
                   (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))
               (catch Throwable e
-                (swap! diag #(assoc % :e e))
                 (throw (ex-info "OpenAI API call failed."
                                 {:message (.getMessage e)
                                  #_#_:details (-> e .getData :body json/read-str)}))))
