@@ -30,7 +30,7 @@
         :doc "a keyword naming the task; unique to the project."}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "3 words or less describing the project; e.g. 'craft brewing'"}
+        :doc "4 words or less describing the project; e.g. 'craft brewing'"}
    :project/desc
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
@@ -118,7 +118,11 @@
    ;; ---------------------- work
    :work/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "a keyword naming something to be accomplished."}
+   :work/optative-sentence
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a keyword naming something to be accomplished."}})
+
 
 (defn datahike-schema
   "Create a Datahike-compatible schema from the above."

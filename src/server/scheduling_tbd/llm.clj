@@ -32,16 +32,21 @@
 ;;; Also might want a prompt for what business they are in.
 (def project-name-prompt
   "Use \"temperature\" value of 0.3 in our conversation.
-Produce a Clojure map containing one key, :summary, the value of which is string of 4 words or less summarizing the industrial scheduling problem being discussed in the text in square brackets.
+Produce a Clojure map containing two keys.
+  The first key is :summary, the value of which is string of 4 words or less summarizing the industrial scheduling problem being discussed in the text in square brackets.
+  The second key is :industry, the value of which is a string of 4 words or less describing the industry in which the work is being performed.
 ## Example:
   [We produce clothes for firefighting. Our most significant scheduling problem is about deciding how many workers to assign to each product.]
-  {:summary \"scheduling firefighter clothes production\"}
+  {:summary \"scheduling firefighter clothes production\"
+   :industry \"apparel manufacturing\"}
 ## Example:
   [We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.
-  {:summary \"scheduling road construction\"}
+  {:summary \"scheduling road construction\"
+   :industry \"road construction and repair\"
 ## Example:
   [Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.
-  {:summary \"Acme job shop scheduling\"}")
+  {:summary \"Acme job shop scheduling\"
+   :industry \"job shop machining\"}")
 
 (defn project-name
   "Return a Clojure map {:summary <some-string>} where <some-string> is a short string summarizing text using 'project-name-prompt'."
@@ -52,11 +57,10 @@ Produce a Clojure map containing one key, :summary, the value of which is string
          (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301" ; <===== ToDo: Try the "text extraction" models.
                                                             :messages [{:role "user" :content q-str}]})
                             :choices first :message :content)]
-                (if-let [summary (-> res read-string :summary)]
-                  (-> summary
-                      str/lower-case
-                      (str/replace #"\s+" "-"))
-                  (throw (ex-info "No :summary provided, or :name is not a string." {:res res}))))
+                (let [res-map (read-string res)]
+                  (if (map? res-map)
+                    res-map
+                  (throw (ex-info "Did not produce a map." {:res-map res-map})))))
               (catch Throwable e
                 (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
          (throw (ex-info "OPENAI_API_KEY environment variable value not found." {}))))))
