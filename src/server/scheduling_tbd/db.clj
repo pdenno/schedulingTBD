@@ -49,17 +49,18 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a name for conversation about this task; unique to the project."}
    :task-t/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a description of this this task; unique to the project."}
    :task-t/pre-task
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "a task/name identifying a task that must occur before this task "}
-   :task-t/resource
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+   :task-t/resource-type
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "a keyword naming a resource (type or instance) used in this task"}
    :task-t/duration-est
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "a reference to a duration (dur) object"}
+
    :task-t/uri
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
@@ -119,9 +120,9 @@
    :work/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword naming something to be accomplished."}
-   :work/optative-sentence
+   :work/objective-sentence
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a keyword naming something to be accomplished."}})
+        :doc "The sentence from user description best describing the scheduling objective."}})
 
 
 (defn datahike-schema

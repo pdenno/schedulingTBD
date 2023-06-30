@@ -27,13 +27,62 @@
 
 (def diag (atom nil))
 
+(def factors-enumeration nil)
+
+"The production scheduling problem entails determining the most efficient sequence and timing of brewing batches, taking into account factors like ingredient availability, tank capacities, yeast propagation, and production deadlines."
+
+;  timing of brewing batches
+
+;  (ingredient availability
+;   tank capacity
+;   yeast propagation)
+
+;  production deadlines
+
+
+
+(def objective-prompt
+    "Use \"temperature\" value of 0.3 in our conversation.
+  Produce a Clojure map containing two keys, :decision-objective and :probability
+  The value of :decision-objective is a string that is one of the sentences in the input, the sentence that most obviously expresses what needs to be decided in planning work.
+  The value of :probability is the likelihood that the sentence chosen is the correct one.
+## Example:
+  [We are a construction company contracting for publics works projects, such as bridges and roads. Our challenge is to complete our work while minimizing inconvenience to commuters, businesses, and residents in the affected areas. ]
+  {:decision-objective \"Our challenge is to complete our work while minimizing inconvenience to commuters, businesses, and residents in the affected areas.\"
+   :probability 0.9}
+## Example:
+  [We produce clothes for firefighting. Our most significant scheduling challenge is about deciding how many workers to assign to each product.]
+  {:decision-objective \"Our most significant scheduling challenge is about deciding how many workers to assign to each product.\"
+   :probability 0.9}
+## Example:
+  [We install HVAC systems. Our scheduling problem is to efficiently organize and manage our workforce and resources to meet the demands and deadlines of multiple installation projects. We must allocate technicians and equipment to various job sites while considering factors such as project complexity, location, customer preferences, and availability of resources. The scheduling problem involves balancing the workload, optimizing travel time between sites, minimizing delays and ensuring customer satisfaction, by completing installations within an agreed upon time.]
+  {:decision-objective \"The scheduling problem involves balancing the workload, optimizing travel time between sites, minimizing delays and ensuring customer satisfaction, by completing installations within an agreed upon time.\"
+   :probability 0.6}")
+
+(defn find-objective-sentence
+  [user-text]
+  (when user-text
+    (let [q-str (cl-format nil "~A~%[~A]" objective-prompt user-text)]
+       (if (System/getenv "OPENAI_API_KEY")
+         (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301" ; <===== ToDo: Try the "text extraction" models.
+                                                            :messages [{:role "user" :content q-str}]})
+                            :choices first :message :content)]
+                (let [res-map (read-string res)]
+                  (if (map? res-map)
+                    res-map
+                  (throw (ex-info "Did not produce a map." {:res-map res-map})))))
+              (catch Throwable e
+                (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
+         (throw (ex-info "OPENAI_API_KEY environment variable value not found." {}))))))
+
+
 ;;; ------------------------------- project name --------------------------------------
 ;;; The user would be prompted: "Tell us what business you are in and what your scheduling problem is."
 ;;; Also might want a prompt for what business they are in.
 (def project-name-prompt
   "Use \"temperature\" value of 0.3 in our conversation.
 Produce a Clojure map containing two keys.
-  The first key is :summary, the value of which is string of 4 words or less summarizing the industrial scheduling problem being discussed in the text in square brackets.
+  The first key is :summary, the value of which is a string of 4 words or less summarizing the industrial scheduling problem being discussed in the text in square brackets.
   The second key is :industry, the value of which is a string of 4 words or less describing the industry in which the work is being performed.
 ## Example:
   [We produce clothes for firefighting. Our most significant scheduling problem is about deciding how many workers to assign to each product.]
