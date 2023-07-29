@@ -6,6 +6,7 @@
            com.wsscode/pathom3                 {:mvn/version "2023.01.31-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
            funcool/promesa                     {:mvn/version "11.0.671"}
+           io.djy/ezzmq                        {:mvn/version "0.8.2"}
            io.replikativ/datahike              {:mvn/version "0.6.1538"}
            mount/mount                         {:mvn/version "0.1.17"}
            net.clojars.wkok/openai-clojure     {:mvn/version "0.6.0"}

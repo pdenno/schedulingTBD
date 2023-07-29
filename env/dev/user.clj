@@ -11,6 +11,7 @@
    [mount.core :as mount]
    [lambdaisland.classpath.watch-deps :as watch-deps]      ;; hot loading for deps
    [scheduling-tbd.core :refer [server]] ; for mount
+   [scheduling-tbd.planner :refer [plan-server]]
    [scheduling-tbd.web.handler]          ; for mount, defines rm.server.config/config, and router stuff.
    [taoensso.timbre :as log]))
 

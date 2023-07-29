@@ -39,15 +39,13 @@
 
 ;  production deadlines
 
-
-
 (def objective-prompt
     "Use \"temperature\" value of 0.3 in our conversation.
   Produce a Clojure map containing two keys, :decision-objective and :probability
   The value of :decision-objective is a string that is one of the sentences in the input, the sentence that most obviously expresses what needs to be decided in planning work.
   The value of :probability is the likelihood that the sentence chosen is the correct one.
 ## Example:
-  [We are a construction company contracting for publics works projects, such as bridges and roads. Our challenge is to complete our work while minimizing inconvenience to commuters, businesses, and residents in the affected areas. ]
+  [We are a construction company contracting for publics works projects, such as bridges and roads. Our challenge is to complete our work while minimizing inconvenience to commuters, businesses, and residents in the affected areas.]
   {:decision-objective \"Our challenge is to complete our work while minimizing inconvenience to commuters, businesses, and residents in the affected areas.\"
    :probability 0.9}
 ## Example:
@@ -74,6 +72,33 @@
               (catch Throwable e
                 (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
          (throw (ex-info "OPENAI_API_KEY environment variable value not found." {}))))))
+
+
+(def project-name-prompt
+  "Use \"temperature\" value of 0.3 in our conversation.
+Produce a Clojure map containing two keys.
+  The first key is :summary, the value of which is a string of 4 words
+  or less summarizing the industrial scheduling problem being discussed
+  in the text in square brackets. The second key is :industry, the value
+  of which is a string of 4 words or less describing the industry in which
+  the work is being performed.
+## Example:
+  [We produce clothes for firefighting. Our most significant scheduling
+   problem is about deciding how many workers to assign to each product.]
+  {:summary \"scheduling firefighter clothes production\"
+   :industry \"apparel manufacturing\"}
+## Example:
+  [We do road construction and repaving. We find coping with our limited
+   resources(trucks, workers etc) a challenge.]
+  {:summary \"scheduling road construction\"
+   :industry \"road construction and repair\"
+## Example:
+  [Acme Machining is a job shop producing mostly injection molds. We want
+   to keep our most important customers happy, but we also want to be
+   responsive to new customers.
+  {:summary \"Acme job shop scheduling\"
+   :industry \"job shop machining\"}")
+
 
 
 ;;; ------------------------------- project name --------------------------------------
