@@ -55,8 +55,10 @@
         result))))
 
 (defn init-planner []
+  (log/info "Starting planner.")
   (future (clojure.java.shell/sh cmd-line))
   (Thread/sleep 2000)
+  (log/info "Testing planner.")
   (test-planner!))
 
 (defstate plan-server
