@@ -7,7 +7,11 @@
 
 ;;; ($get [["schema/name" "urn:oagis-10.8.4:Nouns:Invoice"],  ["schema-object"]])
 (def rm-examples
-  [{:name "Craft Brewing"
+  [{:name "Start a new project!"
+    :data "Hi! Describe a scheduling challenge in a few sentences and we'll get started!"
+    :code "% This is where we will define the MiniZinc for your problem."}
+
+   {:name "Craft Brewing"
     :code "int : nProducts = 5;
 set of int: Product = 1..nProducts;
 set of int: Day = -36..365;

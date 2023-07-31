@@ -1,15 +1,15 @@
 (ns scheduling-tbd.planner
+  "Start and stop the SHOP3 planner."
   (:require
-   [clojure.string :as str]
-   [clojure.java.shell :only [sh]]
+   [clojure.java.shell :refer [sh]]
    [ezzmq.core :as zmq]
    [mount.core :as mount :refer [defstate]]
    [taoensso.timbre :as log]))
 
 (def planner-endpoint "tcp://*:31726")
-(def cmd-line "./resources/start-planner.sh")
 
-(def starting-example
+(def shop2-example
+  "This is an example from usage from the SHOP2 documentation."
   {:domain
    "(defdomain basic-example (
      (:operator (!pickup ?a) () () ((have ?a)))
@@ -23,9 +23,9 @@
    "(defproblem problem1 basic-example
       ((have banjo)) ((swap banjo kiwi)))"
    :find-plans
-   "(find-plans 'problem1 :verbose :plans)"})
-
-(def diag (atom nil))
+   "(find-plans 'problem1 :verbose :plans)"
+   :answer
+   ["(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))"]})
 
 (defn quit-planner!
   "Quit the planner. It can be restarted with a shell command through mount."
@@ -45,21 +45,28 @@
   []
   (zmq/with-new-context
     (let [socket (zmq/socket :req {:connect planner-endpoint})]
-      (zmq/send-msg socket (:domain starting-example))
-      (log/info "Planner:" (zmq/receive-msg socket {:stringify true}))
-      (zmq/send-msg socket (:problem starting-example))
-      (log/info "Planner:" (zmq/receive-msg socket {:stringify true}))
-      (zmq/send-msg socket (:find-plans starting-example))
+      (zmq/send-msg socket (:domain shop2-example))
+      (zmq/receive-msg socket {:stringify true})
+      (zmq/send-msg socket (:problem shop2-example))
+      (zmq/receive-msg socket {:stringify true})
+      (zmq/send-msg socket (:find-plans shop2-example))
       (let [result (zmq/receive-msg socket {:stringify true})]
-        (log/info "Planner:" result)
-        result))))
+        (if (= (:answer shop2-example) result)
+          (do (log/info "Planner passes test.") :passes)
+          (do (log/error "Planner fails test.") :fails-test))))))
 
 (defn init-planner []
-  (log/info "Starting planner.")
-  (future (clojure.java.shell/sh cmd-line))
-  (Thread/sleep 2000)
-  (log/info "Testing planner.")
-  (test-planner!))
+  (if-let [planner-path (-> (System/getenv) (get "PLANNER_SBCL"))] ; ToDo: maybe use system.edn instead.
+    (do (log/info "Starting planner.")
+        (future (sh "/usr/bin/sbcl"
+                    "--core"
+                    (str "./" planner-path)
+                    "--non-interactive"
+                    "--disable-debugger"))
+        (Thread/sleep 2000)
+        (test-planner!))
+    (do (log/error "PLANNER_SBCL environment var not set.")
+        :fails-env)))
 
 (defstate plan-server
   :start (init-planner)

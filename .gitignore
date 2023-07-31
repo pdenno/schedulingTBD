@@ -1,4 +1,5 @@
 *~
+pzmq-shop3*
 pom.xml
 pom.xml.asc
 *.jar
@@ -25,4 +26,3 @@ node_modules/
 .shadow-cljs/
 node_modules/
 resources/public/js/
-
