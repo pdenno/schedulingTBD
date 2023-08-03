@@ -9,10 +9,11 @@
    ["@mui/material/CssBaseline$default" :as CssBaseline]
    ["@mui/material/LinearProgress$default" :as LinearProgress]
    ["@mui/material/Stack$default" :as Stack]
-   ["@mui/material/styles" :as styles]
+   ["@mui/material/styles" :as styles] ; See it used here: https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
    ["@mui/material/Typography$default" :as Typography]
    [promesa.core :as p]
    [stbd-app.util :as util]
+   [stbd-app.components.chat :as chat :refer [Chat]]
    [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text SelectExample]]
    [stbd-app.components.examples :as examples :refer [rm-examples]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
@@ -156,63 +157,36 @@
     (+ @progress-atm 2)))
 
 (defnc Top [{:keys [rm-example width height]}]
-  (let [[result set-result] (hooks/use-state "Ctrl-Enter above to execute.")
-        [progress set-progress] (hooks/use-state 0)
-        [progressing? set-progressing] (hooks/use-state false)
-        banner-height 42
+  (let [banner-height 42
         useful-height (- height banner-height)
-        data-editor-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
-        code-editor-height   (int (* useful-height 0.5))    ; <================================== Ignored?
-        result-editor-height (int (* useful-height 0.5))]   ; <================================== Ignored?
-    (hooks/use-effect [result] (set-editor-text "result" result))
+        chat-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
+        code-editor-height   (int (* useful-height 0.5))]    ; <================================== Ignored?
     ;; setInterval runs its argument function again and again at the argument time interval (milliseconds).
     ;; setInterval returns a handle that can be used by clearInterval to stop the running.
-    (hooks/use-effect [progressing?]
-          (reset! progress-atm 0)
-          (reset! progress-handle
-                  (js/window.setInterval
-                   (fn []
-                     (let [percent (compute-progress)]
-                       (if (or (>= progress 100) (not progressing?))
-                         (do (set-progress 0) (js/window.clearInterval @progress-handle))
-                         (set-progress (reset! progress-atm percent)))))
-                   200)))
     (hooks/use-effect :once ; Need to set :max-height of resizable editors after everything is created.
-      (editor/resize-finish "code-editor" nil code-editor-height)
-      (editor/resize-finish "data-editor" nil data-editor-height)
-      (editor/resize-finish "result" nil result-editor-height))
+      (editor/resize-finish "code-editor" nil code-editor-height))
     ($ Stack {:direction "column" :height useful-height}
        ($ Typography
           {:variant "h4"
            :color "white"
            :backgroundColor "primary.main"
-           :padding "2px 0 2px 20px"
+           :padding "2px 2px 2px 20px"
            :noWrap false
            :height banner-height}
           ($ Stack {:direction "row"}
              "schedulingTBD"
-             ($ Box {:minWidth (- width 320)}) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
-             ($ ButtonGroup
-                ($ SaveModal {:code-fn #(get-user-code)
-                              :data-fn #(get-user-data)}))))
+             ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
        ($ ShareLeftRight
-          {:left  ($ Stack {:direction "column" :spacing "10px"}
+          {:left  ($ Stack {:direction "column"}
                      ($ SelectExample {:init-example (:name rm-example)})
-                     ($ Editor {:name "data-editor"
-                                :height data-editor-height ; Select example is about height of banner.
-                                :text (:data rm-example) }))
+                     ;; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist
+                     ($ chat/Chat :height chat-height))
            :right ($ ShareUpDown
                      {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
                       :up ($ Editor {:name "code-editor"
                                      :height code-editor-height
-                                     :text (:code rm-example)
-                                     :ext-adds #js [(add-result-action {:on-result set-result
-                                                                        :progress-bool set-progressing})]})
-                      :dn ($ Stack {:direction "column"}
-                             ($ LinearProgress {:variant "determinate" :value progress})
-                             ($ Editor {:name "result"
-                                        :height result-editor-height
-                                        :text result}))
+                                     :text (:code rm-example)})
+                      :dn ($ Box)
                       :share-fns (:right-share top-share-fns)})
            :share-fns (:left-share top-share-fns)
            :lf-pct 0.50 ; <=================================

@@ -1,7 +1,7 @@
 (ns scheduling-tbd.util
   "Do lowest level configuration (logging, etc.)."
   (:require
-   [datahike.pull-api            :as dp]
+   #?(:clj [datahike.pull-api            :as dp])
    [mount.core :as mount :refer [defstate]]
    [taoensso.timbre :as log]))
 
@@ -35,6 +35,7 @@
 ;;;    (Yet it does work in clj!) I suppose reading xml isn't something I need in cljs, but it would be
 ;;;    nice to know what is going on here.
 ;;; ToDo: Get some more types in here, and in implementation generally.
+#?(:clj
 (defn db-type-of
   "Return a Datahike schema :db/valueType object for the argument"
   [obj]
@@ -42,15 +43,17 @@
         (number? obj)  :db.type/number
         (keyword? obj) :db.type/keyword
         (map? obj)     :db.type/ref
-        (boolean? obj) :db.type/boolean))
+        (boolean? obj) :db.type/boolean)))
 
 ;;; This seems to cause problems in recursive resolution. (See resolve-db-id)"
+#?(:clj
 (defn db-ref?
   "It looks to me that a datahike ref is a map with exactly one key: :db/id."
   [obj]
-  (and (map? obj) (= [:db/id] (keys obj))))
+  (and (map? obj) (= [:db/id] (keys obj)))))
 
 ;;; {:db/id 3779}
+#?(:clj
 (defn resolve-db-id
   "Return the form resolved, removing properties in filter-set,
    a set of db attribute keys, for example, #{:db/id}."
@@ -67,7 +70,27 @@
                (set? obj)    (set (mapv resolve-aux obj))
                (coll? obj)        (map  resolve-aux obj)
                :else  obj))]
-     (resolve-aux form))))
+     (resolve-aux form)))))
+
+(def max-duration
+  "This is used in places where doing set-clock might not make sense."
+  30000)
+
+(def timeout-info "Used for calls to cljs-ajax and progress bar."
+  (atom {:valid? false :max-millis max-duration :start-time nil :timeout-at nil}))
+
+(defn invalidate-timeout-info
+  []
+  (swap! timeout-info #(assoc % :valid? false)))
+
+(defn start-clock
+  "Set the timeout-info object and return the argument."
+  ([] (start-clock max-duration))
+  ([max-millis]
+   (swap! timeout-info
+          #(let [now #?(:clj (inst-ms (java.util.Date.)) :cljs (.getTime (js/Date.)))]
+             (assoc % :valid? true :max-millis max-millis :start-time now :timeout-at (+ now max-millis))))
+   max-millis))
 
 (defn init-util []
   (config-log :info))

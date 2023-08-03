@@ -50,7 +50,7 @@
                        :exec-fn cognitect.test-runner.api/test
                        :exec-args {:patterns [".*-test.*"]}}
 
-           :app       {:extra-paths ["src/app" "test"]
+           :app       {:extra-paths ["src/app" "src/server" "test"] ; src/server has shared util.cljc
                        :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.23.3"}
                                      lilactown/helix                {:mvn/version "0.1.10"}
                                      cljs-ajax/cljs-ajax            {:mvn/version "0.8.4"}
