@@ -19,16 +19,16 @@
     (log/set-config!
      (-> log/*config*
          (assoc :output-fn #'custom-output-fn)
-         (assoc :min-level [[#{"STBD-DEFAULT" "scheduling-tbd.*" "stdb-app.*" "user"} min-level]
+         (assoc :min-level [[#{"STBD-DEFAULT" "scheduling-tbd.*" "stbd-app.*" "user"} min-level]
                             [#{"datahike.*"} :error]
                             [#{"*"} :error]])))
      (log/error "Invalid timbre reporting level:" min-level)))
 
 (defn default-min-log-level
   "Get the value of 'RM-DEFAULT' in (:min-level log/*config*), it designates
-   the logging level for namespaces of scheduling-tbd stdb-app, and user."
+   the logging level for namespaces of scheduling-tbd stbd-app, and user."
   []
-  (->> log/*config* :min-level (some #(when (contains? (first %) "STDB-DEFAULT") (second %)))))
+  (->> log/*config* :min-level (some #(when (contains? (first %) "STBD-DEFAULT") (second %)))))
 
 ;;; ToDo:
 ;;;  - cljs complains about not finding x/element-nss, which I don't see in the  0.2.0-alpha8 source at all.

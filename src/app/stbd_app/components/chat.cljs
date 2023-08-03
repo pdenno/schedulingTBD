@@ -2,7 +2,7 @@
   "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
    [ajax.core :refer [GET POST]]
-   ;;[applied-science.js-interop :as j]
+   [applied-science.js-interop :as j]
    [helix.core :refer [defnc $]]
    [helix.hooks :as hooks]
    ;;[stbd-app.util :as util]
@@ -14,6 +14,7 @@
    ["@mui/material/Stack$default" :as Stack]
    ["react-chat-elements/dist/main"    :as rce]
    [scheduling-tbd.util :as sutil :refer [timeout-info #_invalidate-timeout-info]]
+   [stbd-app.util :as util]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
 (def diag (atom nil))
@@ -40,8 +41,17 @@
 (def white-style (clj->js {:color "background.paper"}))
 (def blue-style (clj->js {:color "primary"}))
 
+(defn register
+  [name elem]
+  (swap! util/component-refs #(assoc % name elem))
+  elem)
+
 (defnc Chat [{:keys [height]}]
-  (let [[progress set-progress] (hooks/use-state 0)
+  (let [[msg-list set-msg-list] (hooks/use-state (clj->js [{:type "text"
+                                                            :text "Describe your scheduling problem in a few sentences."
+                                                            :title "TBD"
+                                                            :titleColor "Red"}]))
+        [progress set-progress] (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)]
     (hooks/use-effect [progressing?]
       (log/info "In use-effect: progressing? = " progressing?)
@@ -54,12 +64,14 @@
                      (do (set-progress 0) (js/window.clearInterval @progress-handle))
                      (set-progress (reset! progress-atm percent)))))
                200)))
+    (hooks/use-effect [msg-list]
+        (log/info "In use-effect: msg-list = " msg-list))
     (letfn [(send-success [{:keys [save-id]}]
               (log/info "Saved user input:" save-id))
             (send-failure [status status-text]
                 (log/error "Saving example failed: status = " status " status text = " status-text))
             (handle-send []
-              (POST "/api/user-says"
+              #_(POST "/api/user-says"
                     {:params {:user-text "hello"} ; <====================================
                      :timeout 3000
                      :handler       send-success
@@ -72,28 +84,44 @@
                                :flexGrow 1
                                :maxHeight 300 ; (- height 100)
                                :flexDirection "column"})}
-            ($ rce/MessageList {#_#_:toBottomHeight 300
-                                :dataSource (clj->js [{:type "text" :text "hello!" :title "TBD" :titleColor "Red"} ; Default is :position "left"
-                                                      {:position "right" :type "text" :text "hello, TBD!"  :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:position "right" :type "text" :text "more text..." :title "You" :titleColor "Green"}
-                                                      {:type "SystemMessage" :text "End of conversation, 2023-08-01"}])}))
+             ($ rce/MessageList {:dataSource msg-list}))
          ($ LinearProgress {:variant "determinate" :value progress})
          ($ Stack {:direction "row" :spacing "0px"} ; ToDo: Maybe look into prop :rightButtons. Didn't work first time.
-            ($ rce/Input {:placeholder "Type here..."
-                          :style {:min-width "400px"}
-                          :multiline true})
-            ($ IconButton {:onClick handle-send}
-               ($ Box {:sx (clj->js {:background "primary"})}
-                  ($ Send  #_{:sx white-style}))))))))
+            ($ rce/Input {:placeholder "Type here..." :multiline true})
+            ($ IconButton {:onClick #(do
+                                       (log/info "In click: msg-list = " msg-list)
+                                       (set-msg-list (-> msg-list
+                                                         js->clj
+                                                         (conj {:type "text" :text "more!" :title "You" :color "Green" :position "right"})
+                                                         clj->js)))}
+               ($ Send  #_{:sx white-style})))))))
+
+
+(defn get-children
+  "Return a vector of the children of an HTMLCollection."
+  [obj]
+  (when (= "HTMLCollection" (j/get-in obj [:constructor :name]))  ;; HANDY! Get the string naming the type.
+    (let [res (atom [])]
+      (doseq [ix (range (j/get obj :length))]
+        (swap! res conj (j/get obj ix)))
+      @res)))
+
+(defn find-elem
+  "Search the DOM for a node passing the argument test."
+  [node test]
+  (let [found? (atom false)
+        cnt (atom 0)]
+    (letfn [(fe [obj]
+              (swap! cnt inc)
+              (let [typ (j/get-in obj [:constructor :name])
+                    chiln?  (j/get obj :children)]
+                (log/info "typ = " typ " obj = " obj)
+                (cond @found?                  found?
+                      (> @cnt 50)              :failure
+                      (test obj)               (reset! found? obj)
+                      (vector? obj)            (map fe obj)
+                      (nil? obj)               found?
+                      chiln?                   (fe chiln?)
+                      (= "HTMLCollection" typ) (->> obj get-children fe))))]
+      (fe node)
+      @found?)))

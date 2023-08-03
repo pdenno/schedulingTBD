@@ -12,6 +12,7 @@
    ["@mui/material/styles" :as styles] ; See it used here: https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
    ["@mui/material/Typography$default" :as Typography]
    [promesa.core :as p]
+   [scheduling-tbd.util :as sutil]
    [stbd-app.util :as util]
    [stbd-app.components.chat :as chat :refer [Chat]]
    [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text SelectExample]]
@@ -228,7 +229,7 @@
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
 
 (defn ^{:after-load true, :dev/after-load true} mount-root []
-  (util/config-log :info)
+  (sutil/config-log :info)
   (log/info "Logging level for the client:"
             (->> log/*config*
                  :min-level
