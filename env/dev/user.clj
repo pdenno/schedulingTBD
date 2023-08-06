@@ -46,4 +46,5 @@
   to recompile, and then use `start` once things are good."
   []
   (stop)
+  (java.lang.Thread/sleep 2000) ; Planner needs this.
   (tools-ns/refresh :after 'user/start))

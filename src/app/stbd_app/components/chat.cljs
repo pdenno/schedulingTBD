@@ -3,14 +3,16 @@
   (:require
    [ajax.core :refer [GET POST]]
    [applied-science.js-interop :as j]
-   [helix.core :refer [defnc $]]
-   [helix.hooks :as hooks]
+   [helix.core                 :refer [defnc $]]
+   [helix.hooks                :as hooks]
+   [promesa.core               :as p]
    ;;[stbd-app.util :as util]
    ["@mui/icons-material/Send$default" :as Send]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/Button$default" :as Button]
    ["@mui/material/IconButton$default" :as IconButton]
    ["@mui/material/LinearProgress$default" :as LinearProgress]
+   ["@mui/material/Link$default" :as Link]
    ["@mui/material/Stack$default" :as Stack]
    ["react-chat-elements/dist/main"    :as rce]
    [scheduling-tbd.util :as sutil :refer [timeout-info #_invalidate-timeout-info]]
@@ -46,9 +48,18 @@
   (swap! util/component-refs #(assoc % name elem))
   elem)
 
+(defn add-msg [msg-list msg]
+  (-> msg-list
+      js->clj
+      (conj msg)
+      clj->js))
+
 (defnc Chat [{:keys [height]}]
   (let [[msg-list set-msg-list] (hooks/use-state (clj->js [{:type "text"
-                                                            :text "Describe your scheduling problem in a few sentences."
+                                                            :text (clj->js ["Describe your scheduling problem in a few sentences or "
+                                                                            ($ Link {:key 1 :href "http://localhost:3300/learn-more"}
+                                                                               "learn more about how this works")
+                                                                            "."])
                                                             :title "TBD"
                                                             :titleColor "Red"}]))
         [progress set-progress] (hooks/use-state 0)
@@ -66,42 +77,39 @@
                      (do (set-progress 0) (js/window.clearInterval @progress-handle))
                      (set-progress (reset! progress-atm percent)))))
                200)))
-    (letfn [(send-success [{:keys [save-id]}]
-              (log/info "send-msg responds with:" save-id))
-            (send-failure [status status-text]
-                (log/error "Saving example failed: status = " status " status text = " status-text))
-            (send-msg [user-text]
-              (POST "/api/user-says"
-                    {:params {:user-text user-text}
-                     :timeout 30000
-                     :handler       send-success
-                     :error-handler send-failure}))]
-      (log/info "chat height = " height)
-      ;(reset! diag {:height height})
-      ($ Stack {:direction "column" :spacing "0px"}
-         ($ Box {:sx (clj->js {:overflowY "auto" ; :sx was :style
-                               :display "flex"
-                               :flexGrow 1
-                               :maxHeight 300 ; (- height 100)
-                               :flexDirection "column"})}
-             ($ rce/MessageList {:dataSource msg-list}))
-         ($ LinearProgress {:variant "determinate" :value progress})
-         ($ Stack {:direction "row" :spacing "0px"}
-            ($ rce/Input {:referance input-ref ; <==== Yes, rilly!  Also, need a way to clear this after Send (there was code for clear)
-                          :value user-text
-                          :placeholder "Type here..."
-                          :multiline true})
-            ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
-                                       (when-let [user-text (not-empty (j/get iref :value))]
-                                         (set-msg-list
-                                          (-> msg-list
-                                              js->clj
-                                              (conj {:type "text" :text user-text :title "You" :color "Green" :position "right"})
-                                              clj->js))
-                                         (send-msg user-text)
-                                         (j/assoc! iref :value "")))}
-
-               ($ Send)))))))
+    (hooks/use-effect [user-text]
+       (when (not-empty user-text)
+         (let [prom (p/deferred)]
+           (POST "/api/user-says"
+                 {:params {:user-text user-text}
+                  :timeout 30000
+                  :handler (fn [resp] (p/resolve! prom resp))
+                  :error-handler (fn [{:keys [status status-text]}]
+                                   (p/reject! prom (ex-info "CLJS-AJAX error on /api/user-says" {:status status :status-text status-text})))})
+           (-> prom
+               (p/then #(set-msg-list (add-msg msg-list {:type "text" :text (:msg %) :title "TDB" :titleColor "Red"})))
+               (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %)))))))
+    ;;(log/info "chat height = " height)
+    ;;(reset! diag {:height height})
+    ($ Stack {:direction "column" :spacing "0px"}
+       ($ Box {:sx (clj->js {:overflowY "auto" ; :sx was :style
+                             :display "flex"
+                             :flexGrow 1
+                             :maxHeight 300 ; (- height 100)
+                             :flexDirection "column"})}
+          ($ rce/MessageList {:dataSource msg-list}))
+       ($ LinearProgress {:variant "determinate" :value progress})
+       ($ Stack {:direction "row" :spacing "0px"}
+          ($ rce/Input {:referance input-ref ; <==== Yes, rilly!  Also, need a way to clear this after Send (there was code for clear)
+                        :value user-text
+                        :placeholder "Type here..."
+                        :multiline true})
+          ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
+                                     (when-let [user-text (not-empty (j/get iref :value))]
+                                       (set-msg-list (add-msg msg-list  {:type "text" :text user-text :title "You" :color "Green" :position "right"}))
+                                       (j/assoc! iref :value "")
+                                       (set-user-text user-text)))}
+             ($ Send))))))
 
 
 (defn get-children

@@ -23,7 +23,7 @@
    [reitit.http.interceptors.multipart :as multipart]
    [reitit.http.interceptors.dev :as dev] ; for testing
    [reitit.http.spec :as spec]
-   [scheduling-tbd.web.controllers.scheduling-tbd :as stbd]
+   [scheduling-tbd.web.controllers.respond :as resp]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
    [spec-tools.spell :as spell]
@@ -44,6 +44,15 @@
   (render request "home.html" {:errors (:errors flash)}))
 ;;;====================================================
 
+(s/def ::user-says-request (st/spec {:spec (s/keys :req-un [::user-text])
+                                     :name "text"
+                                     :description "The text of the user's message."
+                                     :json-schema/default ""}))
+(s/def ::msg-id int?)
+(s/def ::msg string?)
+
+(s/def ::user-says-response (s/keys :req-un [::msg-id ::msg])) ; This was a problem with $llmExtract?
+
 (def routes
   [["/app" {:get {:summary "Ignore this swagger entry. I will get rid of it someday."
                               :handler home}}]
@@ -54,12 +63,18 @@
             :handler (swagger/create-swagger-handler)}}]
 
    ["/api"
-     {:swagger {:tags ["RADmapper functions"]}}
+    {:swagger {:tags ["RADmapper functions"]}}
+
+    ["/user-says"
+     {:post {:summary "Respond to the user's most recent message."
+             :parameters {:body ::user-says-request}
+             :responses {200 {:body ::user-says-response}}
+             :handler resp/respond}}]
 
     ["/health"
      {:get {:summary "Check server health"
             :responses {200 {:body {:time string? :up-since string?}}}
-            :handler stbd/healthcheck}}]]])
+            :handler resp/healthcheck}}]]])
 
 (def options
   {;:reitit.interceptor/transform dev/print-context-diffs ;; pretty context diffs
