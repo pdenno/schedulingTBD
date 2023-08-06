@@ -19,7 +19,10 @@
         :doc "a string naming a subdirectory containing a project."}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string, same as the :project/name in the project's DB.."}})
+        :doc "a string, same as the :project/name in the project's DB.."}
+   :system/current-project
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
+        :doc "a keyword naming the current project; set by user using UI."}})
 
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
@@ -142,10 +145,6 @@
 ;;; It is set by alter-var-root code in this namespace."
 (defonce sys-db-cfg (atom nil))
 
-;;; Atom for the configuration map used for connecting to the project db.
-;;; It is set by alter-var-root code in this namespace."
-(defonce current-proj-cfg (atom nil))
-
 (defn create-sys-db!
   "Create the system database."
   []
@@ -155,7 +154,16 @@
     (let [conn (d/connect @sys-db-cfg)]
       (d/transact conn db-schema-sys)
       (log/info "Created system schema" conn)
+      (d/transact conn [{:system/current-project :system/undefined-project}])
       conn)))
+
+;;; Atom for the configuration map used for connecting to the project db.
+(defonce proj-base-cfg (atom nil))
+
+(defn current-proj
+  "Get the current project from the system database."
+  []
+  (d/q '[find ?proj :where [_ :system/current-project ?proj]]))
 
 (defn connect-sys
   "Set the var rad-mapper.db-util/conn by doing a d/connect.
@@ -169,23 +177,22 @@
   "Set the var rad-mapper.db-util/conn by doing a d/connect.
    Return a connection atom."
   []
-  (if (d/database-exists? @current-proj-cfg)
-    (d/connect @current-proj-cfg)
+  (if (d/database-exists? @proj-base-cfg)
+    (d/connect @proj-base-cfg)
     (log/warn "There is no DB to connect to.")))
 
 (s/def ::project-db (s/keys :req [:project/name]))
 (defn create-proj-db!
   "Create a project database for the argument project."
-  [trans-map]
+  [{:project/keys [name id] :as trans-map}]
   (if (s/valid? ::project-db trans-map)
-     (let [id (-> trans-map :project/name (str/replace #"\s+" "-") keyword)
-           new-proj-data (-> trans-map (assoc :project/id id) vector)
-           dir (str (-> @current-proj-cfg :store :path-base) (name id))]
+     (let [new-proj-data (-> trans-map (assoc :project/id id) vector)
+           dir (str (-> @proj-base-cfg :store :path-base) (name id))]
        (.mkdir (java.io.File. dir))
-       (swap! current-proj-cfg #(assoc-in % [:store :path] dir))
        ;; ToDo: :project/id is unique. Don't wipe out an existing project. User could be starting over. Maybe add a number.
-       (when (d/database-exists? @current-proj-cfg) (d/delete-database @current-proj-cfg))
-       (d/create-database @current-proj-cfg)
+       (let [db-cfg (assoc @proj-base-cfg :path dir)]
+         (d/create-database db-cfg)
+         (sutil/register-db id db-cfg))
        (let [conn (connect-proj)]
          (d/transact conn db-schema-proj)
          (d/transact conn {:tx-data new-proj-data})
@@ -197,21 +204,22 @@
      (throw (ex-info "Project database must provide :proj/name" {:trans-map trans-map}))))
 
 (defn init-db-cfgs
-  "Set sys-db-cfg atoms for system db and the template for the current-proj-cfg (:path-base).
+  "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
    Recreate the system database if sys-db-cfg.rebuild-db? = true."
   []
   (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB"))
-                     (throw (ex-info (str "Set the environment variable RM_MESSAGING to the directory containing RADmapper databases."
-                                          "\nCreate a directory 'saved-code' under it.") {})))]
-    (reset! current-proj-cfg {:store {:backend :file :path-base (str base-dir "/projects/")}
-                              :schema-flexibility :write})
+                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
+                                          "\nCreate directories 'projects' and 'system' under it.") {})))]
+    (reset! proj-base-cfg {:store {:backend :file :path-base (str base-dir "/projects/")}
+                           :schema-flexibility :write})
 
     (reset! sys-db-cfg {:store {:backend :file :path (str base-dir "/system")}
-                         :rebuild-db? true ; <==================
+                        :rebuild-db? true ; <==================
                         :schema-flexibility :write})
     (when (-> sys-db-cfg deref :rebuild-db?) (create-sys-db!))
     {:sys-cfg @sys-db-cfg
-     :current-proj-cfg @current-proj-cfg}))
+     :proj-base @proj-base-cfg}))
+
 
 (defstate database-cfgs
   :start (init-db-cfgs))

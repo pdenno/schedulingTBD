@@ -8,6 +8,7 @@
    [scheduling-tbd.web.handler :refer [app]]             ; for mount
    [scheduling-tbd.util :refer [util-state]]             ; for mount
    [scheduling-tbd.db   :refer [database-cfgs]]          ; for mount
+   [scheduling-tbd.paillier :refer [api-key]]            ; for mount
    [scheduling-tbd.planner :refer [plan-server]]         ; for mount
    [ring.adapter.jetty :as jetty]
    [taoensso.timbre :as log])

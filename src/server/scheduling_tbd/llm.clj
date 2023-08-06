@@ -16,6 +16,7 @@
    [datahike.pull-api            :as dp]
    [muuntaja.core                :as m]
    [wkok.openai-clojure.api      :as openai]
+   [scheduling-tbd.sutil         :refer [connect-atm get-api-key]]
    [cemerick.url                    :as url]
    [camel-snake-kebab.core          :as csk]
    [clojure.spec.alpha              :as s]
@@ -61,18 +62,18 @@
   [user-text]
   (when user-text
     (let [q-str (cl-format nil "~A~%[~A]" objective-prompt user-text)]
-       (if (System/getenv "OPENAI_API_KEY")
+      (if-let [key (get-api-key :llm)]
          (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301" ; <===== ToDo: Try the "text extraction" models.
-                                                            :messages [{:role "user" :content q-str}]})
-                            :choices first :message :content)]
-                (let [res-map (read-string res)]
-                  (if (map? res-map)
-                    res-map
-                  (throw (ex-info "Did not produce a map." {:res-map res-map})))))
+                                                            :messages [{:role "user" :content q-str}]}
+                                                           {:api-key key})
+                            :choices first :message :content)
+                    res-map (read-string res)]
+                (if (map? res-map)
+                  res-map
+                  (throw (ex-info "Did not produce a map." {:res-map res-map}))))
               (catch Throwable e
                 (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
-         (throw (ex-info "OPENAI_API_KEY environment variable value not found." {}))))))
-
+         (throw (ex-info "No key for use of LLM API found." {}))))))
 
 (def project-name-prompt
   "Use \"temperature\" value of 0.3 in our conversation.
@@ -127,18 +128,18 @@ Produce a Clojure map containing two keys.
   [user-text]
   (when user-text
     (let [q-str (cl-format nil "~A~%[~A]" project-name-prompt user-text)]
-       (if (System/getenv "OPENAI_API_KEY")
-         (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301" ; <===== ToDo: Try the "text extraction" models.
-                                                            :messages [{:role "user" :content q-str}]})
-                            :choices first :message :content)]
-                (let [res-map (read-string res)]
-                  (if (map? res-map)
-                    res-map
-                  (throw (ex-info "Did not produce a map." {:res-map res-map})))))
-              (catch Throwable e
-                (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
-         (throw (ex-info "OPENAI_API_KEY environment variable value not found." {}))))))
-
+      (if-let [key (get-api-key :llm)]
+        (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301"
+                                                           :messages [{:role "user" :content q-str}]}
+                                                          {:api-key key})
+                           :choices first :message :content)
+                   res-map (read-string res)]
+               (if (map? res-map)
+                 res-map
+                 (throw (ex-info "Did not produce a map." {:res-map res-map}))))
+             (catch Throwable e
+               (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
+        (throw (ex-info "No key for use of LLM API found." {}))))))
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-camel-prompt
@@ -171,19 +172,19 @@ The argument map has the following keys:
   [{:keys [purpose string-type capitalize? max-size] :or {max-size 12}}]
   (when purpose
     (let [q-str (cl-format nil "~A~%{:purpose ~S :max-size ~S}" good-camel-prompt purpose max-size)]
-       (if (System/getenv "OPENAI_API_KEY")
-         (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301" ; <===== ToDo: Try the "text extraction" models.
-                                                            :messages [{:role "user" :content q-str}]})
-                            :choices first :message :content)]
-                (-> res read-string)
-                (if-let [var-name (-> res :name string?)]
-                  (cond-> var-name
-                    (= :kebab-case string-type) (csk/->kebab-case-string)
-                    (= :snake-case string-type) (csk/->snake_case_string)
-                    capitalize?                 (str/capitalize))
-                  (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))
-              (catch Throwable e
-                (throw (ex-info "OpenAI API call failed."
-                                {:message (.getMessage e)
-                                 #_#_:details (-> e .getData :body json/read-str)}))))
-         (throw (ex-info "OPENAI_API_KEY environment variable value not found." {}))))))
+      (if-let [key (get-api-key :llm)]
+        (try (let [res (-> (openai/create-chat-completion {:model "gpt-3.5-turbo-0301" ; <===== ToDo: Try the "text extraction" models.
+                                                           :messages [{:role "user" :content q-str}]})
+                           :choices first :message :content)]
+               (-> res read-string)
+               (if-let [var-name (-> res :name string?)]
+                 (cond-> var-name
+                   (= :kebab-case string-type) (csk/->kebab-case-string)
+                   (= :snake-case string-type) (csk/->snake_case_string)
+                   capitalize?                 (str/capitalize))
+                 (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))
+             (catch Throwable e
+               (throw (ex-info "OpenAI API call failed."
+                               {:message (.getMessage e)
+                                #_#_:details (-> e .getData :body json/read-str)}))))
+        (throw (ex-info "No key for use of LLM API found." {}))))))

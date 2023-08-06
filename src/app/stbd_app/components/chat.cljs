@@ -54,6 +54,9 @@
       (conj msg)
       clj->js))
 
+(def craft-brewing-description
+  "In medium-scale craft beer brewing, a significant challenge arises in the form of production scheduling. Craft breweries often produce a diverse range of beer styles with varying ingredients, fermentation times, and packaging requirements. Coordinating the brewing process to meet customer demands while optimizing resources can be complex. The production scheduling problem entails determining the most efficient sequence and timing of brewing batches, taking into account factors like ingredient availability, tank capacities, yeast propagation, and production deadlines. Balancing these variables is crucial to ensure optimal utilization of equipment, minimize idle time, reduce inventory holding costs, and meet customer expectations. Effective production scheduling plays a vital role in maintaining consistent beer quality, managing production costs, and maximizing overall brewery efficiency.")
+
 (defnc Chat [{:keys [height]}]
   (let [[msg-list set-msg-list] (hooks/use-state (clj->js [{:type "text"
                                                             :text (clj->js ["Describe your scheduling problem in a few sentences or "
@@ -106,9 +109,10 @@
                         :multiline true})
           ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
                                      (when-let [user-text (not-empty (j/get iref :value))]
-                                       (set-msg-list (add-msg msg-list  {:type "text" :text user-text :title "You" :color "Green" :position "right"}))
+                                       (set-msg-list (add-msg msg-list  {:type "text" :text #_user-text craft-brewing-description
+                                                                         :title "You" :color "Green" :position "right"}))
                                        (j/assoc! iref :value "")
-                                       (set-user-text user-text)))}
+                                       (set-user-text #_user-text craft-brewing-description)))}
              ($ Send))))))
 
 
