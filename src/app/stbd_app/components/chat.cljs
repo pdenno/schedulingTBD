@@ -52,7 +52,9 @@
                                                             :title "TBD"
                                                             :titleColor "Red"}]))
         [progress set-progress] (hooks/use-state 0)
-        [progressing? _set-progressing] (hooks/use-state false)]
+        [progressing? _set-progressing] (hooks/use-state false)
+        [user-text set-user-text] (hooks/use-state "")
+        input-ref (hooks/use-ref nil)]
     (hooks/use-effect [progressing?]
       (log/info "In use-effect: progressing? = " progressing?)
       (reset! progress-atm 0)
@@ -64,20 +66,18 @@
                      (do (set-progress 0) (js/window.clearInterval @progress-handle))
                      (set-progress (reset! progress-atm percent)))))
                200)))
-    (hooks/use-effect [msg-list]
-        (log/info "In use-effect: msg-list = " msg-list))
     (letfn [(send-success [{:keys [save-id]}]
-              (log/info "Saved user input:" save-id))
+              (log/info "send-msg responds with:" save-id))
             (send-failure [status status-text]
                 (log/error "Saving example failed: status = " status " status text = " status-text))
-            (handle-send []
-              #_(POST "/api/user-says"
-                    {:params {:user-text "hello"} ; <====================================
-                     :timeout 3000
+            (send-msg [user-text]
+              (POST "/api/user-says"
+                    {:params {:user-text user-text}
+                     :timeout 30000
                      :handler       send-success
                      :error-handler send-failure}))]
       (log/info "chat height = " height)
-      (reset! diag {:height height})
+      ;(reset! diag {:height height})
       ($ Stack {:direction "column" :spacing "0px"}
          ($ Box {:sx (clj->js {:overflowY "auto" ; :sx was :style
                                :display "flex"
@@ -86,15 +86,22 @@
                                :flexDirection "column"})}
              ($ rce/MessageList {:dataSource msg-list}))
          ($ LinearProgress {:variant "determinate" :value progress})
-         ($ Stack {:direction "row" :spacing "0px"} ; ToDo: Maybe look into prop :rightButtons. Didn't work first time.
-            ($ rce/Input {:placeholder "Type here..." :multiline true})
-            ($ IconButton {:onClick #(do
-                                       (log/info "In click: msg-list = " msg-list)
-                                       (set-msg-list (-> msg-list
-                                                         js->clj
-                                                         (conj {:type "text" :text "more!" :title "You" :color "Green" :position "right"})
-                                                         clj->js)))}
-               ($ Send  #_{:sx white-style})))))))
+         ($ Stack {:direction "row" :spacing "0px"}
+            ($ rce/Input {:referance input-ref ; <==== Yes, rilly!  Also, need a way to clear this after Send (there was code for clear)
+                          :value user-text
+                          :placeholder "Type here..."
+                          :multiline true})
+            ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
+                                       (when-let [user-text (not-empty (j/get iref :value))]
+                                         (set-msg-list
+                                          (-> msg-list
+                                              js->clj
+                                              (conj {:type "text" :text user-text :title "You" :color "Green" :position "right"})
+                                              clj->js))
+                                         (send-msg user-text)
+                                         (j/assoc! iref :value "")))}
+
+               ($ Send)))))))
 
 
 (defn get-children

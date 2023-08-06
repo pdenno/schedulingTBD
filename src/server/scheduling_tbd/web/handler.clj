@@ -41,12 +41,11 @@
       (content-type "text/html; charset=utf-8")))
 
 (defn home [{:keys [flash] :as request}]
-  (log/info "Request for home.html")
   (render request "home.html" {:errors (:errors flash)}))
 ;;;====================================================
 
 (def routes
-  [["/app" {:get {:summary "Ignore this swagger entry. I get rid of this soon."
+  [["/app" {:get {:summary "Ignore this swagger entry. I will get rid of it someday."
                               :handler home}}]
    ["/swagger.json"
      {:get {:no-doc true
