@@ -44,14 +44,17 @@
   (render request "home.html" {:errors (:errors flash)}))
 ;;;====================================================
 
+(s/def ::user-text string?)
 (s/def ::user-says-request (st/spec {:spec (s/keys :req-un [::user-text])
                                      :name "text"
                                      :description "The text of the user's message."
                                      :json-schema/default ""}))
 (s/def ::msg-id int?)
 (s/def ::msg string?)
+(s/def ::user-says-response (s/keys :req-un [::msg-id ::msg]))
 
-(s/def ::user-says-response (s/keys :req-un [::msg-id ::msg])) ; This was a problem with $llmExtract?
+;;; You can choose not to define specs for the keys.
+(s/def ::list-projects-response (s/keys :req-un [::projects ::current-project]))
 
 (def routes
   [["/app" {:get {:summary "Ignore this swagger entry. I will get rid of it someday."
@@ -65,11 +68,16 @@
    ["/api"
     {:swagger {:tags ["RADmapper functions"]}}
 
-    ["/user-says"
+   ["/user-says"
      {:post {:summary "Respond to the user's most recent message."
              :parameters {:body ::user-says-request}
              :responses {200 {:body ::user-says-response}}
              :handler resp/respond}}]
+
+    ["/list-projects"
+     {:get {:summary "Respond to the user's most recent message."
+            :responses {200 {:body ::list-projects-response}}
+            :handler resp/list-projects}}]
 
     ["/health"
      {:get {:summary "Check server health"

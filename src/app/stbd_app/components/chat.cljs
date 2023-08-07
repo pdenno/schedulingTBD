@@ -55,7 +55,9 @@
       clj->js))
 
 (def craft-brewing-description
-  "In medium-scale craft beer brewing, a significant challenge arises in the form of production scheduling. Craft breweries often produce a diverse range of beer styles with varying ingredients, fermentation times, and packaging requirements. Coordinating the brewing process to meet customer demands while optimizing resources can be complex. The production scheduling problem entails determining the most efficient sequence and timing of brewing batches, taking into account factors like ingredient availability, tank capacities, yeast propagation, and production deadlines. Balancing these variables is crucial to ensure optimal utilization of equipment, minimize idle time, reduce inventory holding costs, and meet customer expectations. Effective production scheduling plays a vital role in maintaining consistent beer quality, managing production costs, and maximizing overall brewery efficiency.")
+  "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.
+   We run several products simultaneously and simply would like to be able to have the beer bottled and ready
+   to ship as near as possible to the dates defined in our sales plan.")
 
 (defnc Chat [{:keys [height]}]
   (let [[msg-list set-msg-list] (hooks/use-state (clj->js [{:type "text"

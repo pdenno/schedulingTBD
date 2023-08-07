@@ -1,2 +1,2 @@
-((nil . ((cider-clojure-cli-global-options . "-A:dev")
+((nil . ((cider-clojure-cli-parameters . "-A:dev")
 	 (cider-default-cljs-repl . shadow))))

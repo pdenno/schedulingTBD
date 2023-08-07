@@ -15,8 +15,8 @@
    [scheduling-tbd.util :as sutil]
    [stbd-app.util :as util]
    [stbd-app.components.chat :as chat :refer [Chat]]
-   [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text SelectExample]]
-   [stbd-app.components.examples :as examples :refer [rm-examples]]
+   [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
+   [stbd-app.components.project :refer [SelectProject list-projects]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.components.save-modal :refer [SaveModal]]
    [helix.core :as helix :refer [defnc $ <>]]
@@ -32,6 +32,8 @@
   "The thing that can be called by js/window.clearInterval to stop incrementing progress under js/window.setInterval."
   (atom nil))
 (def progress-atm "Percent allowed duration for eval-cell. 100% is a timeout." (atom 0))
+
+(def projects-info "A map containing list of projects and the current-project." (atom nil))
 
 (def diag (atom {}))
 
@@ -157,7 +159,7 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
-(defnc Top [{:keys [rm-example width height]}]
+(defnc Top [{:keys [width height]}]
   (let [banner-height 42
         useful-height (- height banner-height)
         chat-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
@@ -179,14 +181,13 @@
              ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"}
-                     ($ SelectExample {:init-example (:name rm-example)})
+                     ($ SelectProject {:projects-info @projects-info})
                      ;; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist
                      ($ chat/Chat :height chat-height))
            :right ($ ShareUpDown
                      {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
                       :up ($ Editor {:name "code-editor"
-                                     :height code-editor-height
-                                     :text (:code rm-example)})
+                                     :height code-editor-height})
                       :dn ($ Box)
                       :share-fns (:right-share top-share-fns)})
            :share-fns (:left-share top-share-fns)
@@ -223,8 +224,7 @@
        ($ styles/ThemeProvider
           {:theme exerciser-theme}
           ($ Top {:width  (:width  @carry-dims-atm)
-                  :height (:height @carry-dims-atm)
-                  :rm-example (get rm-examples 0)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
+                  :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
 
@@ -235,7 +235,9 @@
                  :min-level
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
-  (.render root ($ app)))
+  (-> (list-projects)
+      (p/then #(reset! projects-info %))
+      (p/then (fn [_] (.render root ($ app))))))
 
 (defn ^:export init []
   (mount-root))

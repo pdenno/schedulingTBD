@@ -13,7 +13,6 @@
    ["@mui/material/MenuItem$default" :as MenuItem]
    ["@mui/material/Select$default" :as Select]
    [stbd-app.util :as util]
-   [stbd-app.components.examples :as examples :refer [rm-examples get-example]]
    [stbd-app.components.share :as share]
    [helix.core :as helix :refer [defnc $]]
    [helix.hooks :as hooks]
@@ -80,25 +79,6 @@
   (if-let [s (j/get-in (get-in @util/component-refs [editor-name :view]) [:state :doc])]
     (.toString s)
     ""))
-
-(defnc SelectExample
-  [{:keys [init-example]}]
-  (let [[example set-example] (hooks/use-state init-example)]
-    ($ FormControl {:size "small" ; small makes a tiny difference
-                    :sx {:height "25%"
-                         :maxHeight "25%"}}
-       ($ Select {:variant "filled"
-                  :sx {:style {:height "20px"}}
-                  :value example
-                  :onChange (fn [_e v]
-                              (let [ex-name (j/get-in v [:props :value])
-                                    example (get-example ex-name)]
-                                (set-example ex-name)
-                                (set-editor-text "result" "Ctrl-Enter above to execute.")
-                                (set-editor-text "code-editor" (:code example))
-                                (set-editor-text "data-editor" (:data example))))}
-          (for [ex rm-examples]
-            ($ MenuItem {:key (:name ex) :value (:name ex)} (:name ex)))))))
 
 (defn resize
   "Set dimension of the EditorView for share."
