@@ -4,10 +4,18 @@
    [clojure.java.shell :refer [sh]]
    [ezzmq.core :as zmq]
    [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.db :as db]
    [taoensso.timbre :as log]))
 
 (def planner-endpoint "tcp://*:31726")
 
+;;; ========================== Composing a planning domain  ==================
+
+;;; ========================== Composing a planning problem  ==================
+(
+
+
+;;; ========================== Starting, stopping, and testing ==================
 (def shop2-example
   "This is an example from usage from the SHOP2 documentation."
   {:domain

@@ -16,7 +16,7 @@
    [stbd-app.util :as util]
    [stbd-app.components.chat :as chat :refer [Chat]]
    [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
-   [stbd-app.components.project :refer [SelectProject list-projects]]
+   [stbd-app.components.project :refer [SelectProject initial-projects projects-info]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.components.save-modal :refer [SaveModal]]
    [helix.core :as helix :refer [defnc $ <>]]
@@ -32,8 +32,6 @@
   "The thing that can be called by js/window.clearInterval to stop incrementing progress under js/window.setInterval."
   (atom nil))
 (def progress-atm "Percent allowed duration for eval-cell. 100% is a timeout." (atom 0))
-
-(def projects-info "A map containing list of projects and the current-project." (atom nil))
 
 (def diag (atom {}))
 
@@ -159,7 +157,7 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
-(defnc Top [{:keys [width height]}]
+(defnc Top [{:keys [width height initial-prompt]}]
   (let [banner-height 42
         useful-height (- height banner-height)
         chat-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
@@ -181,9 +179,9 @@
              ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"}
-                     ($ SelectProject {:projects-info @projects-info})
+                     ($ SelectProject {:projs-map @projects-info})
                      ;; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist
-                     ($ chat/Chat :height chat-height))
+                     ($ chat/Chat {:height chat-height :initial-prompt initial-prompt}))
            :right ($ ShareUpDown
                      {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
                       :up ($ Editor {:name "code-editor"
@@ -194,7 +192,7 @@
            :lf-pct 0.50 ; <=================================
            :init-width width}))))
 
-(defnc app []
+(defnc app [{:keys [initial-prompt]}]
   {:helix/features {:check-invalid-hooks-usage true}}
   (let  [[width  set-width]  (hooks/use-state (j/get js/window :innerWidth))
          [height set-height] (hooks/use-state (j/get js/window :innerHeight))
@@ -223,7 +221,8 @@
        (CssBaseline {:children #js []}) ; https://v4.mui.com/components/css-baseline/
        ($ styles/ThemeProvider
           {:theme exerciser-theme}
-          ($ Top {:width  (:width  @carry-dims-atm)
+          ($ Top {:initial-prompt initial-prompt
+                  :width  (:width  @carry-dims-atm)
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
@@ -235,9 +234,9 @@
                  :min-level
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
-  (-> (list-projects)
-      (p/then #(reset! projects-info %))
-      (p/then (fn [_] (.render root ($ app))))))
+  (-> (initial-projects)
+      (p/then (fn [info] (reset! projects-info (update info :projects #(-> % sort (conj "Start a new project") vec)))))
+      (p/then (fn [info] (.render root ($ app {:initial-prompt (:initial-prompt info)}))))))
 
 (defn ^:export init []
   (mount-root))

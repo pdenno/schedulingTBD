@@ -120,7 +120,7 @@ Produce a Clojure map containing two keys.
    :industry \"road construction and repair\"
 ## Example:
   [Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.
-  {:summary \"Acme job shop scheduling\"
+  {:summary \"job shop scheduling\"
    :industry \"job shop machining\"}")
 
 (defn project-name
@@ -140,6 +140,12 @@ Produce a Clojure map containing two keys.
              (catch Throwable e
                (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
         (throw (ex-info "No key for use of LLM API found." {}))))))
+
+#_(defn project-name
+  "Return a Clojure map {:summary <some-string>} where <some-string> is a short string summarizing text using 'project-name-prompt'."
+  [_user-text]
+  {:summary "Amtrak no WiFi"
+   :industry "Beer production"})
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-camel-prompt

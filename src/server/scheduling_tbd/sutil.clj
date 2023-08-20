@@ -13,6 +13,7 @@
 (defn register-db
   "Add a DB configuration."
   [k config]
+  (log/info "Registering DB" k "config =" config)
   (swap! databases-atm #(assoc % k config)))
 
 (defn connect-atm

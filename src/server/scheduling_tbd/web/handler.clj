@@ -49,12 +49,13 @@
                                      :name "text"
                                      :description "The text of the user's message."
                                      :json-schema/default ""}))
-(s/def ::msg-id int?)
-(s/def ::msg string?)
-(s/def ::user-says-response (s/keys :req-un [::msg-id ::msg]))
+
+(s/def ::user-says-response (s/keys :req [:message/id :message/text :message/from]))
 
 ;;; You can choose not to define specs for the keys.
-(s/def ::list-projects-response (s/keys :req-un [::projects ::current-project]))
+(s/def ::initial-projects-response (s/keys
+                                    :opt-un [::projects ::current-project]
+                                    :req-un [::initial-prompt]))
 
 (def routes
   [["/app" {:get {:summary "Ignore this swagger entry. I will get rid of it someday."
@@ -74,10 +75,10 @@
              :responses {200 {:body ::user-says-response}}
              :handler resp/respond}}]
 
-    ["/list-projects"
+    ["/initial-projects"
      {:get {:summary "Respond to the user's most recent message."
-            :responses {200 {:body ::list-projects-response}}
-            :handler resp/list-projects}}]
+            :responses {200 {:body ::initial-projects-response}}
+            :handler resp/initial-projects}}]
 
     ["/health"
      {:get {:summary "Check server health"
