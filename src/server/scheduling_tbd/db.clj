@@ -1,5 +1,5 @@
 (ns scheduling-tbd.db
-  "Database schema, serialization, and connection implementation."
+  "System and project database schemas and database initialization."
   (:require
    [clojure.core :as c]
    [clojure.instant]
@@ -8,307 +8,15 @@
    [datahike.api                 :as d]
    [datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.shop :as shop :refer [db-schema-shop2+]]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm]]
    [taoensso.timbre :as log])
   (:import
    java.time.LocalDateTime))
 
-;;; ToDo: Factor SHOP2 stuff to its own
-;;; ToDo: Next line makes a choice that has global consequences, so maybe wrap the SHOP translation code in something that toggles this.
-(s/check-asserts true)
-
-(defn is-var?
-  "Return true if the argument is a symbol beginning with ?"
-  [x]
-  (and (symbol? x)
-       (= \? (-> x name first))))
-
-;;; ======================= SHOP2 Grammar ================================================================
-;(s/def ::list-term (s/and seq? #(every? (fn [t] (s/valid? ::term t)) %))) ; I don't allow :list, it is never used.
-
-;(s/def ::atom (s/or :simple-atom   #(s/valid? ::simple-atom %) ; ToDo: Don't need s/valid? here?
-;                    :negated-atom  #(s/valid? ::negated-atom %)))
-
-(s/def ::atom (s/and seq? #(-> % first symbol?) #(-> % first is-var? not) #(every? is-var? (rest %))))
-
-(s/def ::negated-atom (s/and seq? #(= (first %) 'not) #(s/valid? ::simple-atom (second %))))
-
-(s/def ::immediate-atom (s/and seq? #(and (= :immediate (first %)) ; I'm not allowing :task
-                                          (s/valid? ::simple-atom (rest %)))))
-
-(s/def ::task-atom (s/or :simple    ::atom
-                         :immediate ::immediate-atom))
-
-(defn lisp-fn? ; ToDo maybe a call to ask-lisp.
-  "Returns true if the argument is bound to a function in lisp."
-  [x] ('#{+ - / * > < <= >= = max min} x))
-(s/def ::fn-symbol lisp-fn?)
-
-(s/def ::term
-  (s/or :var     is-var?
-        :symbol  symbol?
-        :number  number?
-        :list-term ::conjunct))
-
-(s/def ::extended-term
-  (s/or :term ::term
-        :eval-term ::eval-term
-        :call-term ::call-term))
-
-(s/def ::eval-term
-  (s/and seq?
-         #(= (first %) 'eval)
-         #(s/valid? ::lisp-exp (second %))))
-
-(s/def ::call-term
-  (s/and seq?
-         #(= (nth % 0) 'call)
-         #(s/valid? ::fn-symbol (nth % 1))
-         #(every? (fn [t] (s/valid? ::extended-term t)) (-> % rest rest))))
-
-(s/def ::var-list (s/and seq? #(every? is-var? %)))
-
-(s/def ::s-term (s/or :atomic #(or (number? %) (symbol? %) (string? %))
-                      :exp    ::s-exp))
-
-(s/def ::s-exp (s/and seq?
-                      #(-> % (nth 0) symbol?)
-                      #(every? (fn [t] (s/valid? ::s-term t)) (rest %))))
-
-(s/def ::logical-exp
-  (s/or :atom           ::atom
-        :immediate-atom ::immediate-atom
-        :conjunct       ::conjunct
-        :disjunct       ::disjunct
-        :negation       ::negation
-        :implication    ::implication
-        :universal      ::universal
-        :assignment     ::assignment
-        :eval           ::eval
-        :call           ::call
-        :enforce        ::enforce
-        :setof          ::setof))
-
-(s/def ::conjunct    (s/and seq? #(every? (fn [l] (s/valid? ::logical-exp l)) %))) ; I'm prohibiting use of optional 'list'.
-
-(s/def ::disjunct    (s/and seq? #(= (nth % 0) 'or)  #(every? (fn [l] (s/valid? ::logical-exp l)) (rest %))))
-
-(s/def ::negation    (s/and seq? #(= (nth % 0) 'not) #(s/valid? ::logical-exp (second %))))
-
-(s/def ::implication (s/and seq?
-                            #(= (nth % 0) 'imply)
-                            #(s/valid? ::logical-exp (nth % 1))
-                            #(s/valid? ::logical-exp (nth % 2))))
-
-(s/def ::universal (s/and seq?
-                          #(= (nth % 0) 'forall)
-                          #(s/valid? ::var-list (nth % 1))
-                          #(s/valid? ::logical-exp (nth % 2))
-                          #(s/valid? ::logical-exp (nth % 3))))
-
-(s/def ::assignment (s/and seq?
-                           #(= (nth % 0) 'assign)
-                           #(is-var? (nth % 1))
-                           #(s/valid? ::s-exp (nth % 2))))
-
-(s/def ::eval ::eval-term) ; Same syntax but should evaluate to true or false.
-
-(s/def ::call ::call-term) ; Same syntax but should evaluate to true or false.
-
-(s/def ::enforce (s/and seq?
-                        #(= (nth % 0) 'enforce)
-                        #(s/valid? ::simple-atom (nth % 1)) ; I think.
-                        #(every? (fn [t] (s/valid? ::s-exp t)) (-> % rest rest))))
-
-(s/def ::setof  (s/and seq?
-                       #(= (nth % 0) 'setof)
-                       #(is-var? (nth % 1))
-                       #(s/valid? ::s-exp (nth % 2)) ; ToDo: Not clear that this should be an ::s-exp.
-                       #(is-var? (nth % 3))))
-
-;------ toplevel forms ----
-(s/def ::method (s/and seq?
-                       #(= (nth % 0) :method)
-                       #(s/valid? ::simple-atom (nth % 1))
-                       #(s/valid? ::precond-clause (nth % 2))
-                       #(s/valid? ::subtask-clause (nth % 3))))
-
-(s/def ::precond-clause (s/and seq? #(every? (fn [t] (s/valid? ::logical-exp t)) %)))
-
-(s/def ::unordered-subtask-clause (s/and #(= :unordered (nth % 0))
-                                         #(every? (fn [t] (s/valid? ::task-atom t)) (rest %))))
-
-(s/def ::ordered-subtask-clause   (s/or :explicit (s/and #(= :ordered (nth % 0))
-                                                         #(every? (fn [t] (s/valid? ::task-atom t)) (rest %)))
-                                        :implict #(every? (fn [t] (s/valid? ::task-atom t)) %)))
-
-(s/def ::subtask-clause (s/and seq? (s/or :unordered ::unordered-subtask-clause
-                                          :ordered   ::ordered-subtask-clause)))
-
-(s/def ::axiom (s/and seq?
-                       #(= (nth % 0) :-)
-                       #(s/valid? ::simple-atom (nth % 1))
-                       #(every? (fn [e] (s/valid? ::axiom-clause e)) (-> % rest rest))))
-
-(s/def ::unnamed-axiom-clause (s/and seq? #(s/valid? ::logical-exp %)))
-
-(s/def ::named-axiom-clause   (s/and seq?
-                                     #(symbol? (nth % 0))
-                                     #(s/valid? ::logical-exp (nth % 1))))
-
-(s/def ::axiom-clause (s/or :unnamed-axiom-clause ::unnamed-axiom-clause
-                            :named-axiom-clause   ::named-axiom-clause))
-
-
-
-;;;----------------------------------------------------------------------------------------------
-(def sample-method
-  '(:method
-    (transport-person ?p ?c2) ; head
-    ((at ?p ?c1)  ; precondition
-     (aircraft ?a)
-     (at ?a ?c3)
-     (different ?c1 ?c3))
-    ((move-aircraft ?a ?c1) ; subtasks
-     (board ?p ?a ?c1)
-     (move-aircraft ?a ?c2)
-     (debark ?p ?a ?c2))))
-
-(def big-method
-  '(:method (transport-person ?p ?c2)
-            (:sort-by ?cost < ((at ?p ?c1)
-                               (aircraft ?a)
-                               (at ?a ?c3)
-                               (different ?c1 ?c3)
-                               (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
-                               (imply ((different ?c3 ?c1)) (not (possible-person-in ?c3)))
-                               (travel-cost-info ?a ?c3 ?c1 ?cost ?style)))
-
-            ((!!assert ((dest ?a ?c1)))
-             (:immediate upper-move-aircraft ?a ?c1 ?style)
-             (:immediate board ?p ?a ?c1)
-             (!!assert ((dest ?a ?c2)))
-             (:immediate upper-move-aircraft-no-style ?a ?c2)
-             (:immediate debark ?p ?a ?c2))))
-;;;== end trash -------------------------------------------------------------
-(defn exp2db-dispatch [exp & [tag]]
-  (cond tag                             tag
-        (s/valid? ::atom exp)           :atom
-        (s/valid? ::task-atom exp)      :task-atom
-        (s/valid? ::conjunct exp)       :conjunct
-        (s/valid? ::method exp)         :method
-        (s/valid? ::axiom exp)          :axiom
-        ;(s/valid? ::operator exp)      :operator   ; NYI
-        (s/valid? ::negated-atom exp)   :negated-atom
-        (s/valid? ::disjunct exp)       :disjunct
-        (s/valid? ::implication exp)    :implication
-        (s/valid? ::universal exp)      :universal
-        (s/valid? ::assignment exp)     :assignment
-        (s/valid? ::eval exp)           :eval
-        (s/valid? ::call exp)           :call
-        (s/valid? ::enforce exp)        :enforce
-        (s/valid? ::setof exp)          :setof))
-
-(defmulti exp2db #'exp2db-dispatch)
-
-(defmethod exp2db :atom [exp & _]
-  (let [[pred & vars] exp]
-    (cond-> {}
-      true              (assoc :atom/predicate pred)
-      (not-empty vars)  (assoc :atom/roles (-> (let [cnt (atom 0)]
-                                                 (for [v vars]
-                                                   {:role/var v :role/pos (swap! cnt inc)}))
-                                               vec)))))
-
-(defmethod exp2db :task-atom [exp & _]
-  (if (= :immediate (first exp))
-    (-> (exp2db (rest exp) :atom) (assoc :task/immediate? true))
-    (exp2db exp :atom)))
-
-;;; Only called explicitly, e.g. (mapv #(exp2db % :logical-exp) pre)), not in dispatch table.
-(defmethod exp2db :logical-exp [exp & _]
-  (exp2db exp))
-
-;;; Only called explicitly.
-(defmethod exp2db :tasks [exp & _]
-  (let [tasks (if (-> exp first keyword?) (rest exp) exp)
-        cnt (atom 0)]
-    (for [t tasks]
-      (-> (exp2db t :task-atom)
-          (assoc :task/pos (swap! cnt inc))))))
-
-;;; ToDo: task lists can be nested.
-;;; (exp2db sample-method)
-(defmethod exp2db :method [exp & _]
-  (let [[_met head pre tasks] exp]
-    (cond-> {}
-      true                                         (assoc :method/head (exp2db head :atom))
-      (not-empty pre)                              (assoc :method/preconditions (mapv #(exp2db % :logical-exp) pre)) ; ToDo: should be ordered.
-      (s/valid? ::unordered-subtask-clause tasks)  (assoc :method/tasks-are-unordered? true)
-      (not-empty tasks)                            (assoc :method/task-list (exp2db tasks :tasks)))))
-
-;;; (methods-for 'transport-person)
-(defn methods-for
-  "Retrieve all method forms for the given predicate symbol."
-  [pred-sym]
-  (when-let [meth-ents (not-empty
-                        (d/q '[:find [?e ...]
-                               :in $ ?predicate
-                               :where
-                               [?e :atom/predicate ?predicate]
-                               [_ :method/head ?e]]
-                             @(connect-atm :system) pred-sym))]
-    meth-ents))
-
-(def db-schema-shop2+
-  "Defines schema elements about shop2 constructions.
-   This is combined the project-oriented schema elements to define the schema for the system."
-  {;; ---------------------- atom
-   :atom/negated?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
-        :doc "a string naming the proposition inplied by a atom."}
-   :atom/predicate
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol,
-        :doc "a string naming the proposition inplied by a atom."}
-   :atom/role
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "a string, typically a ?var, naming the proposition inplied by a atom."}
-   :role/pos
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long,
-        :doc "a number used for ordering roles in a predicate."}
-   :role/var
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol,
-        :doc "a number used for ordering roles in a predicate."}
-   ;; ---------------------- method
-   :method/expression
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref,
-           :doc "an s-expression of the precondition consisting of a logical connectives ('and', 'or'), and quantifiers applied to atoms or sub-expressions."}
-   :method/head
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref,
-           :doc "a simple-atom indicating task to be completed."}
-   :method/preconditions
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "atoms indicating what must be true in order to apply the method."}
-   :method/task-list
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "atoms describing a means to achieve the head literal."}
-   :method/tasks-are-unordered?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
-        :doc "when true, indicates that the atoms in task-list can be performed in any order. Ordered is the default."}
-   ;; ---------------------- task
-   :task/pos
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long,
-        :doc "indicates the position of the task atom in its task list."}
-   :task/immediate?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
-        :doc "indicates the position of the task atom in its task list."}
-   :task/atom
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long,
-        :doc "indicates the position of the task atom in its task list."}})
-
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
-     - The project's name and DB directory
+     - The project's name and db directory
      - Planning domains, methods, operators, and axioms"
   {;; ---------------------- project
    :project/id
@@ -333,7 +41,7 @@
 
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
-   To eliminate confusion and need for back pointers, each project has its own db. "
+   To eliminate confusion and need for back pointers, each project has its own db."
   {;; ---------------------- message
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
@@ -389,7 +97,6 @@
    :task-t/duration-est
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "a reference to a duration (dur) object"}
-
    :task-t/uri
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
