@@ -1,10 +1,11 @@
 (ns scheduling-tbd.shop
   "Database storage and serialization of SHOP planning domain content."
   (:require
-   [clojure.spec.alpha           :as s]
-   [datahike.api                 :as d]
+   [clojure.pprint       :refer [cl-format]]
+   [clojure.spec.alpha   :as s]
+   [datahike.api         :as d]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm]]
-   [taoensso.timbre :as log]))
+   [taoensso.timbre      :as log]))
 
 ;;; ToDo: Factor SHOP2 stuff to its own
 ;;; ToDo: Next line makes a choice that has global consequences, so maybe wrap the SHOP translation code in something that toggles this.
@@ -23,17 +24,10 @@
        (= \! (-> x name first))))
 
 ;;; ======================= SHOP2 Grammar ================================================================
-;(s/def ::list-term (s/and seq? #(every? (fn [t] (s/valid? ::term t)) %))) ; I don't allow :list, it is never used.
-
-;(s/def ::atom (s/or :simple-atom   #(s/valid? ::simple-atom %) ; ToDo: Don't need s/valid? here?
-;                    :negated-atom  #(s/valid? ::negated-atom %)))
-
 ;;;------------------ atoms and terms
 (s/def ::atom (s/and seq? #(-> % first symbol?) #(-> % first is-var? not) #(every? is-var? (rest %))))
 
-(s/def ::negated-atom (s/and seq? #(= (first %) 'not) #(s/valid? ::atom (second %))))
-
-(s/def ::immediate-atom (s/and seq? #(and (= :immediate (first %)) ; I'm not allowing :task
+(s/def ::immediate-atom (s/and seq? #(and (= :immediate (first %)) ; I'm not allowing syntax ':task'
                                           (s/valid? ::atom (rest %)))))
 
 (s/def ::task-atom (s/or :simple    ::atom
@@ -102,7 +96,6 @@
 
 (s/def ::s-exp-extended (s/or :s-exp    ::s-exp
                               :fn-name  symbol?))
-
 
 ;;;----------- logical expression
 (s/def ::logical-exp
@@ -194,8 +187,8 @@
                                                          #(every? (fn [t] (s/valid? ::task-atom-extended t)) (rest %)))
                                    :implict #(every? (fn [t] (s/valid? ::task-atom-extended t)) %)))
 
-(s/def ::task-list (s/and seq? (s/or :unordered ::unordered-task-list
-                                     :ordered   ::ordered-task-list)))
+(s/def ::task-list (s/and seq? (s/or :ordered   ::ordered-task-list
+                                     :unordered ::unordered-task-list)))
 
 (s/def ::axiom (s/and seq?
                        #(= (nth % 0) :-)
@@ -211,125 +204,121 @@
 (s/def ::axiom-clause (s/or :unnamed-axiom-clause ::unnamed-axiom-clause
                             :named-axiom-clause   ::named-axiom-clause))
 
-;;;----------------------------------------------------------------------------------------------
-(def sample-method
-  '(:method
-    (transport-person ?p ?c2) ; head
-    ((at ?p ?c1)  ; precondition
-     (aircraft ?a)
-     (at ?a ?c3)
-     (different ?c1 ?c3))
-    ((move-aircraft ?a ?c1) ; subtasks
-     (board ?p ?a ?c1)
-     (move-aircraft ?a ?c2)
-     (debark ?p ?a ?c2))))
+;;;======================================= Rewriting to DB elements
+(def ^:dynamic *debugging?* false)
+(def tags   (atom []))
+(def locals (atom [{}]))
 
-(def big-method
-  '(:method (transport-person ?p ?c2)
-            (:sort-by ?cost < ((at ?p ?c1)
-                               (aircraft ?a)
-                               (at ?a ?c3)
-                               (different ?c1 ?c3)
-                               (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
-                               (imply ((different ?c3 ?c1)) (not (possible-person-in ?c3)))
-                               (travel-cost-info ?a ?c3 ?c1 ?cost ?style)))
+;;; This is simpler than RM's rewrite, which relied on :typ from parse and called 'rewrite-meth' using it.
+;;; This grammar has only a few top-level entry points: defdomain, :method :operator and :axoim.
+(defmacro defrewrite [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  `(defmethod rewrite ~tag [~obj & [~@more-args]]
+     (when *debugging?* (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
+     (swap! tags #(conj % ~tag))
+     (swap! locals #(into [{}] %))
+     (let [res# (do ~@body)
+           result# (if (seq? res#) (doall res#) res#)]
+     (swap! tags   #(-> % rest vec))
+     (swap! locals #(-> % rest vec))
+     (do (when *debugging?*
+           (println (cl-format nil "~A<-- ~A returns ~S" (sutil/nspaces (count @tags)) ~tag result#)))
+         result#))))
 
-            ((!!assert ((dest ?a ?c1)))
-             (:immediate upper-move-aircraft ?a ?c1 ?style)
-             (:immediate board ?p ?a ?c1)
-             (!!assert ((dest ?a ?c2)))
-             (:immediate upper-move-aircraft-no-style ?a ?c2)
-             (:immediate debark ?p ?a ?c2))))
-;;;== end trash -------------------------------------------------------------
-(defn exp2db-dispatch
-  "These are roughly ordered by how often they are encountered in the definition of a planning domain."
-  [exp & [tag]]
-  (cond tag                             tag
-        (s/valid? ::atom exp)           :atom
-        (s/valid? ::task-atom exp)      :task-atom
-        (s/valid? ::conjunct exp)       :conjunct
-        (s/valid? ::method exp)         :method
-        (s/valid? ::axiom exp)          :axiom
-        ;(s/valid? ::operator exp)      :operator   ; NYI
-        (s/valid? ::negated-atom exp)   :negated-atom
-        (s/valid? ::disjunct exp)       :disjunct
-        (s/valid? ::implication exp)    :implication
-        (s/valid? ::universal exp)      :universal
-        (s/valid? ::assignment exp)     :assignment
-        (s/valid? ::eval exp)           :eval
-        (s/valid? ::call exp)           :call
-        (s/valid? ::enforce exp)        :enforce
-        (s/valid? ::setof exp)          :setof
-        :else (log/error "No dispatch value for exp = " exp)))
+(defn rewrite-dispatch
+  "Allow calls of two forms: (rewrite exp) (rewrite exp :some-method-key)."
+  [exp & [specified]]
+  (cond ;; Optional 2nd argument specifies method to call. Order matters!
+    (keyword? specified)            specified,
+    (s/valid? ::method exp)         :method
+    (s/valid? ::axiom exp)          :axiom
+    (s/valid? ::logical-exp exp)    :logical-exp
+    :else (throw (ex-info "No dispatch value for exp" {:exp exp}))))
 
-(defmulti exp2db #'exp2db-dispatch)
+(defmulti rewrite #'rewrite-dispatch)
 
-(defmethod exp2db :atom [exp & _]
-  (let [[pred & vars] exp]
+;;;-------------------------------- Top-level methods
+(defrewrite :method [exp _tag _my-props] ; _tag and _my-props is just to remind me how this works.
+  (s/assert ::method exp)
+  (let [[_met head pre tasks] exp]
     (cond-> {}
-      true              (assoc :atom/predicate pred)
-      (not-empty vars)  (assoc :atom/roles (-> (let [cnt (atom 0)]
-                                                 (for [v vars]
-                                                   {:role/var v :role/pos (swap! cnt inc)}))
-                                               vec)))))
+      true                                         (assoc :method/head (rewrite head :atom))
+      (not-empty pre)                              (assoc :method/preconditions (rewrite pre :preconds)) ; ToDo: should be ordered.
+      (s/valid? ::unordered-task-list tasks)       (assoc :method/tasks-are-unordered? true)
+      (not-empty tasks)                            (assoc :method/task-list (rewrite tasks :task-list)))))
 
-(defmethod exp2db :task-list-elem [exp & _]
+(defrewrite :operator [exp]
+  (s/assert ::operator exp)) ; NYI
+
+(defrewrite :axiom [exp]
+  (s/assert ::aixom exp)) ; NYI
+;;;-------------------------------------
+(defn clear-rewrite!
+  "Trouble just passing tags and locals to rewrite.cljc!"
+  []
+  (reset! tags [:toplevel])
+  (reset! locals [{}]))
+;;; Only called explicitly. Note that the things in the task lists are not all task atoms!
+(defrewrite :task-list [exp]
+  (let [explicit (#{:ordered :unordered} (first exp))
+        tasks (if explicit (rest exp) exp)
+        cnt (atom 0)]
+    (cond-> {:task-list/elems (-> (for [t tasks]
+                                    (-> (rewrite t :task-list-elem)
+                                        (assoc :task/pos (swap! cnt inc))))
+                                  vec)}
+      (= explicit :unordered)  (assoc :task-list/unordered? true))))
+
+(defrewrite :task-list-elem [exp]
   (cond (and (= :immediate (first exp))
-             (s/valid? ::atom (rest exp)))       (-> (exp2db (rest exp) :atom) (assoc :task/immediate? true))
-        (s/valid? ::op-call exp)                 (exp2db exp ::op-call)
-        (s/valid? ::op-call-immediate exp)       (-> (exp2db (rest exp) ::op-call) (assoc :task/immediate? true))
-        :else                                    (exp2db exp :atom)))
+             (s/valid? ::atom (rest exp)))       (-> (rewrite (rest exp) :atom) (assoc :task/immediate? true))
+        (s/valid? ::op-call exp)                 (rewrite exp :op-call)
+        (s/valid? ::op-call-immediate exp)       (-> (rewrite (rest exp) :op-call) (assoc :task/immediate? true))
+        :else                                    (rewrite exp :atom)))
 
-(defmethod exp2db :op-call [exp & _]
+(defrewrite :op-call [exp]
   {:op-call/predicate (first exp)
-   :op-call/args (-> (let [cnt (atom 0)]
-                       (for [arg (rest exp)]
+   :op-call/args (let [cnt (atom 0)]
+                   (-> (for [arg (rest exp)]
                          (if (s/valid? ::atom arg)
-                           (-> (exp2db arg :atom)
+                           (-> (rewrite arg :atom)
                                (assoc :arg/pos (swap! cnt inc)))
                            (-> (:arg/pos (swap! cnt inc)) ; Assumes it is a list of atoms.
                                (assoc :op-call/args (-> (let [ncnt (atom 0)]
                                                           (for [narg arg]
-                                                            (-> (exp2db narg :atom)
+                                                            (-> (rewrite narg :atom)
                                                                 (:arg/pos (swap! ncnt inc)))))
-                                                        vec)))))))})
-
-;;; Only called explicitly, e.g. (mapv #(exp2db % :logical-exp) pre)), not in dispatch table.
-(defmethod exp2db :logical-exp [exp & _]
-  (exp2db exp))
-
-;;; Only called explicitly. Note that the things in the task lists are not all task atoms!
-(defmethod exp2db :task-list [exp & _]
-  (let [explicit (#{:ordered :unordered} (first exp))
-        tasks (if explicit (rest exp) exp)
-        cnt (atom 0)]
-    (cond-> {:method/task-list (for [t tasks]
-                                 (-> (exp2db t :task-list-elem)
-                                     (assoc :task/pos (swap! cnt inc))))}
-      (= explicit :unordered)  (assoc :method/tasks-are-unordered? true))))
+                                                        vec)))))
+                       vec))})
 
 ;;; Only called explicitly.
-(defmethod exp2db :preconds [exp & _]
- (cond (s/valid? ::sort-by-exp exp)          (exp2db exp :sort-by)
-       (s/valid? ::first-satisfier-exp exp)  (exp2db exp :first-satisfier)
+(defrewrite :preconds [exp]
+ (cond (s/valid? ::sort-by-exp exp)          (rewrite exp :sort-by)
+       (s/valid? ::first-satisfier-exp exp)  (rewrite exp :first-satisfier)
        :else                                 (let [cnt (atom 0)] ; Ordinary conjunct of :logical-exp
                                                (for [pc exp]
-                                                 (-> {:precond/exp (exp2db pc :logical-exp)}
+                                                 (-> {:precond/exp (rewrite pc :logical-exp)}
                                                      (assoc :precond/pos (swap! cnt inc)))))))
 
-(defmethod exp2db :sort-by [exp & _]
+(defrewrite :sort-by [exp]
   (if (== 4 (count exp))
     (let [[_ var  fn-def lexp] exp]
       (-> {:sort-by/var var}
-          (assoc :sort-by/fn  (exp2db fn-def :s-exp-extended))
-          (assoc :sort-by/exp (exp2db lexp :logical-exp))))
+          (assoc :sort-by/fn  (rewrite fn-def :s-exp-extended))
+          (assoc :sort-by/exps (mapv #(rewrite % :logical-exp) lexp))))
     (let [[_ var lexp] exp]
       (-> {:sort-by/var var}
-          (assoc :sort-by/fn  {:fn/ref '<})
-          (assoc :sort-by/exp (exp2db lexp :logical-exp))))))
+          (assoc :sort-by/fn {:fn/ref '<})
+          (assoc :sort-by/exps (mapv #(rewrite % :logical-exp) lexp))))))
+
+;;;    (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
+(defrewrite :universal [exp]
+  (let [[_ vars conds consq] exp]
+    (-> {:forall/vars (vec vars)}
+        (assoc :forall/conditions   (mapv #(rewrite % :atom) conds))
+        (assoc :forall/consequences (mapv #(rewrite % :atom) consq)))))
 
 ;;; This currently does not handle quoted things.
-(defmethod exp2db :s-exp-extended [exp & _]
+(defrewrite :s-exp-extended [exp]
   (letfn [(box [v] (cond (number? v)  {:box/num v}
                          (string? v)  {:box/str v}
                          (symbol? v) `{:box/sym '~v}))
@@ -342,18 +331,52 @@
                                                                  {:arg/val (box a) :arg/pos (swap! cnt inc)}))
                                                              vec)))))]
     (if (symbol? exp)
-      `{:s-exp/fn-ref '~exp}
+      {:s-exp/fn-ref exp}
       (seq2sexp exp))))
 
-;;; ToDo: task lists can be nested.
-;;; (exp2db sample-method)
-(defmethod exp2db :method [exp & _]
-  (let [[_met head pre tasks] exp]
+;;;-------------------------------- Logical expressions -------------------
+(defrewrite :logical-exp [exp] ; order matters!
+  (cond (s/valid? ::implication exp)    (rewrite exp :implication)
+        (s/valid? ::negation exp)       (rewrite exp :negation)
+        (s/valid? ::disjunct exp)       (rewrite exp :disjunct)
+        (s/valid? ::universal exp)      (rewrite exp :universal)
+        (s/valid? ::assignment exp)     (rewrite exp :assignment)
+        (s/valid? ::eval exp)           (rewrite exp :eval)
+        (s/valid? ::call exp)           (rewrite exp :call)
+        (s/valid? ::enforce exp)        (rewrite exp :enforce)
+        (s/valid? ::setof exp)          (rewrite exp :setof)
+        (s/valid? ::atom exp)           (rewrite exp :atom) ; I think other kinds of atoms are handled by :task-list-elem
+        (s/valid? ::conjunct exp)       (rewrite exp :conjunct)
+        :else (throw (ex-info "Unknown logical exp:" {:exp exp}))))
+
+(defrewrite :implication [exp]
+  (let [[_ l1 l2] exp]
+       {:exp/condition (rewrite l1 :logical-exp)
+        :exp/implies (rewrite l2 :logical-exp)}))
+
+(defrewrite :negation [exp]
+  (-> (rewrite (nth exp 1) :logical-exp)
+      (assoc :exp/negated? true)))
+
+;;; ToDo: Make the next two ordered
+(defrewrite :conjunct [exp]
+  (let [res (mapv #(rewrite % :logical-exp) exp)]
+    (if (empty? res)
+      {:exp/shop-empty-list? true}
+      {:exp/conjunction-of res})))
+
+(defrewrite :disjunct [exp]
+  (-> {:exp/disjunction-of (mapv #(rewrite % :logical-exp) (rest exp))}))
+
+(defrewrite :atom [exp]
+  (let [[pred & vars] exp]
     (cond-> {}
-      true                                         (assoc :method/head (exp2db head :atom))
-      (not-empty pre)                              (assoc :method/preconditions (exp2db pre :preconds)) ; ToDo: should be ordered.
-      (s/valid? ::unordered-task-list tasks)       (assoc :method/tasks-are-unordered? true)
-      (not-empty tasks)                            (assoc :method/task-list (exp2db tasks :tasks)))))
+      true              (assoc :atom/predicate pred)
+      (not-empty vars)  (assoc :atom/roles (-> (let [cnt (atom 0)]
+                                                 (for [v vars]
+                                                   {:role/var v :role/pos (swap! cnt inc)}))
+                                               vec)))))
+;;;-------------------------------- end of Logical expressions -------------------
 
 ;;; (methods-for 'transport-person)
 (defn methods-for
@@ -372,9 +395,6 @@
   "Defines schema elements about shop2 constructs.
    This is combined with the project-oriented schema elements to define the schema for the system (as opposed to schema for a project)."
   {;; ---------------------- atom
-   :atom/negated?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
-        :doc "a string naming the proposition inplied by a atom."}
    :atom/predicate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol,
         :doc "a string naming the proposition inplied by a atom."}
@@ -392,6 +412,15 @@
    :axiom/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
         :doc "a unique name for the axiom; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
+
+   ;; ---------------------- logical expression
+   :exp/disjunct?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
+        :doc "expression is negated."}
+
+   :exp/negated?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
+        :doc "expression is negated."}
 
    ;; ---------------------- method
    :method/expression

@@ -8,6 +8,38 @@
    [scheduling-tbd.llm  :as llm]
    [scheduling-tbd.util :as util]))
 
+
+
+(def sample-method
+  '(:method
+    (transport-person ?p ?c2) ; head
+    ((at ?p ?c1)  ; precondition
+     (aircraft ?a)
+     (at ?a ?c3)
+     (different ?c1 ?c3))
+    ((move-aircraft ?a ?c1) ; subtasks
+     (board ?p ?a ?c1)
+     (move-aircraft ?a ?c2)
+     (debark ?p ?a ?c2))))
+
+(def big-method
+  '(:method (transport-person ?p ?c2)
+            (:sort-by ?cost < ((at ?p ?c1)
+                               (aircraft ?a)
+                               (at ?a ?c3)
+                               (different ?c1 ?c3)
+                               (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
+                               (imply ((different ?c3 ?c1)) (not (possible-person-in ?c3)))
+                               (travel-cost-info ?a ?c3 ?c1 ?cost ?style)))
+
+            ((!!assert ((dest ?a ?c1)))
+             (:immediate upper-move-aircraft ?a ?c1 ?style)
+             (:immediate board ?p ?a ?c1)
+             (!!assert ((dest ?a ?c2)))
+             (:immediate upper-move-aircraft-no-style ?a ?c2)
+             (:immediate debark ?p ?a ?c2))))
+
+
 ;;; ToDo:  WRONG! Both of them. I don't have time for this now.
 (deftest s-expression2db
   (testing "Testing creating db structures for s-expressions"

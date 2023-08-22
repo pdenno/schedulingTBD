@@ -12,7 +12,6 @@
 ;;; ========================== Composing a planning domain  ==================
 
 ;;; ========================== Composing a planning problem  ==================
-(
 
 
 ;;; ========================== Starting, stopping, and testing ==================

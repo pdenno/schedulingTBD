@@ -64,7 +64,7 @@
   (log/info "Got user-text")
   (let [conn (connect-atm (db/current-project-id))]
 
-  (op-start-project user-text))
+  (op-start-project user-text)))
 
 (defn respond
   "Handler function for http://api/user-says."

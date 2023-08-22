@@ -62,3 +62,8 @@
                (coll? obj)        (map  resolve-aux obj)
                :else  obj))]
      (resolve-aux form))))
+
+(defn nspaces
+  "Return a string of n spaces."
+  [n]
+  (reduce (fn [s _] (str s " ")) "" (range n)))
