@@ -190,24 +190,35 @@
 (s/def ::task-list (s/and seq? (s/or :ordered   ::ordered-task-list
                                      :unordered ::unordered-task-list)))
 
+(s/def ::operator (s/and seq?
+                         #(= (nth % 0) :operator)
+                         #(s/valid? ::atom (nth % 1))
+                         #(s/valid? ::precond-clause (nth % 2))
+                         #(s/valid? ::task-list (nth % 3))))
+
 (s/def ::axiom (s/and seq?
                        #(= (nth % 0) :-)
                        #(s/valid? ::atom (nth % 1))
-                       #(every? (fn [e] (s/valid? ::axiom-clause e)) (-> % rest rest))))
-
-(s/def ::unnamed-axiom-clause (s/and seq? #(s/valid? ::logical-exp %)))
-
-(s/def ::named-axiom-clause   (s/and seq?
-                                     #(symbol? (nth % 0))
-                                     #(s/valid? ::logical-exp (nth % 1))))
-
-(s/def ::axiom-clause (s/or :unnamed-axiom-clause ::unnamed-axiom-clause
-                            :named-axiom-clause   ::named-axiom-clause))
+                       #(loop [still-ok? true
+                               terms (subvec (vec %) 2)]
+                          (cond (empty? terms)  true
+                                (not still-ok?) false
+                                :else            (if (symbol? (first terms))
+                                                   (recur (s/valid? ::logical-exp (nth terms 1))
+                                                          (subvec terms 2))
+                                                   (recur (s/valid? ::logical-exp (nth terms 0))
+                                                          (subvec terms 1)))))))
 
 ;;;======================================= Rewriting to DB elements
 (def ^:dynamic *debugging?* false)
 (def tags   (atom []))
 (def locals (atom [{}]))
+
+(defn clear-rewrite!
+  "Trouble just passing tags and locals to rewrite.cljc!"
+  []
+  (reset! tags [:toplevel])
+  (reset! locals [{}]))
 
 ;;; This is simpler than RM's rewrite, which relied on :typ from parse and called 'rewrite-meth' using it.
 ;;; This grammar has only a few top-level entry points: defdomain, :method :operator and :axoim.
@@ -239,24 +250,49 @@
 ;;;-------------------------------- Top-level methods
 (defrewrite :method [exp _tag _my-props] ; _tag and _my-props is just to remind me how this works.
   (s/assert ::method exp)
+  (clear-rewrite!)
   (let [[_met head pre tasks] exp]
     (cond-> {}
       true                                         (assoc :method/head (rewrite head :atom))
       (not-empty pre)                              (assoc :method/preconditions (rewrite pre :preconds)) ; ToDo: should be ordered.
       (s/valid? ::unordered-task-list tasks)       (assoc :method/tasks-are-unordered? true)
-      (not-empty tasks)                            (assoc :method/task-list (rewrite tasks :task-list)))))
+      (not-empty tasks)                            (assoc :method/tasks (rewrite tasks :task-list)))))
 
 (defrewrite :operator [exp]
-  (s/assert ::operator exp)) ; NYI
+  (s/assert ::operator exp)
+  (clear-rewrite!)
+  (let [[_ head preconds dlist alist & [cost]] exp]
+    (cond-> {:op/head (rewrite head :atom)}
+      true (assoc :op/preconds (rewrite preconds :preconds))
+      true (assoc :op/d-list (mapv #(rewrite % :logical-exp) dlist))
+      true (assoc :op/a-list (mapv #(rewrite % :logical-exp) alist))
+      cost (assoc :op/cost (rewrite cost :s-exp-extended)))))
 
+;;; (:- a [name1] E1 [name2] E2 [name3] E3 ... [namen] En)
 (defrewrite :axiom [exp]
-  (s/assert ::aixom exp)) ; NYI
+  (s/assert ::axiom exp)
+  (clear-rewrite!)
+  (let [[_ head exps] exp]
+    {:axiom/head (rewrite head :atom)
+     :axiom/rhs (loop [exps (vec exps)
+                       pos 1
+                       res []]
+                  (cond (empty? exps)              res
+                        (symbol? (nth exps 0))     (recur
+                                                    (subvec exps 2)
+                                                    (inc pos)
+                                                    (conj res {:axiom/term-name (nth exps 0)
+                                                               :axiom/term-pos pos
+                                                               :axiom/term (rewrite (nth exps 1) :logical-exp)}))
+                        :else                      (recur
+                                                    (subvec exps 1)
+                                                    (inc pos)
+                                                    (conj res {:axiom/term-pos pos
+                                                               :axiom/term (rewrite (nth exps 0) :logical-exp)}))))}))
+
+
+
 ;;;-------------------------------------
-(defn clear-rewrite!
-  "Trouble just passing tags and locals to rewrite.cljc!"
-  []
-  (reset! tags [:toplevel])
-  (reset! locals [{}]))
 ;;; Only called explicitly. Note that the things in the task lists are not all task atoms!
 (defrewrite :task-list [exp]
   (let [explicit (#{:ordered :unordered} (first exp))
@@ -290,14 +326,15 @@
                                                         vec)))))
                        vec))})
 
-;;; Only called explicitly.
+;;; Only called explicitly. Currently used for both methods and operators
 (defrewrite :preconds [exp]
  (cond (s/valid? ::sort-by-exp exp)          (rewrite exp :sort-by)
        (s/valid? ::first-satisfier-exp exp)  (rewrite exp :first-satisfier)
        :else                                 (let [cnt (atom 0)] ; Ordinary conjunct of :logical-exp
-                                               (for [pc exp]
-                                                 (-> {:precond/exp (rewrite pc :logical-exp)}
-                                                     (assoc :precond/pos (swap! cnt inc)))))))
+                                               (-> (for [pc exp]
+                                                     (-> {:precond/exp (rewrite pc :logical-exp)}
+                                                         (assoc :precond/pos (swap! cnt inc))))
+                                                   vec))))
 
 (defrewrite :sort-by [exp]
   (if (== 4 (count exp))
@@ -310,18 +347,11 @@
           (assoc :sort-by/fn {:fn/ref '<})
           (assoc :sort-by/exps (mapv #(rewrite % :logical-exp) lexp))))))
 
-;;;    (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
-(defrewrite :universal [exp]
-  (let [[_ vars conds consq] exp]
-    (-> {:forall/vars (vec vars)}
-        (assoc :forall/conditions   (mapv #(rewrite % :atom) conds))
-        (assoc :forall/consequences (mapv #(rewrite % :atom) consq)))))
-
 ;;; This currently does not handle quoted things.
 (defrewrite :s-exp-extended [exp]
   (letfn [(box [v] (cond (number? v)  {:box/num v}
                          (string? v)  {:box/str v}
-                         (symbol? v) `{:box/sym '~v}))
+                         (symbol? v)  {:box/sym v}))
           (seq2sexp [s]
             (cond-> `{:s-exp/fn-ref '~(first s)}
               (-> s rest not-empty) (assoc :s-exp/args (let [cnt (atom 0)]
@@ -351,8 +381,8 @@
 
 (defrewrite :implication [exp]
   (let [[_ l1 l2] exp]
-       {:exp/condition (rewrite l1 :logical-exp)
-        :exp/implies (rewrite l2 :logical-exp)}))
+       {:imply/condition (rewrite l1 :logical-exp)
+        :imply/implies (rewrite l2 :logical-exp)}))
 
 (defrewrite :negation [exp]
   (-> (rewrite (nth exp 1) :logical-exp)
@@ -362,11 +392,23 @@
 (defrewrite :conjunct [exp]
   (let [res (mapv #(rewrite % :logical-exp) exp)]
     (if (empty? res)
-      {:exp/shop-empty-list? true}
-      {:exp/conjunction-of res})))
+      {:conjunction/shop-empty-list? true}
+      {:conjunction/terms res})))
 
 (defrewrite :disjunct [exp]
-  (-> {:exp/disjunction-of (mapv #(rewrite % :logical-exp) (rest exp))}))
+  (-> {:disjunction/terms (mapv #(rewrite % :logical-exp) (rest exp))}))
+
+;;;    (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
+(defrewrite :universal [exp]
+  (let [[_ vars conds consq] exp]
+    (-> {:forall/vars (vec vars)}
+        (assoc :forall/conditions   (mapv #(rewrite % :atom) conds))
+        (assoc :forall/consequences (mapv #(rewrite % :atom) consq)))))
+
+(defrewrite :assignment [exp]
+  (let [[_ v e] exp]
+    {:assign/var v
+     :assign/exp (rewrite e :s-exp-extended)}))
 
 (defrewrite :atom [exp]
   (let [[pred & vars] exp]
@@ -414,10 +456,6 @@
         :doc "a unique name for the axiom; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
 
    ;; ---------------------- logical expression
-   :exp/disjunct?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
-        :doc "expression is negated."}
-
    :exp/negated?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
         :doc "expression is negated."}
@@ -435,7 +473,7 @@
    :method/preconditions
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "atoms indicating what must be true in order to apply the method."}
-   :method/task-list
+   :method/tasks
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "atoms describing a means to achieve the head literal."}
    :method/tasks-are-unordered?

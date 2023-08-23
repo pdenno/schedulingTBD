@@ -8,8 +8,6 @@
    [scheduling-tbd.llm  :as llm]
    [scheduling-tbd.util :as util]))
 
-
-
 (def sample-method
   '(:method
     (transport-person ?p ?c2) ; head
@@ -21,6 +19,16 @@
      (board ?p ?a ?c1)
      (move-aircraft ?a ?c2)
      (debark ?p ?a ?c2))))
+
+(def sample-operator
+  '(:operator (!!cost ?end)
+
+              ((maxtime ?max) ; Since ?max isn't bound in the head, I supose this is a query.
+               (assign ?newmax (eval (if (< ?max ?end) ?end ?max))))
+
+              ((maxtime ?max))
+              ((maxtime ?newmax))
+              (- ?newmax ?max)))
 
 (def big-method
   '(:method (transport-person ?p ?c2)
