@@ -18,14 +18,14 @@
 (def shop2-example
   "This is an example from usage from the SHOP2 documentation."
   {:domain
-   "(defdomain basic-example (
-     (:operator (!pickup ?a) () () ((have ?a)))
-     (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
-     (:method (swap ?x ?y)
-       ((have ?x))
-       ((!drop ?x) (!pickup ?y))
-       ((have ?y))
-       ((!drop ?y) (!pickup ?x)))))"
+   "(defdomain basic-example
+     ((:operator (!pickup ?a) () () ((have ?a)))
+      (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
+      (:method (swap ?x ?y)
+        ((have ?x))
+        ((!drop ?x) (!pickup ?y))
+        ((have ?y))
+        ((!drop ?y) (!pickup ?x)))))"
    :problem
    "(defproblem problem1 basic-example
       ((have banjo)) ((swap banjo kiwi)))"

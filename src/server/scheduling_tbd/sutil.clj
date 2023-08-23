@@ -67,3 +67,10 @@
   "Return a string of n spaces."
   [n]
   (reduce (fn [s _] (str s " ")) "" (range n)))
+
+(defn not-nothing
+  "Returns true if it is a collection and not empty or something else non-nil"
+  [x]
+  (if (seq? x)
+    (not-empty x)
+    x))
