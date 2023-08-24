@@ -35,20 +35,13 @@
                                    :axiom    (s/valid? ::axiom elem)))
                   (nth % 2))))
 
-;;; This looks something like the axiom below, but the fact that there is a task list at the end makes it a little harder.
-;;;      (:method (upper-move-aircraft-no-style ?a ?c)
-;;;               Case1 ((at ?a ?c)) ()
-;;;               Case2 (:sort-by ?cost <
-;;;                               ((at ?a ?somecity)
-;;;                                (travel-cost-info ?a ?somecity ?c ?cost ?style)))
-;;;               ((move-aircraft ?a ?somecity ?c ?style)))
+;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
 (s/def ::method
   (s/and #(reset! diag {:method %})
          seq?
          #(= (nth % 0) :method)
          #(s/valid? ::atom (nth % 1))
-         #(s/valid? ::method-preconditions (-> % vec (subvec 2) butlast))
-         #(s/valid? ::tasks (last %))))
+         #(s/valid? ::method-rhs-pairs (nthrest % 2))))
 
 (s/def ::operator
   (s/and #(reset! diag {:operator %})
@@ -81,24 +74,38 @@
                                               (subvec terms 1))))))))
 
 ;;;---- toplevel support ----------------------------
-(s/def ::method-preconditions
+;;;      (:method (upper-move-aircraft-no-style ?a ?c)
+;;;               Case1 ((at ?a ?c)) ()
+;;;               Case2 (:sort-by ?cost <
+;;;                               ((at ?a ?somecity)
+;;;                                (travel-cost-info ?a ?somecity ?c ?cost ?style)))
+;;;               ((move-aircraft ?a ?somecity ?c ?style)))
+(s/def ::method-rhs-pairs
   (s/and seq?
-         (s/or :empty #(= % '(()))
-               :conjunct #(loop [still-ok? true
-                                 terms (vec %)]
-                            (cond (empty? terms)  true
-                                  (not still-ok?) false
-                                  :else            (if (symbol? (first terms))
-                                                     (recur (every? (fn [c] (s/valid? ::precondition c)) (nth terms 1))
-                                                            (subvec terms 2))
-                                                     (recur (every? (fn [c] (s/valid? ::precondition c)) (nth terms 0))
-                                                            (subvec terms 1))))))))
+         (fn [pairs]
+           (letfn [(cond-good? [x]
+                     (if (-> x first seq?)
+                       (every? #(s/valid? ::precondition %) x)
+                       (s/valid? ::precondition x)))]
+             (loop [still-ok? true
+                    terms (vec pairs)]
+               (cond (empty? terms)  true
+                     (not still-ok?) false
+                     :else           (if (symbol? (first terms))
+                                       (recur (and (cond-good? (nth terms 1))
+                                                   (s/valid? ::tasks (nth terms 2)))
+                                              (subvec terms 3))
+                                       (recur (and (cond-good? (nth terms 0))
+                                                   (s/valid? ::tasks (nth terms 1)))
+                                              (subvec terms 2)))))))))
+
 (s/def ::operator-preconditions
   (s/and seq?
          #(every? (fn [c] (s/valid? ::precondition c)) %)))
 
 (s/def ::precondition
-  (s/or :logical-exp           ::logical-exp
+  (s/or :empty                 empty?
+        :logical-exp           ::logical-exp
         :first-satisfier-exp   ::first-satisfier-exp
         :sort-by-exp           ::sort-by-exp))
 
@@ -354,14 +361,10 @@
 (defrewrite :method [exp]
   (s/assert ::method exp)
   (clear-rewrite!)
-  (let [head (nth exp 1)
-        precond-sets (-> exp vec (subvec 2) butlast vec)
-        tasks (last exp)]
-    (cond-> {}
-      true                                         (assoc :method/head (rewrite head :atom))
-      (not-empty precond-sets)                     (assoc :method/preconditions (rewrite precond-sets :method-preconds)) ; ToDo: should be ordered.
-      (s/valid? ::unordered-task-list tasks)       (assoc :method/tasks-are-unordered? true)
-      (not-empty tasks)                            (assoc :method/tasks (rewrite tasks :task-list)))))
+  (let [[_ head & pairs] exp]
+    (-> {}
+        (assoc :method/head      (rewrite head :atom))
+        (assoc :method/rhs-pairs (rewrite pairs :method-rhs-pairs)))))
 
 (defrewrite :operator [exp]
   (s/assert ::operator exp)
@@ -374,10 +377,11 @@
       cost (assoc :op/cost (rewrite cost :s-exp-extended)))))
 
 ;;; (:- a [name1] E1 [name2] E2 [name3] E3 ... [namen] En)
+;;;   (rewrite '(:- (same ?x ?x) ()) :axiom)
 (defrewrite :axiom [exp]
   (s/assert ::axiom exp)
   (clear-rewrite!)
-  (let [[_ head exps] exp]
+  (let [[_ head & exps] exp]
     {:axiom/head (rewrite head :atom)
      :axiom/rhs (loop [exps (vec exps)
                        pos 1
@@ -386,14 +390,14 @@
                         (symbol? (nth exps 0))     (recur
                                                     (subvec exps 2)
                                                     (inc pos)
-                                                    (conj res {:axiom/term-name (nth exps 0)
-                                                               :axiom/term-pos pos
-                                                               :axiom/term (rewrite (nth exps 1) :logical-exp)}))
+                                                    (conj res (cond-> {:axiom/term-name (nth exps 0)}
+                                                                true                     (assoc :axiom/term-pos pos)
+                                                                (not-empty (nth exps 1)) (assoc :axiom/term (rewrite (nth exps 1) :logical-exp)))))
                         :else                      (recur
                                                     (subvec exps 1)
                                                     (inc pos)
-                                                    (conj res {:axiom/term-pos pos
-                                                               :axiom/term (rewrite (nth exps 0) :logical-exp)}))))}))
+                                                    (conj res (cond-> {:axiom/term-pos pos}
+                                                                (not-empty (nth exps 0)) (assoc :axiom/term (rewrite (nth exps 0) :logical-exp)))))))}))
 
 ;;;-------------------------------------
 ;;; Only called explicitly. Note that the things in the task lists are not all task atoms!
@@ -431,44 +435,27 @@
                                                         vec)))))
                        vec))})
 
-;;; The conds are like
-;;;   - [Case1 ((at ?p ?c)) Case2 ((also ?p ?x))]
-;;;   - [((write-time ?a ?start))]
-;;;   - [Case1 ((at ?a ?c)) () Case2 (:sort-by ?cost < ((at ?a ?somecity) (travel-cost-info ?a ?somecity ?c ?cost ?style)))]
-(defrewrite :method-preconds [conds]
-  (letfn [(process-cond [c exps]
-            (cond (-> c (nth 0) seq?)         [(mapv #(rewrite % :method-precond) (nth exps 0)) (rest exps)]
-                  (-> c (nth 0) (= :sort-by)) [(rewrite c :sort-by) (rest exps)]
-                  (-> c (nth 0) (= :first))   [(rewrite c :first)   (rest exps)]
-                  :else (throw (ex-info "Invalid method precondition" {:exp exps}))))]
-    (loop [res []
-           pos 1
-           exps conds]
-      (if (empty? exps)
-        res
-        (let [name (when (and (not-empty exps) (-> exps (nth 0) symbol?)) (nth exps 0))
-              c (if name (nth exps 1) (nth exps 0))
-              exps (if name (rest exps) exps)
-              [cset new-exps] (process-cond c exps)]
-          (if name
-             (recur
-              (conj res {:cond-set/name name
-                         :cond-set/pos pos
-                         :cond-set/conds cset})
-              (inc pos)
-              new-exps)
-             (recur
-              (conj res {:cond-set/pos pos
-                         :cond-set/conds cset})
-              (inc pos)
-              new-exps)))))))
+;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
+(defrewrite :method-rhs-pairs [pairs]
+  (loop [res []
+         terms (vec pairs)]
+    (if (empty? terms)
+      res
+      (if (symbol? (nth terms 0))
+        (recur (conj res (cond-> {:method/case-name (nth terms 0)}
+                           (not-empty (nth terms 1)) (assoc :method/preconditions (rewrite (nth terms 1) :method-precond))
+                           (not-empty (nth terms 2)) (assoc :method/tasks         (rewrite (nth terms 2) :task-list))))
+               (subvec terms 3))
+        (recur (conj res (cond-> {}
+                           (not-empty (nth terms 0)) (assoc :method/preconditions (rewrite (nth terms 0) :method-precond))
+                           (not-empty (nth terms 1)) (assoc :method/tasks         (rewrite (nth terms 1) :task-list))))
+               (subvec terms 2))))))
 
-      (defrewrite :method-precond [exp]
-  (reset! diag {:method-precond exp})
-  (cond (s/valid? ::sort-by-exp exp)          (rewrite exp :sort-by)
-        (s/valid? ::first-satisfier-exp exp)  (rewrite exp :first-satisfier)
-        (s/valid? ::logical-exp exp)          (rewrite exp :logical-exp)
-        :else  (throw (ex-info "Invalid method precondition" {:exp exp}))))
+(defrewrite :method-precond [c]
+  (cond (-> c (nth 0) seq?)         (mapv #(rewrite % :atom) c)
+        (-> c (nth 0) (= :sort-by)) (rewrite c :sort-by)
+        (-> c (nth 0) (= :first))   (rewrite c :first)
+        :else (throw (ex-info "Invalid method precondition" {:exp c}))))
 
 (defrewrite :operator-preconds [exp]
   (let [cnt (atom 0)] ; Ordinary conjunct of :logical-exp
@@ -590,6 +577,7 @@
                                                 vec)))))
 
 (defrewrite :task-atom [exp]
+  (reset! diag {:task-atom exp})
   (let [[pred & terms] exp]
     (cond-> {}
       true               (assoc :atom/predicate pred)

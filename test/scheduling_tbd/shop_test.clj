@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [clojure.test :refer [deftest is testing]]
    [datahike.api                 :as d]
-   [scheduling-tbd.shop :as shop :refer [exp2db]]
+   [scheduling-tbd.shop :as shop :refer [rewrite]]
    [scheduling-tbd.llm  :as llm]
    [scheduling-tbd.util :as util]))
 
@@ -61,13 +61,13 @@
 ;;; ToDo:  WRONG! Both of them. I don't have time for this now.
 (deftest s-expression2db
   (testing "Testing creating db structures for s-expressions"
-    (is (= {:s-exp/fn-ref '>} (exp2db '> :s-exp-extended)))
+    (is (= {:s-exp/fn-ref '>} (rewrite '> :s-exp-extended)))
     (is (= #:s-exp{:args
                    [{:arg/pos 1, :s-exp/args [#:arg{:val #:box{:num 1}, :pos 1} #:arg{:val #:box{:sym 'x}, :pos 2}], :s-exp/fn-ref '+}
                     #:arg{:val #:box{:num 3}, :pos 2}
                     #:arg{:val #:box{:sym 'q}, :pos 3}],
                    :fn-ref '*}
-           (exp2db '(* (+ 1 x) 3 q) :s-exp-extended)))))
+           (rewrite '(* (+ 1 x) 3 q) :s-exp-extended)))))
 
 ;;; See pg 397 in Dana Nau, et al., "SHOP2: An HTN Planning System" Journal of Artificial Intelligence Research 20 (2003) 379-404
 ;;; (By convention) names of operators begin with an exclamation mark (!).
@@ -268,12 +268,11 @@
                                ((at ?p ?c1)
                                 (at ?a ?c1)
                                 (aircraft ?a)
-                                (onboard ?a ?num)))
-               ((!!assert ((dest ?a ?c1)))
-                (:immediate board ?p ?a ?c1)
-                (!!assert ((dest ?a ?c2)))
-                (:immediate upper-move-aircraft-no-style ?a ?c2)
-                (:immediate debark ?p ?a ?c2)))
+                                (onboard ?a ?num)))  ((!!assert ((dest ?a ?c1)))
+                                                      (:immediate board ?p ?a ?c1)
+                                                      (!!assert ((dest ?a ?c2)))
+                                                      (:immediate upper-move-aircraft-no-style ?a ?c2)
+                                                      (:immediate debark ?p ?a ?c2)))
 
       (:method (transport-person ?p ?c2)
                Case3 (:sort-by ?cost <
@@ -285,25 +284,22 @@
                                         ((same ?c ?c1)))
                                 (imply ((different ?c3 ?c1))
                                        (not (possible-person-in ?c3)))
-                                (travel-cost-info ?a ?c3 ?c1 ?cost ?style)))
-               ((!!assert ((dest ?a ?c1)))
-                (:immediate upper-move-aircraft ?a ?c1 ?style)
-                (:immediate board ?p ?a ?c1)
-                (!!assert ((dest ?a ?c2)))
-                (:immediate upper-move-aircraft-no-style ?a ?c2)
-                (:immediate debark ?p ?a ?c2)))
+                                (travel-cost-info ?a ?c3 ?c1 ?cost ?style)))  ((!!assert ((dest ?a ?c1)))
+                                                                               (:immediate upper-move-aircraft ?a ?c1 ?style)
+                                                                               (:immediate board ?p ?a ?c1)
+                                                                               (!!assert ((dest ?a ?c2)))
+                                                                               (:immediate upper-move-aircraft-no-style ?a ?c2)
+                                                                               (:immediate debark ?p ?a ?c2)))
 
       (:method (upper-move-aircraft ?a ?c ?style)
                Case1 ((at ?a ?c)) ()
-               Case2 ((at ?a ?somecity))
-               ((move-aircraft ?a ?somecity ?c ?style)))
+               Case2 ((at ?a ?somecity))     ((move-aircraft ?a ?somecity ?c ?style)))
 
       (:method (upper-move-aircraft-no-style ?a ?c)
                Case1 ((at ?a ?c)) ()
                Case2 (:sort-by ?cost <
                                ((at ?a ?somecity)
-                                (travel-cost-info ?a ?somecity ?c ?cost ?style)))
-               ((move-aircraft ?a ?somecity ?c ?style)))
+                                (travel-cost-info ?a ?somecity ?c ?cost ?style)))   ((move-aircraft ?a ?somecity ?c ?style)))
 
       (:- (travel-cost-info ?a ?from ?to ?cost slow)
           CASE1 ((capacity ?a ?cap)
