@@ -160,6 +160,8 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The sentence from user description best describing the scheduling objective."}})
 
+(def diag (atom nil))
+
 (defn datahike-schema
   "Create a Datahike-compatible schema from the above."
   [schema]
@@ -226,8 +228,6 @@
   (d/q '[:find [?proj-id ...]
          :where [_ :project/id ?proj-id]]
        @(connect-atm :system)))
-
-(def diag (atom nil))
 
 (defn unique-proj
   "If necessary to ensure uniqueness, update the project name and id."
