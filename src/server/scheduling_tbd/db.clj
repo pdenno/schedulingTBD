@@ -308,10 +308,12 @@
   (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB"))
                      (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
                                           "\nCreate directories 'projects' and 'system' under it.") {})))]
+    ;; https://cljdoc.org/d/io.replikativ/datahike/0.6.1545/doc/datahike-database-configuration
     (reset! proj-base-cfg {:store {:backend :file :path-base (str base-dir "/projects/")}
                            :schema-flexibility :write})
-
     (reset! sys-db-cfg {:store {:backend :file :path (str base-dir "/system")}
+                        :keep-history? false
+                        ;:attribute-refs? true ; With this I can't transact lookup-refs!
                         :rebuild-db? true ; <================== Currently, if you rebuild, you need to get rid of project directories.
                         :schema-flexibility :write})
     (when (-> sys-db-cfg deref :rebuild-db?) (create-sys-db!))

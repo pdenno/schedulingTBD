@@ -1,9 +1,11 @@
 (ns scheduling-tbd.shop
-  "Database storage and serialization of SHOP planning domain content."
+  "Rewrite shop structures to db structures.
+   Rewrite db structures to shop structures."
   (:require
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
    [datahike.api         :as d]
+   [datahike.pull-api    :as dp]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm not-nothing]]
    [taoensso.timbre      :as log]))
 
@@ -57,7 +59,7 @@
 
 ;;; (:- a [name1] E1 [name2] E2 [name3] E3 ... [namen] En)
 (s/def ::axiom
-  (s/and #(reset! diag {:axiom %})
+  (s/and ;#(reset! diag {:axiom %})
          seq?
          #(= (nth % 0) :-)
          #(s/valid? ::atom (nth % 1))
@@ -235,7 +237,9 @@
 (s/def ::call-term
   (s/and seq?
          #(= (nth % 0) 'call)
-         #(s/valid? ::fn-symbol (nth % 1))
+         (s/or :sym #(s/valid? ::fn-symbol (nth % 1))
+               :fun (s/and seq?
+                           #(= 'function (nth (nth % 1) 0))))
          #(every? (fn [t] (s/valid? ::extended-term t)) (-> % rest rest))))
 
 (s/def ::var-list (s/and seq? #(every? is-var? %)))
@@ -312,7 +316,7 @@
                        #(is-var? (nth % 3))))
 
 ;;;======================================= Rewriting to DB elements
-(def ^:dynamic *debugging?* true)
+(def ^:dynamic *debugging?* false)
 (def tags   (atom []))
 (def locals (atom [{}]))
 
@@ -324,8 +328,8 @@
 
 ;;; This is simpler than RM's rewrite, which relied on :typ from parse and called 'rewrite-meth' using it.
 ;;; This grammar has only a few top-level entry points: defdomain, :method :operator and :axiom.
-(defmacro defrewrite [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod rewrite ~tag [~obj & [~@more-args]]
+(defmacro defrew2db [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  `(defmethod rew2db ~tag [~obj & [~@more-args]]
      (when *debugging?* (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
      (swap! locals #(into [{}] %))
@@ -337,154 +341,157 @@
            (println (cl-format nil "~A<-- ~A returns ~S" (sutil/nspaces (count @tags)) ~tag result#)))
          result#))))
 
-(defn rewrite-dispatch
-  "Allow calls of two forms: (rewrite exp) (rewrite exp :some-method-key)."
+(defn rew2db-dispatch
+  "Allow calls of two forms: (rew2db exp) (rew2db exp :some-method-key)."
   [exp & [specified]]
   (cond ;; Optional 2nd argument specifies method to call. Order matters!
     (keyword? specified)            specified,
-    (s/valid? ::domain exp)         :domain
-    (s/valid? ::method exp)         :method
+    (s/valid? ::domain   exp)       :domain
+    (s/valid? ::method   exp)       :method
     (s/valid? ::operator exp)       :operator
-    (s/valid? ::axiom exp)          :axiom
+    (s/valid? ::axiom    exp)       :axiom
     (s/valid? ::logical-exp exp)    :logical-exp ; Essentially, has its own similar dispatch function.
+    (contains? exp :sys/body)       :body
     :else (throw (ex-info "No dispatch value for exp" {:exp exp}))))
 
-(defmulti rewrite #'rewrite-dispatch)
+(defmulti rew2db #'rew2db-dispatch)
 
 ;;;-------------------------------- Top-level methods
-(defrewrite :domain [exp]
+(defrew2db :domain [exp]
   (let [[_ name elems] exp
         cnt (atom 0)]
     (-> {:domain/name name :sys/typ :domain}
         (assoc :domain/elems (vec (for [e elems]
-                                    (-> (rewrite e)
+                                    (-> (rew2db e)
                                         (assoc :sys/pos (swap! cnt inc)))))))))
 
-;;; (rewrite '(:method (transport-person ?p ?c) Case1 ((at ?p ?c)) Case2 ((also ?p ?x)) ()) :method)
-(defrewrite :method [exp]
-  (s/assert ::method exp)
+;;; (rew2db '(:method (transport-person ?p ?c) Case1 ((at ?p ?c)) Case2 ((also ?p ?x)) ()) :method)
+(defrew2db :method [body]
+  (s/assert ::method body)
   (clear-rewrite!)
-  (let [[_ head & pairs] exp]
-    (-> {:sys/typ :method}
-        (assoc :method/head      (rewrite head :atom))
-        (assoc :method/rhs-pairs (rewrite pairs :method-rhs-pairs)))))
+  (let [[_ head & pairs] body]
+    {:sys/body (-> {:sys/typ :method}
+                   (assoc :method/head      (rew2db head :atom))
+                   (assoc :method/rhs-pairs (rew2db pairs :method-rhs-pairs)))}))
 
-(defrewrite :operator [exp]
-  (s/assert ::operator exp)
+(defrew2db :operator [body]
+  (s/assert ::operator body)
   (clear-rewrite!)
-  (let [[_ head preconds dlist alist & [cost]] exp]
-    (cond-> {:sys/typ :operator}
-      true                   (assoc :operator/head (rewrite head :atom))
-      (not-nothing preconds) (assoc :operator/preconds (rewrite preconds :operator-preconds))
-      (not-nothing dlist)    (assoc :operator/d-list   (rewrite dlist :d-list))
-      (not-nothing alist)    (assoc :operator/a-list   (rewrite alist :a-list))
-      cost (assoc :operator/cost (rewrite cost :s-exp-extended)))))
+  (let [[_ head preconds dlist alist & [cost]] body]
+    {:sys/body (cond-> {:sys/typ :operator}
+                 true                   (assoc :operator/head (rew2db head :atom))
+                 (not-nothing preconds) (assoc :operator/preconds (rew2db preconds :operator-preconds))
+                 (not-nothing dlist)    (assoc :operator/d-list   (rew2db dlist :d-list))
+                 (not-nothing alist)    (assoc :operator/a-list   (rew2db alist :a-list))
+                 cost (assoc :operator/cost (rew2db cost :s-exp-extended)))}))
 
 ;;; (:- a [name1] E1 [name2] E2 [name3] E3 ... [namen] En)
-;;;   (rewrite '(:- (same ?x ?x) ()) :axiom)
-(defrewrite :axiom [exp]
-  (s/assert ::axiom exp)
+;;;   (rew2db '(:- (same ?x ?x) ()) :axiom)
+(defrew2db :axiom [body]
+  (s/assert ::axiom body)
   (clear-rewrite!)
-  (let [[_ head & exps] exp]
-    {:sys/typ :axiom
-     :axiom/head (rewrite head :atom)
-     :axiom/rhs (loop [exps (vec exps)
-                       pos 1
-                       res []]
-                  (cond (empty? exps)              res
-                        (symbol? (nth exps 0))     (recur
-                                                    (subvec exps 2)
-                                                    (inc pos)
-                                                    (conj res (cond-> {:rhs/case-name (nth exps 0)}
-                                                                true                     (assoc :sys/pos pos)
-                                                                (not-empty (nth exps 1)) (assoc :rhs/terms (rewrite (nth exps 1) :logical-exp)))))
-                        :else                      (recur
-                                                    (subvec exps 1)
-                                                    (inc pos)
-                                                    (if (not-empty (nth exps 0))
-                                                      (conj res (-> {:sys/pos pos}
-                                                                    (assoc :rhs/terms (rewrite (nth exps 0) :logical-exp))))
-                                                      res))))}))
+  (let [[_ head & exps] body
+        rhs (loop [exps (vec exps)
+                                  pos 1
+                                  res []]
+                             (cond (empty? exps)              res
+                                   (symbol? (nth exps 0))     (recur
+                                                               (subvec exps 2)
+                                                               (inc pos)
+                                                               (conj res (cond-> {:rhs/case-name (nth exps 0)}
+                                                                           true                     (assoc :sys/pos pos)
+                                                                           (not-empty (nth exps 1)) (assoc :rhs/terms (rew2db (nth exps 1) :logical-exp)))))
+                                   :else                      (recur
+                                                               (subvec exps 1)
+                                                               (inc pos)
+                                                               (if (not-empty (nth exps 0))
+                                                                 (conj res (-> {:sys/pos pos}
+                                                                               (assoc :rhs/terms (rew2db (nth exps 0) :logical-exp))))
+                                                                 res))))]
+    {:sys/body (cond-> {:sys/typ :axiom
+                        :axiom/head (rew2db head :atom)}
+                 (not-empty rhs)    (assoc :axiom/rhs rhs))}))
 
 
-;;;-------------------------------------
-;;; Only called explicitly. Note that the things in the task lists are not all task atoms!
-(defrewrite :task-list [exp]
+;;;------- supporting methods ------------------------------
+(defrew2db :body [exp] (-> exp :sys/body rew2db))
+
+(defrew2db :task-list [exp]
   (let [explicit (#{:ordered :unordered} (first exp))
         tasks (if explicit (rest exp) exp)
         cnt (atom 0)]
     (cond-> {:sys/typ :task-list
              :task-list/elems (-> (for [t tasks]
-                                    (-> (rewrite t :task-list-elem)
+                                    (-> (rew2db t :task-list-elem)
                                         (assoc :sys/pos (swap! cnt inc))))
                                   vec)}
       (= explicit :unordered)  (assoc :task-list/unordered? true))))
 
-(defrewrite :task-list-elem [exp]
+(defrew2db :task-list-elem [exp]
   (let [immediate? (= :immediate (first exp))
         exp (if immediate? (rest exp) exp)]
     (as-> exp ?e
-      (cond (s/valid? ::task-atom ?e)  (rewrite ?e :task-atom)
-            (s/valid? ::op-call   ?e)  (rewrite ?e :op-call)
+      (cond (s/valid? ::task-atom ?e)  (rew2db ?e :task-atom)
+            (s/valid? ::op-call   ?e)  (rew2db ?e :op-call)
             :else (throw (ex-info "Task is neither a task-atom or op-call" {:exp ?e})))
       (if immediate? (assoc ?e :task/immediate? true) ?e))))
 
-(defrewrite :op-call [exp]
+(defrew2db :op-call [exp]
   {:sys/typ :op-call
    :op-call/predicate (first exp)
    :op-call/args (let [cnt (atom 0)]
                    (-> (for [arg (rest exp)]
                          (if (s/valid? ::atom arg)
-                           (-> (rewrite arg :atom)
+                           (-> (rew2db arg :atom)
                                (assoc :sys/pos (swap! cnt inc)))
                            (-> {:sys/pos (swap! cnt inc)} ; Assumes it is a list of atoms.
                                (assoc :op-call/args (-> (let [ncnt (atom 0)]
                                                           (for [narg arg]
-                                                            (-> (rewrite narg :atom)
+                                                            (-> (rew2db narg :atom)
                                                                 (assoc :sys/pos (swap! ncnt inc)))))
                                                         vec)))))
                        vec))})
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
-(defrewrite :method-rhs-pairs [pairs]
+(defrew2db :method-rhs-pairs [pairs]
   (loop [res []
          terms (vec pairs)]
     (if (empty? terms)
       res
       (if (symbol? (nth terms 0))
         (recur (conj res (cond-> {:method/case-name (nth terms 0)}
-                           (not-empty (nth terms 1)) (assoc :method/preconditions (rewrite (nth terms 1) :method-precond))
-                           (not-empty (nth terms 2)) (assoc :method/tasks         (rewrite (nth terms 2) :task-list))))
+                           (not-empty (nth terms 1)) (assoc :method/preconditions (rew2db (nth terms 1) :method-precond))
+                           (not-empty (nth terms 2)) (assoc :method/task-list     (rew2db (nth terms 2) :task-list))))
                (subvec terms 3))
         (recur (conj res (cond-> {}
-                           (not-empty (nth terms 0)) (assoc :method/preconditions (rewrite (nth terms 0) :method-precond))
-                           (not-empty (nth terms 1)) (assoc :method/tasks         (rewrite (nth terms 1) :task-list))))
+                           (not-empty (nth terms 0)) (assoc :method/preconditions (rew2db (nth terms 0) :method-precond))
+                           (not-empty (nth terms 1)) (assoc :method/task-list     (rew2db (nth terms 1) :task-list))))
                (subvec terms 2))))))
 
-(defrewrite :method-precond [c]
-  (cond (-> c (nth 0) seq?)         (mapv #(rewrite % :atom) c)
-        (-> c (nth 0) (= :sort-by)) (rewrite c :sort-by)
-        (-> c (nth 0) (= :first))   (rewrite c :first)
+(defrew2db :method-precond [c]
+  (cond (-> c (nth 0) seq?)         (mapv #(rew2db % :atom) c)
+        (-> c (nth 0) (= :sort-by)) (rew2db c :sort-by)
+        (-> c (nth 0) (= :first))   (rew2db c :first)
         :else (throw (ex-info "Invalid method precondition" {:exp c}))))
 
-(defrewrite :operator-preconds [exp]
+(defrew2db :operator-preconds [exp]
   (let [cnt (atom 0)] ; Ordinary conjunct of :logical-exp
     (-> (for [pc exp]
-          (-> {:precond/exp (rewrite pc :logical-exp)}
+          (-> {:precond/exp (rew2db pc :logical-exp)}
               (assoc :sys/pos (swap! cnt inc))))
         vec)))
 
-(defrewrite :sort-by [exp]
+(defrew2db :sort-by [exp]
   (if (== 4 (count exp))
     (let [[_ var  fn-def lexp] exp]
       (-> {:sys/typ :sort-by
            :sort-by/var var}
-          (assoc :sort-by/fn  (rewrite fn-def :s-exp-extended))
-          (assoc :sort-by/exp (rewrite lexp :logical-exp))))
+          (assoc :sort-by/fn  (rew2db fn-def :s-exp-extended))
+          (assoc :sort-by/exp (rew2db lexp :logical-exp))))
     (let [[_ var lexp] exp]
       (-> {:sort-by/var var}
           (assoc :sort-by/fn {:s-exp/fn-ref '<})
-          (assoc :sort-by/exp (rewrite lexp :logical-exp))))))
+          (assoc :sort-by/exp (rew2db lexp :logical-exp))))))
 
 (defn box [v]
   (cond (number? v)  {:box/num v}
@@ -492,159 +499,160 @@
         (symbol? v)  {:box/sym v}
         :else        v))
 
-;;; This currently does not handle quoted things.
-(defrewrite :s-exp-extended [exp]
-  (letfn [(seq2sexp [s]
-            (cond (seq? s) (cond-> {:s-exp/fn-ref (first s) :sys/typ :s-exp}
-                             (-> s rest not-empty) (assoc :s-exp/args (let [cnt (atom 0)]
-                                                                        (-> (for [a (rest s)]
-                                                                              (if (seq? a)
-                                                                                (-> (seq2sexp a) (assoc :sys/pos (swap! cnt inc)))
-                                                                                {:s-exp/arg-val (box a)
-                                                                                 :sys/pos (swap! cnt inc)}))
-                                                                            vec))))
-                  (or (number? s) (string? s) (symbol? s)) (box s)))]
-    (if (symbol? exp)
-      {:s-exp/fn-ref exp :sys/typ :s-exp}
-      (seq2sexp exp))))
-
-(defrewrite :d-list [exp]
+(defrew2db :d-list [exp]
   (let [exp (if (seq? exp) (vec exp) (vector exp))
         cnt (atom 0)]
     (-> (for [e exp]
-          (-> (rewrite e :op-list-elem)
+          (-> (rew2db e :op-list-elem)
               (assoc :sys/pos (swap! cnt inc))))
         vec)))
 
-(defrewrite :a-list [exp]
+(defrew2db :a-list [exp]
   (let [exp (if (seq? exp) (vec exp) (vector exp))
         cnt (atom 0)]
     (-> (for [e exp]
-          (-> (rewrite e :op-list-elem)
+          (-> (rew2db e :op-list-elem)
               (assoc :sys/pos (swap! cnt inc))))
         vec)))
 
-;;; This delete-list or add-list
-(defrewrite :op-list-elem [exp]
+(defrew2db :op-list-elem [exp]
   (cond (symbol? exp)                 {:box/sym exp}
-        (s/valid? ::atom exp)         (rewrite exp :atom)
-        (s/valid? ::protected exp)    (rewrite exp :protected)
-        (s/valid? ::op-universal exp) (rewrite exp :op-universal)
+        (s/valid? ::atom exp)         (rew2db exp :atom)
+        (s/valid? ::protected exp)    (rew2db exp :protected)
+        (s/valid? ::op-universal exp) (rew2db exp :op-universal)
         :else (throw (ex-info "Invalid item in op list:" {:exp exp}))))
 
-(defrewrite ::protected [exp]
-  {:protected/atom (rewrite (nth exp 1) :atom)})
+(defrew2db ::protected [exp]
+  {:protected/atom (rew2db (nth exp 1) :atom)})
 
-(defrewrite ::op-universal [exp]
+(defrew2db ::op-universal [exp]
   (let [[_ vars cond consq] exp]
     (-> {:sys/typ :op-universal
-         :op-forall/vars (vec vars)}
-        (assoc :op-forall/condition    (rewrite cond :logical-exp))
-        (assoc :op-forall/consequences (mapv #(rewrite % :atom) consq)))))
+         :forall/vars (vec vars)}
+        (assoc :forall/conditions   (rew2db cond :logical-exp))
+        (assoc :forall/consequences (mapv #(rew2db % :atom) consq)))))
 
+;;; ---------------- s-expression -----------------
+(defn seq2sexp [s]
+  (cond (seq? s) (cond-> {:s-exp/fn-ref (first s) :sys/typ :s-exp}
+                   (-> s rest not-empty) (assoc :s-exp/args (let [cnt (atom 0)]
+                                                              (for [a (rest s)]
+                                                                (->  (rew2db a :s-exp-arg)
+                                                                     (assoc :sys/pos (swap! cnt inc)))))))
+        (or (number? s) (string? s) (symbol? s)) (box s)))
+
+;;; This currently does not handle quoted things.
+(defrew2db :s-exp-extended [exp]
+  (if (symbol? exp)
+    {:s-exp/fn-ref exp :sys/typ :s-exp}
+    (seq2sexp exp)))
+
+(defrew2db :s-exp-arg [exp]
+  (if (seq? exp)
+    (seq2sexp exp)
+    {:s-exp/arg-val (box exp)}))
 ;;;-------------------------------- Logical expressions -------------------
-(defrewrite :logical-exp [exp] ; order matters!
-  (cond (s/valid? ::implication exp)    (rewrite exp :implication)
-        (s/valid? ::negation exp)       (rewrite exp :negation)
-        (s/valid? ::disjunct exp)       (rewrite exp :disjunct)
-        (s/valid? ::universal exp)      (rewrite exp :universal)
-        (s/valid? ::assignment exp)     (rewrite exp :assignment)
-        (s/valid? ::eval exp)           (rewrite exp :eval)
-        (s/valid? ::call exp)           (rewrite exp :call)
-        (s/valid? ::enforce exp)        (rewrite exp :enforce)
-        (s/valid? ::setof exp)          (rewrite exp :setof)
-        (s/valid? ::atom exp)           (rewrite exp :atom) ; I think other kinds of atoms are handled by :task-list-elem
-        (s/valid? ::conjunct exp)       (rewrite exp :conjunct)
+(defrew2db :logical-exp [exp] ; order matters!
+  (cond (s/valid? ::implication exp)    (rew2db exp :implication)
+        (s/valid? ::negation exp)       (rew2db exp :negation)
+        (s/valid? ::disjunct exp)       (rew2db exp :disjunct)
+        (s/valid? ::universal exp)      (rew2db exp :universal)
+        (s/valid? ::assignment exp)     (rew2db exp :assignment)
+        (s/valid? ::eval exp)           (rew2db exp :eval)
+        (s/valid? ::call exp)           (rew2db exp :call)
+        (s/valid? ::enforce exp)        (rew2db exp :enforce)
+        (s/valid? ::setof exp)          (rew2db exp :setof)
+        (s/valid? ::atom exp)           (rew2db exp :atom) ; I think other kinds of atoms are handled by :task-list-elem
+        (s/valid? ::conjunct exp)       (rew2db exp :conjunct)
         :else (throw (ex-info "Unknown logical exp:" {:exp exp}))))
 
-(defrewrite :implication [exp]
+(defrew2db :implication [exp]
   (let [[_ l1 l2] exp]
     {:sys/typ :implication
-     :imply/condition (rewrite l1 :logical-exp)
-     :imply/consequence (rewrite l2 :logical-exp)}))
+     :imply/condition (rew2db l1 :logical-exp)
+     :imply/consequence (rew2db l2 :logical-exp)}))
 
-(defrewrite :negation [exp]
-  (-> (rewrite (nth exp 1) :logical-exp)
+(defrew2db :negation [exp]
+  (-> (rew2db (nth exp 1) :logical-exp)
       (assoc :exp/negated? true)))
 
 ;;; ToDo: Make the next two ordered
-(defrewrite :conjunct [exp]
-  (let [res (mapv #(rewrite % :logical-exp) exp)]
+(defrew2db :conjunct [exp]
+  (let [res (mapv #(rew2db % :logical-exp) exp)]
     (-> (if (empty? res)
           {:conjunction/shop-empty-list? true}
           {:conjunction/terms res})
         (assoc :sys/typ :conjunction))))
 
-(defrewrite :disjunct [exp]
+(defrew2db :disjunct [exp]
   (-> {:sys/typ :disjunction}
-      (assoc :disjunction/terms (mapv #(rewrite % :logical-exp) (rest exp)))))
+      (assoc :disjunction/terms (mapv #(rew2db % :logical-exp) (rest exp)))))
 
 ;;;    (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
-(defrewrite :universal [exp]
+(defrew2db :universal [exp]
   (let [[_ vars conds consq] exp]
-    (-> {:sys/typ :univeral}
+    (-> {:sys/typ :universal}
         (assoc :forall/vars         (vec vars))
-        (assoc :forall/conditions   (mapv #(rewrite % :atom) conds))
-        (assoc :forall/consequences (mapv #(rewrite % :atom) consq)))))
+        (assoc :forall/conditions   (mapv #(rew2db % :atom) conds))
+        (assoc :forall/consequences (mapv #(rew2db % :atom) consq)))))
 
-(defrewrite :assignment [exp]
+(defrew2db :assignment [exp]
   (let [[_ v e] exp]
     (-> {:sys/typ :assignment}
         (assoc :assign/var v)
-        (assoc :assign/exp (rewrite e :s-exp-extended)))))
+        (assoc :assign/exp (rew2db e :s-exp-extended)))))
 
-(defrewrite :eval [exp]
+(defrew2db :eval [exp]
   {:sys/typ :eval
-   :eval/form (rewrite exp :s-exp-extended)})
+   :eval/form (rew2db exp :s-exp-extended)})
 
-(defrewrite :atom [exp]
+(defrew2db :atom [exp]
   (let [[pred & terms] exp]
     (cond-> {:sys/typ :atom}
       true               (assoc :atom/predicate pred)
       (not-empty terms)  (assoc :atom/roles (-> (let [cnt (atom 0)]
                                                  (for [v terms]
-                                                   {:role/val (box (rewrite v :term))
+                                                   {:role/val (box (rew2db v :term))
                                                     :sys/pos (swap! cnt inc)}))
                                                 vec)))))
 
-(defrewrite :task-atom [exp]
-  (reset! diag {:task-atom exp})
+(defrew2db :task-atom [exp]
   (let [[pred & terms] exp]
-    (cond-> {:sys/typ :atom}
+    (cond-> {:sys/typ :task-atom}
       true               (assoc :atom/predicate pred)
       (not-empty terms)  (assoc :atom/roles (-> (let [cnt (atom 0)]
                                                  (for [v terms]
-                                                   {:role/val (box (rewrite v :task-term))
+                                                   {:role/val (box (rew2db v :task-term))
                                                     :sys/pos (swap! cnt inc)}))
                                                 vec)))))
 
-(defrewrite :term [exp]
+(defrew2db :term [exp]
   (cond (symbol? exp) exp
         (number? exp) exp
-        (seq? exp)    (rewrite exp :list-term)
+        (seq? exp)    (rew2db exp :list-term)
         :else         (throw (ex-info "Not a valid term:" {:exp exp}))))
 
-(defrewrite :task-term [exp]
-  (cond (s/valid? ::term exp)      (rewrite exp :term)
-        (s/valid? ::call-term exp) (rewrite exp :call-term)
-        (s/valid? ::eval-term exp) (rewrite exp :eval-term)
+(defrew2db :task-term [exp]
+  (cond (s/valid? ::term exp)      (rew2db exp :term)
+        (s/valid? ::call-term exp) (rew2db exp :call-term)
+        (s/valid? ::eval-term exp) (rew2db exp :eval-term)
         :else (throw (ex-info "Not a task-term: " {:exp exp}))))
 
-(defrewrite :call-term [exp]
-  (let [[_ fn-sym & args] exp]
+(defrew2db :call-term [exp]
+  (let [[_ fn & args] exp]
     {:sys/typ :call-term
-     :call/fn fn-sym
+     :call/fn (-> fn (nth 1) (nth 1)) ; It looks something like this (function (quote +)).
      :call/args (let [cnt (atom 0)]
                   (-> (for [a args]
-                        (-> (rewrite a :s-exp-extended)
+                        (-> (rew2db a :s-exp-arg)
                             (assoc :sys/pos (swap! cnt inc))))
                       vec))}))
 
-(defrewrite :list-term [exp]
+(defrew2db :list-term [exp]
   {:sys/typ :list-term
    :list/terms (let [cnt (atom 0)]
                   (-> (for [a exp]
-                        (-> {:list/val (box (rewrite a :term))}
+                        (-> {:list/val (box (rew2db a :term))}
                             (assoc :sys/pos (swap! cnt inc))))
                       vec))})
 
@@ -665,7 +673,11 @@
 
 (def db-schema-shop2+
   "Defines schema elements about shop2 constructs.
-   This is combined with the project-oriented schema elements to define the schema for the system (as opposed to schema for a project)."
+   This is combined with the project-oriented schema elements to define the schema for the system (as opposed to schema for a project).
+   The schema contains three 'name' attributes that are :db.unique/identity unique and not part of the serialization for shop3.
+   These are :method/name, :operator/name and :axiom/name. (In contrast, :domain/name IS part of the shop3 serialization.)
+   The purpose of these is to allow DB-based management of in plan elements in the context of authoring and refining through the UI.
+   A naming convention is used for these three where the name of the domain is prefixed with a dot; thus 'zeno."
   {;; ---------------------- assignment
    :assign/exp
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref,
@@ -685,10 +697,13 @@
    ;; ---------------------- axiom
    :axiom/case-name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol
-        :doc "a unique name for the axiom; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
+       :doc  "a name for the axiom case; the name is unique only in the context of this axiom."}
    :axiom/head
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the LHS atom of the axiom."}
+   :axiom/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity,
+        :doc "A DB-unique name for the axiom"}
    :axiom/rhs
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the RHS of this case of the axiom"}
@@ -719,8 +734,8 @@
 
    ;; ----------------------- domain
    :domain/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol, :unique :db.unique/identity,
-        :doc "a unique name for the domain."}
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
+        :doc "a DB-unique name for the domain."}
    :domain/elems
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "The methods, operators and axioms of the domain."}
@@ -767,20 +782,20 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref,
            :doc "a atom indicating task to be completed."}
    :method/case-name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol, :unique :db.unique/identity,
-        :doc "a unique name for the method case; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
-   :method/name ; ToDo: Not yet used.
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol,
+        :doc "a name for the method case; the name is unique only in the context of this method."}
+   :method/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
-           :doc "a unique name for the method; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
+           :doc "a DB-unique name for the method; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
    :method/preconditions
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "atoms indicating what must be true in order to apply the method."}
    :method/rhs-pairs
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "Pairs of conditions and action of a method."}
-   :method/tasks
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "atoms describing a means to achieve the head literal."}
+   :method/task-list
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref,
+        :doc "a single object of :sys/typ = :task-list describing a sequence of tasks to achieve the head literal."}
 
    ;; ---------------------- operation
    :operator/a-list
@@ -797,7 +812,7 @@
         :doc "the head atom of an operation."}
    :operator/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
-        :doc "a unique name for the operation; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
+        :doc "a DB-unique name for the operation; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
    :operator/preconds
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "preconditions of the operation"}
@@ -843,6 +858,10 @@
         :doc "the operator of the s-expression."}
 
    ;; ---------------------- system
+   :sys/body
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref,
+        :doc "the body of a method, operator, or axiom, ensuring (by virtue of :db.cardinality/one) that it replaces, rather than adds."}
+
    :sys/typ
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
         :doc "a keyword indicating the type of the object; it is used to select a serialization method."}
@@ -866,18 +885,9 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
         :doc "when true, indicates that the atoms in task-list can be performed in any order. Ordered is the default."}})
 
-;;;=============================== Serialization ================================================
-
-(defn get-domain [name]
-  (when-let [eid (d/q '[:find ?e .
-                        :in $ $name
-                        :where [?e :domain/name $name]]
-                      @(connect-atm :system)
-                      name)]
-    (sutil/resolve-db-id {:db/id eid} (connect-atm :system) #{:db/id})))
-
-(defmacro defserialize [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod serialize ~tag [~obj & [~@more-args]]
+;;;=============================== Serialization (DB structures as SHOP code) ================================================
+(defmacro defrew2shop [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  `(defmethod rew2shop ~tag [~obj & [~@more-args]]
      (when *debugging?* (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
      (swap! locals #(into [{}] %))
@@ -889,1746 +899,202 @@
            (println (cl-format nil "~A<-- ~A returns ~S" (sutil/nspaces (count @tags)) ~tag result#)))
          result#))))
 
-;;; Things with :sys/typ:
-;;    :assignment :atom :axiom :call-term :conjunction :disjunction :domain :eval :implication :list-term :method
-;;;   :op-call :op-universal :operator :s-exp :sort-by :task-list :universal
-(defn serialize-dispatch
-  "Allow calls of two forms: (serialize exp) (serialize exp :some-method-key)."
+(defn rew2shop-dispatch
+  "Allow calls of two forms: (rew2shop exp) (rew2shop exp :some-method-key).
+   Things with :sys/typ:
+   :assignment :atom :axiom :call-term :conjunction :disjunction :domain :eval :implication :list-term :method
+   :op-call :op-universal :operator :s-exp :sort-by :task-list :universal."
   [exp & [specified]]
-  (cond specified                                   specified
-        (and (map? exp) (contains? exp :sys/typ))   (:sys/typ exp)
-        (contains? exp :box/sym)                    :box
-        (contains? exp :box/num)                    :box
-        (contains? exp :box/str)                    :box
+  (cond specified                                        specified
+        (and (map? exp) (contains? exp :sys/typ))        (:sys/typ exp)
+        (or (symbol? exp) (number? exp) (string? exp))   :simple-type
+        (contains? exp :sys/body)                        :body
+        (contains? exp :box/sym)                         :box
+        (contains? exp :box/num)                         :box
+        (contains? exp :box/str)                         :box
+        (contains? exp :s-exp/arg-val)                   :arg-val
         :else (throw (ex-info "No dispatch value for exp" {:exp exp}))))
 
-(defmulti serialize #'serialize-dispatch)
+(defmulti rew2shop #'rew2shop-dispatch)
 
-(defserialize :domain [exp]
-  `(~'defdomain ~(:domain/name exp)
-    ~(for [e (->> exp :domain/elems (sort-by :sys/pos #_:domain/elem-pos))]
-      (serialize e))))
+(defrew2shop :domain [{:domain/keys [name elems]}]
+  `(~'defdomain ~(symbol name)
+    ~(for [e (sort-by :sys/pos elems)]
+       (rew2shop e))))
 
-(defserialize :axiom [{:axiom/keys [head rhs]}]
-  `(:-
-    ~(serialize head :atom)
-    ~@(map #(serialize % :rhs) (sort-by :sys/pos rhs))))
+;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
+(defrew2shop :method [{:method/keys [head rhs-pairs] :as exp}]
+  (reset! diag exp)
+  `(:method ~(rew2shop head :atom)
+            ~@(mapcat #(rew2shop % :rhs-pair) rhs-pairs))) ; ToDo: Needs :sys/pos.
 
-(defserialize :rhs [{:rhs/keys [terms case-name]}]
-  (let [res (serialize terms)] ; ToDo: terms is a misnomer. Uses :sys/typ :conjunction.
+(defrew2shop :axiom [{:axiom/keys [head rhs] :as exp}]
+  (reset! diag exp)
+  (let [h (rew2shop head :atom)]
+    (if rhs
+      `(:- ~h ~@(map #(rew2shop % :rhs) (sort-by :sys/pos rhs)))
+      `(:- ~h ()))))
+
+
+(defrew2shop :operator [{:operator/keys [head preconds d-list a-list cost] :as exp}]
+  (reset! diag exp)
+  (let [pre (map rew2shop (->> preconds (sort-by :sys/pos) (map :precond/exp)))
+        del (map rew2shop (->> d-list   (sort-by :sys/pos)))
+        add (map rew2shop (->> a-list   (sort-by :sys/pos)))
+        res `(:operator
+              ~(rew2shop head)
+              ~pre
+              ~(if (-> del first symbol?) (first del) del)
+              ~(if (-> add first symbol?) (first add) add))]
+    (if cost
+      (->> cost rew2shop (conj (vec res)) seq)
+      res)))
+
+;;; --------------- Supporting serialization ------------------------
+(defrew2shop :body [exp] (rew2shop (:sys/body exp)))
+
+(defrew2shop :simple-type [exp] exp)
+
+(defrew2shop :rhs [{:rhs/keys [terms case-name]}]
+  (let [res (rew2shop terms)] ; ToDo: terms is a misnomer. Uses :sys/typ :conjunction.
     (if case-name
       `(~case-name ~res)
       res)))
 
-#_(defserialize :atom [{:atom/keys [predicate roles] :exp/keys [negated?]}]
-  (let [atom `(~predicate ~@(map #(serialize % :role) (sort-by :sys/pos roles)))]
-    (if negated? `(~'not ~atom) atom)))
-#_(defserialize :role [{:role/keys [val]}] (serialize val))
-
-(defserialize :atom [{:atom/keys [predicate roles] :exp/keys [negated?]}]
-  (let [atom `(~predicate ~@(map serialize (->> roles (sort-by :sys/pos) (map :role/val))))]
+(defrew2shop :atom [{:atom/keys [predicate roles] :exp/keys [negated?]}]
+  (let [atom `(~predicate ~@(map rew2shop (->> roles (sort-by :sys/pos) (map :role/val))))]
     (if negated? `(~'not ~atom) atom)))
 
-(defserialize :box [{:box/keys [sym num str]}] (or sym num str))
+(defrew2shop :box [{:box/keys [sym num str]}] (or sym num str))
 
-(defserialize :conjunction [{:conjunction/keys [terms]}]
-  (map serialize terms))
+(defrew2shop :conjunction [{:conjunction/keys [terms]}]
+  (map rew2shop terms))
 
-'(serialize '{:sys/typ :eval,
-             :eval/form
-             #:s-exp{:fn-ref eval,
-                     :args
-                     [{:s-exp/fn-ref >=,
-                       :s-exp/args
-                       [{:s-exp/arg-val #:box{:sym ?fuel}, :sys/pos 1}
-                        {:s-exp/fn-ref *,
-                         :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-                         :sys/pos 2}],
-                       :sys/pos 1}]}})
+(defrew2shop :eval [{:eval/keys [form]}] (rew2shop form)) ; It is just an s-exp, I think.
 
-(defserialize :eval [{:eval/keys [form]}] `(~'eval ~(serialize form)))
+(defrew2shop :s-exp [{:s-exp/keys [fn-ref args]}]
+  `(~fn-ref ~@(map rew2shop (->> args (sort-by :sys/pos)))))
 
-(defserialize :s-exp [{:s-exp/keys [fn-ref args]}]
-  `((~'function '~fn-ref) ~@(map serialize (->> args (sort-by :sys/pos) :s-exp/args (map :s-exp/arg-val)))))
+(defrew2shop :arg-val [{:s-exp/keys [arg-val]}]
+  (rew2shop arg-val))
 
-(defserialize :assignment [{:assign/keys [var exp]}]
-  `(:assign ~var ~(serialize exp)))
+(defrew2shop :assignment [{:assign/keys [var exp]}]
+  `(~'assign ~var ~(rew2shop exp)))
 
-(defserialize :method [exp] :method)
-(defserialize :operator [exp] :operator)
-(defserialize :call-term [ex] :nyi)
-(defserialize :disjunction [ex] :nyi)
-(defserialize :implication [ex] :nyi)
-(defserialize :list-term [ex] :nyi)
-(defserialize :op-call [ex] :nyi)
-(defserialize :op-universal [ex] :nyi)
-(defserialize :sort-by [ex] :nyi)
-(defserialize :task-list [ex] :nyi)
-(defserialize :universal [ex] :nyi)
+(defrew2shop :rhs-pair [{:method/keys [case-name preconditions task-list]}]
+  (let [pres (if (-> preconditions vector?)
+               (->> preconditions (sort-by :sys/pos) (map rew2shop))
+               (if (empty? preconditions) '() (rew2shop preconditions)))
+        res `(~pres ~(rew2shop task-list :task-list))]
+    (if case-name
+      (conj res case-name)
+      res)))
 
-(def zeno-for-db
-  '{:domain/name ZENOTRAVEL,
- :sys/typ :domain,
- :domain/elems
- [{:sys/typ :axiom,
-   :axiom/head
-   {:sys/typ :atom, :atom/predicate same, :atom/roles [{:role/val #:box{:sym ?x}, :sys/pos 1} {:role/val #:box{:sym ?x}, :sys/pos 2}]},
-   :axiom/rhs [],
-   :sys/pos 1}
-  {:sys/typ :axiom,
-   :axiom/head
-   {:sys/typ :atom,
-    :atom/predicate different,
-    :atom/roles [{:role/val #:box{:sym ?x}, :sys/pos 1} {:role/val #:box{:sym ?y}, :sys/pos 2}]},
-   :axiom/rhs
-   [{:sys/pos 1,
-     :rhs/terms
-     {:conjunction/terms
-      [{:sys/typ :atom,
-        :atom/predicate same,
-        :atom/roles [{:role/val #:box{:sym ?x}, :sys/pos 1} {:role/val #:box{:sym ?y}, :sys/pos 2}],
-        :exp/negated? true}],
-      :sys/typ :conjunction}}],
-   :sys/pos 2}
-  {:sys/typ :axiom,
-   :axiom/head {:sys/typ :atom, :atom/predicate possible-person-in, :atom/roles [{:role/val #:box{:sym ?city}, :sys/pos 1}]},
-   :axiom/rhs
-   [{:sys/pos 1,
-     :rhs/terms
-     {:conjunction/terms
-      [{:sys/typ :atom, :atom/predicate person, :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1}]}
-       {:sys/typ :atom, :atom/predicate at, :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?city}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate goal,
-        :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?city2}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate different,
-        :atom/roles [{:role/val #:box{:sym ?city2}, :sys/pos 1} {:role/val #:box{:sym ?city}, :sys/pos 2}]}],
-      :sys/typ :conjunction}}],
-   :sys/pos 3}
-  {:sys/typ :operator,
-   :operator/head {:sys/typ :atom, :atom/predicate !!cost, :atom/roles [{:role/val #:box{:sym ?end}, :sys/pos 1}]},
-   :operator/preconds
-   [{:precond/exp {:sys/typ :atom, :atom/predicate maxtime, :atom/roles [{:role/val #:box{:sym ?max}, :sys/pos 1}]}, :sys/pos 1}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?newmax,
-      :assign/exp
-      {:s-exp/fn-ref eval,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/fn-ref if,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref <,
-           :sys/typ :s-exp,
-           :s-exp/args [{:s-exp/arg-val #:box{:sym ?max}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?end}, :sys/pos 2}],
-           :sys/pos 1}
-          {:s-exp/arg-val #:box{:sym ?end}, :sys/pos 2}
-          {:s-exp/arg-val #:box{:sym ?max}, :sys/pos 3}],
-         :sys/pos 1}]}},
-     :sys/pos 2}],
-   :operator/d-list [{:sys/typ :atom, :atom/predicate maxtime, :atom/roles [{:role/val #:box{:sym ?max}, :sys/pos 1}], :sys/pos 1}],
-   :operator/a-list [{:sys/typ :atom, :atom/predicate maxtime, :atom/roles [{:role/val #:box{:sym ?newmax}, :sys/pos 1}], :sys/pos 1}],
-   :operator/cost
-   {:s-exp/fn-ref -,
-    :sys/typ :s-exp,
-    :s-exp/args [{:s-exp/arg-val #:box{:sym ?newmax}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?max}, :sys/pos 2}]},
-   :sys/pos 4}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate board,
-    :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2} {:role/val #:box{:sym ?c}, :sys/pos 3}]},
-   :method/rhs-pairs
-   [#:method{:preconditions
-             [{:sys/typ :atom,
-               :atom/predicate write-time,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?start}, :sys/pos 2}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate !board,
-                :atom/roles
-                [{:role/val #:box{:sym ?p}, :sys/pos 1}
-                 {:role/val #:box{:sym ?a}, :sys/pos 2}
-                 {:role/val #:box{:sym ?c}, :sys/pos 3}
-                 {:role/val #:box{:sym ?start}, :sys/pos 4}
-                 {:role/val #:box{:num 1}, :sys/pos 5}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate !!cost,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :call-term,
-                   :call/fn +,
-                   :call/args [{:s-exp/fn-ref ?start, :sys/typ :s-exp, :sys/pos 1} {:box/num 1, :sys/pos 2}]},
-                  :sys/pos 1}],
-                :task/immediate? true,
-                :sys/pos 2}]}}],
-   :sys/pos 5}
-  {:sys/typ :operator,
-   :operator/head
-   {:sys/typ :atom,
-    :atom/predicate !board,
-    :atom/roles
-    [{:role/val #:box{:sym ?p}, :sys/pos 1}
-     {:role/val #:box{:sym ?a}, :sys/pos 2}
-     {:role/val #:box{:sym ?c}, :sys/pos 3}
-     {:role/val #:box{:sym ?start}, :sys/pos 4}
-     {:role/val #:box{:sym ?duration}, :sys/pos 5}]},
-   :operator/preconds
-   [{:precond/exp {:sys/typ :atom, :atom/predicate person, :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1}]}, :sys/pos 1}
-    {:precond/exp {:sys/typ :atom, :atom/predicate aircraft, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]}, :sys/pos 2}
-    {:precond/exp {:sys/typ :atom, :atom/predicate city, :atom/roles [{:role/val #:box{:sym ?c}, :sys/pos 1}]}, :sys/pos 3}
-    {:precond/exp
-     {:sys/typ :atom, :atom/predicate at, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]},
-     :sys/pos 4}
-    {:precond/exp
-     {:sys/typ :atom, :atom/predicate at, :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]},
-     :sys/pos 5}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate onboard,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?num}, :sys/pos 2}]},
-     :sys/pos 6}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate read-time,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?pmax}, :sys/pos 2}]},
-     :sys/pos 7}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?new-num,
-      :assign/exp
-      {:s-exp/fn-ref +,
-       :sys/typ :s-exp,
-       :s-exp/args [{:s-exp/arg-val #:box{:sym ?num}, :sys/pos 1} {:s-exp/arg-val #:box{:num 1}, :sys/pos 2}]}},
-     :sys/pos 8}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?newpmax,
-      :assign/exp
-      {:s-exp/fn-ref max,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/arg-val #:box{:sym ?pmax}, :sys/pos 1}
-        {:s-exp/fn-ref +,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/arg-val #:box{:sym ?start}, :sys/pos 1}
-          {:s-exp/arg-val #:box{:sym ?duration}, :sys/pos 2}
-          {:s-exp/arg-val #:box{:num 0.01}, :sys/pos 3}],
-         :sys/pos 2}]}},
-     :sys/pos 9}],
-   :operator/d-list
-   [{:sys/typ :atom,
-     :atom/predicate onboard,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?num}, :sys/pos 2}],
-     :sys/pos 1}
-    {:sys/typ :atom,
-     :atom/predicate read-time,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?pmax}, :sys/pos 2}],
-     :sys/pos 2}
-    {:sys/typ :atom,
-     :atom/predicate at,
-     :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}],
-     :sys/pos 3}
-    {:sys/typ :atom,
-     :atom/predicate dest,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}],
-     :sys/pos 4}],
-   :operator/a-list
-   [{:sys/typ :atom,
-     :atom/predicate onboard,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?new-num}, :sys/pos 2}],
-     :sys/pos 1}
-    {:sys/typ :atom,
-     :atom/predicate read-time,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?newpmax}, :sys/pos 2}],
-     :sys/pos 2}
-    {:sys/typ :atom,
-     :atom/predicate in,
-     :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2}],
-     :sys/pos 3}],
-   :operator/cost #:box{:num 0.001},
-   :sys/pos 6}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate debark,
-    :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2} {:role/val #:box{:sym ?c}, :sys/pos 3}]},
-   :method/rhs-pairs
-   [#:method{:preconditions
-             [{:sys/typ :atom,
-               :atom/predicate write-time,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?start}, :sys/pos 2}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate !debark,
-                :atom/roles
-                [{:role/val #:box{:sym ?p}, :sys/pos 1}
-                 {:role/val #:box{:sym ?a}, :sys/pos 2}
-                 {:role/val #:box{:sym ?c}, :sys/pos 3}
-                 {:role/val #:box{:sym ?start}, :sys/pos 4}
-                 {:role/val #:box{:num 1}, :sys/pos 5}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate !!cost,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :call-term,
-                   :call/fn +,
-                   :call/args [{:s-exp/fn-ref ?start, :sys/typ :s-exp, :sys/pos 1} {:box/num 1, :sys/pos 2}]},
-                  :sys/pos 1}],
-                :task/immediate? true,
-                :sys/pos 2}]}}],
-   :sys/pos 7}
-  {:sys/typ :operator,
-   :operator/head
-   {:sys/typ :atom,
-    :atom/predicate !debark,
-    :atom/roles
-    [{:role/val #:box{:sym ?p}, :sys/pos 1}
-     {:role/val #:box{:sym ?a}, :sys/pos 2}
-     {:role/val #:box{:sym ?c}, :sys/pos 3}
-     {:role/val #:box{:sym ?start}, :sys/pos 4}
-     {:role/val #:box{:sym ?duration}, :sys/pos 5}]},
-   :operator/preconds
-   [{:precond/exp {:sys/typ :atom, :atom/predicate person, :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1}]}, :sys/pos 1}
-    {:precond/exp {:sys/typ :atom, :atom/predicate aircraft, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]}, :sys/pos 2}
-    {:precond/exp {:sys/typ :atom, :atom/predicate city, :atom/roles [{:role/val #:box{:sym ?c}, :sys/pos 1}]}, :sys/pos 3}
-    {:precond/exp
-     {:sys/typ :atom, :atom/predicate at, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]},
-     :sys/pos 4}
-    {:precond/exp
-     {:sys/typ :atom, :atom/predicate in, :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2}]},
-     :sys/pos 5}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate onboard,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?num}, :sys/pos 2}]},
-     :sys/pos 6}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate read-time,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?pmax}, :sys/pos 2}]},
-     :sys/pos 7}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?new-num,
-      :assign/exp
-      {:s-exp/fn-ref -,
-       :sys/typ :s-exp,
-       :s-exp/args [{:s-exp/arg-val #:box{:sym ?num}, :sys/pos 1} {:s-exp/arg-val #:box{:num 1}, :sys/pos 2}]}},
-     :sys/pos 8}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?newpmax,
-      :assign/exp
-      {:s-exp/fn-ref max,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/arg-val #:box{:sym ?pmax}, :sys/pos 1}
-        {:s-exp/fn-ref +,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/arg-val #:box{:sym ?start}, :sys/pos 1}
-          {:s-exp/arg-val #:box{:sym ?duration}, :sys/pos 2}
-          {:s-exp/arg-val #:box{:num 0.01}, :sys/pos 3}],
-         :sys/pos 2}]}},
-     :sys/pos 9}],
-   :operator/d-list
-   [{:sys/typ :atom,
-     :atom/predicate onboard,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?num}, :sys/pos 2}],
-     :sys/pos 1}
-    {:sys/typ :atom,
-     :atom/predicate read-time,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?pmax}, :sys/pos 2}],
-     :sys/pos 2}
-    {:sys/typ :atom,
-     :atom/predicate in,
-     :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2}],
-     :sys/pos 3}
-    {:sys/typ :atom,
-     :atom/predicate dest,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}],
-     :sys/pos 4}],
-   :operator/a-list
-   [{:sys/typ :atom,
-     :atom/predicate onboard,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?new-num}, :sys/pos 2}],
-     :sys/pos 1}
-    {:sys/typ :atom,
-     :atom/predicate read-time,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?newpmax}, :sys/pos 2}],
-     :sys/pos 2}
-    {:sys/typ :atom,
-     :atom/predicate at,
-     :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}],
-     :sys/pos 3}],
-   :operator/cost #:box{:num 0.001},
-   :sys/pos 8}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom, :atom/predicate refuel, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]},
-   :method/rhs-pairs
-   [#:method{:preconditions
-             [{:sys/typ :atom,
-               :atom/predicate write-time,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?start}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate read-time,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?pmax}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate capacity,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?cap}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate fuel,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate eval,
-               :atom/roles
-               [{:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym >}, :sys/pos 1}
-                   {:list/val #:box{:sym ?cap}, :sys/pos 2}
-                   {:list/val #:box{:sym ?fuel}, :sys/pos 3}]},
-                 :sys/pos 1}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles [{:role/val #:box{:sym ?duration}, :sys/pos 1} {:role/val #:box{:num 1}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles
-               [{:role/val #:box{:sym ?end}, :sys/pos 1}
-                {:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym +}, :sys/pos 1}
-                   {:list/val #:box{:sym ?start}, :sys/pos 2}
-                   {:list/val #:box{:sym ?duration}, :sys/pos 3}
-                   {:list/val #:box{:num 0.01}, :sys/pos 4}]},
-                 :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles
-               [{:role/val #:box{:sym ?newpmax}, :sys/pos 1}
-                {:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym max}, :sys/pos 1}
-                   {:list/val #:box{:sym ?pmax}, :sys/pos 2}
-                   {:list/val #:box{:sym ?end}, :sys/pos 3}]},
-                 :sys/pos 2}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate !!ra,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym read-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?pmax}, :sys/pos 3}]},
-                     :sys/pos 1}]},
-                  :sys/pos 1}
-                 {:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym read-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?newpmax}, :sys/pos 3}]},
-                     :sys/pos 1}]},
-                  :sys/pos 2}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate !refuel,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1}
-                 {:role/val #:box{:sym ?c}, :sys/pos 2}
-                 {:role/val #:box{:sym ?start}, :sys/pos 3}
-                 {:role/val #:box{:sym ?duration}, :sys/pos 4}],
-                :task/immediate? true,
-                :sys/pos 2}
-               {:sys/typ :atom,
-                :atom/predicate !!cost,
-                :atom/roles [{:role/val #:box{:sym ?end}, :sys/pos 1}],
-                :task/immediate? true,
-                :sys/pos 3}]}}],
-   :sys/pos 9}
-  {:sys/typ :operator,
-   :operator/head
-   {:sys/typ :atom,
-    :atom/predicate !refuel,
-    :atom/roles
-    [{:role/val #:box{:sym ?a}, :sys/pos 1}
-     {:role/val #:box{:sym ?c}, :sys/pos 2}
-     {:role/val #:box{:sym ?start}, :sys/pos 3}
-     {:role/val #:box{:sym ?duration}, :sys/pos 4}]},
-   :operator/preconds
-   [{:precond/exp {:sys/typ :atom, :atom/predicate aircraft, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]}, :sys/pos 1}
-    {:precond/exp {:sys/typ :atom, :atom/predicate city, :atom/roles [{:role/val #:box{:sym ?c}, :sys/pos 1}]}, :sys/pos 2}
-    {:precond/exp
-     {:sys/typ :atom, :atom/predicate at, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]},
-     :sys/pos 3}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate fuel,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]},
-     :sys/pos 4}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate capacity,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?cap}, :sys/pos 2}]},
-     :sys/pos 5}],
-   :operator/d-list
-   [{:sys/typ :atom,
-     :atom/predicate fuel,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}],
-     :sys/pos 1}],
-   :operator/a-list
-   [{:sys/typ :atom,
-     :atom/predicate fuel,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?cap}, :sys/pos 2}],
-     :sys/pos 1}],
-   :operator/cost #:box{:num 0.001},
-   :sys/pos 10}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate zoom,
-    :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2} {:role/val #:box{:sym ?c2}, :sys/pos 3}]},
-   :method/rhs-pairs
-   [#:method{:preconditions
-             [{:sys/typ :atom,
-               :atom/predicate write-time,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?astart}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate read-time,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?pmax}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate distance,
-               :atom/roles
-               [{:role/val #:box{:sym ?c1}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-              {:sys/typ :atom,
-               :atom/predicate fuel,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate fast-burn,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate eval,
-               :atom/roles
-               [{:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym >=}, :sys/pos 1}
-                   {:list/val #:box{:sym ?fuel}, :sys/pos 2}
-                   {:list/val
-                    {:sys/typ :list-term,
-                     :list/terms
-                     [{:list/val #:box{:sym *}, :sys/pos 1}
-                      {:list/val #:box{:sym ?dist}, :sys/pos 2}
-                      {:list/val #:box{:sym ?burn}, :sys/pos 3}]},
-                    :sys/pos 3}]},
-                 :sys/pos 1}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles [{:role/val #:box{:sym ?duration}, :sys/pos 1} {:role/val #:box{:num 1}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles
-               [{:role/val #:box{:sym ?start}, :sys/pos 1}
-                {:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym max}, :sys/pos 1}
-                   {:list/val #:box{:sym ?pmax}, :sys/pos 2}
-                   {:list/val #:box{:sym ?astart}, :sys/pos 3}]},
-                 :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles
-               [{:role/val #:box{:sym ?end}, :sys/pos 1}
-                {:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym +}, :sys/pos 1}
-                   {:list/val #:box{:sym ?start}, :sys/pos 2}
-                   {:list/val #:box{:sym ?duration}, :sys/pos 3}
-                   {:list/val #:box{:num 0.01}, :sys/pos 4}]},
-                 :sys/pos 2}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate !!ra,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym write-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?astart}, :sys/pos 3}]},
-                     :sys/pos 1}
-                    {:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym read-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?pmax}, :sys/pos 3}]},
-                     :sys/pos 2}]},
-                  :sys/pos 1}
-                 {:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym read-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:num 0}, :sys/pos 3}]},
-                     :sys/pos 1}
-                    {:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym write-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?end}, :sys/pos 3}]},
-                     :sys/pos 2}]},
-                  :sys/pos 2}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate !zoom,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1}
-                 {:role/val #:box{:sym ?c1}, :sys/pos 2}
-                 {:role/val #:box{:sym ?c2}, :sys/pos 3}
-                 {:role/val #:box{:sym ?start}, :sys/pos 4}
-                 {:role/val #:box{:sym ?duration}, :sys/pos 5}],
-                :task/immediate? true,
-                :sys/pos 2}
-               {:sys/typ :atom,
-                :atom/predicate !!cost,
-                :atom/roles [{:role/val #:box{:sym ?end}, :sys/pos 1}],
-                :task/immediate? true,
-                :sys/pos 3}]}}],
-   :sys/pos 11}
-  {:sys/typ :operator,
-   :operator/head
-   {:sys/typ :atom,
-    :atom/predicate !zoom,
-    :atom/roles
-    [{:role/val #:box{:sym ?a}, :sys/pos 1}
-     {:role/val #:box{:sym ?c1}, :sys/pos 2}
-     {:role/val #:box{:sym ?c2}, :sys/pos 3}
-     {:role/val #:box{:sym ?start}, :sys/pos 4}
-     {:role/val #:box{:sym ?duration}, :sys/pos 5}]},
-   :operator/preconds
-   [{:precond/exp {:sys/typ :atom, :atom/predicate aircraft, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]}, :sys/pos 1}
-    {:precond/exp {:sys/typ :atom, :atom/predicate city, :atom/roles [{:role/val #:box{:sym ?c1}, :sys/pos 1}]}, :sys/pos 2}
-    {:precond/exp {:sys/typ :atom, :atom/predicate city, :atom/roles [{:role/val #:box{:sym ?c2}, :sys/pos 1}]}, :sys/pos 3}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate onboard,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?num}, :sys/pos 2}]},
-     :sys/pos 4}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate zoom-limit,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?limit}, :sys/pos 2}]},
-     :sys/pos 5}
-    {:precond/exp
-     {:sys/typ :eval,
-      :eval/form
-      {:s-exp/fn-ref eval,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/fn-ref <=,
-         :sys/typ :s-exp,
-         :s-exp/args [{:s-exp/arg-val #:box{:sym ?num}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?limit}, :sys/pos 2}],
-         :sys/pos 1}]}},
-     :sys/pos 6}
-    {:precond/exp
-     {:sys/typ :atom, :atom/predicate at, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}]},
-     :sys/pos 7}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate distance,
-      :atom/roles
-      [{:role/val #:box{:sym ?c1}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]},
-     :sys/pos 8}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate fast-burn,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]},
-     :sys/pos 9}
-    {:precond/exp {:sys/typ :atom, :atom/predicate total-fuel-used, :atom/roles [{:role/val #:box{:sym ?total-fuel}, :sys/pos 1}]},
-     :sys/pos 10}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?new-total,
-      :assign/exp
-      {:s-exp/fn-ref +,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/arg-val #:box{:sym ?total-fuel}, :sys/pos 1}
-        {:s-exp/fn-ref *,
-         :sys/typ :s-exp,
-         :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-         :sys/pos 2}]}},
-     :sys/pos 11}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate fuel,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]},
-     :sys/pos 12}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?new-fuel,
-      :assign/exp
-      {:s-exp/fn-ref -,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/arg-val #:box{:sym ?fuel}, :sys/pos 1}
-        {:s-exp/fn-ref *,
-         :sys/typ :s-exp,
-         :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-         :sys/pos 2}]}},
-     :sys/pos 13}],
-   :operator/d-list
-   [{:sys/typ :atom,
-     :atom/predicate at,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}],
-     :sys/pos 1}
-    {:sys/typ :atom, :atom/predicate total-fuel-used, :atom/roles [{:role/val #:box{:sym ?total-fuel}, :sys/pos 1}], :sys/pos 2}
-    {:sys/typ :atom,
-     :atom/predicate fuel,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}],
-     :sys/pos 3}],
-   :operator/a-list
-   [{:sys/typ :atom,
-     :atom/predicate at,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2}],
-     :sys/pos 1}
-    {:sys/typ :atom, :atom/predicate total-fuel-used, :atom/roles [{:role/val #:box{:sym ?new-total}, :sys/pos 1}], :sys/pos 2}
-    {:sys/typ :atom,
-     :atom/predicate fuel,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?new-fuel}, :sys/pos 2}],
-     :sys/pos 3}],
-   :operator/cost #:box{:num 0.001},
-   :sys/pos 12}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate fly,
-    :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2} {:role/val #:box{:sym ?c2}, :sys/pos 3}]},
-   :method/rhs-pairs
-   [#:method{:preconditions
-             [{:sys/typ :atom,
-               :atom/predicate write-time,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?astart}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate read-time,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?pmax}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate distance,
-               :atom/roles
-               [{:role/val #:box{:sym ?c1}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-              {:sys/typ :atom,
-               :atom/predicate fuel,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate slow-burn,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate eval,
-               :atom/roles
-               [{:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym >=}, :sys/pos 1}
-                   {:list/val #:box{:sym ?fuel}, :sys/pos 2}
-                   {:list/val
-                    {:sys/typ :list-term,
-                     :list/terms
-                     [{:list/val #:box{:sym *}, :sys/pos 1}
-                      {:list/val #:box{:sym ?dist}, :sys/pos 2}
-                      {:list/val #:box{:sym ?burn}, :sys/pos 3}]},
-                    :sys/pos 3}]},
-                 :sys/pos 1}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles [{:role/val #:box{:sym ?duration}, :sys/pos 1} {:role/val #:box{:num 1}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles
-               [{:role/val #:box{:sym ?start}, :sys/pos 1}
-                {:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym max}, :sys/pos 1}
-                   {:list/val #:box{:sym ?pmax}, :sys/pos 2}
-                   {:list/val #:box{:sym ?astart}, :sys/pos 3}]},
-                 :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate assign,
-               :atom/roles
-               [{:role/val #:box{:sym ?end}, :sys/pos 1}
-                {:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym +}, :sys/pos 1}
-                   {:list/val #:box{:sym ?start}, :sys/pos 2}
-                   {:list/val #:box{:sym ?duration}, :sys/pos 3}
-                   {:list/val #:box{:num 0.01}, :sys/pos 4}]},
-                 :sys/pos 2}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate !!ra,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym write-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?astart}, :sys/pos 3}]},
-                     :sys/pos 1}
-                    {:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym read-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?pmax}, :sys/pos 3}]},
-                     :sys/pos 2}]},
-                  :sys/pos 1}
-                 {:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym read-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:num 0}, :sys/pos 3}]},
-                     :sys/pos 1}
-                    {:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym write-time}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?end}, :sys/pos 3}]},
-                     :sys/pos 2}]},
-                  :sys/pos 2}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate !fly,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1}
-                 {:role/val #:box{:sym ?c1}, :sys/pos 2}
-                 {:role/val #:box{:sym ?c2}, :sys/pos 3}
-                 {:role/val #:box{:sym ?start}, :sys/pos 4}
-                 {:role/val #:box{:sym ?duration}, :sys/pos 5}],
-                :task/immediate? true,
-                :sys/pos 2}
-               {:sys/typ :atom,
-                :atom/predicate !!cost,
-                :atom/roles [{:role/val #:box{:sym ?end}, :sys/pos 1}],
-                :task/immediate? true,
-                :sys/pos 3}]}}],
-   :sys/pos 13}
-  {:sys/typ :operator,
-   :operator/head
-   {:sys/typ :atom,
-    :atom/predicate !fly,
-    :atom/roles
-    [{:role/val #:box{:sym ?a}, :sys/pos 1}
-     {:role/val #:box{:sym ?c1}, :sys/pos 2}
-     {:role/val #:box{:sym ?c2}, :sys/pos 3}
-     {:role/val #:box{:sym ?start}, :sys/pos 4}
-     {:role/val #:box{:sym ?duration}, :sys/pos 5}]},
-   :operator/preconds
-   [{:precond/exp {:sys/typ :atom, :atom/predicate aircraft, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]}, :sys/pos 1}
-    {:precond/exp {:sys/typ :atom, :atom/predicate city, :atom/roles [{:role/val #:box{:sym ?c1}, :sys/pos 1}]}, :sys/pos 2}
-    {:precond/exp {:sys/typ :atom, :atom/predicate city, :atom/roles [{:role/val #:box{:sym ?c2}, :sys/pos 1}]}, :sys/pos 3}
-    {:precond/exp
-     {:sys/typ :atom, :atom/predicate at, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}]},
-     :sys/pos 4}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate distance,
-      :atom/roles
-      [{:role/val #:box{:sym ?c1}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]},
-     :sys/pos 5}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate slow-burn,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]},
-     :sys/pos 6}
-    {:precond/exp {:sys/typ :atom, :atom/predicate total-fuel-used, :atom/roles [{:role/val #:box{:sym ?total-fuel}, :sys/pos 1}]},
-     :sys/pos 7}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?new-total,
-      :assign/exp
-      {:s-exp/fn-ref +,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/arg-val #:box{:sym ?total-fuel}, :sys/pos 1}
-        {:s-exp/fn-ref *,
-         :sys/typ :s-exp,
-         :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-         :sys/pos 2}]}},
-     :sys/pos 8}
-    {:precond/exp
-     {:sys/typ :atom,
-      :atom/predicate fuel,
-      :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]},
-     :sys/pos 9}
-    {:precond/exp
-     {:sys/typ :assignment,
-      :assign/var ?new-fuel,
-      :assign/exp
-      {:s-exp/fn-ref -,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/arg-val #:box{:sym ?fuel}, :sys/pos 1}
-        {:s-exp/fn-ref *,
-         :sys/typ :s-exp,
-         :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-         :sys/pos 2}]}},
-     :sys/pos 10}],
-   :operator/d-list
-   [{:sys/typ :atom,
-     :atom/predicate at,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}],
-     :sys/pos 1}
-    {:sys/typ :atom, :atom/predicate total-fuel-used, :atom/roles [{:role/val #:box{:sym ?total-fuel}, :sys/pos 1}], :sys/pos 2}
-    {:sys/typ :atom,
-     :atom/predicate fuel,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}],
-     :sys/pos 3}],
-   :operator/a-list
-   [{:sys/typ :atom,
-     :atom/predicate at,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2}],
-     :sys/pos 1}
-    {:sys/typ :atom, :atom/predicate total-fuel-used, :atom/roles [{:role/val #:box{:sym ?new-total}, :sys/pos 1}], :sys/pos 2}
-    {:sys/typ :atom,
-     :atom/predicate fuel,
-     :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?new-fuel}, :sys/pos 2}],
-     :sys/pos 3}],
-   :operator/cost #:box{:num 0.001},
-   :sys/pos 14}
-  {:sys/typ :operator,
-   :operator/head {:sys/typ :atom, :atom/predicate !!preprocessing, :atom/roles [{:role/val #:box{:sym ?problem-name}, :sys/pos 1}]},
-   :operator/preconds
-   [{:precond/exp {:sys/typ :atom, :atom/predicate totaltime-coeff, :atom/roles [{:role/val #:box{:sym ?tc}, :sys/pos 1}]}, :sys/pos 1}
-    {:precond/exp {:sys/typ :atom, :atom/predicate fuelused-coeff, :atom/roles [{:role/val #:box{:sym ?fc}, :sys/pos 1}]}, :sys/pos 2}
-    {:precond/exp
-     {:sys/typ :eval,
-      :eval/form
-      {:s-exp/fn-ref eval,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/fn-ref setf,
-         :sys/typ :s-exp,
-         :s-exp/args [{:s-exp/arg-val #:box{:sym *tc*}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?tc}, :sys/pos 2}],
-         :sys/pos 1}]}},
-     :sys/pos 3}
-    {:precond/exp
-     {:sys/typ :eval,
-      :eval/form
-      {:s-exp/fn-ref eval,
-       :sys/typ :s-exp,
-       :s-exp/args
-       [{:s-exp/fn-ref setf,
-         :sys/typ :s-exp,
-         :s-exp/args [{:s-exp/arg-val #:box{:sym *fc*}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?fc}, :sys/pos 2}],
-         :sys/pos 1}]}},
-     :sys/pos 4}],
-   :operator/cost #:box{:num 0},
-   :sys/pos 15}
-  {:sys/typ :operator,
-   :operator/head {:sys/typ :atom, :atom/predicate !!assert, :atom/roles [{:role/val #:box{:sym ?g}, :sys/pos 1}]},
-   :operator/a-list [{:box/sym ?g, :sys/pos 1}],
-   :operator/cost #:box{:num 0},
-   :sys/pos 16}
-  {:sys/typ :operator,
-   :operator/head
-   {:sys/typ :atom, :atom/predicate !!ra, :atom/roles [{:role/val #:box{:sym ?D}, :sys/pos 1} {:role/val #:box{:sym ?A}, :sys/pos 2}]},
-   :operator/d-list [{:box/sym ?D, :sys/pos 1}],
-   :operator/a-list [{:box/sym ?A, :sys/pos 1}],
-   :operator/cost #:box{:num 0},
-   :sys/pos 17}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate transport-person,
-    :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]},
-   :method/rhs-pairs
-   [#:method{:case-name Case1,
-             :preconditions
-             [{:sys/typ :atom,
-               :atom/predicate at,
-               :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]}]}],
-   :sys/pos 18}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate transport-person,
-    :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2}]},
-   :method/rhs-pairs
-   [#:method{:case-name Case2,
-             :preconditions
-             {:sys/typ :sort-by,
-              :sort-by/var ?num,
-              :sort-by/fn {:s-exp/fn-ref >, :sys/typ :s-exp},
-              :sort-by/exp
-              {:conjunction/terms
-               [{:sys/typ :atom,
-                 :atom/predicate at,
-                 :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}]}
-                {:sys/typ :atom,
-                 :atom/predicate at,
-                 :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}]}
-                {:sys/typ :atom, :atom/predicate aircraft, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]}
-                {:sys/typ :atom,
-                 :atom/predicate onboard,
-                 :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?num}, :sys/pos 2}]}],
-               :sys/typ :conjunction}},
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate !!assert,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym dest}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?c1}, :sys/pos 3}]},
-                     :sys/pos 1}]},
-                  :sys/pos 1}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate board,
-                :atom/roles
-                [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2} {:role/val #:box{:sym ?c1}, :sys/pos 3}],
-                :task/immediate? true,
-                :sys/pos 2}
-               {:sys/typ :atom,
-                :atom/predicate !!assert,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym dest}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?c2}, :sys/pos 3}]},
-                     :sys/pos 1}]},
-                  :sys/pos 1}],
-                :sys/pos 3}
-               {:sys/typ :atom,
-                :atom/predicate upper-move-aircraft-no-style,
-                :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2}],
-                :task/immediate? true,
-                :sys/pos 4}
-               {:sys/typ :atom,
-                :atom/predicate debark,
-                :atom/roles
-                [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2} {:role/val #:box{:sym ?c2}, :sys/pos 3}],
-                :task/immediate? true,
-                :sys/pos 5}]}}],
-   :sys/pos 19}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate transport-person,
-    :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2}]},
-   :method/rhs-pairs
-   [#:method{:case-name Case3,
-             :preconditions
-             {:sys/typ :sort-by,
-              :sort-by/var ?cost,
-              :sort-by/fn {:s-exp/fn-ref <, :sys/typ :s-exp},
-              :sort-by/exp
-              {:conjunction/terms
-               [{:sys/typ :atom,
-                 :atom/predicate at,
-                 :atom/roles [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}]}
-                {:sys/typ :atom, :atom/predicate aircraft, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]}
-                {:sys/typ :atom,
-                 :atom/predicate at,
-                 :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c3}, :sys/pos 2}]}
-                {:sys/typ :atom,
-                 :atom/predicate different,
-                 :atom/roles [{:role/val #:box{:sym ?c1}, :sys/pos 1} {:role/val #:box{:sym ?c3}, :sys/pos 2}]}
-                {:sys/typ :univeral,
-                 :forall/vars [?c],
-                 :forall/conditions
-                 [{:sys/typ :atom,
-                   :atom/predicate dest,
-                   :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]}],
-                 :forall/consequences
-                 [{:sys/typ :atom,
-                   :atom/predicate same,
-                   :atom/roles [{:role/val #:box{:sym ?c}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}]}]}
-                {:sys/typ :implication,
-                 :imply/condition
-                 {:conjunction/terms
-                  [{:sys/typ :atom,
-                    :atom/predicate different,
-                    :atom/roles [{:role/val #:box{:sym ?c3}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}]}],
-                  :sys/typ :conjunction},
-                 :imply/consequence
-                 {:sys/typ :atom,
-                  :atom/predicate possible-person-in,
-                  :atom/roles [{:role/val #:box{:sym ?c3}, :sys/pos 1}],
-                  :exp/negated? true}}
-                {:sys/typ :atom,
-                 :atom/predicate travel-cost-info,
-                 :atom/roles
-                 [{:role/val #:box{:sym ?a}, :sys/pos 1}
-                  {:role/val #:box{:sym ?c3}, :sys/pos 2}
-                  {:role/val #:box{:sym ?c1}, :sys/pos 3}
-                  {:role/val #:box{:sym ?cost}, :sys/pos 4}
-                  {:role/val #:box{:sym ?style}, :sys/pos 5}]}],
-               :sys/typ :conjunction}},
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate !!assert,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym dest}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?c1}, :sys/pos 3}]},
-                     :sys/pos 1}]},
-                  :sys/pos 1}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate upper-move-aircraft,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1}
-                 {:role/val #:box{:sym ?c1}, :sys/pos 2}
-                 {:role/val #:box{:sym ?style}, :sys/pos 3}],
-                :task/immediate? true,
-                :sys/pos 2}
-               {:sys/typ :atom,
-                :atom/predicate board,
-                :atom/roles
-                [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2} {:role/val #:box{:sym ?c1}, :sys/pos 3}],
-                :task/immediate? true,
-                :sys/pos 3}
-               {:sys/typ :atom,
-                :atom/predicate !!assert,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms
-                      [{:list/val #:box{:sym dest}, :sys/pos 1}
-                       {:list/val #:box{:sym ?a}, :sys/pos 2}
-                       {:list/val #:box{:sym ?c2}, :sys/pos 3}]},
-                     :sys/pos 1}]},
-                  :sys/pos 1}],
-                :sys/pos 4}
-               {:sys/typ :atom,
-                :atom/predicate upper-move-aircraft-no-style,
-                :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2}],
-                :task/immediate? true,
-                :sys/pos 5}
-               {:sys/typ :atom,
-                :atom/predicate debark,
-                :atom/roles
-                [{:role/val #:box{:sym ?p}, :sys/pos 1} {:role/val #:box{:sym ?a}, :sys/pos 2} {:role/val #:box{:sym ?c2}, :sys/pos 3}],
-                :task/immediate? true,
-                :sys/pos 6}]}}],
-   :sys/pos 20}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate upper-move-aircraft,
-    :atom/roles
-    [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2} {:role/val #:box{:sym ?style}, :sys/pos 3}]},
-   :method/rhs-pairs
-   [#:method{:case-name Case1,
-             :preconditions
-             [{:sys/typ :atom,
-               :atom/predicate at,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]}]}
-    #:method{:case-name Case2,
-             :preconditions
-             [{:sys/typ :atom,
-               :atom/predicate at,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?somecity}, :sys/pos 2}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate move-aircraft,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1}
-                 {:role/val #:box{:sym ?somecity}, :sys/pos 2}
-                 {:role/val #:box{:sym ?c}, :sys/pos 3}
-                 {:role/val #:box{:sym ?style}, :sys/pos 4}],
-                :sys/pos 1}]}}],
-   :sys/pos 21}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate upper-move-aircraft-no-style,
-    :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]},
-   :method/rhs-pairs
-   [#:method{:case-name Case1,
-             :preconditions
-             [{:sys/typ :atom,
-               :atom/predicate at,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]}]}
-    #:method{:case-name Case2,
-             :preconditions
-             {:sys/typ :sort-by,
-              :sort-by/var ?cost,
-              :sort-by/fn {:s-exp/fn-ref <, :sys/typ :s-exp},
-              :sort-by/exp
-              {:conjunction/terms
-               [{:sys/typ :atom,
-                 :atom/predicate at,
-                 :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?somecity}, :sys/pos 2}]}
-                {:sys/typ :atom,
-                 :atom/predicate travel-cost-info,
-                 :atom/roles
-                 [{:role/val #:box{:sym ?a}, :sys/pos 1}
-                  {:role/val #:box{:sym ?somecity}, :sys/pos 2}
-                  {:role/val #:box{:sym ?c}, :sys/pos 3}
-                  {:role/val #:box{:sym ?cost}, :sys/pos 4}
-                  {:role/val #:box{:sym ?style}, :sys/pos 5}]}],
-               :sys/typ :conjunction}},
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate move-aircraft,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1}
-                 {:role/val #:box{:sym ?somecity}, :sys/pos 2}
-                 {:role/val #:box{:sym ?c}, :sys/pos 3}
-                 {:role/val #:box{:sym ?style}, :sys/pos 4}],
-                :sys/pos 1}]}}],
-   :sys/pos 22}
-  {:sys/typ :axiom,
-   :axiom/head
-   {:sys/typ :atom,
-    :atom/predicate travel-cost-info,
-    :atom/roles
-    [{:role/val #:box{:sym ?a}, :sys/pos 1}
-     {:role/val #:box{:sym ?from}, :sys/pos 2}
-     {:role/val #:box{:sym ?to}, :sys/pos 3}
-     {:role/val #:box{:sym ?cost}, :sys/pos 4}
-     {:role/val #:box{:sym slow}, :sys/pos 5}]},
-   :axiom/rhs
-   [{:rhs/case-name CASE1,
-     :sys/pos 1,
-     :rhs/terms
-     {:conjunction/terms
-      [{:sys/typ :atom,
-        :atom/predicate capacity,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?cap}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate distance,
-        :atom/roles
-        [{:role/val #:box{:sym ?from}, :sys/pos 1} {:role/val #:box{:sym ?to}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-       {:sys/typ :atom,
-        :atom/predicate slow-burn,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-       {:sys/typ :eval,
-        :eval/form
-        {:s-exp/fn-ref eval,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref <,
-           :sys/typ :s-exp,
-           :s-exp/args
-           [{:s-exp/arg-val #:box{:sym ?cap}, :sys/pos 1}
-            {:s-exp/fn-ref *,
-             :sys/typ :s-exp,
-             :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-             :sys/pos 2}],
-           :sys/pos 1}]}}
-       {:sys/typ :atom,
-        :atom/predicate assign,
-        :atom/roles [{:role/val #:box{:sym ?cost}, :sys/pos 1} {:role/val #:box{:sym most-positive-fixnum}, :sys/pos 2}]}],
-      :sys/typ :conjunction}}
-    {:rhs/case-name CASE2,
-     :sys/pos 2,
-     :rhs/terms
-     {:conjunction/terms
-      [{:sys/typ :atom,
-        :atom/predicate distance,
-        :atom/roles
-        [{:role/val #:box{:sym ?from}, :sys/pos 1} {:role/val #:box{:sym ?to}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-       {:sys/typ :atom,
-        :atom/predicate fuel,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate slow-burn,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-       {:sys/typ :eval,
-        :eval/form
-        {:s-exp/fn-ref eval,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref >=,
-           :sys/typ :s-exp,
-           :s-exp/args
-           [{:s-exp/arg-val #:box{:sym ?fuel}, :sys/pos 1}
-            {:s-exp/fn-ref *,
-             :sys/typ :s-exp,
-             :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-             :sys/pos 2}],
-           :sys/pos 1}]}}
-       {:sys/typ :assignment,
-        :assign/var ?cost,
-        :assign/exp
-        {:s-exp/fn-ref float,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref /,
-           :sys/typ :s-exp,
-           :s-exp/args
-           [{:s-exp/fn-ref +,
-             :sys/typ :s-exp,
-             :s-exp/args
-             [{:s-exp/arg-val #:box{:sym *tc*}, :sys/pos 1}
-              {:s-exp/fn-ref *,
-               :sys/typ :s-exp,
-               :s-exp/args
-               [{:s-exp/arg-val #:box{:sym *fc*}, :sys/pos 1}
-                {:s-exp/fn-ref *,
-                 :sys/typ :s-exp,
-                 :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-                 :sys/pos 2}],
-               :sys/pos 2}],
-             :sys/pos 1}
-            {:s-exp/arg-val #:box{:num 1}, :sys/pos 2}],
-           :sys/pos 1}]}}],
-      :sys/typ :conjunction}}
-    {:rhs/case-name CASE3,
-     :sys/pos 3,
-     :rhs/terms
-     {:conjunction/terms
-      [{:sys/typ :atom,
-        :atom/predicate capacity,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?cap}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate distance,
-        :atom/roles
-        [{:role/val #:box{:sym ?from}, :sys/pos 1} {:role/val #:box{:sym ?to}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-       {:sys/typ :atom,
-        :atom/predicate slow-burn,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-       {:sys/typ :assignment,
-        :assign/var ?cost,
-        :assign/exp
-        {:s-exp/fn-ref float,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref /,
-           :sys/typ :s-exp,
-           :s-exp/args
-           [{:s-exp/fn-ref +,
-             :sys/typ :s-exp,
-             :s-exp/args
-             [{:s-exp/fn-ref *,
-               :sys/typ :s-exp,
-               :s-exp/args [{:s-exp/arg-val #:box{:sym *tc*}, :sys/pos 1} {:s-exp/arg-val #:box{:num 2}, :sys/pos 2}],
-               :sys/pos 1}
-              {:s-exp/fn-ref *,
-               :sys/typ :s-exp,
-               :s-exp/args
-               [{:s-exp/arg-val #:box{:sym *fc*}, :sys/pos 1}
-                {:s-exp/fn-ref *,
-                 :sys/typ :s-exp,
-                 :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-                 :sys/pos 2}],
-               :sys/pos 2}],
-             :sys/pos 1}
-            {:s-exp/arg-val #:box{:num 1}, :sys/pos 2}],
-           :sys/pos 1}]}}],
-      :sys/typ :conjunction}}],
-   :sys/pos 23}
-  {:sys/typ :axiom,
-   :axiom/head
-   {:sys/typ :atom,
-    :atom/predicate travel-cost-info,
-    :atom/roles
-    [{:role/val #:box{:sym ?a}, :sys/pos 1}
-     {:role/val #:box{:sym ?from}, :sys/pos 2}
-     {:role/val #:box{:sym ?to}, :sys/pos 3}
-     {:role/val #:box{:sym ?cost}, :sys/pos 4}
-     {:role/val #:box{:sym fast}, :sys/pos 5}]},
-   :axiom/rhs
-   [{:rhs/case-name CASE1,
-     :sys/pos 1,
-     :rhs/terms
-     {:conjunction/terms
-      [{:sys/typ :atom,
-        :atom/predicate capacity,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?cap}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate distance,
-        :atom/roles
-        [{:role/val #:box{:sym ?from}, :sys/pos 1} {:role/val #:box{:sym ?to}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-       {:sys/typ :atom,
-        :atom/predicate fast-burn,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-       {:sys/typ :eval,
-        :eval/form
-        {:s-exp/fn-ref eval,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref <,
-           :sys/typ :s-exp,
-           :s-exp/args
-           [{:s-exp/arg-val #:box{:sym ?cap}, :sys/pos 1}
-            {:s-exp/fn-ref *,
-             :sys/typ :s-exp,
-             :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-             :sys/pos 2}],
-           :sys/pos 1}]}}
-       {:sys/typ :atom,
-        :atom/predicate assign,
-        :atom/roles [{:role/val #:box{:sym ?cost}, :sys/pos 1} {:role/val #:box{:sym most-positive-fixnum}, :sys/pos 2}]}],
-      :sys/typ :conjunction}}
-    {:rhs/case-name CASE2,
-     :sys/pos 2,
-     :rhs/terms
-     {:conjunction/terms
-      [{:sys/typ :atom,
-        :atom/predicate distance,
-        :atom/roles
-        [{:role/val #:box{:sym ?from}, :sys/pos 1} {:role/val #:box{:sym ?to}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-       {:sys/typ :atom,
-        :atom/predicate fuel,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate zoom-limit,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?limit}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate onboard,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?num}, :sys/pos 2}]}
-       {:sys/typ :eval,
-        :eval/form
-        {:s-exp/fn-ref eval,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref <,
-           :sys/typ :s-exp,
-           :s-exp/args [{:s-exp/arg-val #:box{:sym ?num}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?limit}, :sys/pos 2}],
-           :sys/pos 1}]}}
-       {:sys/typ :atom,
-        :atom/predicate fast-burn,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-       {:sys/typ :eval,
-        :eval/form
-        {:s-exp/fn-ref eval,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref >=,
-           :sys/typ :s-exp,
-           :s-exp/args
-           [{:s-exp/arg-val #:box{:sym ?fuel}, :sys/pos 1}
-            {:s-exp/fn-ref *,
-             :sys/typ :s-exp,
-             :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-             :sys/pos 2}],
-           :sys/pos 1}]}}
-       {:sys/typ :assignment,
-        :assign/var ?cost,
-        :assign/exp
-        {:s-exp/fn-ref float,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref /,
-           :sys/typ :s-exp,
-           :s-exp/args
-           [{:s-exp/fn-ref +,
-             :sys/typ :s-exp,
-             :s-exp/args
-             [{:s-exp/arg-val #:box{:sym *tc*}, :sys/pos 1}
-              {:s-exp/fn-ref *,
-               :sys/typ :s-exp,
-               :s-exp/args
-               [{:s-exp/arg-val #:box{:sym *fc*}, :sys/pos 1}
-                {:s-exp/fn-ref *,
-                 :sys/typ :s-exp,
-                 :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-                 :sys/pos 2}],
-               :sys/pos 2}],
-             :sys/pos 1}
-            {:s-exp/arg-val #:box{:num 1}, :sys/pos 2}],
-           :sys/pos 1}]}}],
-      :sys/typ :conjunction}}
-    {:rhs/case-name CASE3,
-     :sys/pos 3,
-     :rhs/terms
-     {:conjunction/terms
-      [{:sys/typ :atom,
-        :atom/predicate capacity,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?cap}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate distance,
-        :atom/roles
-        [{:role/val #:box{:sym ?from}, :sys/pos 1} {:role/val #:box{:sym ?to}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-       {:sys/typ :atom,
-        :atom/predicate fast-burn,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate zoom-limit,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?limit}, :sys/pos 2}]}
-       {:sys/typ :atom,
-        :atom/predicate onboard,
-        :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?num}, :sys/pos 2}]}
-       {:sys/typ :eval,
-        :eval/form
-        {:s-exp/fn-ref eval,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref <,
-           :sys/typ :s-exp,
-           :s-exp/args [{:s-exp/arg-val #:box{:sym ?num}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?limit}, :sys/pos 2}],
-           :sys/pos 1}]}}
-       {:sys/typ :assignment,
-        :assign/var ?cost,
-        :assign/exp
-        {:s-exp/fn-ref float,
-         :sys/typ :s-exp,
-         :s-exp/args
-         [{:s-exp/fn-ref /,
-           :sys/typ :s-exp,
-           :s-exp/args
-           [{:s-exp/fn-ref +,
-             :sys/typ :s-exp,
-             :s-exp/args
-             [{:s-exp/fn-ref *,
-               :sys/typ :s-exp,
-               :s-exp/args [{:s-exp/arg-val #:box{:sym *tc*}, :sys/pos 1} {:s-exp/arg-val #:box{:num 2}, :sys/pos 2}],
-               :sys/pos 1}
-              {:s-exp/fn-ref *,
-               :sys/typ :s-exp,
-               :s-exp/args
-               [{:s-exp/arg-val #:box{:sym *fc*}, :sys/pos 1}
-                {:s-exp/fn-ref *,
-                 :sys/typ :s-exp,
-                 :s-exp/args [{:s-exp/arg-val #:box{:sym ?dist}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?burn}, :sys/pos 2}],
-                 :sys/pos 2}],
-               :sys/pos 2}],
-             :sys/pos 1}
-            {:s-exp/arg-val #:box{:num 1}, :sys/pos 2}],
-           :sys/pos 1}]}}],
-      :sys/typ :conjunction}}],
-   :sys/pos 24}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate move-aircraft,
-    :atom/roles
-    [{:role/val #:box{:sym ?a}, :sys/pos 1}
-     {:role/val #:box{:sym ?c1}, :sys/pos 2}
-     {:role/val #:box{:sym ?c2}, :sys/pos 3}
-     {:role/val #:box{:sym slow}, :sys/pos 4}]},
-   :method/rhs-pairs
-   [#:method{:preconditions
-             [{:sys/typ :atom,
-               :atom/predicate fuel,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate distance,
-               :atom/roles
-               [{:role/val #:box{:sym ?c1}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-              {:sys/typ :atom,
-               :atom/predicate slow-burn,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate eval,
-               :atom/roles
-               [{:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym >}, :sys/pos 1}
-                   {:list/val #:box{:sym ?fuel}, :sys/pos 2}
-                   {:list/val
-                    {:sys/typ :list-term,
-                     :list/terms
-                     [{:list/val #:box{:sym *}, :sys/pos 1}
-                      {:list/val #:box{:sym ?dist}, :sys/pos 2}
-                      {:list/val #:box{:sym ?burn}, :sys/pos 3}]},
-                    :sys/pos 3}]},
-                 :sys/pos 1}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate fly,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2} {:role/val #:box{:sym ?c2}, :sys/pos 3}],
-                :sys/pos 1}]}}
-    #:method{:tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate refuel,
-                :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate fly,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2} {:role/val #:box{:sym ?c2}, :sys/pos 3}],
-                :task/immediate? true,
-                :sys/pos 2}]}}],
-   :sys/pos 25}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate move-aircraft,
-    :atom/roles
-    [{:role/val #:box{:sym ?a}, :sys/pos 1}
-     {:role/val #:box{:sym ?c1}, :sys/pos 2}
-     {:role/val #:box{:sym ?c2}, :sys/pos 3}
-     {:role/val #:box{:sym fast}, :sys/pos 4}]},
-   :method/rhs-pairs
-   [#:method{:preconditions
-             [{:sys/typ :atom,
-               :atom/predicate fuel,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?fuel}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate distance,
-               :atom/roles
-               [{:role/val #:box{:sym ?c1}, :sys/pos 1} {:role/val #:box{:sym ?c2}, :sys/pos 2} {:role/val #:box{:sym ?dist}, :sys/pos 3}]}
-              {:sys/typ :atom,
-               :atom/predicate fast-burn,
-               :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?burn}, :sys/pos 2}]}
-              {:sys/typ :atom,
-               :atom/predicate eval,
-               :atom/roles
-               [{:role/val
-                 {:sys/typ :list-term,
-                  :list/terms
-                  [{:list/val #:box{:sym >}, :sys/pos 1}
-                   {:list/val #:box{:sym ?fuel}, :sys/pos 2}
-                   {:list/val
-                    {:sys/typ :list-term,
-                     :list/terms
-                     [{:list/val #:box{:sym *}, :sys/pos 1}
-                      {:list/val #:box{:sym ?dist}, :sys/pos 2}
-                      {:list/val #:box{:sym ?burn}, :sys/pos 3}]},
-                    :sys/pos 3}]},
-                 :sys/pos 1}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate zoom,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2} {:role/val #:box{:sym ?c2}, :sys/pos 3}],
-                :sys/pos 1}]}}
-    #:method{:tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate refuel,
-                :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate zoom,
-                :atom/roles
-                [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c1}, :sys/pos 2} {:role/val #:box{:sym ?c2}, :sys/pos 3}],
-                :task/immediate? true,
-                :sys/pos 2}]}}],
-   :sys/pos 26}
-  {:sys/typ :method,
-   :method/head
-   {:sys/typ :atom,
-    :atom/predicate transport-aircraft,
-    :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}]},
-   :method/rhs-pairs
-   [#:method{:preconditions
-             [{:sys/typ :atom,
-               :atom/predicate not,
-               :atom/roles
-               [{:role/val
-                 {:sys/typ :list-term, :list/terms [{:list/val #:box{:sym no-use}, :sys/pos 1} {:list/val #:box{:sym ?a}, :sys/pos 2}]},
-                 :sys/pos 1}]}],
-             :tasks
-             {:sys/typ :task-list,
-              :task-list/elems
-              [{:sys/typ :atom,
-                :atom/predicate !!assert,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms [{:list/val #:box{:sym no-use}, :sys/pos 1} {:list/val #:box{:sym ?a}, :sys/pos 2}]},
-                     :sys/pos 1}]},
-                  :sys/pos 1}],
-                :sys/pos 1}
-               {:sys/typ :atom,
-                :atom/predicate upper-move-aircraft-no-style,
-                :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1} {:role/val #:box{:sym ?c}, :sys/pos 2}],
-                :task/immediate? true,
-                :sys/pos 2}
-               {:sys/typ :atom,
-                :atom/predicate !!ra,
-                :atom/roles
-                [{:role/val
-                  {:sys/typ :list-term,
-                   :list/terms
-                   [{:list/val
-                     {:sys/typ :list-term,
-                      :list/terms [{:list/val #:box{:sym no-use}, :sys/pos 1} {:list/val #:box{:sym ?a}, :sys/pos 2}]},
-                     :sys/pos 1}]},
-                  :sys/pos 1}
-                 {:role/val {:sys/typ :list-term, :list/terms []}, :sys/pos 2}],
-                :task/immediate? true,
-                :sys/pos 3}]}}],
-   :sys/pos 27}]})
+(defrew2shop :task-list [{:task-list/keys [elems] :as exp}]
+  (->> elems (sort-by :sys/pos) (map rew2shop)))
+
+(defrew2shop :task-atom [{:task/keys [immediate?] :atom/keys [predicate roles]}]
+  (let [atom `(~predicate ~@(map rew2shop (->> roles (sort-by :sys/pos) (map :role/val))))]
+    (if immediate? `(:immediate ~@atom) atom)))
+
+(defrew2shop :call-term [{:call/keys [fn args]}]
+  `(~'call (~'function '~fn) ~@(map rew2shop (sort-by :sys/pos args))))
+
+;;; ToDo: Some of the following have not been tested.
+(defrew2shop :disjunction [exp] `(~'or ~(map rew2shop exp)))
+
+(defrew2shop :implication [{:imply/keys[condition consequence]}]
+  `(~'imply ~(rew2shop condition) ~(rew2shop consequence)))
+
+(defrew2shop :list-term [{:list/keys [terms] :as exp}]
+  (->> terms (sort-by :sys/pos) (map :list/val) (map rew2shop)))
+
+(defrew2shop :op-call [exp]
+  (rew2shop exp :call-term))
+
+(defrew2shop :op-universal [{:op-forall/keys [vars condition consequences]}]
+  `(~'forall (map rew2shop vars)
+    ~(rew2shop condition)
+    ~(map rew2shop consequences)))
+
+(defrew2shop :sort-by [{:sort-by/keys [var fn exp]}]
+  `(:sort-by ~(rew2shop var) ~(rew2shop fn) ~(rew2shop exp)))
+
+(defrew2shop :universal [{:forall/keys [vars conditions consequences]}]
+  `(~'forall ~(map rew2shop vars) ~(map rew2shop conditions) ~(map rew2shop consequences)))
+
+;;; ------------------------ Top-level manipulation -----------------------------------
+(declare code-type)
+(defn canon2db
+  "Given a canonical structure, create the corresponding DB structure.
+   :canon/pos of each element of :domain/elems is :sys/pos in the DB."
+  [{:domain/keys [name elems]}]
+    {:domain/name name
+     :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
+                            (-> (rew2db  (:canon/code %))
+                                (assoc :sys/pos (:canon/pos %))
+                                (assoc name-attr (get % name-attr))))
+                         (sort-by :canon/pos elems))})
+
+(defn canon2shop
+  "Rewrite 'canonical' (which is SHOP form embeddded in EDN) as SHOP."
+  [{:domain/keys [name elems]}]
+  `(~'defdomain ~(symbol name)
+    ~(->> elems (sort-by :canon/pos) (map :canon/code))))
+
+(defn name2db
+  "Return the DB entry at the argument name"
+  [name]
+  (when-let [eid (d/q '[:find ?e .
+                        :in $ ?name
+                        :where (or [?e :method/name ?name]
+                                   [?e :operator/name ?name]
+                                   [?e :axiom/name ?name]
+                                   [?e :domain/name ?name])]
+                      @(connect-atm :system)
+                      name)]
+    (sutil/resolve-db-id {:db/id eid} (connect-atm :system) #{:db/id})))
+
+(defn db2canon [name]
+  (when-let [obj (name2db name)]
+    {:domain/name name
+     :domain/elems  (let [cnt (atom 0)]
+                      (for [e (->> obj :domain/elems (sort-by :sys/pos))]
+                        (let [name-attr (keyword (code-type e) "name")]
+                          (-> {:canon/pos (swap! cnt inc)}
+                              (assoc name-attr (get e name-attr))
+                              (assoc :canon/code (rew2shop e))))))}))
+
+(defn db2shop
+  "Return the DB structure with the given name (a :domain :method, :operator, or :axiom)."
+  [name]
+  (when-let [obj (name2db name)]
+    (rew2shop obj)))
+
+(defn code-type [exp]
+  (cond (contains? exp :method/name)   "method"
+        (contains? exp :axiom/name)    "axiom"
+        (contains? exp :operator/name) "operator"))
+
+
+;;; ------------------------ DB Stuff -------------------------
+;;; ToDo: This is probably not necessary! I had :db.unique where it should not be.
+(defn collect-lookups
+  [obj]
+  (let [lookups (atom [])
+        id-attr? #{#_:domain/name :method/name :axiom/name :operator/name}]
+    (letfn [(co [x]
+              (cond (map? x)    (doseq [[k v] (seq x)]
+                                  (when (id-attr? k) (swap! lookups conj [:db/add -1 k v]))
+                                  (co v))
+                    (vector? x) (doseq [e x] (co e))))]
+      (co obj)
+      @lookups)))
+
+(defn write-obj
+  "Create lookup objects write those, then write the whole thing."
+  [obj]
+  (let [lookup-refs (collect-lookups obj)
+        conn (connect-atm :system)]
+    (doseq [x lookup-refs] (d/transact conn [x]))
+    (d/transact conn [obj])))
