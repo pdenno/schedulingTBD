@@ -1,6 +1,6 @@
 (ns scheduling-tbd.shop
-  "Rewrite shop structures to db structures.
-   Rewrite db structures to shop structures."
+  "Rewrite SHOP structures to db structures.
+   Rewrite db structures to SHOP structures."
   (:require
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
@@ -20,8 +20,9 @@
   (and (symbol? x)
        (= \? (-> x name first))))
 
+;;; I don't think this is actually required by parsers, but I could make it so in my work.
 (defn is-op?
-  "Return true if the argument is a symbol beginning with ?"
+  "Return true if the argument is a symbol beginning with !"
   [x]
   (and (symbol? x)
        (= \! (-> x name first))))
@@ -1075,7 +1076,6 @@
   (cond (contains? exp :method/name)   "method"
         (contains? exp :axiom/name)    "axiom"
         (contains? exp :operator/name) "operator"))
-
 
 ;;; ------------------------ DB Stuff -------------------------
 ;;; ToDo: This is probably not necessary! I had :db.unique where it should not be.
