@@ -115,11 +115,11 @@ Produce a Clojure map containing two keys.
   {:summary \"scheduling firefighter clothes production\"
    :industry \"apparel manufacturing\"}
 ## Example:
-  [We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.
+  [We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.]
   {:summary \"scheduling road construction\"
    :industry \"road construction and repair\"
 ## Example:
-  [Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.
+  [Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.]
   {:summary \"job shop scheduling\"
    :industry \"job shop machining\"}")
 
