@@ -6,7 +6,7 @@ SchedulingTBD is exploratory software for writing systems that enable joint (hum
 Currently, we are using this code to explore joint formulation of scheduling problems with [MiniZinc](https://www.minizinc.org/) as the DSL.
 The idea of implementations such as our MiniZinc effort is to probe the research question
 *"Can we effectively engage a person possessing little background in model formulation in a 'conversation' where we jointly formulate a model important to their work?"*
-Consequently, the code (Clojure and ClojureScript) provides a web app to host conversations.
+Consequently, the code (Clojure and ClojureScript) provides a web app to host conversations about scheduling work, and when schedulingTBD is ready to go, it will produce MiniZinc to schedule the user's work.
 
 As of this writing, September 2023, we are just getting start with this idea.
 It is part of a NIST project, ”Human/Machine Teaming for Manufacturing Digital Twins.”
