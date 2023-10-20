@@ -3,7 +3,7 @@
    [clojure.string        :as str]
    [clojure.test          :refer [deftest is testing]]
    [scheduling-tbd.domain :as domain]
-   [scheduling-tbd.llm    :as llm :refer [chat2clj]]))
+   [scheduling-tbd.llm    :as llm :refer [query-llm]]))
 
 (def proj-objective-prompt
   (conj domain/project-objective-partial
@@ -13,9 +13,9 @@
 
 (deftest project-objective-test
   (testing "Testing that project objective prompt is okay. Really this only cares that it returns a clojure map with the correct keys.")
-  (let [res (chat2clj proj-objective-prompt {:model "gpt-4"})]
+  (let [res (query-llm proj-objective-prompt {:model "gpt-4"})]
     (is (= #{:objective :probability} (-> res keys set))))
 
   ;; This one is interest, in some sense better than GPT-4. It sometimes returns two sentences.
-  (let [res (chat2clj proj-objective-prompt {:model "gpt-3.5-turbo"})]
+  (let [res (query-llm proj-objective-prompt {:model "gpt-3.5-turbo"})]
     (is (= #{:objective :probability} (-> res keys set)))))

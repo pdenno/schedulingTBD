@@ -35,18 +35,18 @@
 
 (def diag (atom nil))
 
-(defn chat2clj
+(defn query-llm
   "Return a Clojure map that is read from the string created by the LLM given the vector of messages that is the argument."
-  [messages & {:keys [model] :or {model "gpt-3.5-turbo"}}]
+  [messages & {:keys [model raw-text?] :or {model "gpt-3.5-turbo"}}]
   (if-let [key (get-api-key :llm)]
     (try (let [res (-> (openai/create-chat-completion {:model model :messages messages} {:api-key key})
                        :choices first :message :content)
-               res-map (read-string res)]
-           (if (map? res-map)
-             res-map
-             (throw (ex-info "Did not produce a map." {:res-map res-map}))))
+               res (cond-> res(not raw-text?) read-string)]
+           (if (or (map? res) (string? res))
+             res
+             (throw (ex-info "Did not produce a map." {:result res}))))
          (catch Throwable e
-           (log/error "Call to chat2clj failed.")
+           (log/error "Call to query-llm failed.")
            (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
     (throw (ex-info "No key for use of LLM API found." {}))))
 
