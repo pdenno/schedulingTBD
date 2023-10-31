@@ -34,7 +34,9 @@
    :answer
    ["(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))"]})
 
-(defn quit-planner!
+(defn quit-planner! [])
+
+#_(defn quit-planner!
   "Quit the planner. It can be restarted with a shell command through mount."
   []
   (let [fut (future
@@ -62,7 +64,9 @@
           (do (log/info "Planner passes test.") :passes)
           (do (log/error "Planner fails test.") :fails-test))))))
 
-(defn init-planner []
+(defn init-planner [])
+
+#_(defn init-planner []
   (if-let [planner-path (-> (System/getenv) (get "PLANNER_SBCL"))] ; ToDo: maybe use system.edn instead.
     (do (log/info "Starting planner.")
         (future (sh "/usr/bin/sbcl"

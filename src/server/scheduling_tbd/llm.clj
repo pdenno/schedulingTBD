@@ -33,15 +33,19 @@
    {:id "gpt-3.5-turbo-instruct",      :created 1692901427, :owned_by "system"} ; "This is not a chat model and thus not supported in the v1/chat/completions endpoint. Did you mean to use v1/completions?
    {:id "gpt-3.5-turbo-instruct-0914", :created 1694122472, :owned_by "system"}]
 
+(def chat-model? #{"gpt-3.5-turbo", "gpt-3.5-turbo-0301", "gpt-3.5-turbo-16k", "gpt-3.5-turbo-16k-0613", "gpt-3.5-turbo-0613", "gpt-4-0613", "gpt-4-0314", "gpt-4"})
+
 (def diag (atom nil))
 
 (defn query-llm
   "Return a Clojure map that is read from the string created by the LLM given the vector of messages that is the argument."
-  [messages & {:keys [model raw-text?] :or {model "gpt-3.5-turbo"}}]
+  [messages & {:keys [model raw-text?] :or {model "gpt-3.5-turbo"} :as other}]
+  (reset! diag {:msg messages :other other})
+  (assert (chat-model? model)) ; Otherwise you get an http 404; you might not connect the dots!
   (if-let [key (get-api-key :llm)]
     (try (let [res (-> (openai/create-chat-completion {:model model :messages messages} {:api-key key})
                        :choices first :message :content)
-               res (cond-> res(not raw-text?) read-string)]
+               res (cond-> res (not raw-text?) read-string)]
            (if (or (map? res) (string? res))
              res
              (throw (ex-info "Did not produce a map." {:result res}))))
@@ -51,7 +55,7 @@
     (throw (ex-info "No key for use of LLM API found." {}))))
 
 ;;; ------------------------------- naming variables --------------------------------------
-(def good-var-prompt
+(def good-var-partial
     [{:role "system"    :content "You are a helpful assistant."}
      {:role "user"      :content "Produce a Clojure map containing one key, :name, the value of which is a camelCase string used to name a programming variable and matching the requirements described in the text in square brackets."}
 
@@ -77,10 +81,10 @@
      :capitalize? - either true or false."
   [{:keys [purpose string-type capitalize?] :or {string-type :camelCase}}]
   (when purpose
-    (let [prompt (conj good-var-prompt
+    (let [prompt (conj good-var-partial
                        {:role "user"
                         :content (cl-format nil "[~A]" purpose)})]
-      (try (let [res (chat2clj prompt {:model "gpt-4"})]
+      (try (let [res (query-llm prompt {:model "gpt-4"})]
              (if-let [var-name (:name res)]
                (cond-> var-name
                  (= :kebab-case string-type) (csk/->kebab-case-string)

@@ -3,7 +3,6 @@
   (:require
    [scheduling-tbd.llm           :as llm :refer [query-llm]]
    [scheduling-tbd.sutil         :refer [connect-atm get-api-key]]
-   [clojure.pprint               :refer [cl-format pprint]]
    [clojure.string               :as str]
    [taoensso.timbre              :as log]))
 
@@ -27,6 +26,7 @@
    {:role "user"      :content "[Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.]"}
    {:role "assistant" :content "{:summary \"job shop scheduling\"}"}])
 
+
 (def project-objective-partial
   "This is used to scan text for an objective. Wrap the user's paragraph in square brackets."
   [{:role "system"    :content "You are a helpful assistant."}
@@ -35,36 +35,111 @@ From it, produce a Clojure map containing 2 keys, :decision-objective and :proba
   The value of :objective is a string that is one of the sentences in the input, the sentence that most obviously expresses what needs to be decided in planning work.
   The value of :probability is the likelihood that the sentence really is the one that best expresses an objective."}
 
-   {:role "user"      :content "[We are a construction company contracting for publics works projects, such as bridges and roads. Our challenge is to complete our work while minimizing inconvenience to commuters, businesses, and residents in the affected areas.]"}
+   {:role "user"      :content "[We are a construction company contracting for publics works projects, such as bridges and roads.
+Our challenge is to complete our work while minimizing inconvenience to commuters, businesses, and residents in the affected areas.]"}
    {:role "assistant" :content "{:objective \"Our challenge is to complete our work while minimizing inconvenience to commuters, businesses, and residents in the affected areas.\" :probability 0.9}"}
 
 
    {:role "user"      :content "[We install HVAC systems. Our scheduling problem is to efficiently organize and manage our workforce and resources to meet the demands and deadlines of multiple installation projects.
  We must allocate technicians and equipment to various job sites while considering factors such as project complexity, location, customer preferences, and availability of resources.
  The scheduling problem involves balancing the workload, optimizing travel time between sites, minimizing delays and ensuring customer satisfaction, by completing installations within an agreed upon time.]"}
-   {:role "assistant" :content "{:objective \"The scheduling problem involves balancing the workload, optimizing travel time between sites, minimizing delays and ensuring customer satisfaction, by completing installations within an agreed upon time.\"
+   {:role "assistant" :content "{:objective \"The scheduling problem involves balancing the workload, optimizing travel time between sites, minimizing delays and ensuring customer satisfaction,
+ by completing installations within an agreed upon time.\"
    :probability 0.6}"}
    {:role "user"      :content "Correct. In this one, the probability is lower because the sentence beginning with \"Our scheduling problem is to efficiently organize...\" also seems like an objective."}
 
    {:role "user"      :content "[We produce clothes for firefighting. It is fun to do. Our most significant scheduling challenge is about deciding how many workers to assign to each product.]"}
    {:role "assistant" :content "{:objective \"Our most significant scheduling challenge is about deciding how many workers to assign to each product.\" :probability 0.9}"}])
 
+;;; ["artifactual-project scheduling", "artifactual-fixed process scheduling", "service scheduling"]
+(def base-scheduling-type
+  "This provides probabilities for three kinds of scheduling which we assume are disjoint, therefore the probabilities sum to 1.0"
+  [{:role "system"    :content "You are a helpful assistant."}
+   {:role "user"      :content "Classify the text in square brackets according to the probability of how well it describes each of three classes of scheduling problems.
+ The classes are assumed to be disjoint so the sum of the three probabilties should be 1.0. The three categories are expressed as Clojure keywords; they are:
+      :project-scheduling - scheduling of work that resembles a unique project where tasks are..."}])
+
+;;; ToDo: Not sure that "disjoint and covering...therefore" is logically correct here!
+(def service-vs-artifact-partial
+  "This provides probabilities for whether the scheduling concerns a service vs artifact. We assume those two classes are disjoint and covering."
+  [{:role "system"    :content "You are a helpful assistant."}
+   {:role "user"      :content "The text in square brackets describes a scheduling problem.
+ Classify it using probabilities expressing how well it describes each of two classes;
+ the classes are assumed to be disjoint and covering so the sum of the two probabilties should be 1.0.
+ The classes are:
+   :service - the text describes the scheduling of a service to be rendered.
+   :artifact - the text describes the scheduling of the production of physical artifacts.
+ Express your result as a Clojure map where the keys are the keywords :service and :artifact."}
+   {:role "user"      :content "[We provide music lessons. Our scheduling challenges is finding each week a practice room and time at which students and instructors can meet.]"}
+   {:role "assistant" :content "{:service 1.0, :artifact 0.0}"}
+   {:role "user"      :content "[We produce and repair clothes for firefighting. Our most significant scheduling challenge is about deciding how many workers to assign to each product.]"}
+   {:role "assistant" :content "{:service 0.2, :artifact 0.8}"}
+   {:role "user"      :content "[We repair traffic signal and street lights, replacing bulbs, etc. Our scheduling challenge is in reaching and repairing the most important jobs quickly.]"}
+   {:role "assistant" :content "{:service 0.9, :artifact 0.2}"}
+   {:role "user"      :content "WRONG: The sum of 0.9 and 0.2 is not 1.0."}])
 
 (defn pretend-you-manage-prompt
   [manage-what]
-  [{:role "system"    :content (cl-format nil "Pretend you manage ~A. You have good knowledge of the business's processes and supply chain." manage-what)}
+  [{:role "system"    :content (format "Pretend you manage %s. You have good knowledge of the business's processes and supply chain." manage-what)}
    {:role "user"      :content "In no more than 5 sentences, describe your principal scheduling problem."}])
 
-(defn run-interview [what-you-manage]
-  (let [high-level-desc (-> what-you-manage
-                            pretend-you-manage-prompt
-                            (query-llm {:model "gpt-4" :raw-text? true}))
-        user-text       {:role "user" :content (cl-format nil "[~A]" high-level-desc)}
-        project-name    (-> (conj project-name-partial      user-text) (query-llm {:model "gpt-3.5-turbo"}) :summary)
-        objective       (-> (conj project-objective-partial user-text) (query-llm {:model "gpt-4"})         :objective)]
-    {:high-level   high-level-desc
-     :project-name project-name
-     :objective    objective}))
+;;; ToDo: This is temporary for the web app.
+(defn project-name [user-text]
+  (when-let [project-name (-> (conj project-name-partial user-text) (query-llm {:model "gpt-3.5-turbo" :raw-text? true}))]
+    (str/replace project-name #"\s+" "-")))
+
+(defn run-interview [what-you-manage & desc]
+  (let [high-level-desc (or (first desc)
+                            (-> what-you-manage
+                                pretend-you-manage-prompt
+                                (query-llm {:model "gpt-4" :raw-text? true})))
+        user-text {:role "user" :content (format "[%s]" high-level-desc)}
+        project-name (-> (conj project-name-partial user-text) (query-llm {:model "gpt-3.5-turbo" :raw-text? true}))]
+
+    {:high-level    high-level-desc
+     :activity-name (-> (re-matches #"(.*)\s+scheduling" project-name) (nth 1))
+     :project-name  project-name
+     :objective     (-> (conj project-objective-partial   user-text) (query-llm {:model "gpt-4"})         :objective)
+     :service?      (-> (conj service-vs-artifact-partial user-text) (query-llm {:model "gpt-4"}))}))
+
+(def user-problems
+  {:snack-food "The primary challenge in our scheduling process involves effectively coordinating all the steps in our supply chain, starting from raw material procurement to the final delivery of our snack foods to grocery chains.
+ We aim to maintain an optimal inventory level which involves proper timing of production runs to minimize stockouts and excess storage costs.
+ Seasonal fluctuations in demand, delays from suppliers, equipment breakdowns, and transportation delays pose consistent scheduling problems.
+ Additionally, the scheduling process needs to account for shelf-life of our products to prevent wastage.
+ Lastly, integrating all the processes within the firm and communicating the schedule effectively to all the stakeholders is a significant problem.",
+
+   :paving "The principal scheduling problem faced is coordinating the availability of our clients, skilled work crew, and the delivery of material supplies.
+ Unpredictable weather conditions often lead to sudden schedule changes.
+ Also, delays in supply chain due to various reasons can significantly affect the timeline of the project.
+ Balancing multiple projects simultaneously without over-committing our resources is also a challenge.
+ Lastly, unanticipated repairs and maintenance of our paving equipment affects our work schedule.",
+
+   :injection-molds "The principal scheduling problem in running an injection mold job shop is coordinating the different job orders in a manner that optimizes our machine utilization and minimizes production time without leading to bottlenecks.
+ We must effectively manage the flow of materials from suppliers, ensuring that they're available exactly when needed to avoid delays.
+ It's also crucial to ensure our labor force is appropriately assigned to different tasks in the shop to maximize efficiency.
+ Lastly, unexpected maintenance or breakdowns of machinery can throw our schedule off and present a major challenge.
+ Central to all this is the need for high precision and quality in molds, which can potentially impact scheduling if reworks or corrections are required due to errors.",
+
+   :brewery "As the manager of a craft brewery, the principal scheduling problem is coordinating the production process to maintain a consistent supply of diverse beers without overproduction or storage issues.
+ This spans from the initial scheduling of raw materials procurement, to the fermenting process which can take weeks, and finally to the bottling and distribution procedures.
+ Additionally, managing seasonal demand fluctuations and accommodating special edition or experimental brews without disrupting the core product line adds complexity.
+ Timely maintenance of brewing equipment and quality check is also crucial to the schedule.
+ Lastly, ensuring synergies with marketing timelines and release dates is necessary to avoid any mismatch between supply and market launch."})
+
+;;; ToDo: I've seen :snack-food going from {:service 0.5, :artifact 0.5}, {:service 0.0, :artifact 1.0}. I suppose delivering to a supply-chain partner....
+(defn test-service-vs-artifact
+  []
+  (reduce-kv (fn [m k v]
+               (try
+                 (let [user-text {:role "user" :content (format "[%s]" v)}]
+                   (assoc m k (-> (conj service-vs-artifact-partial user-text) (query-llm {:model "gpt-4"}))))
+                 (catch Throwable e
+                   (assoc m k (format "Failed: %s" e)))))
+             {}
+             user-problems))
+
+;(reduce-kv (fn [m k v] (assoc m k (test-service-vs-artifact k))) {} user-problems)
 
 ;;; (run-interview "a company that sells snack foods to grocery chains")
 #_{:high-level

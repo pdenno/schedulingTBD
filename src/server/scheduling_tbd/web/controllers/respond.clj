@@ -4,7 +4,7 @@
    [datahike.api            :as d]
    [ring.util.http-response :as http]
    [scheduling-tbd.db       :as db]
-   [scheduling-tbd.llm      :as llm]
+   [scheduling-tbd.domain   :as domain]
    [scheduling-tbd.sutil    :refer [connect-atm]]
    [taoensso.timbre :as log])
   (:import
@@ -36,7 +36,7 @@
 (defn op-start-project
   "Execute plan operations to start a project about user-text."
   [user-text]
-  (let [{:keys [summary industry]} (llm/project-name user-text)
+  (let [{:keys [summary industry]} (domain/project-name user-text)
         id (-> summary str/lower-case (str/replace #"\s+" "-") keyword)
         proj-info  {:project/id id
                     :project/name summary
