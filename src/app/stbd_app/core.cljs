@@ -35,7 +35,7 @@
 
 (def diag (atom {}))
 
-(def exerciser-theme
+(def app-theme
   (styles/createTheme
    (j/lit {:palette {:background {:paper "#F0F0F0"}
                      :primary   colors/blue
@@ -220,7 +220,7 @@
        ;; Use of CssBaseline removes padding/margin around application, if nothing else.
        (CssBaseline {:children #js []}) ; https://v4.mui.com/components/css-baseline/
        ($ styles/ThemeProvider
-          {:theme exerciser-theme}
+          {:theme app-theme}
           ($ Top {:initial-prompt initial-prompt
                   :width  (:width  @carry-dims-atm)
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.

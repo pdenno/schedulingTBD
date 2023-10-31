@@ -26,7 +26,6 @@
    {:role "user"      :content "[Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.]"}
    {:role "assistant" :content "{:summary \"job shop scheduling\"}"}])
 
-
 (def project-objective-partial
   "This is used to scan text for an objective. Wrap the user's paragraph in square brackets."
   [{:role "system"    :content "You are a helpful assistant."}
@@ -85,7 +84,10 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 
 ;;; ToDo: This is temporary for the web app.
 (defn project-name [user-text]
-  (when-let [project-name (-> (conj project-name-partial user-text) (query-llm {:model "gpt-3.5-turbo" :raw-text? true}))]
+  (when-let [project-name (-> (conj project-name-partial
+                                    {:role "user" :content user-text})
+                              (query-llm {:model "gpt-3.5-turbo"})
+                              :summary)]
     (str/replace project-name #"\s+" "-")))
 
 (defn run-interview [what-you-manage & desc]
@@ -94,13 +96,18 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                                 pretend-you-manage-prompt
                                 (query-llm {:model "gpt-4" :raw-text? true})))
         user-text {:role "user" :content (format "[%s]" high-level-desc)}
-        project-name (-> (conj project-name-partial user-text) (query-llm {:model "gpt-3.5-turbo" :raw-text? true}))]
-
+        project-name (-> (conj project-name-partial user-text)
+                         (query-llm {:model "gpt-3.5-turbo"})
+                         :summary
+                         (str/replace #"\s+" "-"))]
     {:high-level    high-level-desc
      :activity-name (-> (re-matches #"(.*)\s+scheduling" project-name) (nth 1))
      :project-name  project-name
-     :objective     (-> (conj project-objective-partial   user-text) (query-llm {:model "gpt-4"})         :objective)
-     :service?      (-> (conj service-vs-artifact-partial user-text) (query-llm {:model "gpt-4"}))}))
+     :objective     (-> (conj project-objective-partial user-text)
+                        (query-llm {:model "gpt-4"})
+                        :objective)
+     :service?      (-> (conj service-vs-artifact-partial user-text)
+                        (query-llm {:model "gpt-4"}))}))
 
 (def user-problems
   {:snack-food "The primary challenge in our scheduling process involves effectively coordinating all the steps in our supply chain, starting from raw material procurement to the final delivery of our snack foods to grocery chains.

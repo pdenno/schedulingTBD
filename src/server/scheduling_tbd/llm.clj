@@ -44,7 +44,10 @@
   (assert (chat-model? model)) ; Otherwise you get an http 404; you might not connect the dots!
   (if-let [key (get-api-key :llm)]
     (try (let [res (-> (openai/create-chat-completion {:model model :messages messages} {:api-key key})
-                       :choices first :message :content)
+                       :choices
+                       first
+                       :message
+                       :content)
                res (cond-> res (not raw-text?) read-string)]
            (if (or (map? res) (string? res))
              res

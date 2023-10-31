@@ -1,4 +1,5 @@
 (ns stbd-app.components.project
+  "A React component to select projects and get the initial list of projects from the server."
   (:require
    [ajax.core :refer [GET]]
    [applied-science.js-interop :as j]

@@ -34,14 +34,14 @@
                                         @(connect-atm :system)))))))
 
 (defn op-start-project
-  "Execute plan operations to start a project about user-text."
+  "Summarize user-text as a project name. Execute plan operations to start a project about user-text."
   [user-text]
-  (let [{:keys [summary industry]} (domain/project-name user-text)
+  (let [summary (domain/project-name user-text)
         id (-> summary str/lower-case (str/replace #"\s+" "-") keyword)
         proj-info  {:project/id id
                     :project/name summary
                     :project/desc user-text ; <==== ToDo: Save this as :msg-id 1 (0 is the "Describe your scheduling problem" message).
-                    :project/industry industry}
+                    #_#_:project/industry _industry}
         proj-info (db/create-proj-db! proj-info) ; May rename the project-info.
         id (:project/id proj-info)]
     (db/add-msg id (d/q '[:find ?prompt . :where [_ :system/initial-prompt ?prompt]] @(connect-atm :system)) :system)
@@ -52,19 +52,18 @@
     ;; 2) Store first two messages (prompt and user's first contribution).
     ;; 3) Check that there isn't a project by that name.
     ;; 4) Let user change the name of the project.
-    (log/info "op-start-project: Responding with: "
-              (str "Great! We'll call your project '" (:project/name proj-info) "'. "))
-    (db/add-msg id (str "Great! We'll call your project '" (:project/name proj-info) "'. ") :system)))
+    (let [response (str "Great! We'll call your project '" (:project/name proj-info) "'. ")]
+      (log/info "op-start-project: Responding with: " response)
+      (db/add-msg id response :system))))
 
+;;; [conn (connect-atm (db/current-project-id))]
 ;;; (let [{:keys [decision-objective probability]} (llm/find-objective-sentence craft-brewing-desc)] ...) ; <======= First y/n!
 
 (defn plan-response
   "Top-level function to respond to a user's message."
   [user-text]
   (log/info "Got user-text")
-  (let [conn (connect-atm (db/current-project-id))]
-
-  (op-start-project user-text)))
+  (op-start-project user-text))
 
 (defn respond
   "Handler function for http://api/user-says."
