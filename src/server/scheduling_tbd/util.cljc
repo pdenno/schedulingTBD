@@ -1,8 +1,10 @@
 (ns scheduling-tbd.util
   "Do lowest level configuration (logging, etc.)."
   (:require
-   [mount.core :as mount :refer [defstate]]
-   [taoensso.timbre :as log]))
+   [datahike.api         :as d]
+   [datahike.pull-api    :as dp]
+   [mount.core           :as mount :refer [defstate]]
+   [taoensso.timbre      :as log]))
 
 ;;; ToDo: The problem with output to log/debug might have to do with *err* not defined in cljs.
 (defn custom-output-fn
@@ -48,6 +50,47 @@
           #(let [now #?(:clj (inst-ms (java.util.Date.)) :cljs (.getTime (js/Date.)))]
              (assoc % :valid? true :max-millis max-millis :start-time now :timeout-at (+ now max-millis))))
    max-millis))
+
+(defonce databases-atm (atom {}))
+
+(defn register-db
+  "Add a DB configuration."
+  [k config]
+  (assert (#{:him :system} k))
+  (swap! databases-atm #(assoc % k config)))
+
+(defn connect-atm
+  "Return a connection atom for the DB."
+  [k]
+  (when-let [db-cfg (get @databases-atm k)]
+    (if (d/database-exists? db-cfg)
+      (d/connect db-cfg)
+      (log/warn "There is no DB to connect to."))))
+
+;;; This seems to cause problems in recursive resolution. (See resolve-db-id)"
+(defn db-ref?
+  "It looks to me that a datahike ref is a map with exactly one key: :db/id."
+  [obj]
+  (and (map? obj) (= [:db/id] (keys obj))))
+
+;;; {:db/id 3779}
+(defn resolve-db-id
+  "Return the form resolved, removing properties in filter-set,
+   a set of db attribute keys, for example, #{:db/id}."
+  ([form conn-atm] (resolve-db-id form conn-atm #{}))
+  ([form conn-atm filter-set]
+   (letfn [(resolve-aux [obj]
+             (cond
+               (db-ref? obj) (let [res (dp/pull @conn-atm '[*] (:db/id obj))]
+                               (if (= res obj) nil (resolve-aux res)))
+               (map? obj) (reduce-kv (fn [m k v] (if (filter-set k) m (assoc m k (resolve-aux v))))
+                                     {}
+                                     obj)
+               (vector? obj)      (mapv resolve-aux obj)
+               (set? obj)    (set (mapv resolve-aux obj))
+               (coll? obj)        (map  resolve-aux obj)
+               :else  obj))]
+     (resolve-aux form))))
 
 (defn init-util []
   (config-log :info))
