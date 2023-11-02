@@ -1,17 +1,24 @@
 (ns scheduling-tbd.how-made
-  "Create a DB of 'How It's Made' (him) episodes. Store LLM-generated scheduling challenges for testing."
+  "Create a DB of 'How It's Made' (him) episodes. Store LLM-generated scheduling challenge text for testing.
+   See  https://en.wikipedia.org/wiki/List_of_How_It%27s_Made_episodes
+   There are about 400 episodes; each episode has 4 segments.
+   The content of the DB is often the same as what is in data/him-db.edn, (ToDo:) which is used to create the base DB."
   (:require
    [clojure.pprint          :refer [pprint]]
    [clojure.string          :as str]
    [datahike.api            :as d]
-   [datahike.pull-api       :as dp]
-   [hickory.core            :as hick]
-   [mount.core              :as mount :refer [defstate]] ; I suppose there are easier ways, but I'd like to learn this tool.
+   [hickory.core            :as hick] ; There might be easier ways, but I'd like to learn this tool.
+   [mount.core              :as mount :refer [defstate]]
    [scheduling-tbd.util     :as util :refer [connect-atm]]
    [taoensso.timbre :as log]))
 
+;;; ToDo:
+;;;  - Make :rebuild-db? use data/him-db.edn if it exists.
+;;;  - Write a function to get the challenge-intro for any :segment/name.
+;;;  - Populate the :segment/challenge-intro field with sentences from chat. (Check whether it exists, first.)
+
 (def him-schema+
-  "Defines content of the How It's Made DB. In convenient format, not Datahike format."
+  "Defines content of the How It's Made DB in a convenient format, not Datahike format."
   {;; ---------------------- episode
    :episode/date
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
@@ -28,21 +35,23 @@
    ;; ---------------------- segment
    :segment/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
-        :doc "a string that uniquely identifies the stement."}
+        :doc "a string that uniquely identifies the segment."}
    :segment/link
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "a reference to an optional segment link object for the segment."}
    :segment/useless?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "an optional value for segments for segments that are unlikely to be useful (e.g. 'sardines')
- This might be set after analyzing the DB a bit."}
+        :doc "a boolean that is true if the segment is unlikely to serve as a useful testcase (e.g. 'sardines')"}
+   :segment/challenge-intro
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a short paragraph describing the scheduling challenges of making the thing in :segment/name."}
    ;; ---------------------- segment-link
    :segment-link/href
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "the href of the optional segment-link"}
+        :doc "the href of the optional :segment/link"}
    :segment-link/text
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a text of the link."}})
+        :doc "a text of the optional :segment/link."}})
 
 (def him-schema
   "Create a Datahike-compatible schema from the above."
@@ -53,6 +62,7 @@
              []
              him-schema+))
 
+;;; -------------------- Processing the raw html ----------------------------
 (defn hick-tables
   "Walk the hickory, collecting 'wikitables'."
   [hick-data]
@@ -133,7 +143,7 @@
       (filter season?)
       (mapcat table-episodes)
       vec))
-
+;;; -------------------- DB functions ----------------------------
 ;;; We bother with this because someday we ought to have testing about HIM things.
 (def suspected-useless
   "A set of segments (their names) suspected to be poor candidates for asking about making one (e.g. sardines)."
@@ -159,9 +169,9 @@
 
 (defn get-him-db-content
   "Return sorted DB content, or part thereof.
-    :min-seq returns no episodes with a smaller :episode/sequence-number.
-    :max-seq returns no episodes with a larger  :episode/sequence-number.
-    :names Returns only only segments in the argument collection (not its episode).
+    :min-seq - return no episodes with a smaller than :episode/sequence-number.
+    :max-seq - return no episodes with a larger than :episode/sequence-number.
+    :names - return only segments in the argument collection (not its episode).
 
    Example usage: (get-him-db-content {:min-seq 1 :max-seq 5}).
    Example usage: (get-him-db-content #{\"Sardines\" \"Bread\"})."
@@ -194,6 +204,10 @@
     (d/transact conn him-schema)
     (d/transact conn {:tx-data data})
     (mark-as-useless suspected-useless)))
+
+;;;--------------------- Populating :segment/challenge-intro  ---------------------
+
+
 
 ;;;--------------------- Starting and stopping ---------------------
 ;;; Based on ./db.clj
