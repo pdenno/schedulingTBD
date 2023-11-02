@@ -29,8 +29,3 @@ But we'll start by seeing how far we can get just using plain SHOP3 capabilities
   - Support a UI for authoring rules and prompts.
 
 ![alt text](https://github.com/pdenno/schedulingTBD/blob/main/doc/SchedulingTBD-early.png?raw=true)
-
-
-## References
-  - [1] Robert P. Goldman, *Solving POMDPs online through HTN Planning and Monte Carlo Tree Search*, Proceedings of the 4th ICAPS Workshop on Hierarchical Planning (HPlan 2021).
-  - [2] Mykel J. Kochenderfer, *Decision Making Under Uncertainty: Theory and Applications*, MIT Press, 2015.
