@@ -17,10 +17,10 @@ The authoring capabilities provided to experts in use of the analytical tool (an
 
 Currently the tool does little more than get things started.
 (See the screenshot below.)
-I think that the AI planning might use [SHOP3](https://github.com/shop-planner/shop3)
-(and updated version of University of Maryland's Simple Hierarchical Ordered Planner (SHOP)) in some role in
-an on-line partially observable Markov descision process (on-line POMDP) [1,2].
-But we'll start by seeing how far we can get just using plain SHOP3 capabilities.
+I think we might [SHOP3](https://github.com/shop-planner/shop3)
+(and updated version of University of Maryland's Simple Hierarchical Ordered Planner (SHOP)) in
+an on-line partially observable Markov descision process (on-line POMDP).
+But we'll start by generating test cases running mostly static interviews.
 
 ## ToDo
   - Explore planning with SHOP3.
@@ -29,8 +29,3 @@ But we'll start by seeing how far we can get just using plain SHOP3 capabilities
   - Support a UI for authoring rules and prompts.
 
 ![alt text](https://github.com/pdenno/schedulingTBD/blob/main/doc/SchedulingTBD-early.png?raw=true)
-
-
-## References
-  - [1] Robert P. Goldman, *Solving POMDPs online through HTN Planning and Monte Carlo Tree Search*, Proceedings of the 4th ICAPS Workshop on Hierarchical Planning (HPlan 2021).
-  - [2] Mykel J. Kochenderfer, *Decision Making Under Uncertainty: Theory and Applications*, MIT Press, 2015.
