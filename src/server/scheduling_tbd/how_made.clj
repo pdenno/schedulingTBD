@@ -4,18 +4,16 @@
    There are about 400 episodes; each episode has 4 segments.
    The content of the DB is often the same as what is in data/him-db.edn, (ToDo:) which is used to create the base DB."
   (:require
+   [clojure.java.io         :as io]
    [clojure.pprint          :refer [pprint]]
    [clojure.string          :as str]
    [datahike.api            :as d]
    [hickory.core            :as hick] ; There might be easier ways, but I'd like to learn this tool.
    [mount.core              :as mount :refer [defstate]]
+   [scheduling-tbd.domain   :as dom]
+   [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.util     :as util :refer [connect-atm]]
    [taoensso.timbre :as log]))
-
-;;; ToDo:
-;;;  - Make :rebuild-db? use data/him-db.edn if it exists.
-;;;  - Write a function to get the challenge-intro for any :segment/name.
-;;;  - Populate the :segment/challenge-intro field with sentences from chat. (Check whether it exists, first.)
 
 (def him-schema+
   "Defines content of the How It's Made DB in a convenient format, not Datahike format."
@@ -173,7 +171,7 @@
     :max-seq - return no episodes with a larger than :episode/sequence-number.
     :names - return only segments in the argument collection (not its episode).
 
-   Example usage: (get-him-db-content {:min-seq 1 :max-seq 5}).
+   Example usage: (get-him-db-content {:min-seq 3 :max-seq 5}).
    Example usage: (get-him-db-content #{\"Sardines\" \"Bread\"})."
   [& {:keys [min-seq max-seq names]}]
   (assert (or (empty? names) (set? names)))
@@ -188,28 +186,62 @@
       names    (filter #(names (:segment/name %)))
       true     vec)))
 
+(defn segment-exists?
+  [name]
+  (d/q '[:find  ?e .
+         :in $ ?name
+         :where (?e :segment/name ?name)]
+       @(connect-atm :him) name))
+
+;;;--------------------- Populating :segment/challenge-intro  ---------------------
+(defn write-challenge-intro
+  "Write the value for :segment/challenge-intro for the argument segment name.
+   Example usage (write-challenge-intro \"Aluminium foil\")"
+  [seg-name]
+  (if (segment-exists? seg-name)
+    (if-let [challenge (-> (str "a company that makes " seg-name)
+                             dom/pretend-you-manage-prompt
+                             (llm/query-llm {:model "gpt-4" :raw-text? true}))]
+      (do (log/info "Intro Response: " challenge)
+          (d/transact (connect-atm :him) {:tx-data [{:segment/name seg-name
+                                                     :segment/challenge-intro challenge}]}))
+      (log/error "Problem getting challenge-intro for" seg-name))
+    (log/error "No such segment:" seg-name)))
+
+(defn write-intros
+  "Write intros for segments in the argument episodes, indexed like get-him-db-content."
+  [& {:keys [names] :as epi-args}]
+  (let [content (get-him-db-content epi-args)
+        seg-names (if (not-empty names)
+                    content
+                    (->> content
+                         (mapcat :episode/segments)
+                         (map :segment/name)))]
+    (doseq [seg-name seg-names]
+      (write-challenge-intro seg-name))))
+
+;;;--------------------- Starting, stopping, recreating etc.  ---------------------
 (defn write-db-backup
   "Write a file of current db content.
-   Example-usage (write-db-backup \"data/him-db.edn\")."
-  [filename]
-  (spit filename (with-out-str (pprint (get-him-db-content)))))
+   Example-usage (write-db-backup \"my-him-db.edn\")
+   Example-usage (write-db-backup) writes to data/him-db.edn which is kept in the repository."
+  ([] (write-db-backup "data/him-db.edn"))
+  ([filename]
+   (spit filename (with-out-str (pprint (get-him-db-content))))))
 
 (defn create-him-db
   "Create the How It's Made DB."
   [cfg]
   (when (d/database-exists? cfg) (d/delete-database cfg))
   (d/create-database cfg)
-  (let [data (made-data)
+  (let [data (if (.exists (io/file "./data/him-db.edn"))
+               (-> "./data/him-db.edn" slurp read-string)
+               (made-data))
         conn (connect-atm :him)]
     (d/transact conn him-schema)
     (d/transact conn {:tx-data data})
     (mark-as-useless suspected-useless)))
 
-;;;--------------------- Populating :segment/challenge-intro  ---------------------
-
-
-
-;;;--------------------- Starting and stopping ---------------------
 ;;; Based on ./db.clj
 (defn init-him
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
@@ -220,7 +252,7 @@
                                           "\nCreate directories 'projects' and 'system' under it.") {})))
         him-cfg {:store {:backend :file :path (str base-dir "/etc/other-dbs/him")}
                  :keep-history? false
-                 :rebuild-db? false ; <================== ToDo: Make rebuild use data/him-db.edn if it exists.
+                 :rebuild-db? false ; <=========================
                  :schema-flexibility :write}]
     (util/register-db :him him-cfg)
     (when (:rebuild-db? him-cfg) (create-him-db him-cfg))

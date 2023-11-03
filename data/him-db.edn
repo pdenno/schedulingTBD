@@ -1,19 +1,27 @@
 [#:episode{:date "January 6, 2001",
            :id "1-01",
            :segments
-           [#:segment{:link
+           [#:segment{:challenge-intro
+                      "Our principal scheduling problem revolves around coordinating raw material procurement with production schedules and customer delivery deadlines. We often face the challenge of ensuring a continuous supply of high-quality raw aluminium, which is subject to market availability and price fluctuations. The energy-intensive nature of aluminium production further mandates us to abide by specific utility schedules, failing which could lead to costly disruptions. Finally, synchronization of our manufacturing processes and customer demands require us to adeptly balance production rates with varying lead times and order sizes.",
+                      :link
                       #:segment-link{:href "/wiki/Aluminium_foil",
                                      :text "Aluminium foil"},
-                      :name "Aluminum foil"}
-            #:segment{:link
+                      :name "Aluminium foil"}
+            #:segment{:challenge-intro
+                      "Our principal scheduling problem boils down to efficiently coordinating multiple variable elements in our production process. These include reconciling supplier timelines for raw materials delivery, regulating internal manufacturing stages, accounting for fluctuating seasonal demand, and ensuring timely shipment to retailers. Additionally, unanticipated demand surge or supply chain disruptions pose considerable challenges. The issue is mainly compounded by the product's seasonality, which calls for careful forecasting and demand planning. Finally, the production process for custom-designed snowboards results in frequent changes in the production schedule.",
+                      :link
                       #:segment-link{:href "/wiki/Snowboard",
                                      :text "Snowboard"},
                       :name "Snowboards"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "The principal scheduling problem in our contact lenses manufacturing company revolves around efficiently managing production schedules to cater to fluctuating demand that varies with factors like fashion trends and seasonal eye issues. We also grapple with coordinating different stages of production, such as lens molding, hydration, sterilization, packaging, ensuring minimal downtime. There's also the aspect of integrating our production schedule with our supply chain to prevent a backlog of inventory or risk running out of stock. Additionally, scheduling preventative maintenance for our equipment to avoid unexpected downtime poses a challenge. Lastly, navigating unforeseen disruptions like material delays, equipment breakdowns, and global crises like the COVID-19 pandemic affects our scheduling capacity.",
+                      :link
                       #:segment-link{:href "/wiki/Contact_lens",
                                      :text "Contact lens"},
                       :name "Contact lenses"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "The principal scheduling problem we face in the production of bread is coordinating and synchronizing the various stages of the process, from sourcing raw materials like flour and yeast, to baking, packaging, and delivery in a timely manner. This is often complex due to factors like fluctuating market demand, supply delays, and the perishable nature of our products. We also need to factor in maintenance periods for our equipment without disrupting production. Simultaneously, we must adhere to strict hygiene and quality regulations that mandate specific times and conditions for each step. It's a constant challenge to balance efficiency, cost-effectiveness, and quality assurance in our schedule.",
+                      :link
                       #:segment-link{:href "/wiki/Bread",
                                      :text "Bread"},
                       :name "Bread"}],
@@ -21,19 +29,27 @@
  #:episode{:date "January 13, 2001",
            :id "1-02",
            :segments
-           [#:segment{:link
+           [#:segment{:challenge-intro
+                      "The principal scheduling problem we face is the synchronization of raw material supply, production, and delivery of finished products. Since the CD production process relies heavily on various components like polycarbonate plastic, aluminum, and packaging materials, ensuring that these materials are available in the right quantities and at the right time is vital. Additionally, coordinating the management of production lines to avoid downtime, while keeping pace with customer demand is a significant challenge. Moreover, logistical issues also need to be optimally arranged to ensure prompt delivery to our clients. Lastly, sudden surges in market demand or supply shortages can disrupt this schedule, impacting the overall operation.",
+                      :link
                       #:segment-link{:href "/wiki/Compact_disc",
                                      :text "Compact disc"},
                       :name "Compact discs"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "The principal scheduling problem involves coordinating the procurement of raw materials, primarily high-quality milk, with the production process of Mozzarella cheese. This includes having to consider factors such as the shelf-life of milk, the cheese aging process, and the variability in milk production due to seasonal changes. Balancing the timing to ensure fresh milk is efficiently transformed into Mozzarella cheese without causing waste is a challenge. Additionally, we have to arrange for the timely distribution of our product to various outlets to maintain the freshest possible product. Fluctuating market demand also significantly influences the scheduling process.",
+                      :link
                       #:segment-link{:href "/wiki/Mozzarella",
                                      :text "Mozzarella"},
                       :name "Mozzarella cheese"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "Our principal scheduling problem lies within balancing production and ensuring the timely receipt of raw materials. We often struggle to synchronize our production schedule with the availability of raw materials because of unpredictable delays in supplier deliveries. Additionally, seasonal demand fluctuations create scheduling adjustments. Any break in rhythm due to these issues could lead to a halt in production or a surplus of inventory, both affecting the company financially. Furthermore, coordinating with different departments like design, production, and distribution also poses a challenge in terms of seamless scheduling.",
+                      :link
                       #:segment-link{:href "/wiki/Pantyhose",
                                      :text "Pantyhose"},
                       :name "Tights"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "Our primary scheduling problem revolves around coordinating our raw material supply chain with our production process. We must ensure a timely procurement of raw materials, such as phosphor powder and mercury for the fluorescent coating, and the production of glass tubing and electrodes, to avoid bottlenecks or delays. Furthermore, planning for machine maintenance without impacting production schedule is a challenge. Adjustments for unpredictable demand fluctuations can also pose considerable scheduling issues. Lastly, syncing production with distribution to ensure products reach the market on time without leading to overstocking is a crucial balancing act.",
+                      :link
                       #:segment-link{:href "/wiki/Fluorescent_lamp",
                                      :text "Fluorescent lamp"},
                       :name "Fluorescent tubes"}],
@@ -41,37 +57,53 @@
  #:episode{:date "January 20, 2001",
            :id "1-03",
            :segments
-           [#:segment{:link
+           [#:segment{:challenge-intro
+                      "Our principal scheduling problem primarily revolves around coordinating the timing between our procurement, production, packaging, and distribution processes. It's a challenge to ensure the consistent availability of raw materials, particularly wood and plastic, according to our production schedules. Additionally, synchronization between production output and packaging capacity is critical to prevent bottlenecks. Equally vital is aligning the timing between the readiness of packaged toothpicks and their scheduled delivery to our distributors. The key issue is to maintain a reliable flow that supports consistent output without excess inventory or undue delay.",
+                      :link
                       #:segment-link{:href "/wiki/Toothpick",
                                      :text "Toothpick"},
                       :name "Toothpicks"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "Our principal scheduling problem revolves around coordinating the various stages of the production process to prevent bottlenecks and delays. This includes ensuring our raw material supplies, primarily acrylic and fiberglass, arrive in time, aligning our workforce to handle fluctuating demand, and properly scheduling our machines for molding and finishing the bathtubs. This is further complicated by the need for quality checks at multiple stages and the varying production times of different bathtub models. Addressing unexpected breakdowns or delays in supply further adds to this complexity. Lastly, coordinating shipment to our distributors across various locations in a timely manner presents another level of scheduling challenge.",
+                      :link
                       #:segment-link{:href "/wiki/Bathtub",
                                      :text "Bathtub"},
                       :name "Acrylic bathtubs"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "The main scheduling problem in our business involves timely acquiring and managing parts and supplies from various global vendors. Coordinating these deliveries to align with our production schedule is challenging, especially given fluctuating lead times and possible delays. Additionally, synchronizing manufacturing processes to ensure a seamless assembly line operation while minimizing idle time is vital. It is also crucial to handle unexpected changes or disruptions in the schedule. Finally, ensuring maintenance and quality inspections are timely done to keep the production on schedule is equally critical.",
+                      :link
                       #:segment-link{:href "/wiki/Helicopter",
                                      :text "Helicopter"},
                       :name "Helicopters"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "Our principal scheduling problem revolves around accurately aligning our supply chain and production processes to match fluctuating demand patterns. Irregularity in procuring raw materials like barley, hops, and yeast often disrupts the production schedule. Additionally, synchronizing various stages of beer production — malting, mashing, fermentation, maturation, and packaging - presents a challenge, as each has its own time requirements. The complexity is compounded by brewers producing multiple types of beer simultaneously. Mistimed production can result in overstock, product waste, or customer dissatisfaction due to delayed or inconsistent product availability.",
+                      :link
                       #:segment-link{:href "/wiki/Beer", :text "Beer"},
                       :name "Beer"}],
            :sequence-number 3}
  #:episode{:date "January 27, 2001",
            :id "1-04",
            :segments
-           [#:segment{:link
+           [#:segment{:challenge-intro
+                      "Our principal scheduling problem is managing the production timeline to effectively meet fluctuating customer demand. This includes the allocation of resources for various stages like design, manufacturing, assembly, testing, and quality control. Moreover, planning the procurement timeline for components sourcing from various global suppliers is a challenge. Additionally, we struggle to swiftly respond to unexpected delays or disruptions in the supply chain. Finally, coordinating the post-production processes like packaging and distribution in response to changing customer orders adds to the complex scheduling issues.",
+                      :link
                       #:segment-link{:href "/wiki/Hearing_aid",
                                      :text "Hearing aid"},
                       :name "Hearing aids"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "The principal scheduling problem for our 3D puzzle company is coordinating the production and assembly processes within our capacity constraints. We need to balance the procurement of raw materials, their conversion into puzzle pieces, and the final assembly and packaging. Seasonal demand variation adds further complexity to the scheduling process. Additionally, the time-sensitive nature of product launches or promotional campaigns presents challenges in synchronizing our production and supply chains accordingly. Lastly, unexpected disruptions in supply, production, or distribution can potentially put our schedule off track.",
+                      :link
                       #:segment-link{:href "/wiki/Mechanical_puzzle",
                                      :text "Mechanical puzzle"},
                       :name "3D puzzles"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "The principal scheduling problem is coordinating the full scope of our production cycle. This entails managing the timing of raw material procurement, ensuring the availability of these materials to avoid production halt, while also aligning manufacturing timeline with the estimated delivery dates for our clients. Furthermore, it involves scheduling maintenance of machinery to prevent sudden breakdowns. This sophisticated interplay of different schedules can cause delays and discrepancies if not carefully managed. Finally, unforeseen circumstances such as delays in shipment or machinery malfunction pose continuous challenges to our schedule.",
+                      :link
                       #:segment-link{:href "/wiki/Mat", :text "Mat"},
                       :name "Rubber mats"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "The principal scheduling problem in our toilet manufacturing business is managing the balance between our supply chain and production line activities. This involves coordinating the procurement of raw materials, their arrival times, and the initiation of production to ensure a steady flow of operations. Delays in receiving raw materials like ceramic and plastic parts can stall production, leading to costly downtime. Similarly, failure to schedule adequate production time may lead to inventory shortages or excess, negatively affecting storage costs and customer satisfaction. Additionally, scheduling the maintenance of our manufacturing equipment to avoid unexpected downtime while meeting delivery deadlines is also a significant challenge.",
+                      :link
                       #:segment-link{:href "/wiki/Toilet",
                                      :text "Toilet"},
                       :name "Toilets"}],
@@ -79,19 +111,27 @@
  #:episode{:date "February 3, 2001",
            :id "1-05",
            :segments
-           [#:segment{:link
+           [#:segment{:challenge-intro
+                      "One of the principal scheduling problems my company faces is aligning the procurement of raw materials, mainly wood pulp, with our production schedule. Since the process of turning pulp into paper is time-consuming and involves several stages, any delay in acquiring raw materials immediately impacts our production timeline. Further, juggling between addressing the immediate, fluctuating demand, and predicting long term paper needs for efficient production is challenging. Maintaining a consistent delivery schedule with our distribution partners, given the production variables, is also a substantial hurdle. Lastly, scheduling regular maintenance for our machinery without disrupting the production cycle adds to the complexity.",
+                      :link
                       #:segment-link{:href "/wiki/Special_fine_paper",
                                      :text "Special fine paper"},
                       :name "Copy paper"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "Our principal scheduling problem lies in coordinating the various stages of jean production, from sourcing raw materials and manufacturing to handling interruptions in the supply chain. The multifaceted process involves unpredictability in raw denim supply, timely delivery of other essential materials like buttons, zippers, threads etc., allocation of human resources for manufacturing, scheduling machine usage, and managing shipment timelines. Disruptions in any single component can cause significant delays affecting the entire production schedule. The issue is further complicated by the need to handle multiple product lines and custom orders concurrently. Thus, the challenge is to create a flexible yet efficient schedule that accommodates these complexities while optimizing the use of resources and minimizing production time.",
+                      :link
                       #:segment-link{:href "/wiki/Jeans",
                                      :text "Jeans"},
                       :name "Jeans"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "Our principal scheduling problem lies in the synchronization of our supply chain - obtaining raw materials, manufacturing components, assembling finished products, and shipping them to consumers within stipulated deadlines. Delays in any one step can disrupt the entire process, predominantly impacted by factors such as supplier reliability, inefficiencies in production, and transport issues. Coordinating with multiple vendors globally has also posed challenges due to diverse time zones and languages. Additionally, there's an increasing difficulty to promptly adjust schedules in response to sudden changes in demand. Lastly, managing inventories effectively to avoid stockouts or excessive storage costs while ensuring on-time delivery is a complex balancing act.",
+                      :link
                       #:segment-link{:href "/wiki/Computer",
                                      :text "Computer"},
                       :name "Computers"}
-            #:segment{:link
+            #:segment{:challenge-intro
+                      "The principal scheduling problem lies in coordinating the manufacturing, processing, and delivery phases in a synchronized manner. Balancing supply with fluctuating demand is a constant challenge. Interruptions or delays in raw material supply such as silica sand, lime, and soda ash can impact the production cycle. Machine downtime for maintenance or unexpected faults can disrupt the production schedule, causing delays in meeting customer deadlines. Lastly, coordinating with logistics for timely delivery while accounting for any unexpected transportation issues remains a significant scheduling problem.",
+                      :link
                       #:segment-link{:href "/wiki/Plate_glass",
                                      :text "Plate glass"},
                       :name "Plate glass"}],
