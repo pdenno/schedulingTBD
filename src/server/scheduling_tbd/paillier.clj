@@ -1,5 +1,6 @@
 (ns scheduling-tbd.paillier
   (:require
+   [clojure.edn :as edn]
    [mount.core :as mount :refer [defstate]]
    [taoensso.timbre :as log])
   (:import
@@ -155,7 +156,7 @@
                                        (assoc m k (to-int v))))
                          {} x)
               x))]
-    (-> "SCHEDULING_TBD_DB" System/getenv (str "/etc/key-pairs.edn") slurp read-string to-int)))
+    (-> "SCHEDULING_TBD_DB" System/getenv (str "/etc/key-pairs.edn") slurp edn/read-string to-int)))
 
 (def key-string
   "7475489924104995055380174349467603249885928864115625436043229933637579577536025458294055469976726659454196292515216432536572901820696584292117795815989021875450439167441476576815634591476176048112693987333376227197931881257015399750192143192380783354033881412351889293571476466849512469222864554417448152596821216004817346804734703142080450702857038127500056533383867651456435164457440338431657989976610348946851276215352556373476279565010460780013652954000398100627050578751652188199234078190335813304857476532940159505351172981226105802721346907240557493731758197388857778036548952470246104546197374336482676325913")
@@ -167,7 +168,7 @@
   []
   (or #_(System/getenv "OPENAI_API_KEY") ; Never use this, it will only cause building the production version to be more complex.
       (try (let [paillier (init-paillier)]
-             (->> key-string BigInteger. (decrypt-string (:private-key paillier)) read-string :llm))
+             (->> key-string BigInteger. (decrypt-string (:private-key paillier)) edn/read-string :llm))
            (catch Throwable e (log/error "Could not find LLM API key:" (.getMessage e))))
       (log/error "LLM API key is neither an environment variable nor build secret.")))
 

@@ -1,5 +1,6 @@
 (ns scheduling-tbd.web.handler
   (:require
+   [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
    [mount.core :as mount :refer [defstate]]
@@ -24,6 +25,7 @@
    [reitit.http.interceptors.dev :as dev] ; for testing
    [reitit.http.spec :as spec]
    [scheduling-tbd.web.controllers.respond :as resp]
+   [scheduling-tbd.web.routes.websockets   :as wsock]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
    [spec-tools.spell :as spell]
@@ -66,8 +68,16 @@
                              :description "API with reitit-http"}}
             :handler (swagger/create-swagger-handler)}}]
 
+   ["/ws"
+    {:get {:summary "I'm guessing!"
+           :responses {200 {:body string?}}
+           :handler wsock/echo-websocket-handler
+           #_(fn [& req]
+             (log/info "req =" req)
+             (ok ":How-about-this?"))}}]
+
    ["/api"
-    {:swagger {:tags ["RADmapper functions"]}}
+    {:swagger {:tags ["SchedulingTBD functions"]}}
 
    ["/user-says"
      {:post {:summary "Respond to the user's most recent message."
@@ -86,7 +96,7 @@
             :handler resp/healthcheck}}]]])
 
 (def options
-  {;:reitit.interceptor/transform dev/print-context-diffs ;; pretty context diffs
+  {:reitit.interceptor/transform dev/print-context-diffs ;; pretty context diffs
    :validate spec/validate ;; enable spec validation for route data
    :reitit.spec/wrap spell/closed ;; strict top-level validation  (error reported if you don't have the last two interceptors)
    :exception pretty/exception
@@ -123,7 +133,7 @@
    (ring/create-default-handler)))
 
 (defn handler-init []
-  (let [site-config (-> "system.edn" io/resource slurp read-string :dev :handler/ring)
+  (let [site-config (-> "system.edn" io/resource slurp edn/read-string :dev :handler/ring)
         s ^String (:cookie-secret site-config)
         cookie-store (cookie/cookie-store {:key (.getBytes s)})
         app (-> (http/ring-handler

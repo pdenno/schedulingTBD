@@ -14,6 +14,7 @@
    [promesa.core :as p]
    [scheduling-tbd.util :as sutil]
    [stbd-app.util :as util]
+   [stbd-app.wsock :as wsock]
    [stbd-app.components.chat :as chat :refer [Chat]]
    [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
    [stbd-app.components.project :refer [SelectProject initial-projects projects-info]]
@@ -25,7 +26,7 @@
    ["react-router-dom" :as router :refer [useSearchParams]]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
-(def svr-prefix "http://localhost:3000")
+;(def svr-prefix "http://localhost:3000") ; And isn't it 3300?
 (declare get-user-data get-user-code)
 
 (def progress-handle

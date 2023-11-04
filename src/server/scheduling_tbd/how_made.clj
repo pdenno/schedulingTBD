@@ -4,6 +4,7 @@
    There are about 400 episodes; each episode has 4 segments.
    The content of the DB is often the same as what is in data/him-db.edn, (ToDo:) which is used to create the base DB."
   (:require
+   [clojure.edn             :as edn]
    [clojure.java.io         :as io]
    [clojure.pprint          :refer [pprint]]
    [clojure.string          :as str]
@@ -121,7 +122,7 @@
             (row2obj [x] (let [[[ep-id] [ep-num] & segs] (->> x :content (filter map?) (mapv :content))
                                date (last segs)]
                            {:episode/id ep-id
-                            :episode/sequence-number (read-string ep-num)
+                            :episode/sequence-number (edn/read-string ep-num)
                             :episode/date (-> date (nth 0) (str/replace  #"\n" "")) ; ToDo: More strings need this.
                             :episode/segments (->> segs butlast (mapv seg-data))}))]
 
@@ -248,7 +249,7 @@
   (when (d/database-exists? cfg) (d/delete-database cfg))
   (d/create-database cfg)
   (let [data (if (.exists (io/file "./data/him-db.edn"))
-               (-> "./data/him-db.edn" slurp read-string)
+               (-> "./data/him-db.edn" slurp edn/read-string)
                (made-data))
         conn (connect-atm :him)]
     (d/transact conn him-schema)

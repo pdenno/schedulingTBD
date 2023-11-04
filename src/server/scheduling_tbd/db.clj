@@ -2,6 +2,7 @@
   "System and project database schemas and database initialization."
   (:require
    [clojure.core :as c]
+   [clojure.edn  :as edn]
    [clojure.instant]
    [clojure.spec.alpha           :as s]
    [clojure.string               :as str]
@@ -240,7 +241,7 @@
       (let [pat (re-pattern (str "^" name "( \\d+)?"))
             nums (map #(let [[success num] (re-matches pat %)]
                          (when success (or num "0"))) names)
-            num (->> nums (map read-string) (apply max) inc)
+            num (->> nums (map edn/read-string) (apply max) inc)
             new-name (str name " " num)
             new-id   (-> new-name (str/replace #"\s+" "-") keyword)]
         (-> proj-info

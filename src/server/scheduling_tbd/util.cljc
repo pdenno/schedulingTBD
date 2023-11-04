@@ -1,8 +1,8 @@
 (ns scheduling-tbd.util
   "Do lowest level configuration (logging, etc.)."
   (:require
-   [datahike.api         :as d]
-   [datahike.pull-api    :as dp]
+   #?@(:clj [[datahike.api         :as d]
+             [datahike.pull-api    :as dp]])
    [mount.core           :as mount :refer [defstate]]
    [taoensso.timbre      :as log]))
 
@@ -59,13 +59,14 @@
   (assert (#{:him :system} k))
   (swap! databases-atm #(assoc % k config)))
 
+#?(:clj
 (defn connect-atm
   "Return a connection atom for the DB."
   [k]
   (when-let [db-cfg (get @databases-atm k)]
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
-      (log/warn "There is no DB to connect to."))))
+      (log/warn "There is no DB to connect to.")))))
 
 ;;; This seems to cause problems in recursive resolution. (See resolve-db-id)"
 (defn db-ref?
@@ -74,6 +75,7 @@
   (and (map? obj) (= [:db/id] (keys obj))))
 
 ;;; {:db/id 3779}
+#?(:clj
 (defn resolve-db-id
   "Return the form resolved, removing properties in filter-set,
    a set of db attribute keys, for example, #{:db/id}."
@@ -90,7 +92,7 @@
                (set? obj)    (set (mapv resolve-aux obj))
                (coll? obj)        (map  resolve-aux obj)
                :else  obj))]
-     (resolve-aux form))))
+     (resolve-aux form)))))
 
 (defn init-util []
   (config-log :info))

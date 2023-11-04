@@ -2,46 +2,50 @@
  :deps    {camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
            com.cemerick/url                    {:mvn/version "0.1.1"}
-           com.taoensso/timbre                 {:mvn/version "6.1.0"}
-           com.wsscode/pathom3                 {:mvn/version "2023.01.31-alpha"}
+           com.taoensso/timbre                 {:mvn/version "6.1.0"} ; 6.3.1 is available but give taoensso/encore gives deprecated errors in shadow.
+           com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
-           funcool/promesa                     {:mvn/version "11.0.671"}
+           funcool/promesa                     {:mvn/version "11.0.678"}
+           ;;http-kit/http-kit                   {:mvn/version "2.8.0-beta3"}
+           ;;http-kit/http-kit                   {:mvn/version "2.7.0"}
+           org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"}
            io.djy/ezzmq                        {:mvn/version "0.8.2"}
-           io.replikativ/datahike              {:mvn/version "0.6.1538"}
+           io.replikativ/datahike              {:mvn/version "0.6.1538"} ; 1552 is available.
            mount/mount                         {:mvn/version "0.1.17"}
-           net.clojars.wkok/openai-clojure     {:mvn/version "0.6.0"}
-           org.apache.logging.log4j/log4j-api  {:mvn/version "2.20.0"} ; ToDo: Move logging to :dev.
-           org.apache.logging.log4j/log4j-core {:mvn/version "2.20.0"} ; ToDo: Move logging to :dev.
+           net.clojars.wkok/openai-clojure     {:mvn/version "0.11.1"}
+           org.apache.logging.log4j/log4j-api  {:mvn/version "2.21.1"} ; ToDo: Move logging to :dev.
+           org.apache.logging.log4j/log4j-core {:mvn/version "2.21.1"} ; ToDo: Move logging to :dev.
            org.clj-commons/hickory             {:mvn/version "0.7.3"}
-           org.slf4j/slf4j-nop                 {:mvn/version "2.0.7"}  ; Stop spurious logging!
+           org.slf4j/slf4j-nop                 {:mvn/version "2.0.9"}  ; Stop spurious logging!
            org.clojure/data.codec              {:mvn/version "0.1.1"}
            org.clojure/data.json               {:mvn/version "2.4.0"}
            org.clojure/data.xml                {:mvn/version "0.2.0-alpha8"}
            org.clojure/data.zip                {:mvn/version "1.0.0"}}
+
 
  ;; See .dir-locals.el for some defaults on CIDER C-c M-j
  :aliases {:dev          {:extra-paths    ["src/server" "test" "env/dev" "resources"]
                           :jvm-opts       ["-XX:-OmitStackTraceInFastThrow"] ; https://www.metosin.fi/blog/missing-stacktraces/
                           ;; :dev includes src/server (for use with exerciser) thus much of this stuff.
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
-                                           cider/cider-nrepl               {:mvn/version "0.30.0"}
+                                           cider/cider-nrepl               {:mvn/version "0.43.0"}
                                            com.lambdaisland/classpath      {:mvn/version "0.4.44"}
                                            ;criterium/criterium            {:mvn/version "0.4.6"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
-                                           lilactown/helix                 {:mvn/version "0.1.10"}
+                                           lilactown/helix                 {:mvn/version "0.2.0"}
                                            org.clojure/java.classpath      {:mvn/version "1.0.0"}
                                            ;;pjstadig/humane-test-output   {:mvn/version "0.11.0"}
                                            metosin/muuntaja                {:mvn/version "0.6.8"}
-                                           nrepl/nrepl                     {:mvn/version "1.0.0"}
+                                           nrepl/nrepl                     {:mvn/version "1.1.0"}
                                            org.clojure/tools.namespace     {:mvn/version "1.4.4"}
                                            metosin/reitit                  {:mvn/version "0.6.0"}
                                            metosin/ring-http-response      {:mvn/version "0.9.3"}
-                                           ring/ring-defaults              {:mvn/version "0.3.4"}
-                                           ring/ring-jetty-adapter         {:mvn/version "1.10.0"}
-                                           ring/ring-core                  {:mvn/version "1.10.0"}
-                                           ring/ring-devel                 {:mvn/version "1.10.0"}
+                                           ring/ring-defaults              {:mvn/version "0.4.0"}
+                                           ring/ring-jetty-adapter         {:mvn/version "1.11.0-beta2"}  ;; These were 1.10.0
+                                           ring/ring-core                  {:mvn/version "1.11.0-beta2"}  ;; I switched to try org.ring-clojure/ring-websocket-async
+                                           ring/ring-devel                 {:mvn/version "1.11.0-beta2"}  ;; Of course, both could have been accommodated.
                                            ring-cors/ring-cors             {:mvn/version "0.1.13"}
-                                           selmer/selmer                   {:mvn/version "1.12.58"}}} ; Used for home.html.
+                                           selmer/selmer                   {:mvn/version "1.12.59"}}} ; Used for home.html.
 
            :test      {:extra-paths    ["test" "env/dev"] ; clojure -X:dev:test
                        :extra-deps
@@ -52,20 +56,20 @@
                        :exec-args {:patterns [".*-test.*"]}}
 
            :app       {:extra-paths ["src/app" "src/server" "test"] ; src/server has shared util.cljc
-                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.23.3"}
-                                     lilactown/helix                {:mvn/version "0.1.10"}
+                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.25.10"}
+                                     lilactown/helix                {:mvn/version "0.2.0"}
                                      cljs-ajax/cljs-ajax            {:mvn/version "0.8.4"}
                                      applied-science/js-interop     {:mvn/version "0.4.2"}}}
 
            :kaochaSTBD {:extra-paths    ["test" "env/dev"]
-                        :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.23.3"}
-                                         lambdaisland/kaocha       {:mvn/version "1.84.1335"}
-                                         lambdaisland/kaocha-cljs2 {:mvn/version "0.1.58"}
+                        :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.25.10"}
+                                         lambdaisland/kaocha       {:mvn/version "1.87.1366"}
+                                         lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                                          com.lambdaisland/glogi    {:mvn/version "1.3.169"}
-                                         nrepl/nrepl               {:mvn/version "1.0.0"}
-                                         cider/cider-nrepl         {:mvn/version "0.30.0"}}}
+                                         nrepl/nrepl               {:mvn/version "1.1.0"}
+                                         cider/cider-nrepl         {:mvn/version "0.43.0"}}}
 
-           :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.9.4"} #_{:git/tag "v0.9.4" :git/sha "76b78fe"}}
+           :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.9.6"} #_{:git/tag "v0.9.4" :git/sha "76b78fe"}}
                       :ns-default build}
 
            ;; clj -M:morpheus -d graphs -f svg -e 'clojure.core/.*|:clj-kondo/unknown-namespace/.*|:cljs.core/.*' src
@@ -74,10 +78,26 @@
                             :main-opts       ["-m" "thomasa.morpheus.main"]}}}
 
 ;;; clj -T:search/outdated
-;;; |    :file |                                           :name |  :current |   :latest |
-;;; |----------+-------------------------------------------------+-----------+-----------|
-;;; | deps.edn |                                     aleph/aleph |     0.6.1 |     0.6.2 | not used anymore
-;;; |          | com.google.javascript/closure-compiler-unshaded | v20230206 | v20230502 | not updated
-;;; |          |                                 funcool/promesa |  10.0.663 |  11.0.671 |
-;;; |          |                          io.replikativ/datahike |  0.6.1538 |  0.6.1541 | not changed
-;;; |          |                             lambdaisland/kaocha | 1.83.1314 | 1.84.1335 |
+;;; |    :file |                               :name |         :current |          :latest |
+;;; |----------+-------------------------------------+------------------+------------------|
+;;; | deps.edn |                   cider/cider-nrepl |           0.30.0 |           0.43.0 |
+;;; |          |                 com.taoensso/timbre |            6.1.0 |            6.3.1 |
+;;; |          |                 com.wsscode/pathom3 | 2023.01.31-alpha | 2023.08.22-alpha |
+;;; |          |                     funcool/promesa |         11.0.671 |         11.0.678 |
+;;; |          |       io.github.clojure/tools.build |            0.9.4 |            0.9.6 |
+;;; |          |              io.replikativ/datahike |         0.6.1538 |         0.6.1552 |
+;;; |          |                 lambdaisland/kaocha |        1.84.1335 |        1.87.1366 |
+;;; |          |           lambdaisland/kaocha-cljs2 |           0.1.58 |           0.2.72 |
+;;; |          |                     lilactown/helix |           0.1.10 |            0.2.0 |
+;;; |          |                     lilactown/helix |           0.1.10 |            0.2.0 |
+;;; |          |     net.clojars.wkok/openai-clojure |            0.6.0 |           0.11.1 |
+;;; |          |                         nrepl/nrepl |            1.0.0 |            1.1.0 |
+;;; |          |                         nrepl/nrepl |            1.0.0 |            1.1.0 |
+;;; |          |  org.apache.logging.log4j/log4j-api |           2.20.0 |           2.21.1 |
+;;; |          | org.apache.logging.log4j/log4j-core |           2.20.0 |           2.21.1 |
+;;; |          |                 org.slf4j/slf4j-nop |            2.0.7 |            2.0.9 |
+;;; |          |                  ring/ring-defaults |            0.3.4 |            0.4.0 |
+;;; |          |                       selmer/selmer |          1.12.58 |          1.12.59 |
+;;; |          |                thheller/shadow-cljs |           2.23.3 |          2.25.10 |
+;;; |          |                thheller/shadow-cljs |           2.23.3 |          2.25.10 |
+;;; |          |       io.github.clojure/tools.build |            0.9.4 |            0.9.6 |

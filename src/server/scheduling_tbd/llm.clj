@@ -7,7 +7,7 @@
 
    N.B. LSP annotates many operators here as '0 references'; of course, they are used."
   (:require
-   [clojure.core :as c]
+   [clojure.edn                  :as edn]
    [wkok.openai-clojure.api      :as openai]
    [scheduling-tbd.sutil         :refer [get-api-key]]
    [camel-snake-kebab.core       :as csk]
@@ -48,7 +48,7 @@
                        first
                        :message
                        :content)
-               res (cond-> res (not raw-text?) read-string)]
+               res (cond-> res (not raw-text?) edn/read-string)]
            (if (or (map? res) (string? res))
              res
              (throw (ex-info "Did not produce a map." {:result res}))))

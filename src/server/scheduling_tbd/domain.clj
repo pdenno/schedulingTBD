@@ -236,3 +236,50 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 ;;;    - Similar to what I said about "deeper classification" above, I think deeper on "fixed process scheduling" would help here.
 ;;;      This is batch manufacturing without a place to put WIP. That makes it something like synchronous line discrete scheduling, but the products all follow the same path.
 ;;;    - Whenever the problem classifies as "fixed process scheduling" we'll ask (either the LLM or the human) what the steps are. In the next iteration, I'll ask the LLM.
+
+;;; ------------------- Continuing...
+
+;;; Frequently, users (in the real world as well as the test data) will allude to inventory challenges.
+;;; There are two principal types: raw material and finished goods stockout.
+;;; Two things we'll need to do to help these people are:
+;;;   (1) Obviously don't schedule a task that quite likely won't have materials needed to carry it out, and
+;;;   (2) Offer to analyze their inventory management processes.
+;;; (1) is something we'll do soon, (2) quite a bit later. But the important point at the introduction is to steer the conversation away from the inventory problem.
+;;; We should try to characterize (mechanistically) the manufacturing problem first if at all possible.
+;;; Generally speaking, finished goods stock outs take things in different directions (e.g. demand forecasting) than raw materials.
+
+;;; ToDo:
+;;;   (1) Write the finished good version of the following, which handles raw-material shortages.
+;;;   (2) Get these into responses in the conversation.
+
+(def raw-material-challenge-partial
+  [{:role "system"    :content "You are a helpful assistant."}
+   {:role "user"      :content "Respond with either 'yes' or 'no' to whether the text in square brackets alludes to a raw-materials shortage."}
+
+   {:role "user"      :content "[We produce clothes for firefighting. Our most significant scheduling problem is about deciding how many workers to assign to each product.]"}
+   {:role "assistant" :content "no"}
+
+   {:role "user"      :content "[We do road construction and repaving. We find coping with our limited resources (trucks, workers, aggregate, etc.) a challenge.]"}
+   {:role "assistant" :content "yes"}
+
+   {:role "user"      :content "[Our principal scheduling problem revolves around coordinating raw material procurement with production schedules and customer delivery deadlines.
+ We often face the challenge of ensuring a continuous supply of high-quality raw aluminium, which is subject to market availability and price fluctuations.]"}
+   {:role "assistant" :content "yes"}
+
+   {:role "user"      :content "[We run several products simultaneously and simply would like to be able to have the beer bottled and ready to ship as near as possible to
+ the dates defined in our sales plan.]"}
+   {:role "assistant" :content "no"}])
+
+(defn text-cites-raw-material-challenge?
+  "Return true, false, or :huh? depending on whether the text cites an inventory challenge." ; ToDo: Should I throw or return :huh?
+  [text]
+  (try (let [yes-or-no (-> (conj raw-material-challenge-partial
+                                 {:role "user" :content (format "[%s]" text)})
+                           (query-llm {:raw-text? true :model "gpt-3.5-turbo"}))
+             yes-pos (re-matches #"\s*yes\s*" yes-or-no)
+             no-pos  (when-not yes-pos (re-matches #"\s*no\s*" yes-or-no))
+             answer  (cond yes-pos true
+                           no-pos false
+                           :else :huh?)]
+         answer)
+       (catch Throwable _e :huh?)))

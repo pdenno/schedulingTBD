@@ -2,11 +2,13 @@
   "top-most file for starting the server, sets mount state server and system atom."
   (:require
    [ajax.core :refer [GET]] ; for testing
+   [clojure.edn     :as edn]
    [clojure.java.io :as io]
    [clojure.string]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.web.handler :refer [app]]             ; for mount
    [scheduling-tbd.db   :refer [database-cfgs]]          ; for mount
+   [scheduling-tbd.how-made :refer [him-cfg]]          ; for mount
    [scheduling-tbd.paillier :refer [api-key]]            ; for mount
    [scheduling-tbd.planner :refer [plan-server]]         ; for mount
    [scheduling-tbd.util :refer [util-state]]             ; for mount
@@ -43,7 +45,7 @@
       (log/error t (str "server failed to start on port: " port)))))
 
 (defn start-server [& {:keys [profile] :or {profile :dev}}]
-  (let [base-config (-> "system.edn" io/resource slurp read-string profile)
+  (let [base-config (-> "system.edn" io/resource slurp edn/read-string profile)
         port (-> base-config :server/http :port)
         host (-> base-config :server/http :host)]
     (try (let [server (jetty/run-jetty #'scheduling-tbd.web.handler/app {:port port, :join? false})]
