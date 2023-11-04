@@ -139,7 +139,9 @@
  #:episode{:date "February 10, 2001",
            :id "1-06",
            :segments
-           [#:segment{:link
+           [#:segment{:challenge-intro
+                      "Our principal scheduling problem typically revolves around coordinating raw material acquisition with production runs while accounting for shipping and delivery timelines. We are often challenged with ensuring raw materials such as steel and zinc arrive on time for production and that production lines are adequately staffed to produce the requisite quantity of nails and staples. Simultaneously, we must schedule shipping and delivery in coordination with retail demand to prevent stockouts or overstocks. This multi-layered scheduling creates complexities due to unexpected delays in raw material delivery or fluctuations in market demand for our products. Last-minute changes can disrupt production schedules, leading to inefficiencies and increased costs.\n",
+                      :link
                       #:segment-link{:href "/wiki/Nail_(fastener)",
                                      :text "Nail (fastener)"},
                       :name "Nails and staples"}

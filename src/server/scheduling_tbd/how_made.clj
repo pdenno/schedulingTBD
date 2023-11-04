@@ -190,13 +190,22 @@
   [name]
   (d/q '[:find  ?e .
          :in $ ?name
-         :where (?e :segment/name ?name)]
+         :where [?e :segment/name ?name]]
+       @(connect-atm :him) name))
+
+(defn intro-exists?
+  [name]
+  (d/q '[:find  ?e .
+         :in $ ?name
+         :where
+         [?e :segment/name ?name]
+         [?e :segment/challenge-intro]]
        @(connect-atm :him) name))
 
 ;;;--------------------- Populating :segment/challenge-intro  ---------------------
 (defn write-challenge-intro
   "Write the value for :segment/challenge-intro for the argument segment name.
-   Example usage (write-challenge-intro \"Aluminium foil\")"
+   Example usage: (write-challenge-intro \"Aluminium foil\")"
   [seg-name]
   (if (segment-exists? seg-name)
     (if-let [challenge (-> (str "a company that makes " seg-name)
@@ -208,8 +217,10 @@
       (log/error "Problem getting challenge-intro for" seg-name))
     (log/error "No such segment:" seg-name)))
 
+;;; You probably want to call write-db-backup after running this.
 (defn write-intros
-  "Write intros for segments in the argument episodes, indexed like get-him-db-content."
+  "Write intros for segments in the argument episodes, indexed like get-him-db-content, plus the key :redo?.
+   Example usage: (write-intros {:min-seq 6, :max-seq 15})."
   [& {:keys [names] :as epi-args}]
   (let [content (get-him-db-content epi-args)
         seg-names (if (not-empty names)
@@ -218,7 +229,9 @@
                          (mapcat :episode/segments)
                          (map :segment/name)))]
     (doseq [seg-name seg-names]
-      (write-challenge-intro seg-name))))
+      (if (and (intro-exists? seg-name) (not (:redo? epi-args)))
+        (log/info "Intro exists and you didn't ask to :redo?, so skipping:" seg-name)
+        (write-challenge-intro seg-name)))))
 
 ;;;--------------------- Starting, stopping, recreating etc.  ---------------------
 (defn write-db-backup
