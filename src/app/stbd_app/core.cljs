@@ -26,13 +26,24 @@
    ["react-router-dom" :as router :refer [useSearchParams]]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
-;(def svr-prefix "http://localhost:3000") ; And isn't it 3300?
 (declare get-user-data get-user-code)
 
 (def progress-handle
   "The thing that can be called by js/window.clearInterval to stop incrementing progress under js/window.setInterval."
   (atom nil))
 (def progress-atm "Percent allowed duration for eval-cell. 100% is a timeout." (atom 0))
+
+(def dispatch-table
+  "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
+  {:tbd-says  ping-diag})
+
+(defn dispatch [{:keys [dispatch-key] :as msg}]
+  (if (contains? dispatch-table dispatch-key)
+    ((get dispatch-table dispatch-key) msg)
+    (log/error "No dispatch function for " msg)))
+
+(defn ws-handler [args]
+  (log/info "ws-handler: args = " args))
 
 (def diag (atom {}))
 
@@ -78,7 +89,7 @@
       result)))
 
 (j/defn eval-cell
-  "Run RADmapper on the string retrieved from the editor's state.
+  "Run <whatever process> on the string retrieved from the editor's state.
    Apply the result to the argument function on-result, which was is the set-result function set up by hooks/use-state.
    Similarly, on-progress is the progress bar completion value set up by hooks/use-state [progress set-progress].
    Note that the actual change to the output editor is done in a use-effect [state] in the toplevel component.
@@ -235,6 +246,8 @@
                  :min-level
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
+  (when-let [proc @wsock/ping-process] (js/window.clearInterval proc))
+  (wsock/connect! ws-handler)
   (-> (initial-projects)
       (p/then (fn [info] (reset! projects-info (update info :projects #(-> % sort (conj "Start a new project") vec)))))
       (p/then (fn [info] (.render root ($ app {:initial-prompt (:initial-prompt info)}))))))

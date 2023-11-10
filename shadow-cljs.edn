@@ -4,6 +4,7 @@
  :builds ; Only :frontend :kaochaRM have been used much.
  {:frontend ;-------------- Running the exerciser -------------------
   {:target           :browser
+   :nrepl           {:middleware [cider.nrepl/cider-middleware]}
    :output-dir       "resources/public/js"
    :asset-path       "/js"
    :compiler-options {:externs ["datascript/externs.js"]}

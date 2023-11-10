@@ -22,7 +22,7 @@
   (when-let [db-cfg (get @databases-atm k)]
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
-      (log/warn "There is no DB to connect to."))))
+      (log/warn "DB is registered but does not exist."))))
 
 ;;; ToDo:
 ;;;  - cljs complains about not finding x/element-nss, which I don't see in the  0.2.0-alpha8 source at all.
@@ -62,6 +62,14 @@
                (coll? obj)        (map  resolve-aux obj)
                :else  obj))]
      (resolve-aux form))))
+
+(defn root-entities
+  "Return a vector of root entities (natural numbers) for all root entities of the DB."
+  [conn-atm]
+  (d/q '[:find [?e ...] :where
+         [?e]
+         (not [_ _ ?e])]
+       @conn-atm))
 
 (defn nspaces
   "Return a string of n spaces."

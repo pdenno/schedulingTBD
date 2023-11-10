@@ -51,23 +51,6 @@
              (assoc % :valid? true :max-millis max-millis :start-time now :timeout-at (+ now max-millis))))
    max-millis))
 
-(defonce databases-atm (atom {}))
-
-(defn register-db
-  "Add a DB configuration."
-  [k config]
-  (assert (#{:him :system} k))
-  (swap! databases-atm #(assoc % k config)))
-
-#?(:clj
-(defn connect-atm
-  "Return a connection atom for the DB."
-  [k]
-  (when-let [db-cfg (get @databases-atm k)]
-    (if (d/database-exists? db-cfg)
-      (d/connect db-cfg)
-      (log/warn "There is no DB to connect to.")))))
-
 ;;; This seems to cause problems in recursive resolution. (See resolve-db-id)"
 (defn db-ref?
   "It looks to me that a datahike ref is a map with exactly one key: :db/id."
@@ -93,6 +76,7 @@
                (coll? obj)        (map  resolve-aux obj)
                :else  obj))]
      (resolve-aux form)))))
+
 
 (defn init-util []
   (config-log :info))

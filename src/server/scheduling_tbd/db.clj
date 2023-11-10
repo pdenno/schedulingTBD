@@ -4,6 +4,8 @@
    [clojure.core :as c]
    [clojure.edn  :as edn]
    [clojure.instant]
+   [clojure.java.io              :as io]
+   [clojure.pprint       :refer [pprint]]
    [clojure.spec.alpha           :as s]
    [clojure.string               :as str]
    [datahike.api                 :as d]
@@ -190,20 +192,6 @@
                  :text \"learn more about how this works\"}}
    \".\"]")
 
-(defn create-sys-db!
-  "Create the system database."
-  []
-  (when (:rebuild-db? @sys-db-cfg)
-    (log/info "Recreating the system database.")
-    (when (d/database-exists? @sys-db-cfg) (d/delete-database @sys-db-cfg))
-    (d/create-database @sys-db-cfg)
-    (register-db :system @sys-db-cfg)
-    (let [conn (connect-atm :system)]
-      (d/transact conn db-schema-sys)
-      (d/transact conn [{:system/name "SYSTEM" ; Singleton
-                         :system/initial-prompt initial-prompt}])
-      conn)))
-
 ;;; Atom for the configuration map used for connecting to the project db.
 (defonce proj-base-cfg (atom nil))
 
@@ -224,12 +212,51 @@
                 :system/current-project-id id}]))
 
 (defn list-projects
-  "List all the projects known by the system DB."
+  "Return a vector of maps describing each project known by the system DB."
   []
-  (d/q '[:find [?proj-id ...]
-         :where [_ :project/id ?proj-id]]
+  (d/q '[:find ?proj-id ?proj-dir
+         :keys project/id :project/dir
+         :where
+         [?e :project/id  ?proj-id]
+         [?e :project/dir ?proj-dir]]
        @(connect-atm :system)))
 
+;;; ----------------------- Backup and recover project and system DB ---------------------
+(defn backup-proj-dbs
+  "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir."
+  [{:keys [tar-dir] :or {tar-dir "data/projects/"}}]
+  (doseq [{:project/keys [id]} (list-projects)]
+    (let [conn-atm (connect-atm id)
+          filename (str tar-dir (name id) ".edn")
+          s (with-out-str
+              (println "[")
+              (doseq [ent-id  (sutil/root-entities conn-atm)]
+                (let [obj (sutil/resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
+                  ;; Write content except schema elements and transaction markers.
+                  (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
+                    (pprint obj)
+                    (println))))
+              (println "]"))]
+      (log/info "Writing project to" filename)
+      (spit filename s))))
+
+(defn recreate-dbs!
+  "Create the system database."
+  []
+  (when (:rebuild-db? @sys-db-cfg)
+    (log/info "Recreating the system and project databases.")
+    (let [proj-base-dir (-> proj-base-cfg deref :store :path-base)]
+      (when (-> proj-base-dir io/file .isDirectory)
+        (backup-proj-dbs proj-base-dir)))
+    (when (d/database-exists? @sys-db-cfg) (d/delete-database @sys-db-cfg))
+    (d/create-database @sys-db-cfg)
+    (let [conn (connect-atm :system)]
+      (d/transact conn db-schema-sys)
+      (d/transact conn [{:system/name "SYSTEM" ; Singleton
+                         :system/initial-prompt initial-prompt}])
+      conn)))
+
+;;; ----------------------- Creating a project DB ----------------------
 (defn unique-proj
   "If necessary to ensure uniqueness, update the project name and id."
   [proj-info]
@@ -302,6 +329,15 @@
       msg)
     (log/info "Project does not exist" {:id id})))
 
+;;; -------------------- Starting and stopping -------------------------
+(defn register-project-dbs
+  "Make a config for each project and register it."
+  []
+  (doseq [{:project/keys [id dir]} (list-projects)]
+    (register-db id {:store {:backend :file :path dir
+                             :keep-history? false
+                             :schema-flexibility :write}})))
+
 (defn init-db-cfgs
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
    Recreate the system database if sys-db-cfg.rebuild-db? = true."
@@ -315,10 +351,11 @@
     (reset! sys-db-cfg {:store {:backend :file :path (str base-dir "/system")}
                         :keep-history? false
                         ;:attribute-refs? true ; With this I can't transact lookup-refs!
-                        :rebuild-db? true ; <================== Currently, if you rebuild, you need to get rid of project directories.
+                        :rebuild-db? false ; <=== If true, it will rebuild project directories too. (Otherwise errors guessing new project names.)
                         :schema-flexibility :write})
-    (when (-> sys-db-cfg deref :rebuild-db?) (create-sys-db!))
-    (log/info "Existing projects:" (list-projects))
+    (register-db :system @sys-db-cfg)
+    (when (-> sys-db-cfg deref :rebuild-db?) (recreate-dbs!))
+    (register-project-dbs)
     {:sys-cfg @sys-db-cfg
      :proj-base @proj-base-cfg}))
 

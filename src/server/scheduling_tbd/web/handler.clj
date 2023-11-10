@@ -59,6 +59,10 @@
                                     :opt-un [::projects ::current-project]
                                     :req-un [::initial-prompt]))
 
+(s/def ::ws-id (st/spec {:spec string?
+                         :name "id"
+                         :description "A unique identifier provided by the client when establishing the websocket."}))
+
 (def routes
   [["/app" {:get {:summary "Ignore this swagger entry. I will get rid of it someday."
                               :handler home}}]
@@ -69,12 +73,9 @@
             :handler (swagger/create-swagger-handler)}}]
 
    ["/ws"
-    {:get {:summary "I'm guessing!"
-           :responses {200 {:body string?}}
-           :handler wsock/echo-websocket-handler
-           #_(fn [& req]
-             (log/info "req =" req)
-             (ok ":How-about-this?"))}}]
+    {:get {:summary "Web socket"
+           :responses {200 {:id ::ws-id}}
+           :handler wsock/establish-websocket-handler}}]
 
    ["/api"
     {:swagger {:tags ["SchedulingTBD functions"]}}
@@ -96,7 +97,7 @@
             :handler resp/healthcheck}}]]])
 
 (def options
-  {:reitit.interceptor/transform dev/print-context-diffs ;; pretty context diffs
+  {;:reitit.interceptor/transform dev/print-context-diffs ;; pretty context diffs
    :validate spec/validate ;; enable spec validation for route data
    :reitit.spec/wrap spell/closed ;; strict top-level validation  (error reported if you don't have the last two interceptors)
    :exception pretty/exception

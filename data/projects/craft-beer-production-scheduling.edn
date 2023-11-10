@@ -1,0 +1,27 @@
+[
+#:project{:desc
+          "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan.",
+          :id :craft-beer-production-scheduling,
+          :name "craft-beer-production-scheduling"}
+
+#:summary{:name "SUMMARY", :next-msg-id 3}
+
+#:message{:from :user,
+          :id 1,
+          :text
+          "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan.",
+          :time #inst "2023-11-09T17:46:33.232-00:00"}
+
+#:message{:from :system,
+          :id 0,
+          :text
+          "[\"Describe your scheduling problem in a few sentences or \"\n    {:link-info {:href \"http://localhost:3300/learn-more\"\n                 :text \"learn more about how this works\"}}\n   \".\"]",
+          :time #inst "2023-11-09T17:46:33.193-00:00"}
+
+#:message{:from :system,
+          :id 2,
+          :text
+          "Great! We'll call your project 'craft-beer-production-scheduling'. ",
+          :time #inst "2023-11-09T17:46:33.262-00:00"}
+
+]
