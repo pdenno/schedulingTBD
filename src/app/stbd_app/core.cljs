@@ -26,6 +26,8 @@
    ["react-router-dom" :as router :refer [useSearchParams]]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
+(def diag (atom {}))
+
 (declare get-user-data get-user-code)
 
 (def progress-handle
@@ -33,19 +35,20 @@
   (atom nil))
 (def progress-atm "Percent allowed duration for eval-cell. 100% is a timeout." (atom 0))
 
+(defn no-op [& _arg])
+(defn confirm-ping [msg] (log/info "Confirmed ping to server:" msg))
+(defn ws-tbd-says [msg] (log/info "ws-tbd-says:" msg))
+
 (def dispatch-table
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
-  {:tbd-says  ping-diag})
+  {:ping-confirm  confirm-ping
+   :tbd-says      ws-tbd-says})
 
-(defn dispatch [{:keys [dispatch-key] :as msg}]
-  (if (contains? dispatch-table dispatch-key)
-    ((get dispatch-table dispatch-key) msg)
+(defn ws-dispatch [{:keys [dispatch-key] :as msg}]
+  (reset! diag msg)
+  (if-let [dfn (get dispatch-table dispatch-key)]
+    (dfn msg)
     (log/error "No dispatch function for " msg)))
-
-(defn ws-handler [args]
-  (log/info "ws-handler: args = " args))
-
-(def diag (atom {}))
 
 (def app-theme
   (styles/createTheme
@@ -169,6 +172,8 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
+(def chat-diag (atom nil))
+
 (defnc Top [{:keys [width height initial-prompt]}]
   (let [banner-height 42
         useful-height (- height banner-height)
@@ -193,7 +198,7 @@
           {:left  ($ Stack {:direction "column"}
                      ($ SelectProject {:projs-map @projects-info})
                      ;; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist
-                     ($ chat/Chat {:height chat-height :initial-prompt initial-prompt}))
+                     (reset! chat-diag ($ chat/Chat {:height chat-height :initial-prompt initial-prompt})))
            :right ($ ShareUpDown
                      {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
                       :up ($ Editor {:name "code-editor"
@@ -247,7 +252,7 @@
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
   (when-let [proc @wsock/ping-process] (js/window.clearInterval proc))
-  (wsock/connect! ws-handler)
+  (wsock/connect! ws-dispatch)
   (-> (initial-projects)
       (p/then (fn [info] (reset! projects-info (update info :projects #(-> % sort (conj "Start a new project") vec)))))
       (p/then (fn [info] (.render root ($ app {:initial-prompt (:initial-prompt info)}))))))

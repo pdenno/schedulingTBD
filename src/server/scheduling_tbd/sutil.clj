@@ -64,12 +64,14 @@
      (resolve-aux form))))
 
 (defn root-entities
-  "Return a vector of root entities (natural numbers) for all root entities of the DB."
+  "Return a sorted vector of root entities (natural numbers) for all root entities of the DB."
   [conn-atm]
-  (d/q '[:find [?e ...] :where
-         [?e]
-         (not [_ _ ?e])]
-       @conn-atm))
+  (-> (d/q '[:find [?e ...] :where
+             [?e]
+             (not [_ _ ?e])]
+           @conn-atm)
+      sort
+      vec))
 
 (defn nspaces
   "Return a string of n spaces."

@@ -27,17 +27,21 @@
     chans))
 
 (defn close-ws-channels [id]
-  (let [{:keys [in out err]} (make-ws-channels id)]
-    (log/info "Closing websocket channels for " id)
-    (async/close! in)
-    (async/close! out)
-    (async/close! err)
-    (swap! socket-channels #(dissoc % id))))
+  (when (contains? @socket-channels id)
+    (let [{:keys [in out err]} (get @socket-channels id)]
+      (log/info "Closing websocket channels for " id)
+      (async/close! in)
+      (async/close! out)
+      (async/close! err)
+      (swap! socket-channels #(dissoc % id)))))
+
+(declare ws-send-client)
 
 (defn ping-diag
-  [{:keys [client-id]}]
-  (log/info "Ping from" client-id)
-  :ping-ok)
+  "Create a ping confirmation for use in middle of a round-trip."
+  [{:keys [client-id ping-id]}]
+  (log/info "Ping" ping-id "from" client-id)
+  {:dispatch-key :ping-confirm})
 
 (def dispatch-table
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
@@ -50,23 +54,28 @@
 
 (defn establish-websocket-handler [request]
   (if-let [id (-> request :query-params keywordize-keys :id)]
-    (let [{:keys [in out err]} (make-ws-channels id)]
-      (log/info "Starting websocket handler for " id)
-      (go (try
-            (loop []
-              (when-let [msg (<! in)]
-                (>! out (-> msg edn/read-string dispatch str))
-                (recur)))
-            (finally (close-ws-channels id))))
-      {:ring.websocket/listener (wsa/websocket-listener in out err)})
+    (do (close-ws-channels id)
+        (let [{:keys [in out err]} (make-ws-channels id)]
+          (log/info "Starting websocket handler for " id)
+          (go (try
+                (loop []
+                  (when-let [msg (<! in)]
+                    (log/info "Received msg =" msg)
+                    (>! out (-> msg edn/read-string dispatch str)) ; For round-trip messages from client.
+                    (recur)))
+                (finally (close-ws-channels id))))
+          {:ring.websocket/listener (wsa/websocket-listener in out err)}))
     (log/error "Websocket client did not provide id.")))
 
 (defn ws-send-client
   "Send the argument message to the specified client or current-client-id.
-   Example usage: (ws-send-client {:tbd-says \"Hello, world!\"})."
-  [{:keys [msg client-id]}]
-  (let [client-id (or client-id @current-client-id)
-        out (->> client-id (get @socket-channels) :out)]
-    (if out
-      (go (>! out (str msg)))
-      (log/error "Could not find out async channel for client" client-id))))
+   This is only used for server-initiated interactions.
+   Example usage: (ws-send-client {:dispatch-key :tbd-says :msg \"Hello, world!\"})."
+  ([msg] (if-let [client-id @current-client-id]
+           (ws-send-client msg client-id)
+           (log/error "client-id not set in ws-send-client.")))
+  ([msg client-id]
+   (log/info "Sending msg = " msg)
+   (if-let [out (->> client-id (get @socket-channels) :out)]
+     (go (>! out (str msg)))
+     (log/info "Could not find out async channel for client" client-id))))

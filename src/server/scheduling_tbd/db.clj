@@ -224,10 +224,10 @@
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-dbs
   "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir."
-  [{:keys [tar-dir] :or {tar-dir "data/projects/"}}]
+  [{:keys [target-dir] :or {target-dir "data/projects/"}}]
   (doseq [{:project/keys [id]} (list-projects)]
     (let [conn-atm (connect-atm id)
-          filename (str tar-dir (name id) ".edn")
+          filename (str target-dir (name id) ".edn")
           s (with-out-str
               (println "[")
               (doseq [ent-id  (sutil/root-entities conn-atm)]
