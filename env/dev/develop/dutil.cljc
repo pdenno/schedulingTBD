@@ -1,13 +1,15 @@
 (ns develop.dutil
   "Tools for repl-based exploration of SchedulingTBD code"
   (:require
-   [clojure.pprint :refer [pprint]]))
+   [ajax.core :refer [GET POST]]
+   [clojure.pprint :refer [pprint]]
+   [promesa.core   :as p]))
 
 (defn clean-form
   "Replace some namespaces with aliases"
   [form]
   (let [ns-alia {"scheduling-tbd.sutil"         "sutil"
-                 "scheduling-tbd.shop"          "shop" 
+                 "scheduling-tbd.shop"          "shop"
                  "promesa.core"                 "p"
                  "clojure.spec.alpha"           "s"
                  "java.lang.Math"               "Math"}
@@ -54,3 +56,19 @@
    This takes away those namespace prefixes."
   [form]
   (clean-form form))
+
+(defmacro ajax-test
+  "Test an HTTP request, returning the response.
+   Example usage:
+       (require '[develop.dutil :as devl])
+       (devl/ajax-test \"/api/get-conversation\" {:client-id \"8d0e3fdc-b4bf-446e-b4bf-0568aee96af0\"})."
+  [uri params & {:keys [method] :or {method 'ajax.core/GET}}]
+  `(let [prom# (promesa.core/deferred)
+         req-data# {:params ~params
+                    :handler (fn [resp#] (promesa.core/resolve! prom# resp#))
+                    :error-handler (fn [{:keys [status# status-text#]}]
+                                     (promesa.core/reject! prom# (ex-info ~(str "CLJS-AJAX error on " uri)
+                                                                          {:status status# :status-text status-text#})))
+                    :timeout 2000}]
+     (~method ~(str "http://localhost:3300" uri) req-data#)
+     (promesa.core/await prom# 2500)))

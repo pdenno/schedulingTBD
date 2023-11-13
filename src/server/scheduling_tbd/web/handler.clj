@@ -1,5 +1,7 @@
 (ns scheduling-tbd.web.handler
+  "HTTP router and handlers. Currently you have to user/restart (or similar) for changes to be seen."
   (:require
+   [ajax.core :refer [GET POST]] ; for debugging
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
@@ -24,12 +26,20 @@
    [reitit.http.interceptors.multipart :as multipart]
    [reitit.http.interceptors.dev :as dev] ; for testing
    [reitit.http.spec :as spec]
-   [scheduling-tbd.web.controllers.respond :as resp]
+   [scheduling-tbd.web.controllers.converse    :as converse]
+   [scheduling-tbd.web.controllers.db-respond  :as db-resp]
    [scheduling-tbd.web.routes.websockets   :as wsock]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
    [spec-tools.spell :as spell]
    [taoensso.timbre  :as log]))
+
+;;; Reitit: (pronounced "rate it") a routing library.
+;;;   - https://github.com/metosin/reitit, (docs)
+;;;   - https://www.youtube.com/watch?v=cSntRGAjPiM  (50-minute video)
+;;;   - https://www.slideshare.net/metosin/reitit-clojurenorth-2019-141438093 (slides for the above)
+
+;;; Note: Compared to using the web app, the swagger API (page index.html) is much more useful for debugging a request.
 
 ;;; =========== Pages (just homepage, thus far.)  =======
 (def selmer-opts {:custom-resource-path (io/resource "html")})
@@ -45,59 +55,84 @@
 (defn home [{:keys [flash] :as request}]
   (render request "home.html" {:errors (:errors flash)}))
 ;;;====================================================
-
-(s/def ::user-text string?)
-(s/def ::user-says-request (st/spec {:spec (s/keys :req-un [::user-text])
-                                     :name "text"
-                                     :description "The text of the user's message."
-                                     :json-schema/default ""}))
-
-(s/def ::user-says-response (s/keys :req [:message/id :message/text :message/from]))
-
 ;;; You can choose not to define specs for the keys.
-(s/def ::initial-projects-response (s/keys
-                                    :opt-un [::projects ::current-project]
-                                    :req-un [::initial-prompt]))
 
-(s/def ::ws-id (st/spec {:spec string?
-                         :name "id"
-                         :description "A unique identifier provided by the client when establishing the websocket."}))
+;;; --------- (require '[develop.dutil :as devl]) ; Of course, you'll have to (user/restart) when you update things here.
+;;; --------- Try it with :reitit.interceptor/transform dev/print-context-diffs. See below.
+;;; --------- (devl/ajax-test "/api/user-says" {:user-text "LLM: What's the capital of Iowa?"} {:method ajax.core/POST})
+(s/def ::user-says-request  (s/keys :req-un [::user-text]))
+;;;(s/def :message/id integer?)  ; ToDo: Should switch to malli. One of the flaws of spec is the naming here.
+;;;(s/def :message/text string?)
+;;;(s/def :message/from string?)
+;;;(s/def :message/time string?)
+(s/def ::user-says-response map? #_(s/keys :req [:message/id :message/text :message/from :message/time]))
+(s/def ::user-text   (st/spec {:spec  string?
+                               :name "user-text"
+                               :description "The text of the user's message."
+                               :json-schema/default "LLM: What's the capital of Iowa?"}))
 
+;;; -------- (devl/ajax-test "/api/get-projects" [])
+(s/def ::get-projects-response (s/keys :opt-un [::projects]))
+(s/def ::projects (st/spec {:spec (s/coll-of string?)
+                            :name "projects"
+                            :description "The :project/name of all projects."}))
+
+;;; -------- (devl/ajax-test "/api/get-conversation" {:project-id "craft-beer-brewery-scheduling"})
+(s/def ::get-conversation-request (s/keys :req-un [::project-id]))
+(s/def ::get-conversation-response (s/coll-of map?))
+(s/def ::project-id (st/spec {:spec string?
+                              :name "project-id"
+                              :description "A kebab-case string (will be keywordized) unique to the system DB identifying a project."
+                              :json-schema/default "craft-beer-brewery-scheduling"}))
+
+;;; -------- (devl/ajax-test "/api/ws" {:client-id "my-fake-uuid"}) ; ToDo: ajax-test not working here. Not investigated
+(s/def ::ws-connection-request (s/keys :req-un [::client-id]))
+
+;;; If the swagger UI (the page you get when you GET index.html) displays "Failed to load API definition", try :no-doc true
+;;; on the most recent definition (or many of them until things start working).
 (def routes
-  [["/app" {:get {:summary "Ignore this swagger entry. I will get rid of it someday."
-                              :handler home}}]
+  [["/app" {:get {:no-doc true
+                  :summary "Load the web app for someone."
+                  :handler home}}]
+
    ["/swagger.json"
      {:get {:no-doc true
-            :swagger {:info {:title "RADmapper API"
+            :swagger {:info {:title "SchedulingTBD API"
                              :description "API with reitit-http"}}
             :handler (swagger/create-swagger-handler)}}]
 
    ["/ws"
-    {:get {:summary "Web socket"
-           :responses {200 {:id ::ws-id}}
+    {:get {:summary "Web socket connection request"
+           :parameters {:query ::ws-connection-request}
            :handler wsock/establish-websocket-handler}}]
 
    ["/api"
     {:swagger {:tags ["SchedulingTBD functions"]}}
 
    ["/user-says"
-     {:post {:summary "Respond to the user's most recent message."
-             :parameters {:body ::user-says-request}
-             :responses {200 {:body ::user-says-response}}
-             :handler resp/respond}}]
+    {:post {:summary "Respond to the user's most recent message."
+            :parameters {:body ::user-says-request}
+            :responses {200 {:body ::user-says-response}}
+            :handler converse/reply}}]
 
-    ["/initial-projects"
-     {:get {:summary "Respond to the user's most recent message."
-            :responses {200 {:body ::initial-projects-response}}
-            :handler resp/initial-projects}}]
+    ["/get-conversation"
+     {:get {:summary "Get the conversation from the project database."
+            :parameters {:query ::get-conversation-request}
+            :responses {200 {:body ::get-conversation-response}}
+            :handler  db-resp/get-conversation}}]
+
+    ["/get-projects"
+     {:get {:summary "Get a vector of projects maps and the current project."
+            :responses {200 {:body ::get-projects-response}}
+            :handler db-resp/get-projects}}]
 
     ["/health"
      {:get {:summary "Check server health"
             :responses {200 {:body {:time string? :up-since string?}}}
-            :handler resp/healthcheck}}]]])
+            :handler db-resp/healthcheck}}]]])
 
 (def options
-  {;:reitit.interceptor/transform dev/print-context-diffs ;; pretty context diffs
+  {;:reitit.interceptor/transform dev/print-context-diffs ;<======= pretty context diffs of the request (but slows things down quite a bit)!
    :validate spec/validate ;; enable spec validation for route data
    :reitit.spec/wrap spell/closed ;; strict top-level validation  (error reported if you don't have the last two interceptors)
    :exception pretty/exception
@@ -145,8 +180,8 @@
                 (defaults/wrap-defaults
                  (assoc-in site-config [:session :store] cookie-store))
 
-                ;; For Kaocha testing through port 1818, at least."
-                (wrap-cors :access-control-allow-origin [#"http://localhost:1818"]
+                ;; For Kaocha testing through port 1818, at least." 3300 for devl/ajax-test.
+                (wrap-cors :access-control-allow-origin [#"http://localhost:1818" #_#"http://localhost:3300"]
                            :access-control-allow-methods [:get :put :post :delete]))]
     app))
 

@@ -29,7 +29,7 @@
 (defn close-ws-channels [id]
   (when (contains? @socket-channels id)
     (let [{:keys [in out err]} (get @socket-channels id)]
-      (log/info "Closing websocket channels for " id)
+      (log/info "Closing websocket channels for " id (now))
       (async/close! in)
       (async/close! out)
       (async/close! err)
@@ -48,19 +48,19 @@
   {:ping ping-diag})
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]
+  (when-not (= :ping dispatch-key) (log/info "Received msg:" msg))
   (if (contains? dispatch-table dispatch-key)
     ((get dispatch-table dispatch-key) msg)
     (log/error "No dispatch function for " msg)))
 
 (defn establish-websocket-handler [request]
-  (if-let [id (-> request :query-params keywordize-keys :id)]
+  (if-let [id (-> request :query-params keywordize-keys :client-id)]
     (do (close-ws-channels id)
         (let [{:keys [in out err]} (make-ws-channels id)]
-          (log/info "Starting websocket handler for " id)
+          (log/info "Starting websocket handler for " id (now))
           (go (try
                 (loop []
                   (when-let [msg (<! in)]
-                    (log/info "Received msg =" msg)
                     (>! out (-> msg edn/read-string dispatch str)) ; For round-trip messages from client.
                     (recur)))
                 (finally (close-ws-channels id))))

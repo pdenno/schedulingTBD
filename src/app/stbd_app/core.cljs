@@ -17,7 +17,7 @@
    [stbd-app.wsock :as wsock]
    [stbd-app.components.chat :as chat :refer [Chat]]
    [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
-   [stbd-app.components.project :refer [SelectProject initial-projects projects-info]]
+   [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.components.save-modal :refer [SaveModal]]
    [helix.core :as helix :refer [defnc $ <>]]
@@ -141,7 +141,7 @@
     (.toString s)
     ""))
 
-(defn search-props
+#_(defn search-props
   "Return the object that has a prop that passes the test."
   [obj test]
   (let [found? (atom nil)
@@ -174,7 +174,7 @@
 
 (def chat-diag (atom nil))
 
-(defnc Top [{:keys [width height initial-prompt]}]
+(defnc Top [{:keys [width height conversation projects]}]
   (let [banner-height 42
         useful-height (- height banner-height)
         chat-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
@@ -196,9 +196,9 @@
              ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"}
-                     ($ SelectProject {:projs-map @projects-info})
+                     ($ SelectProject {:projects projects})
                      ;; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist
-                     (reset! chat-diag ($ chat/Chat {:height chat-height :initial-prompt initial-prompt})))
+                     (reset! chat-diag ($ chat/Chat {:height chat-height :conversation conversation})))
            :right ($ ShareUpDown
                      {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
                       :up ($ Editor {:name "code-editor"
@@ -209,7 +209,7 @@
            :lf-pct 0.50 ; <=================================
            :init-width width}))))
 
-(defnc app [{:keys [initial-prompt]}]
+(defnc app [{:keys [conversation projects]}]
   {:helix/features {:check-invalid-hooks-usage true}}
   (let  [[width  set-width]  (hooks/use-state (j/get js/window :innerWidth))
          [height set-height] (hooks/use-state (j/get js/window :innerHeight))
@@ -238,11 +238,15 @@
        (CssBaseline {:children #js []}) ; https://v4.mui.com/components/css-baseline/
        ($ styles/ThemeProvider
           {:theme app-theme}
-          ($ Top {:initial-prompt initial-prompt
+          ($ Top {:conversation conversation
+                  :projects projects
                   :width  (:width  @carry-dims-atm)
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
+
+(def temp-initial "ToDo: I'll get rid of this once I write the HTTP request for get-conversation."
+  "[\"Describe your scheduling problem in a few sentences or \"\n    {:link-info {:href \"http://localhost:3300/learn-more\"\n                 :text \"learn more about how this works\"}}\n   \".\"]")
 
 (defn ^{:after-load true, :dev/after-load true} mount-root []
   (sutil/config-log :info)
@@ -252,10 +256,19 @@
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
   (when-let [proc @wsock/ping-process] (js/window.clearInterval proc))
-  (wsock/connect! ws-dispatch)
-  (-> (initial-projects)
-      (p/then (fn [info] (reset! projects-info (update info :projects #(-> % sort (conj "Start a new project") vec)))))
-      (p/then (fn [info] (.render root ($ app {:initial-prompt (:initial-prompt info)}))))))
+  (let [#_#_current-project (atom nil)
+        #_#_converse (atom nil)
+        #_#_conversation (clj->js [{:type "text"
+                                :text (chat/msg-text2rce-string temp-initial)
+                                :title "TBD"
+                                :titleColor "Red"}])]
+    (wsock/connect! ws-dispatch)
+    (-> (proj/get-projects-request) ; Returns a list of strings; the first one is the system DB's current project.
+        (p/then #(reset! proj/project-names (:projects %)))
+        ;;(p/then (fn [_] (reset! current-project (first @proj/project-names))))
+        (p/then #(-> % first chat/get-conversation)) ; returns a new promise
+        (p/then #(chat/conversation2rce %))
+        (p/then (fn [conversation] (.render root ($ app {:conversation conversation :projects @proj/project-names})))))))
 
 (defn ^:export init []
   (mount-root))

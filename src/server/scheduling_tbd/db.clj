@@ -37,10 +37,7 @@
         :doc "the value 'SYSTEM' to represent a single objectin holding data such as the current project name."}
    :system/current-project-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
-        :doc "a keyword naming the current project; set by user using UI, it is one of the :project/id values in this DB."}
-   :system/initial-prompt
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
-        :doc "The prompt that starts a conversation."}})
+        :doc "a keyword naming the current project; set by user using UI, it is one of the :project/id values in this DB."}})
 
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
@@ -51,13 +48,26 @@
         :doc "The agent, either :user or :system, issuing the message."}
    :message/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
-        :doc "The unique ID of a message. These are sequential natural numbers starting at 0."}
-   :message/text
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The text of the message."}
+        :doc "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, which aren't stored, some values can be skipped."}
+   :message/content
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "msg-text and msg-link objects."}
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
+
+   ;; ---------------------- msg-link
+   :msg-link/text
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The text of describing a msg-link which is itself part of :message/content."}
+   :msg-link/uri
+      #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+           :doc "The URI of a msg-link which is itself part of :message/content."}
+
+   ;; ---------------------- msg-text
+   :msg-text/string
+      #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+           :doc "A text string as part of :message/content."}
 
    ;; ---------------------- project
    :project/id
@@ -77,10 +87,9 @@
    :summary/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "the value 'SUMMARY'. This is used to keep information about the state of the conversation."}
-   :summary/next-msg-id
+   :summary/next-msg-id ; ToDo: Is this worthwhile? datalog can do this!
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc "The ID (a natural number) to be assigned to the next message written (either side of conversation)."}
-
    ;; ---------------------- task type (Of course these are not planner tasks!)
    :task-t/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
@@ -163,6 +172,12 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The sentence from user description best describing the scheduling objective."}})
 
+(def intro-message
+  "The first message of a conversation."
+  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
+   {:msg-link/uri "http://localhost:3300/learn-more"
+    :msg-link/text "learn more about how this works."}])
+
 (def diag (atom nil))
 
 (defn datahike-schema
@@ -223,8 +238,9 @@
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-dbs
-  "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir."
-  [{:keys [target-dir] :or {target-dir "data/projects/"}}]
+  "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir.
+   Example usage: (backup-proj-dbs)"
+  [& {:keys [target-dir] :or {target-dir "data/projects/"}}]
   (doseq [{:project/keys [id]} (list-projects)]
     (let [conn-atm (connect-atm id)
           filename (str target-dir (name id) ".edn")
@@ -240,21 +256,60 @@
       (log/info "Writing project to" filename)
       (spit filename s))))
 
-(defn recreate-dbs!
-  "Create the system database."
+(defn backup-system-db
+  "Backup the system database to an edn file."
+  [& {:keys [target-dir] :or {target-dir "data/"}}]
+      (let [conn-atm (connect-atm :system)
+            filename (str target-dir "system.edn")
+            s (with-out-str
+                (println "[")
+                (doseq [ent-id  (sutil/root-entities conn-atm)]
+                  (let [obj (sutil/resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
+                    ;; Write content except schema elements and transaction markers.
+                    (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
+                      (pprint obj)
+                      (println))))
+                (println "]"))]
+      (log/info "Writing system DB to" filename)
+      (spit filename s)))
+
+(defn recreate-system-db!
+  "Recreate the system database from an EDN file."
   []
-  (when (:rebuild-db? @sys-db-cfg)
-    (log/info "Recreating the system and project databases.")
-    (let [proj-base-dir (-> proj-base-cfg deref :store :path-base)]
-      (when (-> proj-base-dir io/file .isDirectory)
-        (backup-proj-dbs proj-base-dir)))
-    (when (d/database-exists? @sys-db-cfg) (d/delete-database @sys-db-cfg))
-    (d/create-database @sys-db-cfg)
-    (let [conn (connect-atm :system)]
-      (d/transact conn db-schema-sys)
-      (d/transact conn [{:system/name "SYSTEM" ; Singleton
-                         :system/initial-prompt initial-prompt}])
-      conn)))
+  (if (.exists (io/file "data/system.edn"))
+    (do (log/info "Recreating the system database.")
+        (when (d/database-exists? @sys-db-cfg) (d/delete-database @sys-db-cfg))
+        (d/create-database @sys-db-cfg)
+        (register-db :system @sys-db-cfg)
+        (let [conn (connect-atm :system)]
+          (d/transact conn db-schema-sys)
+          (d/transact conn (-> "data/system.edn" slurp read-string)))
+        true)
+    (log/error "Not recreating system DB: No backup file.")))
+
+(defn recreate-project-db!
+  "Recreate a DB for each project using EDN files."
+  [id]
+  (let [backup-file (format "data/projects/%s.edn" (name id))]
+    (if (.exists (io/file backup-file))
+      (let [cfg (-> @proj-base-cfg (assoc-in [:store :path]
+                                             (str (-> @proj-base-cfg :store :path-base)
+                                                  (name :craft-beer-brewery-scheduling))))]
+        (when (d/database-exists? cfg) (d/delete-database cfg))
+        (d/create-database cfg)
+        (register-db id cfg)
+        (let [conn (connect-atm id)]
+          (d/transact conn db-schema-proj)
+          (d/transact conn (->> backup-file slurp read-string)))
+        true)
+    (log/error "Not recreating DB because backup file does not exist:" backup-file))))
+
+(defn recreate-project-dbs!
+  "Recreate a DB for each project using EDN files."
+  []
+  (log/info "Recreating project databases.")
+  (doseq [proj (list-projects)]
+    (recreate-project-db! (:project/id proj))))
 
 ;;; ----------------------- Creating a project DB ----------------------
 (defn unique-proj
@@ -279,7 +334,6 @@
 (defn create-proj-db!
   "Create a project database for the argument project."
   [proj-info]
-  (reset! diag proj-info)
   (if (s/valid? ::project-db proj-info)
     (let [proj-info (unique-proj proj-info)
           id (:project/id proj-info)
@@ -306,28 +360,51 @@
      (throw (ex-info "Project database must provide :proj/name and :proj/id"
                      {:proj-info proj-info}))))
 
+(defn next-msg-id
+  "Return the next message ID in the project's DB."
+  [project-id]
+  (if-let [conn (connect-atm project-id)]
+    (d/q '[:find ?next-id .
+           :where
+           [?e :summary/name "SUMMARY"]
+           [?e :summary/next-msg-id ?next-id]]
+         @conn)
+    (log/info "Project does not exist" {:id project-id})))
+
+(defn inc-msg-id!
+  "Increment the next message ID in the project's DB."
+  [project-id]
+  (let [id (next-msg-id project-id)
+        conn (connect-atm project-id)]
+    (d/transact conn [{:summary/name "SUMMARY"
+                       :summary/next-msg-id (inc id)}])))
+
+(defn message-form
+  "Create a map that looks like the messages that are stored in the DB and communicated to the web app.
+   Assumes just one msg-text."
+  [msg-id from msg-text]
+  {:message/id msg-id
+   :message/from from
+   :message/text [{:msg/text msg-text}]
+   :message/time (-> (LocalDateTime/now)
+                     str
+                     clojure.instant/read-instant-date)})
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
-  [id msg-text from]
-  (if-let [conn (connect-atm id)] ; ToDo the then part (and thus the if) should not be necessary.
+  [project-id msg-text from]
+  (if-let [conn (connect-atm project-id)] ; ToDo the then part (and thus the if) should not be necessary.
     (let [msg-id (d/q '[:find ?next-id .
                         :where
                         [?e :summary/name "SUMMARY"]
                         [?e :summary/next-msg-id ?next-id]]
                       @conn)
-          msg (-> {}
-                  (assoc :message/id msg-id)
-                  (assoc :message/from from)
-                  (assoc :message/time (-> (LocalDateTime/now)
-                                           str
-                                           clojure.instant/read-instant-date ))
-                  (assoc :message/text msg-text))]
+          msg (message-form msg-id from msg-text)]
       (d/transact conn
                   [msg
                    {:summary/name "SUMMARY"
                     :summary/next-msg-id (inc msg-id)}])
       msg)
-    (log/info "Project does not exist" {:id id})))
+    (log/info "Project does not exist" {:id project-id})))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs
@@ -340,9 +417,9 @@
 
 (defn init-db-cfgs
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
-   Recreate the system database if sys-db-cfg.rebuild-db? = true."
+   Recreate the system database if sys-db-cfg.recreate-db? = true."
   []
-  (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB"))
+  (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB")) ; "/opt/scheduling" typically.
                      (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
                                           "\nCreate directories 'projects' and 'system' under it.") {})))]
     ;; https://cljdoc.org/d/io.replikativ/datahike/0.6.1545/doc/datahike-database-configuration
@@ -351,10 +428,12 @@
     (reset! sys-db-cfg {:store {:backend :file :path (str base-dir "/system")}
                         :keep-history? false
                         ;:attribute-refs? true ; With this I can't transact lookup-refs!
-                        :rebuild-db? false ; <=== If true, it will rebuild project directories too. (Otherwise errors guessing new project names.)
+                        :recreate-dbs? false ; <=== If true, it will recreate the system DB and project directories too.
                         :schema-flexibility :write})
     (register-db :system @sys-db-cfg)
-    (when (-> sys-db-cfg deref :rebuild-db?) (recreate-dbs!))
+    (when (-> sys-db-cfg deref :recreate-dbs?)
+      (recreate-system-db!)
+      (recreate-project-dbs!))
     (register-project-dbs)
     {:sys-cfg @sys-db-cfg
      :proj-base @proj-base-cfg}))

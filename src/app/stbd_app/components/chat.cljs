@@ -4,10 +4,11 @@
    [ajax.core :refer [GET POST]]
    [applied-science.js-interop :as j]
    [cljs.reader                :refer [read-string]]
+   [clojure.edn                :as edn]
+   [clojure.walk               :as walk :refer [keywordize-keys]]
    [helix.core                 :refer [defnc $]]
    [helix.hooks                :as hooks]
    [promesa.core               :as p]
-   ;;[stbd-app.util :as util]
    ["@mui/icons-material/Send$default" :as Send]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/Button$default" :as Button]
@@ -58,31 +59,15 @@
 (def item-keys "Atom for a unique :key of some UI object." (atom 0))
 
 (defn make-link
+  "Create a MUI link. (Works for react-chat-elements too.)
+   Example usage: (make-link {:href 'https://en.wikipedia.org/wiki/%22Hello,_World!%22_program' :text 'Hello, world!'})"
   [{:keys [href text]}]
   ($ Link {:key (swap! item-keys inc)
            :href href}
      text))
 
-(defn prompt-from-string
-  "Return a JS array containing content that could be the :text of a rce/message."
-  [prompt]
-  (letfn [(pfs [x]
-            (cond (vector? x) (mapv pfs x)
-                  (and (map? x) (contains? x :link-info)) (-> x :link-info make-link)
-                  :else x))]
-    (try (-> prompt read-string pfs clj->js)
-         (catch :default e (log/info "Bad prompt text: " {:prompt prompt :err e})))))
-
-(def craft-brewing-description
-  "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.
-   We run several products simultaneously and simply would like to be able to have the beer bottled and ready
-   to ship as near as possible to the dates defined in our sales plan.")
-
-(defnc Chat [{:keys [height initial-prompt]}]
-  (let [[msg-list set-msg-list] (hooks/use-state (clj->js [{:type "text"
-                                                            :text (prompt-from-string initial-prompt)
-                                                            :title "TBD"
-                                                            :titleColor "Red"}]))
+(defnc Chat [{:keys [height conversation]}]
+  (let [[msg-list set-msg-list] (hooks/use-state conversation)
         [progress set-progress] (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
         [user-text set-user-text] (hooks/use-state "")
@@ -105,7 +90,7 @@
                   :timeout 30000
                   :handler (fn [resp] (p/resolve! prom resp))
                   :error-handler (fn [{:keys [status status-text]}]
-                                   (p/reject! prom (ex-info "CLJS-AJAX error on /api/us:summary/next-msg-ider-says" {:status status :status-text status-text})))})
+                                   (p/reject! prom (ex-info "CLJS-AJAX error on /api/user-says" {:status status :status-text status-text})))})
            (-> prom
                (p/then #(set-msg-list (add-msg msg-list {:type "text" :text (:message/text %) :title "TBD" :titleColor "Red"})))
                (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %)))))))
@@ -126,10 +111,10 @@
                         :multiline true})
           ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
                                      (when-let [text (not-empty (j/get iref :value))]
-                                       (set-msg-list (add-msg msg-list  {:type "text" :text #_text craft-brewing-description
+                                       (set-msg-list (add-msg msg-list  {:type "text" :text text
                                                                          :title "You" :color "Green" :position "right"}))
                                        (j/assoc! iref :value "")
-                                       (set-user-text #_text craft-brewing-description)))}
+                                       (set-user-text text)))}
              ($ Send))))))
 
 (defn get-children
@@ -160,3 +145,56 @@
                       (= "HTMLCollection" typ) (->> obj get-children fe))))]
       (fe node)
       @found?)))
+
+(defn get-conversation
+  "Return a promise that will resolve to the vector of a maps describing the complete conversation so far."
+  [project-id]
+  (let [prom (p/deferred)]
+    (GET (str "/api/get-conversation?project-id=" project-id)
+         {:timeout 3000
+          :handler (fn [resp] (p/resolve! prom resp))
+          :error-handler (fn [{:keys [status status-text]}]
+                           (p/reject! prom (ex-info "CLJS-AJAX error on /api/list-projects"
+                                                    {:status status :status-text status-text})))})
+    prom))
+
+(def example-converse
+  [{"message/from" "system",
+    "message/id" 0,
+    "message/text" "{:text/vec [\"Describe your scheduling problem in a few sentences or \"\n    {:link-info {:href \"http://localhost:3300/learn-more\"\n                 :text \"learn more about how this works\"}}\n   \".\"]",
+    "message/time" "2023-11-11T10:12:49Z"},
+   {"message/from" "user",
+    "message/id" 1,
+    "message/text" "We are a medium-sized craft beer brewery...."
+    "message/time" "2023-11-11T10:12:49Z"},
+   {"message/from" "system",
+    "message/id" 2,
+    "message/text" "Great! We'll call your project 'craft-beer-brewery-scheduling'. ",
+    "message/time" "2023-11-11T10:12:49Z"}])
+
+;;; This is a bit weird because read-string is only the right thing to do when
+(defn msg-text2rce-string
+  "Argument is a DB :message/text, which can read-string to a vector that contains a mix of text and
+   maps with :link-info in them.
+   Return a JS array containing content that could be the :text of a react-chat-elements/message."
+  [msg-text]
+  (letfn [(pfs [x]
+            (cond (vector? x) (mapv pfs x)
+                  (and (map? x) (contains? x :link-info)) (-> x :link-info make-link)
+                  :else x))]
+    (try (-> msg-text pfs)
+         (catch :default e (log/info "Bad DB :message/text: " {:msg-text msg-text :err e})))))
+
+(defn conversation2rce
+  "Rewrite the conversation messages to objects acceptable to the React Chat Elements component."
+  [msgs]
+  (let [msgs  (walk/keywordize-keys msgs)
+        who   {"system" "TBD", "user" "YOU"}
+        color {"system" "Red", "user" "Green"}]
+    (reset! diag msgs)
+    (->> msgs
+         (mapv #(-> {:type "text"}
+                    (assoc :text (-> % :message/text msg-text2rce-string))
+                    (assoc :title (get who (:message/from %)))
+                    (assoc :titleCollor (get color (:message/from %)))))
+         clj->js)))

@@ -12,13 +12,13 @@
    [stbd-app.components.editor :refer [set-editor-text]]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
-(def projects-info "A map containing list of projects and the current-project." (atom nil))
+(def project-names "A vector of all projects for the system DB." (atom nil))
 
-(defn initial-projects
+(defn get-projects-request
   "Return a promise that will resolve to a map listing projects and the current project."
   []
   (let [prom (p/deferred)]
-    (GET "/api/initial-projects"
+    (GET "/api/get-projects"
          {:timeout 3000
           :handler (fn [resp] (p/resolve! prom resp))
           :error-handler (fn [{:keys [status status-text]}]
@@ -27,9 +27,8 @@
     prom))
 
 (defnc SelectProject
-  [{:keys [projs-map]}]
-  (let [[project set-project] (hooks/use-state (or (:current-project projs-map)
-                                                   "Start a new project"))]
+  [{:keys [projects]}]
+  (let [[project set-project] (hooks/use-state (or (first projects) "Start a new project"))]
     ($ FormControl {:size "small" ; small makes a tiny difference
                     :sx {:height "25%"
                          :maxHeight "25%"}}
@@ -37,10 +36,8 @@
                   :sx {:style {:height "20px"}}
                   :value project
                   :onChange (fn [_e v]
-                              (let [proj-name (j/get-in v [:props :value])
-                                    #_#_proj (get-project proj-name)]
+                              (let [proj-name (j/get-in v [:props :value])]
                                 (set-project proj-name)
-                                (set-editor-text "result" "Ctrl-Enter above to execute.")
                                 (set-editor-text "code-editor" "% We will put MiniZinc code here.")))}
-          (for [p (:projects projs-map)]
+          (for [p (assoc projects 1 "Start a new project")]
             ($ MenuItem {:key p :value p} p))))))

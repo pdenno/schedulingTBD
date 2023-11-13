@@ -48,7 +48,7 @@
 (defn resolve-db-id
   "Return the form resolved, removing properties in filter-set,
    a set of db attribute keys, for example, #{:db/id}."
-  ([form conn-atm] (resolve-db-id form conn-atm #{}))
+  ([form conn-atm] (resolve-db-id form conn-atm #{:db/id}))
   ([form conn-atm filter-set]
    (letfn [(resolve-aux [obj]
              (cond

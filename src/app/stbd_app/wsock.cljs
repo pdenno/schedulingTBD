@@ -9,7 +9,7 @@
 (def diag (atom nil))
 ;;;(defonce keep-alive? (atom true))
 (def client-id "A random uuid naming this client. It changes on disconnect." (str (random-uuid)))
-(def ws-url (str "ws://localhost:" util/server-port "/ws?id=" client-id))
+(def ws-url (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
 
 (def ping-id (atom 0))
 (defn ping!
@@ -58,4 +58,4 @@
   (if (= 3 (.-readyState chan))
     (do (log/info "======== Making new connection on WS close.")
         (connect! receive-handler))
-    (log/error "Web socked not ready to reconnect.")))
+    (log/error "Web socket not ready to reconnect.")))

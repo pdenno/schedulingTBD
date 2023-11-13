@@ -57,6 +57,13 @@
            (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
     (throw (ex-info "No key for use of LLM API found." {}))))
 
+(defn llm-directly
+  "User can ask anything outside of session by starting the text with 'LLM:."
+  [question]
+  (query-llm [{:role "system"    :content "You are a helpful assistant."}
+              {:role "user"      :content question}]
+             {:raw-text? true}))
+
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-var-partial
     [{:role "system"    :content "You are a helpful assistant."}
