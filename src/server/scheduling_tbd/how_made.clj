@@ -11,6 +11,7 @@
    [datahike.api            :as d]
    [hickory.core            :as hick] ; There might be easier ways, but I'd like to learn this tool.
    [mount.core              :as mount :refer [defstate]]
+   [scheduling-tbd.db       :as proj-db]
    [scheduling-tbd.domain   :as dom]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm]]
@@ -256,7 +257,31 @@
     (d/transact conn {:tx-data data})
     (mark-as-useless suspected-useless)))
 
-;;; Based on ./db.clj
+;;; ------------------- Create projects for entries ---------------
+(defn segment-intros
+  "Return the a map of info for segments that have intros."
+  []
+  (d/q '[:find ?name ?intro
+         :keys segment/name segment/intro
+         :where
+         [?e :segment/challenge-intro ?intro]
+         [?e :segment/name ?name]]
+       @(connect-atm :him)))
+
+(defn create-project!
+  "Add the project to the system and create a project DB for it.
+   Example usage (create-project! 'Aluminium Foil') -- really!."
+  [seg-name]
+  (if-let [intro (->> (segment-intros)
+                      (some #(when (= seg-name (:segment/name %)) (:segment/intro %))))]
+    (let [pname (-> seg-name (str " production scheduling"))]
+      (proj-db/create-proj-db!
+       {:project/name pname
+        :project/id   (-> pname str/lower-case (str/replace #"\s+" "-") keyword)
+        :segment/challenge-intro intro}))
+    (log/error "Project by that name not found:" seg-name)))
+
+;;; ------------------- Starting and stopping ---------------
 (defn init-him
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
    Recreate the system database if sys-db-cfg.rebuild-db? = true."

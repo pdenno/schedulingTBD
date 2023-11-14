@@ -34,9 +34,9 @@
 (defn get-projects
   "Return a vector of all the :project/name in the DB. The first one in the vector is the current project."
   [_request]
-  (let [projects (d/q '[:find [?name ...] :where [_ :project/name ?name]] @(connect-atm :system))
+  (let [projects (->> (db/list-projects) (map :project/id) (map name))
         current-project-name (when-let [proj (db/current-project-id)] (name proj))
-        projects (-> projects set (disj current-project-name) seq (conj current-project-name) vec)]
+        projects (-> projects set (disj current-project-name) sort (conj current-project-name) vec)]
     (log/info "Call to get-projects")
     (http/ok
      (cond-> {}

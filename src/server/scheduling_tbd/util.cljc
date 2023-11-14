@@ -42,13 +42,18 @@
   []
   (swap! timeout-info #(assoc % :valid? false)))
 
+#?(:clj
+   (defn now [] (new java.util.Date))
+   :cljs
+   (defn now [] (.getTime (js/Date.))))
+
 (defn start-clock
   "Set the timeout-info object and return the argument."
   ([] (start-clock max-duration))
   ([max-millis]
    (swap! timeout-info
-          #(let [now #?(:clj (inst-ms (java.util.Date.)) :cljs (.getTime (js/Date.)))]
-             (assoc % :valid? true :max-millis max-millis :start-time now :timeout-at (+ now max-millis))))
+          #(let [now (now)]
+             (assoc % :valid? true :max-millis max-millis :start-time (now) :timeout-at (+ now max-millis))))
    max-millis))
 
 ;;; This seems to cause problems in recursive resolution. (See resolve-db-id)"
@@ -77,7 +82,7 @@
                :else  obj))]
      (resolve-aux form)))))
 
-
+;;; -------------- Starting and stopping ----------------------
 (defn init-util []
   (config-log :info))
 

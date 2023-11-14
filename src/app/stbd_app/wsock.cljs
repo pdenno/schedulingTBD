@@ -1,4 +1,5 @@
 (ns stbd-app.wsock
+  "This is web-socket stuff I'm not using anymore. I'll keep it around just in case."
   (:require
    [cljs.reader                :as edn]
    [stbd-app.util              :as util]
@@ -11,6 +12,15 @@
 (def client-id "A random uuid naming this client. It changes on disconnect." (str (random-uuid)))
 (def ws-url (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
 
+(defn no-op [& _arg])
+(defn confirm-ping [msg] (log/info "Confirmed ping to server:" msg))
+(defn ws-tbd-says [msg] (log/info "ws-tbd-says:" msg))
+
+(def dispatch-table
+  "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
+  {:ping-confirm  confirm-ping
+   :tbd-says      ws-tbd-says})
+
 (def ping-id (atom 0))
 (defn ping!
   "Ping the server to keep the socket alive."
@@ -21,6 +31,13 @@
                         :client-id client-id
                         :ping-id (swap! ping-id inc)})))
     (log/error "Couldn't send ping; channel isn't open.")))
+
+
+(defn ws-dispatch [{:keys [dispatch-key] :as msg}]
+  (reset! diag msg)
+  (if-let [dfn (get dispatch-table dispatch-key)]
+    (dfn msg)
+    (log/error "No dispatch function for " msg)))
 
 (defn dispatch-on-channel [event receive-handler]
   (let [data (.-data event)]

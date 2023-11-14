@@ -1,6 +1,7 @@
 (ns scheduling-tbd.sutil
   "Server utilities."
   (:require
+   [clojure.java.io         :as io]
    [datahike.api            :as d]
    [datahike.pull-api       :as dp]
    [scheduling-tbd.paillier :refer [api-key]]

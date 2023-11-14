@@ -14,11 +14,11 @@
 
 (def project-names "A vector of all projects for the system DB." (atom nil))
 
-(defn get-projects-request
+(defn get-project-list
   "Return a promise that will resolve to a map listing projects and the current project."
   []
   (let [prom (p/deferred)]
-    (GET "/api/get-projects"
+    (GET "/api/list-projects"
          {:timeout 3000
           :handler (fn [resp] (p/resolve! prom resp))
           :error-handler (fn [{:keys [status status-text]}]
@@ -27,7 +27,8 @@
     prom))
 
 (defnc SelectProject
-  [{:keys [projects]}]
+  [{:keys [projects change-project-fn]}]
+  (log/info "In SelectProject: projects = " projects)
   (let [[project set-project] (hooks/use-state (or (first projects) "Start a new project"))]
     ($ FormControl {:size "small" ; small makes a tiny difference
                     :sx {:height "25%"
@@ -38,6 +39,7 @@
                   :onChange (fn [_e v]
                               (let [proj-name (j/get-in v [:props :value])]
                                 (set-project proj-name)
+                                (change-project-fn proj-name) ; communicates up to parent.
                                 (set-editor-text "code-editor" "% We will put MiniZinc code here.")))}
-          (for [p (assoc projects 1 "Start a new project")]
+          (for [p (into [(first projects) "Start a new project"] (rest projects))]
             ($ MenuItem {:key p :value p} p))))))

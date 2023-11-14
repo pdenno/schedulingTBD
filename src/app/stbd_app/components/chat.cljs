@@ -23,6 +23,7 @@
 
 (def diag (atom nil))
 
+;;; -------------------- This stuff maybe for later (its from RADmapper) ---------------------------
 (def progress-handle
   "The thing that can be called by js/window.clearInterval to stop incrementing progress under js/window.setInterval."
   (atom nil))
@@ -42,159 +43,167 @@
               (+ @progress-atm 2))]
     res))
 
-(def white-style (clj->js {:color "background.paper"}))
-(def blue-style (clj->js {:color "primary"}))
-
-(defn register
-  [name elem]
-  (swap! util/component-refs #(assoc % name elem))
-  elem)
-
-(defn add-msg [msg-list msg]
-  (-> msg-list
-      js->clj
-      (conj msg)
-      clj->js))
-
+;;; ------------------------- active stuff ------------------------------------
 (def item-keys "Atom for a unique :key of some UI object." (atom 0))
 
 (defn make-link
   "Create a MUI link. (Works for react-chat-elements too.)
-   Example usage: (make-link {:href 'https://en.wikipedia.org/wiki/%22Hello,_World!%22_program' :text 'Hello, world!'})"
-  [{:keys [href text]}]
+   Example usage: (make-link 'https://en.wikipedia.org/wiki/%22Hello,_World!%22_program' 'Hello, world!'})"
+  [href text]
   ($ Link {:key (swap! item-keys inc)
            :href href}
      text))
 
-(defnc Chat [{:keys [height conversation]}]
-  (let [[msg-list set-msg-list] (hooks/use-state conversation)
-        [progress set-progress] (hooks/use-state 0)
-        [progressing? _set-progressing] (hooks/use-state false)
-        [user-text set-user-text] (hooks/use-state "")
-        input-ref (hooks/use-ref nil)]
-    (hooks/use-effect [progressing?]
-      (reset! progress-atm 0)
-      (reset! progress-handle
-              (js/window.setInterval
-               (fn []
-                 (let [percent (compute-progress)]
-                   (if (or (>= progress 100) (not progressing?))
-                     (do (set-progress 0) (js/window.clearInterval @progress-handle))
-                     (set-progress (reset! progress-atm percent)))))
-               200)))
-    (hooks/use-effect [user-text]
-       (when (not-empty user-text)
-         (let [prom (p/deferred)]
-           (POST "/api/user-says"
-                 {:params {:user-text user-text}
-                  :timeout 30000
-                  :handler (fn [resp] (p/resolve! prom resp))
-                  :error-handler (fn [{:keys [status status-text]}]
-                                   (p/reject! prom (ex-info "CLJS-AJAX error on /api/user-says" {:status status :status-text status-text})))})
-           (-> prom
-               (p/then #(set-msg-list (add-msg msg-list {:type "text" :text (:message/text %) :title "TBD" :titleColor "Red"})))
-               (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %)))))))
-    ;;(log/info "chat height = " height)
-    ;;(reset! diag {:height height})
-    ($ Stack {:direction "column" :spacing "0px"}
-       ($ Box {:sx (clj->js {:overflowY "auto" ; :sx was :style
-                             :display "flex"
-                             :flexGrow 1
-                             :maxHeight 300 ; (- height 100)
-                             :flexDirection "column"})}
-          ($ rce/MessageList {:dataSource msg-list}))
-       ($ LinearProgress {:variant "determinate" :value progress})
-       ($ Stack {:direction "row" :spacing "0px"}
-          ($ rce/Input {:referance input-ref ; <==== Yes, rilly!
-                        :value user-text
-                        :placeholder "Type here..."
-                        :multiline true})
-          ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
-                                     (when-let [text (not-empty (j/get iref :value))]
-                                       (set-msg-list (add-msg msg-list  {:type "text" :text text
-                                                                         :title "You" :color "Green" :position "right"}))
-                                       (j/assoc! iref :value "")
-                                       (set-user-text text)))}
-             ($ Send))))))
+(def msg-style {:system {:name "TBD" :color "Red"   :position "left"}
+                :user   {:name "You" :color "Green" :position "right"}})
 
-(defn get-children
-  "Return a vector of the children of an HTMLCollection."
-  [obj]
-  (when (= "HTMLCollection" (j/get-in obj [:constructor :name]))  ;; HANDY! Get the string naming the type.
-    (let [res (atom [])]
-      (doseq [ix (range (j/get obj :length))]
-        (swap! res conj (j/get obj ix)))
-      @res)))
+;;; ToDo: Remove this and it usages?
+(def msg-index "This might be a waste of time. WS won't' print the same message twice in a row."  (atom 0))
 
-(defn find-elem
-  "Search the DOM for a node passing the argument test."
-  [node test]
-  (let [found? (atom false)
-        cnt (atom 0)]
-    (letfn [(fe [obj]
-              (swap! cnt inc)
-              (let [typ (j/get-in obj [:constructor :name])
-                    chiln?  (j/get obj :children)]
-                (log/info "typ = " typ " obj = " obj)
-                (cond @found?                  found?
-                      (> @cnt 50)              :failure
-                      (test obj)               (reset! found? obj)
-                      (vector? obj)            (map fe obj)
-                      (nil? obj)               found?
-                      chiln?                   (fe chiln?)
-                      (= "HTMLCollection" typ) (->> obj get-children fe))))]
-      (fe node)
-      @found?)))
+(defn rce-msg
+  "Return a React Chat Elements (RCE) message for simple text content.
+   Example usage: (rce-msg :system :text 'Hello, World!')."
+  [speaker text]
+  (let [{:keys [name color position]} (get msg-style speaker)]
+    (clj->js {:id (swap! msg-index inc)
+              :type "text"
+              :title name
+              :titleColor color
+              :position position
+              :text (vector text)})))
+
+(defn msg2rce
+  "Rewrite the conversation DB-style messages to objects acceptable to the RCE component."
+  [msg]
+  (let [{:keys [name color position]} (get msg-style (:message/from msg))]
+    (-> {:type "text"}
+        (assoc :id (swap! msg-index inc))
+        (assoc :title name)
+        (assoc :titleColor color)
+        (assoc :position position)
+        (assoc :text (reduce (fn [res elem]
+                               (if (contains? elem :msg-link/uri)
+                                 (conj res (make-link (:msg-link/uri elem) (:msg-link/text elem)))
+                                 (conj res (:msg-text/string elem))))
+                             []
+                             (:message/content msg)))
+        clj->js)))
+
+(defn add-msg [msg-list msg]
+  (let [res (-> msg-list js->clj (conj msg) clj->js)]
+     #(-> %
+          (assoc :msg-list-in-add-msg res)
+          (assoc :msg-in-add-msg msg))
+    res))
 
 (defn get-conversation
   "Return a promise that will resolve to the vector of a maps describing the complete conversation so far."
   [project-id]
+  (log/info "Call to get-conversation for" project-id)
   (let [prom (p/deferred)]
     (GET (str "/api/get-conversation?project-id=" project-id)
          {:timeout 3000
           :handler (fn [resp] (p/resolve! prom resp))
           :error-handler (fn [{:keys [status status-text]}]
-                           (p/reject! prom (ex-info "CLJS-AJAX error on /api/list-projects"
+                           (p/reject! prom (ex-info "CLJS-AJAX error on /api/get-conversation"
                                                     {:status status :status-text status-text})))})
     prom))
 
-(def example-converse
-  [{"message/from" "system",
-    "message/id" 0,
-    "message/text" "{:text/vec [\"Describe your scheduling problem in a few sentences or \"\n    {:link-info {:href \"http://localhost:3300/learn-more\"\n                 :text \"learn more about how this works\"}}\n   \".\"]",
-    "message/time" "2023-11-11T10:12:49Z"},
-   {"message/from" "user",
-    "message/id" 1,
-    "message/text" "We are a medium-sized craft beer brewery...."
-    "message/time" "2023-11-11T10:12:49Z"},
-   {"message/from" "system",
-    "message/id" 2,
-    "message/text" "Great! We'll call your project 'craft-beer-brewery-scheduling'. ",
-    "message/time" "2023-11-11T10:12:49Z"}])
+(def intro-message
+  "The first message of a conversation."
+  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
+   {:msg-link/uri "http://localhost:3300/learn-more"
+    :msg-link/text "learn more about how this works"}
+   {:msg-text/string "."}])
 
-;;; This is a bit weird because read-string is only the right thing to do when
-(defn msg-text2rce-string
-  "Argument is a DB :message/text, which can read-string to a vector that contains a mix of text and
-   maps with :link-info in them.
-   Return a JS array containing content that could be the :text of a react-chat-elements/message."
-  [msg-text]
-  (letfn [(pfs [x]
-            (cond (vector? x) (mapv pfs x)
-                  (and (map? x) (contains? x :link-info)) (-> x :link-info make-link)
-                  :else x))]
-    (try (-> msg-text pfs)
-         (catch :default e (log/info "Bad DB :message/text: " {:msg-text msg-text :err e})))))
+;;; ------------------- web-socket ------------------------------
 
-(defn conversation2rce
-  "Rewrite the conversation messages to objects acceptable to the React Chat Elements component."
-  [msgs]
-  (let [msgs  (walk/keywordize-keys msgs)
-        who   {"system" "TBD", "user" "YOU"}
-        color {"system" "Red", "user" "Green"}]
-    (reset! diag msgs)
-    (->> msgs
-         (mapv #(-> {:type "text"}
-                    (assoc :text (-> % :message/text msg-text2rce-string))
-                    (assoc :title (get who (:message/from %)))
-                    (assoc :titleCollor (get color (:message/from %)))))
-         clj->js)))
+(def client-id "A random uuid naming this client. It changes on disconnect." (str (random-uuid)))
+(def ws-url (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
+(def channel (atom nil))
+
+(def ping-id (atom 0))
+(defn ping!
+  "Ping the server to keep the socket alive."
+  []
+  (if-let [chan @channel]
+    (when (= 1 (.-readyState chan)) ; 0=connecting, 1=open, 2=closing, 3=closed.
+      (.send chan (str {:dispatch-key :ping,
+                        :client-id client-id
+                        :ping-id (swap! ping-id inc)})))
+    (log/error "Couldn't send ping; channel isn't open.")))
+
+(def connected? (atom false))
+
+
+;;; ------------------- Component ------------------------------
+(defnc Chat [{:keys [height conversation]}]
+  (log/info "---Updating Chat--- conversation =" conversation) ; <=================== didn't get new stuff.
+  (let [[msg-list set-msg-list] (hooks/use-state conversation)
+        [progress set-progress] (hooks/use-state 0)
+        [progressing? _set-progressing] (hooks/use-state false)
+        [user-text     set-user-text] (hooks/use-state "")
+        [system-text set-system-text] (hooks/use-state "")
+        input-ref (hooks/use-ref nil)]
+    (letfn [(connect! []  ; I think this has to be here owing to scoping restrictions on hooks functions,...
+              (if-let [chan (js/WebSocket. ws-url)]
+                (do (log/info "Websocket Connected!")
+                    (reset! channel chan)
+                    (reset! connected? true)
+                    (set! (.-onmessage chan)
+                          (fn [event]
+                            (let [msg (-> event .-data edn/read-string)]
+                              (when (= :tbd-says (:dispatch-key msg))
+                                (set-system-text (:msg msg)))))) ; ...namely, this function.
+                    (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))))
+                (throw (ex-info "Websocket Connection Failed:" {:url ws-url}))))]
+      ;; ------------- talk through web socket; server-initiated.
+      (when-not @connected? (connect!)) ; Start the web socket.
+      (hooks/use-effect [system-text]
+        (when (not-empty system-text)
+          (let [new-msg (rce-msg :system system-text)]
+            (set-msg-list (add-msg msg-list new-msg)))))
+      ;; ------------- Send user-text through REST API; wait on promise for response.
+      (hooks/use-effect [user-text]
+        (when (not-empty user-text)
+          (let [prom (p/deferred)]
+            (POST "/api/user-says"
+                  {:params {:user-text user-text}
+                   :timeout 30000
+                   :handler (fn [resp] (p/resolve! prom resp))
+                   :error-handler (fn [{:keys [status status-text]}]
+                                    (p/reject! prom (ex-info "CLJS-AJAX error on /api/user-says" {:status status :status-text status-text})))})
+            (-> prom
+                (p/then #(set-msg-list (->> % msg2rce (add-msg msg-list))))
+                (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %)))))))
+      ;; -------------- progress stuff (currentl not hooked up)
+      (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
+        (reset! progress-atm 0)
+        (reset! progress-handle
+                (js/window.setInterval
+                 (fn []
+                   (let [percent (compute-progress)]
+                     (if (or (>= progress 100) (not progressing?))
+                       (do (set-progress 0) (js/window.clearInterval @progress-handle))
+                       (set-progress (reset! progress-atm percent)))))
+                 200)))
+      ;; ----------------- component UI structure.
+      ($ Stack {:direction "column" :spacing "0px"}
+         ($ Box {:sx (clj->js {:overflowY "auto" ; :sx was :style
+                               :display "flex"
+                               :flexGrow 1
+                               :maxHeight 300 ; (- height 100)
+                               :flexDirection "column"})}
+            ($ rce/MessageList {:dataSource msg-list}))
+         ($ LinearProgress {:variant "determinate" :value progress})
+         ($ Stack {:direction "row" :spacing "0px"}
+            ($ rce/Input {:referance input-ref ; <==== Yes, rilly!
+                          :value user-text
+                          :placeholder "Type here..."
+                          :multiline true})
+            ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
+                                       (when-let [text (not-empty (j/get iref :value))]
+                                         (set-msg-list (add-msg msg-list (rce-msg :user text)))
+                                         (j/assoc! iref :value "")
+                                         (set-user-text text)))}
+               ($ Send)))))))

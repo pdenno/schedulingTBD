@@ -1,0 +1,31 @@
+[
+#:summary{:name "SUMMARY", :next-msg-id 4}
+
+#:project{:id :aluminium-foil-production-scheduling,
+          :name "Aluminium foil production scheduling"}
+
+#:message{:content
+          [#:msg-text{:string
+                      "Describe your scheduling problem in a few sentences or "}
+           #:msg-link{:text "learn more about how this works",
+                      :uri "http://localhost:3300/learn-more"}
+           #:msg-text{:string "."}],
+          :from :system,
+          :id 1,
+          :time #inst "2023-11-13T22:13:48.676-00:00"}
+
+#:message{:content
+          [#:msg-text{:string
+                      "Our principal scheduling problem revolves around coordinating raw material procurement with production schedules and customer delivery deadlines. We often face the challenge of ensuring a continuous supply of high-quality raw aluminium, which is subject to market availability and price fluctuations. The energy-intensive nature of aluminium production further mandates us to abide by specific utility schedules, failing which could lead to costly disruptions. Finally, synchronization of our manufacturing processes and customer demands require us to adeptly balance production rates with varying lead times and order sizes."}],
+          :from :user,
+          :id 2,
+          :time #inst "2023-11-13T17:13:48.708-00:00"}
+
+#:message{:content
+          [#:msg-text{:string
+                      "Great! We'll call your project 'Aluminium foil production scheduling'."}],
+          :from :system,
+          :id 3,
+          :time #inst "2023-11-13T17:13:48.748-00:00"}
+
+]

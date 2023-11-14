@@ -31,8 +31,7 @@
    [scheduling-tbd.web.routes.websockets   :as wsock]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
-   [spec-tools.spell :as spell]
-   [taoensso.timbre  :as log]))
+   [spec-tools.spell :as spell]))
 
 ;;; Reitit: (pronounced "rate it") a routing library.
 ;;;   - https://github.com/metosin/reitit, (docs)
@@ -62,7 +61,7 @@
 ;;; --------- (devl/ajax-test "/api/user-says" {:user-text "LLM: What's the capital of Iowa?"} {:method ajax.core/POST})
 (s/def ::user-says-request  (s/keys :req-un [::user-text]))
 ;;;(s/def :message/id integer?)  ; ToDo: Should switch to malli. One of the flaws of spec is the naming here.
-;;;(s/def :message/text string?)
+;;;(s/def :message/content (s/coll-of map?))
 ;;;(s/def :message/from string?)
 ;;;(s/def :message/time string?)
 (s/def ::user-says-response map? #_(s/keys :req [:message/id :message/text :message/from :message/time]))
@@ -71,8 +70,8 @@
                                :description "The text of the user's message."
                                :json-schema/default "LLM: What's the capital of Iowa?"}))
 
-;;; -------- (devl/ajax-test "/api/get-projects" [])
-(s/def ::get-projects-response (s/keys :opt-un [::projects]))
+;;; -------- (devl/ajax-test "/api/list-projects" [])
+(s/def ::list-projects-response (s/keys :req-un [::projects]))
 (s/def ::projects (st/spec {:spec (s/coll-of string?)
                             :name "projects"
                             :description "The :project/name of all projects."}))
@@ -110,24 +109,28 @@
     {:swagger {:tags ["SchedulingTBD functions"]}}
 
    ["/user-says"
-    {:post {:summary "Respond to the user's most recent message."
+    {:post {:no-doc true
+            :summary "Respond to the user's most recent message."
             :parameters {:body ::user-says-request}
             :responses {200 {:body ::user-says-response}}
             :handler converse/reply}}]
 
     ["/get-conversation"
-     {:get {:summary "Get the conversation from the project database."
+     {:get {:no-doc true
+            :summary "Get the conversation from the project database."
             :parameters {:query ::get-conversation-request}
             :responses {200 {:body ::get-conversation-response}}
             :handler  db-resp/get-conversation}}]
 
-    ["/get-projects"
-     {:get {:summary "Get a vector of projects maps and the current project."
-            :responses {200 {:body ::get-projects-response}}
+    ["/list-projects"
+     {:get {:no-doc true
+            :summary "Get a vector of projects maps and the current project."
+            :responses {200 {:body ::list-projects-response}}
             :handler db-resp/get-projects}}]
 
     ["/health"
-     {:get {:summary "Check server health"
+     {:get {:no-doc true
+            :summary "Check server health"
             :responses {200 {:body {:time string? :up-since string?}}}
             :handler db-resp/healthcheck}}]]])
 
@@ -145,7 +148,7 @@
                          ;; content-negotiation
                          (muuntaja/format-negotiate-interceptor)
                          ;; encodeing response body                ; This one will take :body object (e.g. a map) and return ad java.io.ByteArrayInputStream
-                         (muuntaja/format-response-interceptor)    ; Nothing past here reports anything trough print-context-diffs.
+                         (muuntaja/format-response-interceptor)    ; Nothing past here reports anything through print-context-diffs.
                          ;; exception handling
                          (exception/exception-interceptor)
                          ;; decoding request body
@@ -181,7 +184,7 @@
                  (assoc-in site-config [:session :store] cookie-store))
 
                 ;; For Kaocha testing through port 1818, at least." 3300 for devl/ajax-test.
-                (wrap-cors :access-control-allow-origin [#"http://localhost:1818" #_#"http://localhost:3300"]
+                (wrap-cors :access-control-allow-origin [#"http://localhost:1818"]
                            :access-control-allow-methods [:get :put :post :delete]))]
     app))
 
