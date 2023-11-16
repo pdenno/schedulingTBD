@@ -90,7 +90,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                               :summary)]
     (str/replace project-name #"\s+" "-")))
 
-(defn run-interview [what-you-manage & desc]
+(defn pretend-you-manage-interview [what-you-manage & desc]
   (let [high-level-desc (or (first desc)
                             (-> what-you-manage
                                 pretend-you-manage-prompt
@@ -148,7 +148,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 
 ;(reduce-kv (fn [m k v] (assoc m k (test-service-vs-artifact k))) {} user-problems)
 
-;;; (run-interview "a company that sells snack foods to grocery chains")
+;;; (pretend-you-manage-interview "a company that sells snack foods to grocery chains")
 #_{:high-level
      "The primary challenge in our scheduling process involves effectively coordinating all the steps in our supply chain, starting from raw material procurement to the final delivery of our snack foods to grocery chains.
       We aim to maintain an optimal inventory level which involves proper timing of production runs to minimize stockouts and excess storage costs.
@@ -168,7 +168,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 ;;;   - We'd work backwards from demand, associating products with production lines.
 ;;;   - It isn't clear whether we are solving a problem for a single facility or not. We'd need to ask about that, and if multiple facilities, what runs where, what can run where, etc.
 
-;;; (run-interview "a contracting company for paving")
+;;; (pretend-you-manage-interview "a contracting company for paving")
 #_ {:high-level
       "The principal scheduling problem faced is coordinating the availability of our clients, skilled work crew, and the delivery of material supplies.
        Unpredictable weather conditions often lead to sudden schedule changes.
@@ -200,7 +200,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 ;;;     They want to be able to update the schedules every day with progress or lack thereof.
 ;;;     I've done something like that before with Jupyter notebooks integrated with Mzn. But, of course, we'll focus on just getting the basic problem done in Mzn first.
 
-;;; (run-interview "a job shop that makes injection molds")
+;;; (pretend-you-manage-interview "a job shop that makes injection molds")
 #_{:high-level
    "The principal scheduling problem in running an injection mold job shop is coordinating the different job orders in a manner that optimizes our machine utilization and minimizes production time without leading to bottlenecks.
     We must effectively manage the flow of materials from suppliers, ensuring that they're available exactly when needed to avoid delays.
@@ -220,7 +220,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 ;;;      I think deeper classification of "project scheduling" would help here. The title has "job shop scheduling" that gets us pretty far, generally speaking
 
 
-;;; (run-interview "a craft brewery")
+;;; (pretend-you-manage-interview "a craft brewery")
 #_{:high-level
    "As the manager of a craft brewery, the principal scheduling problem is coordinating the production process to maintain a consistent supply of diverse beers without overproduction or storage issues.
     This spans from the initial scheduling of raw materials procurement, to the fermenting process which can take weeks, and finally to the bottling and distribution procedures.
@@ -271,15 +271,15 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    {:role "assistant" :content "no"}])
 
 (defn text-cites-raw-material-challenge?
-  "Return true, false, or :huh? depending on whether the text cites an inventory challenge." ; ToDo: Should I throw or return :huh?
+  "Return :yes, :no, or :unknown depending on whether the text cites an inventory challenge."
   [text]
   (try (let [yes-or-no (-> (conj raw-material-challenge-partial
                                  {:role "user" :content (format "[%s]" text)})
                            (query-llm {:raw-text? true :model "gpt-3.5-turbo"}))
              yes-pos (re-matches #"\s*yes\s*" yes-or-no)
              no-pos  (when-not yes-pos (re-matches #"\s*no\s*" yes-or-no))
-             answer  (cond yes-pos true
-                           no-pos false
-                           :else :huh?)]
+             answer  (cond yes-pos :yes
+                           no-pos  :no
+                           :else   :unknown)]
          answer)
        (catch Throwable _e :huh?)))

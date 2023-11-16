@@ -5,26 +5,30 @@
    [datahike.api            :as d]
    [ring.util.http-response :as http]
    [scheduling-tbd.db       :as db]
-   [scheduling-tbd.domain   :as domain]
+   [scheduling-tbd.domain   :as dom]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm]]
    [taoensso.timbre :as log]))
+
+;;; ToDo: Need to have some kind of a planning algorithm to kick things off starting with the planned remark about
+;;;       not focusing on the raw materials supply chain, but rather the process steps being scheduled.
+;;;       I could use the SHOP3 stuff for this, but it might be better to look elsewhere.
 
 (def diag (atom {}))
 
 (defn op-start-project
   "Summarize user-text as a project name. Execute plan operations to start a project about user-text."
   [user-text]
-  (let [summary (domain/project-name user-text)
+  (let [summary (dom/project-name user-text)
         id (-> summary str/lower-case (str/replace #"\s+" "-") keyword)
         proj-info  {:project/id id
                     :project/name summary
                     :project/desc user-text ; <==== ToDo: Save this as :msg-id 1 (0 is the "Describe your scheduling problem" message).
                     #_#_:project/industry _industry}
         proj-info (db/create-proj-db! proj-info) ; May rename the project-info.
-        id (:project/id proj-info)]
-    (db/add-msg id (d/q '[:find ?prompt . :where [_ :system/initial-prompt ?prompt]] @(connect-atm :system)) :system)
-    (db/add-msg id user-text :user)
+        proj-id (:project/id proj-info)]
+    (db/add-msg proj-id (d/q '[:find ?prompt . :where [_ :system/initial-prompt ?prompt]] @(connect-atm :system)) :system)
+    (db/add-msg proj-id user-text :user)
     ;; ToDo:
     ;; 0) Call the planner and make this code an operator!
     ;; 1) Set :system/current-project.
@@ -33,7 +37,7 @@
     ;; 4) Let user change the name of the project.
     (let [response (str "Great! We'll call your project '" (:project/name proj-info) "'. ")]
       (log/info "op-start-project: Responding with: " response)
-      (db/add-msg id response :system))))
+      (db/add-msg proj-id response :system))))
 
 ;;; [conn (connect-atm (db/current-project-id))]
 ;;; (let [{:keys [decision-objective probability]} (llm/find-objective-sentence craft-brewing-desc)] ...) ; <======= First y/n!
@@ -46,6 +50,7 @@
     (db/inc-msg-id! project-id)
     (db/message-form msg-id :system response-text)))
 
+;;; ToDo: This will be updated to do some sort of planning POMDP, etc.
 (defn plan-response
   "Top-level function to respond to a user's message."
   [user-text]

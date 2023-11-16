@@ -203,12 +203,21 @@
          [?entity :system/current-project-id ?proj]]
        @(connect-atm :system)))
 
+(defn project-exists?
+  [proj-id]
+  (assert (keyword? proj-id))
+  (d/q '[:find ?e .
+         :in $ ?proj-id
+         :where [?e :project/id ?proj-id]]
+       @(connect-atm :system) proj-id))
+
 (defn set-current-project
   "Get the current project from the system database."
-  [id]
+  [proj-id & {:keys [check-exists?] :or {check-exists? true}}]
+  (when check-exists? (project-exists? proj-id))
   (d/transact (connect-atm :system)
               [{:system/name "SYSTEM" ; Singleton
-                :system/current-project-id id}]))
+                :system/current-project-id proj-id}]))
 
 (defn list-projects
   "Return a vector of maps describing each project known by the system DB."
@@ -382,19 +391,6 @@
 ;;;    1) (db/backup-system-db)
 ;;;    2) Edit the .edn to remove the project.
 ;;;    3) (db/recreate-system-db!)
-(defn delete-the-proj-dir
-  "Delete recursively the directory defined by the id.
-   I'm being careful about this and hard-coding it to be in /opt/scheduling/projects/."
-  [id]
-  (let [dir (->> id name (str "/opt/scheduling/projects/") java.io.File.)]
-    (letfn [(ddr [file]
-              (if (.isDirectory file)
-                (doseq [f (file-seq file)] (ddr f))
-                (io/delete-file file)))]
-      (if (.isDirectory dir)
-        (ddr dir)
-        (log/info "No such directory:" dir)))))
-
 (defn create-proj-db!
   "Create a project database for the argument project."
   [proj-info]
@@ -403,13 +399,10 @@
           {:project/keys [id name] :as new-proj-info}
           (if-not challenge-intro (unique-proj proj-info) proj-info) ; we'll force overwrite of HIM projects.
           dir (str (-> @proj-base-cfg :store :base-path) (clojure.core/name id))]
-      (.mkdir (java.io.File. dir))
+      (when-not (-> dir java.io.File. .isDirectory) (-> dir .java.ioFile. .mkdir))
       ;; ToDo: :project/id is unique. Don't wipe out an existing project. User could be starting over. Maybe add a number.
       (let [proj-cfg (assoc @proj-base-cfg :store {:backend :file :path dir})] ; drops :base-path too.
-        (when (d/database-exists? proj-cfg)
-          (d/delete-database proj-cfg)
-          (when (-> dir java.io.File. .isDirectory) ; ToDo: Is this really necessary?
-            (delete-the-proj-dir dir)))
+        (when (d/database-exists? proj-cfg) (d/delete-database proj-cfg))
         (d/create-database proj-cfg)
         (register-db id proj-cfg))
       ;; Add to project db

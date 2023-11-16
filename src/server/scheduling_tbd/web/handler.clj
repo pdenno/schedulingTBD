@@ -38,7 +38,17 @@
 ;;;   - https://www.youtube.com/watch?v=cSntRGAjPiM  (50-minute video)
 ;;;   - https://www.slideshare.net/metosin/reitit-clojurenorth-2019-141438093 (slides for the above)
 
-;;; Note: Compared to using the web app, the swagger API (page index.html) is much more useful for debugging a request.
+;;; Notes:
+;;;   * You can specify keywords and keywords will be conveyed to the web app, but the swagger API will show them as strings.
+;;;   * If the swagger UI (the page you get when you GET index.html) displays "Failed to load API definition", try :no-doc true
+;;;     on the most recent definition (or many of them until things start working).
+;;;   * The devl/ajax-tests are Work In Process. Some have uninvestigated bugs.
+;;;   * You can choose not to define specs for the keys. (Really??? I'm not so sure!)
+;;;   * The most useful debugging techniques seem to be (in order):
+;;;       1) Get the handler definition good enough that it displays in the swagger UI.
+;;;       2) Execute with swagger and determine whether problem is with Clojure Spec validation.
+;;;       3) If it is get diag atoms for the offending request or response and run s/valid? and s/explain by hand.
+;;;       4) If none of that is the problem, study what the wrappers are doing by uncommenting ev/print-context-diffs and running the code.
 
 ;;; =========== Pages (just homepage, thus far.)  =======
 (def selmer-opts {:custom-resource-path (io/resource "html")})
@@ -54,7 +64,6 @@
 (defn home [{:keys [flash] :as request}]
   (render request "home.html" {:errors (:errors flash)}))
 ;;;====================================================
-;;; You can choose not to define specs for the keys.
 
 ;;; --------- (require '[develop.dutil :as devl]) ; Of course, you'll have to (user/restart) when you update things here.
 ;;; --------- Try it with :reitit.interceptor/transform dev/print-context-diffs. See below.
@@ -71,14 +80,26 @@
                                :json-schema/default "LLM: What's the capital of Iowa?"}))
 
 ;;; -------- (devl/ajax-test "/api/list-projects" [])
-(s/def ::list-projects-response (s/keys :req-un [::projects]))
+(s/def ::others (s/coll-of keyword?))
+(s/def ::current-project keyword?)
+(s/def ::list-projects-response (s/keys :req-un [::others ::current-project]))
 (s/def ::projects (st/spec {:spec (s/coll-of string?)
                             :name "projects"
-                            :description "The :project/name of all projects."}))
+                            :description "The :project/name of all projects."
+                            :json-schema/default ["craft-beer-brewery-scheduling" "snowboard-production-scheduling"]}))
 
 ;;; -------- (devl/ajax-test "/api/get-conversation" {:project-id "craft-beer-brewery-scheduling"})
-(s/def ::get-conversation-request (s/keys :req-un [::project-id]))
-(s/def ::get-conversation-response (s/coll-of map?))
+(s/def ::get-conversation-request (st/spec {:spec (s/keys :req-un [::project-id])
+                                            :name "project-id"
+                                            :description "A string uniquely identifying the project to the system DB."
+                                            :json-schema/default "craft-beer-brewery-scheduling"}))
+(s/def ::conv-for (st/spec {:spec #(or (string? %) (keyword? %))
+                            :name "conv-for" ; The description for responses is not shown in Swagger UI.
+                            :description "The project-id for which the conversation is provided."
+                            :json-schema/default "craft-beer-brewery-scheduling"}))
+
+(s/def ::conv (s/coll-of map?))
+(s/def ::get-conversation-response (s/keys :req-un [::conv-for ::conv]))
 (s/def ::project-id (st/spec {:spec string?
                               :name "project-id"
                               :description "A kebab-case string (will be keywordized) unique to the system DB identifying a project."
@@ -87,49 +108,60 @@
 ;;; -------- (devl/ajax-test "/api/ws" {:client-id "my-fake-uuid"}) ; ToDo: ajax-test not working here. Not investigated
 (s/def ::ws-connection-request (s/keys :req-un [::client-id]))
 
-;;; If the swagger UI (the page you get when you GET index.html) displays "Failed to load API definition", try :no-doc true
-;;; on the most recent definition (or many of them until things start working).
+;;; -------- (devl/ajax-test "/api/set-current-project" {:project-id "craft-beer-brewery-scheduling"} {:method ajax.core/POST}) ; ToDo: doesn't work.
+(s/def ::set-current-project-request (s/keys :req-un [::project-id]))
+(s/def ::set-current-project-response (s/keys :req-un [::project-id]))
+
 (def routes
   [["/app" {:get {:no-doc true
                   :summary "Load the web app for someone."
                   :handler home}}]
 
    ["/swagger.json"
-     {:get {:no-doc true
+     {:get {;:no-doc true
             :swagger {:info {:title "SchedulingTBD API"
                              :description "API with reitit-http"}}
             :handler (swagger/create-swagger-handler)}}]
 
    ["/ws"
-    {:get {:summary "Web socket connection request"
+    {:get {:no-doc true
+           :summary "Web socket connection request"
            :parameters {:query ::ws-connection-request}
            :handler wsock/establish-websocket-handler}}]
 
    ["/api"
-    {:swagger {:tags ["SchedulingTBD functions"]}}
+    {:swagger {;:no-doc true
+               :tags ["SchedulingTBD functions"]}}
 
    ["/user-says"
-    {:post {:no-doc true
+    {:post {;:no-doc true
             :summary "Respond to the user's most recent message."
             :parameters {:body ::user-says-request}
             :responses {200 {:body ::user-says-response}}
             :handler converse/reply}}]
 
     ["/get-conversation"
-     {:get {:no-doc true
-            :summary "Get the conversation from the project database."
+     {:get {;:no-doc true
+            :summary "Get the project's conversation from its project DB."
             :parameters {:query ::get-conversation-request}
             :responses {200 {:body ::get-conversation-response}}
             :handler  db-resp/get-conversation}}]
 
     ["/list-projects"
-     {:get {:no-doc true
+     {:get {;:no-doc true
             :summary "Get a vector of projects maps and the current project."
             :responses {200 {:body ::list-projects-response}}
-            :handler db-resp/get-projects}}]
+            :handler db-resp/list-projects}}]
+
+    ["/set-current-project"
+     {:post {;:no-doc true
+             :summary "Get a vector of projects maps and the current project."
+             :parameters {:query ::set-current-project-request}
+             :responses {200 {:body ::set-current-project-request}} ; {:body {:project-id string?}}}
+             :handler db-resp/set-current-project}}]
 
     ["/health"
-     {:get {:no-doc true
+     {:get {;:no-doc true
             :summary "Check server health"
             :responses {200 {:body {:time string? :up-since string?}}}
             :handler db-resp/healthcheck}}]]])

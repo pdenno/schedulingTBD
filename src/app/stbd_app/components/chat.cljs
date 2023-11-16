@@ -1,25 +1,22 @@
 (ns stbd-app.components.chat
   "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
-   [ajax.core :refer [GET POST]]
    [applied-science.js-interop :as j]
-   [cljs.reader                :refer [read-string]]
    [clojure.edn                :as edn]
-   [clojure.walk               :as walk :refer [keywordize-keys]]
    [helix.core                 :refer [defnc $]]
    [helix.hooks                :as hooks]
    [promesa.core               :as p]
    ["@mui/icons-material/Send$default" :as Send]
    ["@mui/material/Box$default" :as Box]
-   ["@mui/material/Button$default" :as Button]
    ["@mui/material/IconButton$default" :as IconButton]
    ["@mui/material/LinearProgress$default" :as LinearProgress]
    ["@mui/material/Link$default" :as Link]
    ["@mui/material/Stack$default" :as Stack]
    ["react-chat-elements/dist/main"    :as rce]
    [scheduling-tbd.util :as sutil :refer [timeout-info #_invalidate-timeout-info]]
-   [stbd-app.util :as util]
-   [taoensso.timbre :as log :refer-macros [info debug log]]))
+   [stbd-app.db-access  :as dba]
+   [stbd-app.util       :as util]
+   [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
 (def diag (atom nil))
 
@@ -73,7 +70,8 @@
               :text (vector text)})))
 
 (defn msg2rce
-  "Rewrite the conversation DB-style messages to objects acceptable to the RCE component."
+  "Rewrite the conversation DB-style messages to objects acceptable to the RCE component.
+   Does not do clj->js on it, however."
   [msg]
   (let [{:keys [name color position]} (get msg-style (:message/from msg))]
     (-> {:type "text"}
@@ -86,28 +84,10 @@
                                  (conj res (make-link (:msg-link/uri elem) (:msg-link/text elem)))
                                  (conj res (:msg-text/string elem))))
                              []
-                             (:message/content msg)))
-        clj->js)))
+                             (:message/content msg))))))
 
 (defn add-msg [msg-list msg]
-  (let [res (-> msg-list js->clj (conj msg) clj->js)]
-     #(-> %
-          (assoc :msg-list-in-add-msg res)
-          (assoc :msg-in-add-msg msg))
-    res))
-
-(defn get-conversation
-  "Return a promise that will resolve to the vector of a maps describing the complete conversation so far."
-  [project-id]
-  (log/info "Call to get-conversation for" project-id)
-  (let [prom (p/deferred)]
-    (GET (str "/api/get-conversation?project-id=" project-id)
-         {:timeout 3000
-          :handler (fn [resp] (p/resolve! prom resp))
-          :error-handler (fn [{:keys [status status-text]}]
-                           (p/reject! prom (ex-info "CLJS-AJAX error on /api/get-conversation"
-                                                    {:status status :status-text status-text})))})
-    prom))
+  (-> msg-list js->clj (conj msg) clj->js))
 
 (def intro-message
   "The first message of a conversation."
@@ -121,6 +101,7 @@
 (def client-id "A random uuid naming this client. It changes on disconnect." (str (random-uuid)))
 (def ws-url (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
 (def channel (atom nil))
+(def connected? (atom false))
 
 (def ping-id (atom 0))
 (defn ping!
@@ -133,19 +114,17 @@
                         :ping-id (swap! ping-id inc)})))
     (log/error "Couldn't send ping; channel isn't open.")))
 
-(def connected? (atom false))
-
-
 ;;; ------------------- Component ------------------------------
-(defnc Chat [{:keys [height conversation]}]
-  (log/info "---Updating Chat--- conversation =" conversation) ; <=================== didn't get new stuff.
-  (let [[msg-list set-msg-list] (hooks/use-state conversation)
+(defnc Chat [{:keys [height conv-map]}]
+  (let [[msg-list set-msg-list] (hooks/use-state (->> conv-map :conv (mapv msg2rce) clj->js)) ; ToDo: Not clear why this doesn't set msg-list...
         [progress set-progress] (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
-        [user-text     set-user-text] (hooks/use-state "")
-        [system-text set-system-text] (hooks/use-state "")
+        [user-text     set-user-text]   (hooks/use-state "")
+        [system-text set-system-text]   (hooks/use-state "")
         input-ref (hooks/use-ref nil)]
-    (letfn [(connect! []  ; I think this has to be here owing to scoping restrictions on hooks functions,...
+    (hooks/use-effect [conv-map] ;... and this is necessary.
+      (set-msg-list (->> conv-map :conv (mapv msg2rce) clj->js)))
+    (letfn [(connect! []  ; I think this has to be here owing to scoping restrictions on hooks functions,... ToDo: Can't I pass it in?
               (if-let [chan (js/WebSocket. ws-url)]
                 (do (log/info "Websocket Connected!")
                     (reset! channel chan)
@@ -166,16 +145,9 @@
       ;; ------------- Send user-text through REST API; wait on promise for response.
       (hooks/use-effect [user-text]
         (when (not-empty user-text)
-          (let [prom (p/deferred)]
-            (POST "/api/user-says"
-                  {:params {:user-text user-text}
-                   :timeout 30000
-                   :handler (fn [resp] (p/resolve! prom resp))
-                   :error-handler (fn [{:keys [status status-text]}]
-                                    (p/reject! prom (ex-info "CLJS-AJAX error on /api/user-says" {:status status :status-text status-text})))})
-            (-> prom
-                (p/then #(set-msg-list (->> % msg2rce (add-msg msg-list))))
-                (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %)))))))
+          (-> (dba/user-says user-text)
+              (p/then #(set-msg-list (->> % msg2rce (add-msg msg-list))))
+              (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %))))))
       ;; -------------- progress stuff (currentl not hooked up)
       (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
         (reset! progress-atm 0)
@@ -187,6 +159,7 @@
                        (do (set-progress 0) (js/window.clearInterval @progress-handle))
                        (set-progress (reset! progress-atm percent)))))
                  200)))
+      (reset! diag {:msg-list msg-list})
       ;; ----------------- component UI structure.
       ($ Stack {:direction "column" :spacing "0px"}
          ($ Box {:sx (clj->js {:overflowY "auto" ; :sx was :style

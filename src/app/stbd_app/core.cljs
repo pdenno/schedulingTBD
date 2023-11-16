@@ -17,11 +17,12 @@
    ["react-dom/client" :as react-dom]
    ["react-router-dom" :as router :refer [useSearchParams]]
    [scheduling-tbd.util :as sutil]
-   [stbd-app.util :as util]
    [stbd-app.components.chat :as chat :refer [Chat]]
    [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
+   [stbd-app.db-access :as dba]
+   [stbd-app.util :as util]
    [stbd-app.wsock :as wsock]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
@@ -149,6 +150,8 @@
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")
                   :on-stop-drag-dn (partial editor/resize-finish "result")}})
 
+(def really? (atom nil))
+
 ;;; ToDo: Needs work.
 (defn compute-progress
   "Use either progress-atm or timeout-info to return a percent done."
@@ -156,22 +159,30 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
-(defnc Top [{:keys [width height projects conversation-in]}]
+(defnc Top [{:keys [width height]}]
   (let [banner-height 42
-        [current-project set-current-project] (hooks/use-state (first projects))
-        [conversation set-conversation]       (hooks/use-state conversation-in)
+        [proj set-proj]                       (hooks/use-state nil)
+        [others set-others]                   (hooks/use-state nil)
+        [conversation set-conversation]       (hooks/use-state {:conv [] :conv-for "nobody"})
         useful-height (- height banner-height)
         chat-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
         code-editor-height   (int (* useful-height 0.5))]    ; <================================== Ignored?
     (hooks/use-effect :once ; Need to set :max-height of resizable editors after everything is created.
-      (editor/resize-finish "code-editor" nil code-editor-height))
+                      (editor/resize-finish "code-editor" nil code-editor-height))
+    (hooks/use-effect :once
+       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
+           (p/then #(do (set-proj (:current-project %))
+                        (set-others (:others %))))))
+    (hooks/use-effect [proj]
+      (when proj
+        (-> (dba/get-conversation (name proj))
+            (p/then #(set-conversation %)))))
     (letfn [(change-project [p]
-              (when (not= current-project p)
-                (log/info "Top: Changing project to " p)
-                (set-current-project p)
-                (-> (chat/get-conversation p) ; returns a new promise
-                    (p/then #(->> % (mapv chat/msg2rce) clj->js))
-                    (p/then #(set-conversation %)))))]
+              ;(log/info "--------- Calling change-project -------")
+              (when (not= proj p)
+                (dba/set-current-project p)
+                (set-others (-> (replace {p proj} others) sort))
+                (set-proj p)))]
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
             {:variant "h4"
@@ -185,9 +196,8 @@
                ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
          ($ ShareLeftRight
             {:left  ($ Stack {:direction "column"}
-                       ($ SelectProject {:projects projects :change-project-fn change-project})
-                       ;; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist
-                       ($ chat/Chat {:height chat-height :conversation conversation}))
+                       ($ SelectProject {:current-project proj :others others :change-project-fn change-project})
+                       ($ chat/Chat {:height chat-height :conv-map conversation}))
              :right ($ ShareUpDown
                        {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
                         :up ($ Editor {:name "code-editor"
@@ -198,7 +208,7 @@
              :lf-pct 0.50 ; <=================================
              :init-width width})))))
 
-(defnc app [{:keys [conversation-in projects]}]
+(defnc app []
   {:helix/features {:check-invalid-hooks-usage true}}
   (let  [[width  set-width]  (hooks/use-state (j/get js/window :innerWidth))
          [height set-height] (hooks/use-state (j/get js/window :innerHeight))
@@ -227,9 +237,7 @@
        (CssBaseline {:children #js []}) ; https://v4.mui.com/components/css-baseline/
        ($ styles/ThemeProvider
           {:theme app-theme}
-          ($ Top {:projects projects
-                  :conversation-in conversation-in
-                  :width  (:width  @carry-dims-atm)
+          ($ Top {:width  (:width  @carry-dims-atm)
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
@@ -247,11 +255,7 @@
   (log/info "Starting a ping process.") ; Start this here so you don't get one every time the chat updates!
   (reset! ping-process (js/window.setInterval (fn [] (chat/ping!)) 10000)) ; Ping to keep-alive.
   ;; Project list and conversation need to be available when .render. Thus promises.
-  (-> (proj/get-project-list) ; Returns a promise. Resolves to list of strings. The first one is the system DB's current project.
-      (p/then #(reset! proj/project-names (:projects %)))
-      (p/then (fn [_] (chat/get-conversation (first @proj/project-names)))); returns a new promise
-      (p/then #(->> % (mapv chat/msg2rce) clj->js))
-      (p/then #(.render root ($ app {:conversation-in % :projects @proj/project-names})))))
+  (.render root ($ app)))
 
 (defn ^:export init []
   (mount-root))
