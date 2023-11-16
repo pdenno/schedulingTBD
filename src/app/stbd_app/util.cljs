@@ -5,6 +5,8 @@
 
 (def diag (atom nil))
 
+(def server-port 3300) ; ToDo: Get this from config.
+
 ;;; ToDo: Is there a react way? It looks like react doesn't have this notion.
 (def root "The application's root 'Symbol(react.element)' element" (atom nil))
 

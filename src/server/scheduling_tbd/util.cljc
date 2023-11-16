@@ -42,31 +42,19 @@
   []
   (swap! timeout-info #(assoc % :valid? false)))
 
+#?(:clj
+   (defn now [] (new java.util.Date))
+   :cljs
+   (defn now [] (.getTime (js/Date.))))
+
 (defn start-clock
   "Set the timeout-info object and return the argument."
   ([] (start-clock max-duration))
   ([max-millis]
    (swap! timeout-info
-          #(let [now #?(:clj (inst-ms (java.util.Date.)) :cljs (.getTime (js/Date.)))]
-             (assoc % :valid? true :max-millis max-millis :start-time now :timeout-at (+ now max-millis))))
+          #(let [now (now)]
+             (assoc % :valid? true :max-millis max-millis :start-time (now) :timeout-at (+ now max-millis))))
    max-millis))
-
-(defonce databases-atm (atom {}))
-
-(defn register-db
-  "Add a DB configuration."
-  [k config]
-  (assert (#{:him :system} k))
-  (swap! databases-atm #(assoc % k config)))
-
-#?(:clj
-(defn connect-atm
-  "Return a connection atom for the DB."
-  [k]
-  (when-let [db-cfg (get @databases-atm k)]
-    (if (d/database-exists? db-cfg)
-      (d/connect db-cfg)
-      (log/warn "There is no DB to connect to.")))))
 
 ;;; This seems to cause problems in recursive resolution. (See resolve-db-id)"
 (defn db-ref?
@@ -94,6 +82,7 @@
                :else  obj))]
      (resolve-aux form)))))
 
+;;; -------------- Starting and stopping ----------------------
 (defn init-util []
   (config-log :info))
 

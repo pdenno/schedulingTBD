@@ -6,13 +6,13 @@
    [clojure.java.io :as io]
    [clojure.string]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.web.handler :refer [app]]             ; for mount
    [scheduling-tbd.db   :refer [database-cfgs]]          ; for mount
-   [scheduling-tbd.how-made :refer [him-cfg]]          ; for mount
+   [scheduling-tbd.how-made :refer [him-cfg]]            ; for mount
    [scheduling-tbd.paillier :refer [api-key]]            ; for mount
    [scheduling-tbd.planner :refer [plan-server]]         ; for mount
    [scheduling-tbd.util :refer [util-state]]             ; for mount
-
+   [scheduling-tbd.web.handler :refer [app]]             ; for mount
+   [scheduling-tbd.web.routes.websockets :refer [wsock]] ; for mount
    [ring.adapter.jetty :as jetty]
    [taoensso.timbre :as log])
   (:gen-class))
@@ -44,6 +44,7 @@
     (catch Throwable t
       (log/error t (str "server failed to start on port: " port)))))
 
+;;; There's a lot to learn here about the server abstraction; it is explained here: https://github.com/ring-clojure/ring/wiki
 (defn start-server [& {:keys [profile] :or {profile :dev}}]
   (let [base-config (-> "system.edn" io/resource slurp edn/read-string profile)
         port (-> base-config :server/http :port)

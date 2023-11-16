@@ -1,0 +1,9 @@
+[
+#:system{:current-project-id :aluminium-foil-production-scheduling,
+         :name "SYSTEM"}
+
+#:project{:dir
+          "/opt/scheduling/projects/craft-beer-brewery-scheduling",
+          :id :craft-beer-brewery-scheduling,
+          :name "craft-beer-brewery-scheduling"}
+]

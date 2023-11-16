@@ -1,6 +1,7 @@
 (ns scheduling-tbd.sutil
   "Server utilities."
   (:require
+   [clojure.java.io         :as io]
    [datahike.api            :as d]
    [datahike.pull-api       :as dp]
    [scheduling-tbd.paillier :refer [api-key]]
@@ -22,7 +23,7 @@
   (when-let [db-cfg (get @databases-atm k)]
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
-      (log/warn "There is no DB to connect to."))))
+      (log/warn "DB is registered but does not exist."))))
 
 ;;; ToDo:
 ;;;  - cljs complains about not finding x/element-nss, which I don't see in the  0.2.0-alpha8 source at all.
@@ -48,7 +49,7 @@
 (defn resolve-db-id
   "Return the form resolved, removing properties in filter-set,
    a set of db attribute keys, for example, #{:db/id}."
-  ([form conn-atm] (resolve-db-id form conn-atm #{}))
+  ([form conn-atm] (resolve-db-id form conn-atm #{:db/id}))
   ([form conn-atm filter-set]
    (letfn [(resolve-aux [obj]
              (cond
@@ -62,6 +63,16 @@
                (coll? obj)        (map  resolve-aux obj)
                :else  obj))]
      (resolve-aux form))))
+
+(defn root-entities
+  "Return a sorted vector of root entities (natural numbers) for all root entities of the DB."
+  [conn-atm]
+  (-> (d/q '[:find [?e ...] :where
+             [?e]
+             (not [_ _ ?e])]
+           @conn-atm)
+      sort
+      vec))
 
 (defn nspaces
   "Return a string of n spaces."

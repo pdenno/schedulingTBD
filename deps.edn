@@ -6,8 +6,6 @@
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
            funcool/promesa                     {:mvn/version "11.0.678"}
-           ;;http-kit/http-kit                   {:mvn/version "2.8.0-beta3"}
-           ;;http-kit/http-kit                   {:mvn/version "2.7.0"}
            org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"}
            io.djy/ezzmq                        {:mvn/version "0.8.2"}
            io.replikativ/datahike              {:mvn/version "0.6.1538"} ; 1552 is available.
@@ -28,7 +26,7 @@
                           :jvm-opts       ["-XX:-OmitStackTraceInFastThrow"] ; https://www.metosin.fi/blog/missing-stacktraces/
                           ;; :dev includes src/server (for use with exerciser) thus much of this stuff.
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
-                                           cider/cider-nrepl               {:mvn/version "0.43.0"}
+                                           cider/cider-nrepl               {:mvn/version "0.43.1"}
                                            com.lambdaisland/classpath      {:mvn/version "0.4.44"}
                                            ;criterium/criterium            {:mvn/version "0.4.6"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
@@ -67,7 +65,7 @@
                                          lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                                          com.lambdaisland/glogi    {:mvn/version "1.3.169"}
                                          nrepl/nrepl               {:mvn/version "1.1.0"}
-                                         cider/cider-nrepl         {:mvn/version "0.43.0"}}}
+                                         cider/cider-nrepl         {:mvn/version "0.43.1"}}}
 
            :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.9.6"} #_{:git/tag "v0.9.4" :git/sha "76b78fe"}}
                       :ns-default build}
@@ -80,7 +78,7 @@
 ;;; clj -T:search/outdated
 ;;; |    :file |                               :name |         :current |          :latest |
 ;;; |----------+-------------------------------------+------------------+------------------|
-;;; | deps.edn |                   cider/cider-nrepl |           0.30.0 |           0.43.0 |
+;;; | deps.edn |                   cider/cider-nrepl |           0.30.0 |           0.43.1 |
 ;;; |          |                 com.taoensso/timbre |            6.1.0 |            6.3.1 |
 ;;; |          |                 com.wsscode/pathom3 | 2023.01.31-alpha | 2023.08.22-alpha |
 ;;; |          |                     funcool/promesa |         11.0.671 |         11.0.678 |

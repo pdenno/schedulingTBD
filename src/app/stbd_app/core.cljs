@@ -2,6 +2,8 @@
   (:require
    [applied-science.js-interop :as j]
    [clojure.string :as str]
+   [helix.core :as helix :refer [defnc $ <>]]
+   [helix.hooks :as hooks]
    ["@codemirror/view" :as view]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
@@ -12,29 +14,26 @@
    ["@mui/material/styles" :as styles] ; See it used here: https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
    ["@mui/material/Typography$default" :as Typography]
    [promesa.core :as p]
-   [scheduling-tbd.util :as sutil]
-   [stbd-app.util :as util]
-   [stbd-app.wsock :as wsock]
-   [stbd-app.components.chat :as chat :refer [Chat]]
-   [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
-   [stbd-app.components.project :refer [SelectProject initial-projects projects-info]]
-   [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
-   [stbd-app.components.save-modal :refer [SaveModal]]
-   [helix.core :as helix :refer [defnc $ <>]]
-   [helix.hooks :as hooks]
    ["react-dom/client" :as react-dom]
    ["react-router-dom" :as router :refer [useSearchParams]]
+   [scheduling-tbd.util :as sutil]
+   [stbd-app.components.chat :as chat :refer [Chat]]
+   [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
+   [stbd-app.components.project :as proj :refer [SelectProject]]
+   [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
+   [stbd-app.db-access :as dba]
+   [stbd-app.util :as util]
+   [stbd-app.wsock :as wsock]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
-;(def svr-prefix "http://localhost:3000") ; And isn't it 3300?
+(def diag (atom {}))
+
 (declare get-user-data get-user-code)
 
 (def progress-handle
   "The thing that can be called by js/window.clearInterval to stop incrementing progress under js/window.setInterval."
   (atom nil))
 (def progress-atm "Percent allowed duration for eval-cell. 100% is a timeout." (atom 0))
-
-(def diag (atom {}))
 
 (def app-theme
   (styles/createTheme
@@ -78,7 +77,7 @@
       result)))
 
 (j/defn eval-cell
-  "Run RADmapper on the string retrieved from the editor's state.
+  "Run <whatever process> on the string retrieved from the editor's state.
    Apply the result to the argument function on-result, which was is the set-result function set up by hooks/use-state.
    Similarly, on-progress is the progress bar completion value set up by hooks/use-state [progress set-progress].
    Note that the actual change to the output editor is done in a use-effect [state] in the toplevel component.
@@ -127,7 +126,7 @@
     (.toString s)
     ""))
 
-(defn search-props
+#_(defn search-props
   "Return the object that has a prop that passes the test."
   [obj test]
   (let [found? (atom nil)
@@ -151,6 +150,8 @@
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")
                   :on-stop-drag-dn (partial editor/resize-finish "result")}})
 
+(def really? (atom nil))
+
 ;;; ToDo: Needs work.
 (defn compute-progress
   "Use either progress-atm or timeout-info to return a percent done."
@@ -158,42 +159,56 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
-(defnc Top [{:keys [width height initial-prompt]}]
+(defnc Top [{:keys [width height]}]
   (let [banner-height 42
+        [proj set-proj]                       (hooks/use-state nil)
+        [others set-others]                   (hooks/use-state nil)
+        [conversation set-conversation]       (hooks/use-state {:conv [] :conv-for "nobody"})
         useful-height (- height banner-height)
         chat-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
         code-editor-height   (int (* useful-height 0.5))]    ; <================================== Ignored?
-    ;; setInterval runs its argument function again and again at the argument time interval (milliseconds).
-    ;; setInterval returns a handle that can be used by clearInterval to stop the running.
     (hooks/use-effect :once ; Need to set :max-height of resizable editors after everything is created.
-      (editor/resize-finish "code-editor" nil code-editor-height))
-    ($ Stack {:direction "column" :height useful-height}
-       ($ Typography
-          {:variant "h4"
-           :color "white"
-           :backgroundColor "primary.main"
-           :padding "2px 2px 2px 20px"
-           :noWrap false
-           :height banner-height}
-          ($ Stack {:direction "row"}
-             "schedulingTBD"
-             ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
-       ($ ShareLeftRight
-          {:left  ($ Stack {:direction "column"}
-                     ($ SelectProject {:projs-map @projects-info})
-                     ;; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist
-                     ($ chat/Chat {:height chat-height :initial-prompt initial-prompt}))
-           :right ($ ShareUpDown
-                     {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
-                      :up ($ Editor {:name "code-editor"
-                                     :height code-editor-height})
-                      :dn ($ Box)
-                      :share-fns (:right-share top-share-fns)})
-           :share-fns (:left-share top-share-fns)
-           :lf-pct 0.50 ; <=================================
-           :init-width width}))))
+                      (editor/resize-finish "code-editor" nil code-editor-height))
+    (hooks/use-effect :once
+       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
+           (p/then #(do (set-proj (:current-project %))
+                        (set-others (:others %))))))
+    (hooks/use-effect [proj]
+      (when proj
+        (-> (dba/get-conversation (name proj))
+            (p/then #(set-conversation %)))))
+    (letfn [(change-project [p]
+              ;(log/info "--------- Calling change-project -------")
+              (when (not= proj p)
+                (dba/set-current-project p)
+                (set-others (-> (replace {p proj} others) sort))
+                (set-proj p)))]
+      ($ Stack {:direction "column" :height useful-height}
+         ($ Typography
+            {:variant "h4"
+             :color "white"
+             :backgroundColor "primary.main"
+             :padding "2px 2px 2px 20px"
+             :noWrap false
+             :height banner-height}
+            ($ Stack {:direction "row"}
+               "schedulingTBD"
+               ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
+         ($ ShareLeftRight
+            {:left  ($ Stack {:direction "column"}
+                       ($ SelectProject {:current-project proj :others others :change-project-fn change-project})
+                       ($ chat/Chat {:height chat-height :conv-map conversation}))
+             :right ($ ShareUpDown
+                       {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
+                        :up ($ Editor {:name "code-editor"
+                                       :height code-editor-height})
+                        :dn ($ Box)
+                        :share-fns (:right-share top-share-fns)})
+             :share-fns (:left-share top-share-fns)
+             :lf-pct 0.50 ; <=================================
+             :init-width width})))))
 
-(defnc app [{:keys [initial-prompt]}]
+(defnc app []
   {:helix/features {:check-invalid-hooks-usage true}}
   (let  [[width  set-width]  (hooks/use-state (j/get js/window :innerWidth))
          [height set-height] (hooks/use-state (j/get js/window :innerHeight))
@@ -222,11 +237,11 @@
        (CssBaseline {:children #js []}) ; https://v4.mui.com/components/css-baseline/
        ($ styles/ThemeProvider
           {:theme app-theme}
-          ($ Top {:initial-prompt initial-prompt
-                  :width  (:width  @carry-dims-atm)
+          ($ Top {:width  (:width  @carry-dims-atm)
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
+(defonce ping-process (atom nil))
 
 (defn ^{:after-load true, :dev/after-load true} mount-root []
   (sutil/config-log :info)
@@ -235,9 +250,12 @@
                  :min-level
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
-  (-> (initial-projects)
-      (p/then (fn [info] (reset! projects-info (update info :projects #(-> % sort (conj "Start a new project") vec)))))
-      (p/then (fn [info] (.render root ($ app {:initial-prompt (:initial-prompt info)}))))))
+  (reset! chat/connected? false)
+  (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
+  (log/info "Starting a ping process.") ; Start this here so you don't get one every time the chat updates!
+  (reset! ping-process (js/window.setInterval (fn [] (chat/ping!)) 10000)) ; Ping to keep-alive.
+  ;; Project list and conversation need to be available when .render. Thus promises.
+  (.render root ($ app)))
 
 (defn ^:export init []
   (mount-root))

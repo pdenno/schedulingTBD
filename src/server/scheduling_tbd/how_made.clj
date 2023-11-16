@@ -11,9 +11,10 @@
    [datahike.api            :as d]
    [hickory.core            :as hick] ; There might be easier ways, but I'd like to learn this tool.
    [mount.core              :as mount :refer [defstate]]
+   [scheduling-tbd.db       :as proj-db]
    [scheduling-tbd.domain   :as dom]
    [scheduling-tbd.llm      :as llm]
-   [scheduling-tbd.util     :as util :refer [connect-atm]]
+   [scheduling-tbd.sutil    :as sutil :refer [connect-atm]]
    [taoensso.timbre :as log]))
 
 (def him-schema+
@@ -168,8 +169,8 @@
 
 (defn get-him-db-content
   "Return sorted DB content, or part thereof.
-    :min-seq - return no episodes with a smaller than :episode/sequence-number.
-    :max-seq - return no episodes with a larger than :episode/sequence-number.
+    :min-seq - return no episodes with an :episode/sequence-number smaller than this.
+    :max-seq - return no episodes with an :episode/sequence-number larger than this.
     :names - return only segments in the argument collection (not its episode).
 
    Example usage: (get-him-db-content {:min-seq 3 :max-seq 5}).
@@ -179,7 +180,7 @@
   (let [conn-atm (connect-atm :him)]
     (cond->> (d/q '[:find [?e ...] :where [?e :episode/id]] @conn-atm)
       true     sort
-      true     (mapv #(util/resolve-db-id {:db/id %} conn-atm #{:db/id}))
+      true     (mapv #(sutil/resolve-db-id {:db/id %} conn-atm #{:db/id}))
       min-seq  (filter #(>= (:episode/sequence-number %) min-seq))
       max-seq  (filter #(<= (:episode/sequence-number %) max-seq))
       names    (filter (fn [epi] (some #(names (:segment/name %)) (:episode/segments epi))))
@@ -256,7 +257,31 @@
     (d/transact conn {:tx-data data})
     (mark-as-useless suspected-useless)))
 
-;;; Based on ./db.clj
+;;; ------------------- Create projects for entries ---------------
+(defn segment-intros
+  "Return the a map of info for segments that have intros."
+  []
+  (d/q '[:find ?name ?intro
+         :keys segment/name segment/intro
+         :where
+         [?e :segment/challenge-intro ?intro]
+         [?e :segment/name ?name]]
+       @(connect-atm :him)))
+
+(defn create-project!
+  "Add the project to the system and create a project DB for it.
+   Example usage (create-project! 'Aluminium Foil') -- really!."
+  [seg-name]
+  (if-let [intro (->> (segment-intros)
+                      (some #(when (= seg-name (:segment/name %)) (:segment/intro %))))]
+    (let [pname (-> seg-name (str " production scheduling"))]
+      (proj-db/create-proj-db!
+       {:project/name pname
+        :project/id   (-> pname str/lower-case (str/replace #"\s+" "-") keyword)
+        :segment/challenge-intro intro}))
+    (log/error "Project by that name not found:" seg-name)))
+
+;;; ------------------- Starting and stopping ---------------
 (defn init-him
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
    Recreate the system database if sys-db-cfg.rebuild-db? = true."
@@ -268,7 +293,7 @@
                  :keep-history? false
                  :rebuild-db? false ; <=========================
                  :schema-flexibility :write}]
-    (util/register-db :him him-cfg)
+    (sutil/register-db :him him-cfg)
     (when (:rebuild-db? him-cfg) (create-him-db him-cfg))
     him-cfg))
 
