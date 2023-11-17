@@ -33,9 +33,11 @@ But we'll start by generating test cases running mostly static interviews.
   * Install install a Java JDK and [Clojure](https://clojure.org/).
   * Start a server REPL by starting Clojure in your editor from anywhere in the repository and running `(start)` in the `user` namespace.
   * If you are starting from scratch, you'll need to create the systems and projects databases. 
-  ```(in-ns 'scheduling-tbd.db)
+ 
+   ```(in-ns 'scheduling-tbd.db)
 	(recreate-system-db!)
-	recreate-project-dbs!)```
+	recreate-project-dbs!)
+   ```
 
 ### The web app
   * Install [nodeJS/npm](https://nodejs.org/en/).
