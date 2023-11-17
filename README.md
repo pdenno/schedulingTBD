@@ -34,11 +34,11 @@ But we'll start by generating test cases running mostly static interviews.
   * Start a server REPL by starting Clojure in your editor from anywhere in the repository and running `(start)` in the `user` namespace.
   * If you are starting from scratch, you'll need to create the system and projects databases. The files for these are data/system-db.edn and the edn files in data/projects.
  
-   ```
+ ```
 (in-ns 'scheduling-tbd.db)
 (recreate-system-db!)
 (recreate-project-dbs!)
-   ```
+ ```
 
 ### The web app
   * Install [nodeJS/npm](https://nodejs.org/en/).
