@@ -25,7 +25,7 @@
    :project/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
         :doc "a keyword matching the one in the same named property of a project database"}
-   :project/dir
+   :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
         :doc "a string naming a subdirectory containing a project."}
    :project/name
@@ -76,7 +76,7 @@
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
-   :project/desc
+   :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
    :project/industry
@@ -87,7 +87,10 @@
    :summary/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "the value 'SUMMARY'. This is used to keep information about the state of the conversation."}
-   :summary/next-msg-id ; ToDo: Is this worthwhile? datalog can do this!
+   :summary/interview-state
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "a keyword (enum val from some set; ns=interview-state) indicating the current disposition of the interview."}
+   :summary/next-msg-id ; ToDo: Remove this. Datalog can do it easy.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc "The ID (a natural number) to be assigned to the next message written (either side of conversation)."}
    ;; ---------------------- task type (Of course these are not planner tasks!)

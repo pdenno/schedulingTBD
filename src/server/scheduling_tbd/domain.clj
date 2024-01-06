@@ -77,6 +77,10 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    {:role "assistant" :content "{:service 0.9, :artifact 0.2}"}
    {:role "user"      :content "WRONG: The sum of 0.9 and 0.2 is not 1.0."}])
 
+;;; ToDo: Seeing how we are getting so much text about supply chain/inventory management, maybe not mention supply chain.
+;;;       I'd like to say "manufacturing processes" rather than "business's processes" (where appropriate) so maybe run this after mfg/service query.
+;;;       In the mfg case, the user would ask about manufacturing scheduling problems.
+;;;       Thus have two versions of this, one for manufacturing and one for services.
 (defn pretend-you-manage-prompt
   [manage-what]
   [{:role "system"    :content (format "Pretend you manage %s. You have good knowledge of the business's processes and supply chain." manage-what)}

@@ -2,6 +2,7 @@
  :deps    {camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
            com.cemerick/url                    {:mvn/version "0.1.1"}
+           com.github.pdenno/explainlib        {:mvn/version "1.0.12"}
            com.taoensso/timbre                 {:mvn/version "6.1.0"} ; 6.3.1 is available but give taoensso/encore gives deprecated errors in shadow.
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets

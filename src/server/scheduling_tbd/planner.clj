@@ -1,20 +1,13 @@
 (ns scheduling-tbd.planner
-  "Start and stop the SHOP3 planner."
+  "Planning, currently including SHOP3 planner."
   (:require
-   [clojure.java.shell :refer [sh]]
-   [ezzmq.core :as zmq]
+   [clojure.java.shell :refer [sh]] ; SHOP3
+   ;[explainlib.core    :as exp]
+   [ezzmq.core :as zmq]             ; SHOP3
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.db :as db]
    [taoensso.timbre :as log]))
 
-(def planner-endpoint "tcp://*:31726")
-
-;;; ========================== Composing a planning domain  ==================
-
-;;; ========================== Composing a planning problem  ==================
-
-
-;;; ========================== Starting, stopping, and testing ==================
+;;; ------ explainlib & clara rules exploration -----------------------
 (def shop2-example
   "This is an example from usage from the SHOP2 documentation."
   {:domain
@@ -34,6 +27,17 @@
    :answer
    ["(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))"]})
 
+;;; ====================================================
+;;; ========================== SHOP3  ==================
+;;; ====================================================
+(def planner-endpoint "tcp://*:31726")
+
+;;; -------------------------- Composing a planning domain  ------------------
+
+;;; -------------------------- Composing a planning problem  ------------------
+
+
+;;; -------------------------- Starting, stopping, and testing ------------------
 (defn quit-planner! [])
 
 #_(defn quit-planner!
