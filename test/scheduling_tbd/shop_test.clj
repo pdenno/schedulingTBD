@@ -2,9 +2,8 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [clojure.test :refer [deftest is testing]]
    [datahike.api                 :as d]
-   [scheduling-tbd.shop :as shop]
+   [scheduling-tbd.shop :as shop :refer [rew2db]]
    [scheduling-tbd.llm  :as llm]
    [scheduling-tbd.sutil :as sutil :refer [connect-atm]]
    [scheduling-tbd.util :as util]
@@ -63,19 +62,14 @@
 ;;; ToDo:  WRONG! Both of them. I don't have time for this now.
 (deftest s-expression2db
   (testing "Testing creating db structures for s-expressions"
-    (is (= {:s-exp/fn-ref '>} (rewrite '> :s-exp-extended)))
+    (is (= {:s-exp/fn-ref '>} (rew2db '> :s-exp-extended)))
     (is (= #:s-exp{:args
                    [{:arg/pos 1, :s-exp/args [#:arg{:val #:box{:num 1}, :pos 1} #:arg{:val #:box{:sym 'x}, :pos 2}], :s-exp/fn-ref '+}
                     #:arg{:val #:box{:num 3}, :pos 2}
                     #:arg{:val #:box{:sym 'q}, :pos 3}],
                    :fn-ref '*}
-           (rewrite '(* (+ 1 x) 3 q) :s-exp-extended)))))
+           (rew2db '(* (+ 1 x) 3 q) :s-exp-extended)))))
 
-;;; See pg 397 in Dana Nau, et al., "SHOP2: An HTN Planning System" Journal of Artificial Intelligence Research 20 (2003) 379-404
-;;; (By convention) names of operators begin with an exclamation mark (!).
-;;; This doesn't use:
-;;; - and (logical expressions are implicit when nested)
-;;; - :task (an optional keyword that can be the first element of a task atom).
 
 (def zeno
   "This is an example in the 'canonical' form of a domain. When a SHOP version is needed, use shop/canon2shop.

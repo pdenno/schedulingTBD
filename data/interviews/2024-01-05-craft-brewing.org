@@ -1,12 +1,12 @@
 * Overview of the experiment in this .org file
    * [2024-01-05 Fri] experiment.
+     - [[https://platform.openai.com/playground?assistant=asst_rloUcbsn34Ctajed90ILdGBt&mode=assistant&thread=thread_VYDCgBTyJvpTeKNrMGS8CC0J][URL to this work]], probably only works from my login.
    * I'm using gpt-4-1104-preview.
    * I haven't investigated the  function / code interpretation / retrieval capabilities of the web UI yet.
      - But I know "code interpretation" is about python.
    * Not sure there is an API exactly for this. =Needs investigation.=
    * After a few minutes with an earlier assistant, I realized I needed the additional _Your answers typically are short, just a few sentences each._
      in the "You are a helpful assistant" thing!
-   * [[https://platform.openai.com/playground?assistant=asst_rloUcbsn34Ctajed90ILdGBt&mode=assistant&thread=thread_VYDCgBTyJvpTeKNrMGS8CC0J][URL to this work]] probably only works for my login.
    * I mixed interview elements with concept of operations (CONOPS) explanation/validation.
    * Reading the script: /These are my annotations./  +I should not have said this.+ _emphasis_
      | I reformatted the expert's answer as a table.    |
@@ -26,6 +26,33 @@ The main production scheduling challenge is balancing the demand for various bee
 while also considering the fermentation and aging process times, packaging schedules, and the need to optimize the use of resources
 such as labor, equipment, and ingredients.
 Additionally, we must manage inventory levels to meet distribution commitments without overproducing, which might lead to excess stock and product spoilage.
+** Analysis on this response
+  * {:fact :well-known-process :prob 0.8} /Therefore can get steps off-line./
+*** Background question to vanilla assistant:
+Scheduling problems are operations research problems.
+Commonly cited problem types involve visiting "stages" consisting of one or more principal production resources that have similar but perhaps not identical capabilities.
+A "job" produces the product.
+
+1) single stop model - each job runs through just one stage.
+2) flow shop model - each job runs through a fixed series of stages.
+3) job shop model - each job has its own predetermined route through various stages.
+
+Which of these do you suppose is most appropriate for production scheduling for craft beer production. Respond with just one of the above three.
+
+It responds with "flow shop model" /Flow, job shop, and well-known process can be used to decide that next step is ask about task ordering./
+
+* TBD - Ordering questions based on background queries (recognizable process)
+Is it fair to say that the production steps involve malting, milling, mashing, lautering, boiling, fermenting, brighting, and bottling?
+/Proabably should have specified _Y/N would be fine._ and then caught the NO rather than asking directly like I had./
+
+** Craft Brewing Terse Expert
+/....Because now I have to keep in mind that the question was essentialy Y/N and and that this is not a YES./
+Almost.
+The steps you listed are part of the brewing process, but malting is typically not done by the brewery itself; malted grains are usually purchased from a maltster.
+The correct steps would be milling, mashing, lautering, boiling (with hops addition), cooling, fermenting, conditioning
+(which includes the brightening step in a bright beer tank for clarification), and finally packaging, which could be
+bottling, canning, or kegging. Each of these steps has its own timing and equipment requirements.
+/I learn something every day; I didn't know about "malsters"; Extra kudos if it is actually true (though we don't really care.)/
 
 * TBD - How many products run simultaneously?
 How many products (beers) do you run simultaneously?
@@ -43,20 +70,9 @@ but for the purpose of our system, let’s assume we run 10 different beers simu
 /(2) making modeling choices we want control over! This one isn't a problem because it was what we were going to do, but still./
 This would include a mix of year-round offerings and seasonal specialties.
 Each of these beers may have different production schedules and resource requirements.
-/Also I think that's a red herring; seasonal specialties is just another job./
+/Also I think that's a red herring; seasonal specialties is just another job. Define "different"; they are all different./
 
-* TBD - Exercising the homework we did
-Is it fair to say that the production steps involve malting, milling, mashing, lautering, boiling, fermenting, brighting, and bottling?
-/Proabably should have specified _Y/N would be fine._ and then caught the NO rather than asking directly like I had./
 
-** Craft Brewing Terse Expert
-/....Because now I have to keep in mind that the question was essentialy Y/N and and that this is not a YES./
-Almost.
-The steps you listed are part of the brewing process, but malting is typically not done by the brewery itself; malted grains are usually purchased from a maltster.
-The correct steps would be milling, mashing, lautering, boiling (with hops addition), cooling, fermenting, conditioning
-(which includes the brightening step in a bright beer tank for clarification), and finally packaging, which could be
-bottling, canning, or kegging. Each of these steps has its own timing and equipment requirements.
-/I learn something every day; I didn't know about "malsters"; Extra kudos if it is actually true (though we don't really care.)/
 
 * TBD - Principal resources for each step
 What is the principal resource used in each of the steps?
@@ -129,17 +145,13 @@ The product must go from one step to the next. Is that correct? (Just a Y/N answ
 ** Craft Brewing Terse Expert
 No.
 
-* TBD - Okay, why did you say no? Best part of this scenario!
+* TBD - Okay, why did you say no? _Best part of this scenario!_
 Okay. Why did you say no?
 
 ** Craft Brewing Terse Expert
-/If this can't be reconciled, the planner might have to backtrack and repair some of its knowledge./
-/The reconciliation requires general domain knowledge, plus knowledge of the production mechanism that we've inferred thus far./
 /Generally speaking, this exchanges provides the hardest challenge of the experiment./
-/Specifically, TBD's planner (not really it is just me) is on a task to eliminate the possibility of WIP from its model of the production mechanism./
-/But sometimes a "machine" can serve as buffer space too! We probably want to treat these two "machines" as utilizing "block after service" discipline./
-/In that case, we need to convince the users that our notion of buffering WIP is the thing to run with./
-/This can be tricky, because like biotech manufacturing, the "workpiece" isn't just sitting there, it is evolving!/ =NEEDS WORK. Read the user's text!=
+/Specifically, TBD's planner (not really it is just me) is on a task to eliminate the possibility of buffered WIP from its model of the production mechanism and/
+/the expert seems to be objecting./
 
 I said "No" because there are stages in the brewing process where the product can be stored temporarily before moving on to the next stage.
 The most notable are post-boiling and pre-fermentation, where wort can be held in a hot liquor tank if necessary, and post-fermentation,
@@ -147,22 +159,33 @@ where beer can be stored in conditioning tanks before it moves to packaging.
 Additionally, there can be temporary storage for the wort between lautering and boiling if scheduling demands it,
 though this is less ideal due to the risk of infection and quality loss.
 
-/Here we need to enter a plan task to analyze the text with respect to our knowledge of how WIP and buffering work./
-/Specifically, there are a few ways we can go here:/
-/(1) We can
+/I did some background investigation on this and learned two things:/
+/(1) Despite the name, the hot liquor tank is used to hold hot water and sometimes a coil circulating wort for heat exchange./
+/(2) Surfing around, I've found that the use of the tank as suggested here isn't very common./
+/The principal problem we have here, I think, is that the HLT has not yet been mentioned; it isn't among the principal resources enumerated./
 
-/Impressive reasoning, reflecting real domain reasoning from Chat-GPT!/
-/And as for us??? What does not kill us will make us stronger!/
-/...of course it probably WILL kill us for a few months at least.../
+/Sometimes a "machine" can serve as buffer space. This is typically described as "block after service" (BAS) discipline./
+/Further, there are products where there is no such thing as "just sitting there, waiting for service". Biotech manufacturing has many examples./
+
+/I think at this point we'd have a mechanistic description of the system./
+/That description doesn't mention a HLT because the HLT is an ancillary resource used in a few steps./
+/Storage in the conditioning tank is BAS, which means it is a no-op./
+/I think a fact asserting that the system has buffer space for WIP would have above 0.5 probability owing to this exchange./
+/But no elements of the model of the resources would be buffers primarily./
+
+/More generally, if things like this can't be reconciled, the planner might have to backtrack and repair some of its knowledge./
+/The reconciliation requires general domain knowledge, plus knowledge of the production mechanism that we've inferred thus far./
 
 * TBD - Resolution of the 1st exception raised by the expert
 Is it okay if we consider storage in the hot liquor tank part of the preparation step we talked about? (Y/N would be fine.)
+/If this comes up again, it will be owing to the user mentioning it again, after first MiniZinc implementation./
 
 ** Craft Brewing Terse Expert
 Yes.
 
 * TBD - Resolution of the 2nd exception raised by the expert
-Likewise could we consider storage in the conditioning take part of the conditioning step? (Y/N would be fine.)
+Likewise could we consider storage in the conditioning tank part of the conditioning step? (Y/N would be fine.)
+/This will just happen. The product will sit in the tank until you can package it./
 
 ** Craft Brewing Terse Expert
 Yes.
@@ -207,14 +230,14 @@ For the sake of simplicity and uniformity in our scheduling system, let's assume
 allowing any batch to be fermented in any tank without capacity issues.
 This is a common scenario for many craft breweries, although in reality, there might be variations.
 
-* TBD - Willing to cerate a hypothetical demand scenario?
+* TBD - Willing to create a hypothetical demand scenario?
 Does it make sense to you (in your business) for us to create a hypothetical demand scenario for your beer products?
 We will use it to illustrate how the scheduling system works. (A simple Y/N would be fine.)
 
 ** Craft Brewing Terse Expert
 Yes.
 
-* TBD - request for demand schedule
+* TBD - Request for demand schedule
 Great! Provide me with such a demand schedule, naming the product, quantity and date the product is due.
  /Note: Any place where we ask for table oriented-data, we ought allow them to fill it out on-line, or upload a table./
  /We'd display an example table./
@@ -251,7 +274,7 @@ In this case, if we often produce batches of 6000 liters, all the conditioning a
 
 However, if the tanks are smaller or if variety in batch sizes is common in our brewery, then we would need to split larger batches into multiple tanks or brew them in several runs. For the sake of continuity in our hypothetical scenario, let's say all tanks accommodate 6000 liters, and demand for products less than the tank size would simply mean the tank wouldn't be filled to capacity.
 
-* TBD 1-1 demand schedule item to job?
+* TBD - One-to-one demand schedule item to job?
 Is it okay then that we assume for now that there is a one-to-one correspondence between each item in the demand schedule and a batch?
 That is, we schedule batches. (A Y/N would be fine.)
 
@@ -382,7 +405,7 @@ Packaging: 1 day
 These times are hypothetical and can vary based on recipe specifics, yeast performance, beer style, and other factors.
 Packaging duration is estimated for a full day to account for setup, potential delays, and changeovers if applicable.
 
-* TBD - More CONOPS
+* TBD - More CONOPS presentation
 Super.
 The first draft of the scheduling system we will build together will schedule product so that the product finishes the last step of the
 production process (packaging) a few days before it is to be shipped to customers.

@@ -1,6 +1,6 @@
 (ns scheduling-tbd.shop
-  "Rewrite SHOP structures to db structures.
-   Rewrite db structures to SHOP structures."
+  "Rewrite SHOP planning domain structures to db structures.
+   Rewrite db structures to SHOP planning domain (defdomain) structures."
   (:require
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
@@ -9,7 +9,16 @@
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm not-nothing]]
    [taoensso.timbre      :as log]))
 
-;;; ToDo: Factor SHOP2 stuff to its own
+;;; Terminology used in this file:
+;;;   edn       - a simple EDN rendering of the planning domain used in exploratory programming.
+;;;               The way to get from this to a SHOP2 lispy defdomain is (-> edn edn2canonical canon2shop)
+;;;   canonical - an EDN rendering of the file suitable for storage in datahike. Specifically, it adds :canon/pos to ::db.cardinality/many data
+;;;               so that ordering won't be lost.
+;;;
+;;; Use of SHOP2 might be temporary, but use of planning domains is probably going to stick around.
+;;; In our usage, we develop plan structure with EDN and then canonicalize it before storage.
+;;; The whole point of storing planning domains (as fine-grained structures) is to allow updating and plan repair.
+
 ;;; ToDo: Next line makes a choice that has global consequences, so maybe wrap the SHOP translation code in something that toggles this.
 (s/check-asserts true)
 (def diag (atom nil))
@@ -367,6 +376,7 @@
                                         (assoc :sys/pos (swap! cnt inc)))))))))
 
 ;;; (rew2db '(:method (transport-person ?p ?c) Case1 ((at ?p ?c)) Case2 ((also ?p ?x)) ()) :method)
+;;; Method: (:method <head> [label]
 (defrew2db :method [body]
   (s/assert ::method body)
   (clear-rewrite!)
@@ -375,6 +385,7 @@
                    (assoc :method/head      (rew2db head :atom))
                    (assoc :method/rhs-pairs (rew2db pairs :method-rhs-pairs)))}))
 
+;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>])
 (defrew2db :operator [body]
   (s/assert ::operator body)
   (clear-rewrite!)
@@ -924,21 +935,20 @@
        (rew2shop e))))
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
-(defrew2shop :method [{:method/keys [head rhs-pairs] :as exp}]
-  (reset! diag exp)
+(defrew2shop :method [{:method/keys [head rhs-pairs]}]
   `(:method ~(rew2shop head :atom)
             ~@(mapcat #(rew2shop % :rhs-pair) rhs-pairs))) ; ToDo: Needs :sys/pos.
 
-(defrew2shop :axiom [{:axiom/keys [head rhs] :as exp}]
-  (reset! diag exp)
+(defrew2shop :axiom [{:axiom/keys [head rhs]}]
   (let [h (rew2shop head :atom)]
     (if rhs
-      `(:- ~h ~@(map #(rew2shop % :rhs) (sort-by :sys/pos rhs)))
+      (let [rew1 (mapcat #(rew2shop % :rhs) (sort-by :sys/pos rhs))]
+        (if (-> rew1 first symbol?)
+          `(:- ~h ~@rew1)
+          `(:- ~h ~rew1)))
       `(:- ~h ()))))
 
-
 (defrew2shop :operator [{:operator/keys [head preconds d-list a-list cost] :as exp}]
-  (reset! diag exp)
   (let [pre (map rew2shop (->> preconds (sort-by :sys/pos) (map :precond/exp)))
         del (map rew2shop (->> d-list   (sort-by :sys/pos)))
         add (map rew2shop (->> a-list   (sort-by :sys/pos)))
@@ -986,6 +996,7 @@
   (let [pres (if (-> preconditions vector?)
                (->> preconditions (sort-by :sys/pos) (map rew2shop))
                (if (empty? preconditions) '() (rew2shop preconditions)))
+        pres (if (= :sort-by (-> pres first first)) (first pres) pres) ; :sort-by is different!
         res `(~pres ~(rew2shop task-list :task-list))]
     (if case-name
       (conj res case-name)
@@ -1007,7 +1018,7 @@
 (defrew2shop :implication [{:imply/keys[condition consequence]}]
   `(~'imply ~(rew2shop condition) ~(rew2shop consequence)))
 
-(defrew2shop :list-term [{:list/keys [terms] :as exp}]
+(defrew2shop :list-term [{:list/keys [terms]}]
   (->> terms (sort-by :sys/pos) (map :list/val) (map rew2shop)))
 
 (defrew2shop :op-call [exp]
@@ -1019,7 +1030,7 @@
     ~(map rew2shop consequences)))
 
 (defrew2shop :sort-by [{:sort-by/keys [var fn exp]}]
-  `(:sort-by ~(rew2shop var) ~(rew2shop fn) ~(rew2shop exp)))
+  `(:sort-by ~(rew2shop var) ~(-> fn rew2shop first) ~(rew2shop exp)))
 
 (defrew2shop :universal [{:forall/keys [vars conditions consequences]}]
   `(~'forall ~(map rew2shop vars) ~(map rew2shop conditions) ~(map rew2shop consequences)))
@@ -1043,8 +1054,8 @@
   `(~'defdomain ~(symbol name)
     ~(->> elems (sort-by :canon/pos) (map :canon/code))))
 
-(defn name2db
-  "Return the DB entry at the argument name"
+(defn db-entry-for
+  "Return the named DB structure. name is string and db.unique/identity"
   [name]
   (when-let [eid (d/q '[:find ?e .
                         :in $ ?name
@@ -1056,26 +1067,52 @@
                       name)]
     (sutil/resolve-db-id {:db/id eid} (connect-atm :system) #{:db/id})))
 
-(defn db2canon [name]
-  (when-let [obj (name2db name)]
-    {:domain/name name
-     :domain/elems  (let [cnt (atom 0)]
-                      (for [e (->> obj :domain/elems (sort-by :sys/pos))]
-                        (let [name-attr (keyword (code-type e) "name")]
-                          (-> {:canon/pos (swap! cnt inc)}
-                              (assoc name-attr (get e name-attr))
-                              (assoc :canon/code (rew2shop e))))))}))
+(defn db2canon
+  "Rewrite the named DB structure (a :db.unique/identity) to canonical."
+  [name]
+  (when-let [obj (db-entry-for name)]
+    (let [cnt (atom 0)]
+      (cond (contains? obj :domain/name) {:domain/name name
+                                          :domain/elems (-> (for [e (->> obj :domain/elems (sort-by :sys/pos))]
+                                                              (let [name-attr (keyword (code-type e) "name")]
+                                                                (-> {:canon/pos (swap! cnt inc)}
+                                                                    (assoc name-attr (get e name-attr))
+                                                                    (assoc :canon/code (rew2shop e)))))
+                                                            vec)}
+            ;; This one is just used in debugging, I think.
+            (#{"method" "axiom" "operator"} (code-type obj))
+                                        {(keyword (code-type obj) "name") name
+                                         :canon/code (-> obj :sys/body rew2shop)}))))
 
 (defn db2shop
   "Return the DB structure with the given name (a :domain :method, :operator, or :axiom)."
   [name]
-  (when-let [obj (name2db name)]
+  (when-let [obj (db-entry-for name)]
     (rew2shop obj)))
 
 (defn code-type [exp]
   (cond (contains? exp :method/name)   "method"
         (contains? exp :axiom/name)    "axiom"
         (contains? exp :operator/name) "operator"))
+
+;;; ------------------------ edn2canonical ------------------------------
+(defn edn2canonical
+  "Rewrite the EDN as canonical."
+  [{:domain/keys [name] :as edn}]
+  (let [cnt (atom 0)]
+    (update edn :domain/elems
+            #(for [e %]
+               (cond (contains? e :method/head)
+                     (-> e
+                         (assoc :canon/pos (swap! cnt inc))
+                         (assoc :method/name (str name "." (-> e :method/head first)))
+                         (assoc :canon/code
+                                `(:method
+                                  ~(:method/head e)
+                                  ~@(for [p (:method/rhs-pairs e)]
+                                      (-> (into [(or (:rhs/case-name p) "")]
+                                                `(~(:method/precondition p)))
+                                          (into `(~(:rhs/terms p)))))))))))))
 
 ;;; ------------------------ DB Stuff -------------------------
 ;;; ToDo: This is probably not necessary! I had :db.unique where it should not be.
