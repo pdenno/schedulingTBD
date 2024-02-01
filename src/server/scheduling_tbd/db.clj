@@ -299,7 +299,8 @@
           (d/transact conn db-schema-proj)
           (d/transact conn (->> backup-file slurp edn/read-string)))
         true)
-    (log/error "Not recreating DB because backup file does not exist:" backup-file))))
+          )
+    (log/error "Not recreating DB because backup file does not exist:" backup-file)))
 
 (defn recreate-project-dbs!
   "Recreate a DB for each project using EDN files."
@@ -451,7 +452,7 @@
     (reset! sys-db-cfg {:store {:backend :file :path (str base-dir "/system")}
                         :keep-history? false
                         ;:attribute-refs? true ; With this I can't transact lookup-refs!
-                        :recreate-dbs? false ; <=== If true, it will recreate the system DB and project directories too.
+                        :recreate-dbs? false ; <=== If true, it will recreate the system DB and project directories too. This SHOULD be true the first time you run this, or it won't run!
                         :schema-flexibility :write})
     (register-db :system @sys-db-cfg)
     (when (-> sys-db-cfg deref :recreate-dbs?)

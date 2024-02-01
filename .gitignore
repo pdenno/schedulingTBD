@@ -21,8 +21,11 @@ pom.xml.asc
 .lsp/.cache
 resources/js
 public/js
+/opt/
+.DS_Store
 
 node_modules/
 .shadow-cljs/
 node_modules/
 resources/public/js/
+

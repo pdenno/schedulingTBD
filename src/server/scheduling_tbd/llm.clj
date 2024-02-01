@@ -48,7 +48,8 @@
                        first
                        :message
                        :content)
-               res (cond-> res (not raw-text?) edn/read-string)]
+               res (cond-> res raw-text? edn/read-string)] ;
+           (log/info "LLM answer:" res) ; really useful for debugging the UI
            (if (or (map? res) (string? res))
              res
              (throw (ex-info "Did not produce a map." {:result res}))))

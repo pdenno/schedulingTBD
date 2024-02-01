@@ -21,6 +21,7 @@
   "Return a connection atom for the DB."
   [k]
   (when-let [db-cfg (get @databases-atm k)]
+    (log/info db-cfg)
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
       (log/warn "DB is registered but does not exist."))))
