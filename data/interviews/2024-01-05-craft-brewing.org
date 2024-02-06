@@ -8,17 +8,19 @@
    * After a few minutes with an earlier assistant, I realized I needed the additional _Your answers typically are short, just a few sentences each._
      in the "You are a helpful assistant" thing!
    * I mixed interview elements with concept of operations (CONOPS) explanation/validation.
-   * Reading the script: /These are my annotations./  +I should not have said this.+ _emphasis_
+   * Reading the script: /These are my annotations./  +I should not have said this.+ _emphasis_ *Does not show on org*
      | I reformatted the expert's answer as a table.    |
 
 * Run instructions
 /This is what I used when I set up the assistant./
+
 You manage a company that brews craft beer. You are an expert in production of the company's products and management of its supply chains.
 You help me by answering questions that will allow us together to build a scheduling systems for your company.
 Your answers typically are short, just a few sentences each.
 
 * TBD - The (almost) generic starting question
 Please describe the main +production+ scheduling challenge you face.
+
 /We aim to design scheduling systems for production AND services./
 
 ** Craft Brewing Terse Expert
@@ -58,6 +60,7 @@ bottling, canning, or kegging. Each of these steps has its own timing and equipm
 
 * TBD - How many products run simultaneously?
 How many products (beers) do you run simultaneously?
+
  /Here I assume we did a background analysis starting with naming the project./
  /Making separate LLM queries about the thing they are talking about, we decide the "first 5 sentences" describe a well-known process./
  /It being a well known process, we can do a bit more investigation and get our own list of process steps, that we present as a list/
@@ -66,12 +69,18 @@ How many products (beers) do you run simultaneously?
 
 ** Craft Brewing Terse Expert
 /Two things I find annoying here:/
+
 This can vary widely between breweries depending on their size and capabilities,
+
 /(1) generalizing about breweries rather than playing the role requested, and.../
+
 but for the purpose of our system, let’s assume we run 10 different beers simultaneously.
+
 /(2) making modeling choices we want control over! This one isn't a problem because it was what we were going to do, but still./
+
 This would include a mix of year-round offerings and seasonal specialties.
 Each of these beers may have different production schedules and resource requirements.
+
 /Also I think that's a red herring; seasonal specialties is just another job. Define "different"; they are all different./
 
 
@@ -120,6 +129,7 @@ Moreover, there can be overlapping processes, such as brewing a new batch while 
 
 * TBD - One product at a time?
 There is just one product type flowing through each of these steps at a time, right?
+
 /Maybe I shouldn't have asked this until after the next question, which flows better with the previous question about task times./
 
 ** Craft Brewing Terse Expert
@@ -139,6 +149,7 @@ Yes.
 * TBD - I ask a Y/N (about WIP) and get a No.
 /By convention, "yes" means the planner is on a good plan....Oops!/
 /This is another plan step/
+
 +It sounds to me+  that your processes do not have a place to store work-in-process product.
 The product must go from one step to the next. Is that correct? (Just a Y/N answer would be fine.)
 
@@ -187,6 +198,7 @@ Yes.
 
 * TBD - Resolution of the 2nd exception raised by the expert
 Likewise could we consider storage in the conditioning tank part of the conditioning step? (Y/N would be fine.)
+
 /This will just happen. The product will sit in the tank until you can package it./
 
 ** Craft Brewing Terse Expert
@@ -207,6 +219,7 @@ How many of each of those resource do you actually have?
 
 ** Craft Brewing Terse Expert
 The specific number of resources would depend on our actual facility size and production capacity, but for the sake of this example, let's define it as follows:
+
 /There you go again...Get real!/
 
 Preparation: We might have 2 brewhouses for the preparation step.
@@ -241,6 +254,7 @@ Yes.
 
 * TBD - Request for demand schedule
 Great! Provide me with such a demand schedule, naming the product, quantity and date the product is due.
+
  /Note: Any place where we ask for table oriented-data, we ought allow them to fill it out on-line, or upload a table./
  /We'd display an example table./
 
@@ -266,6 +280,7 @@ seasonal beers, and variable processing times.
 
 * TBD - Tank capacity differences
  /Here I'm using the word hypothetical in ways I wouldn't bother with a human./
+ 
 Great! However, I see that you only need 2000 Liters of Saisson, yet 6000 Liters of IPA (India Pale Ale).
 Do all your (hypothetical) conditioning and fermenting tanks accommodate 6000 Liters, or do we have to split these up into batches?
 
@@ -286,9 +301,9 @@ Yes.
 * TBD - Can you guess what is missing?
 Great! But before we can create a hypothetical production +schedule+ /I should have said 'scheduling system' here/ for the hypothetical demand schedule
 on the hypothetical resources you described, there is a bit more information we'll need to specify. Can you guess what that is?
+
  /I'm just playing around here, but I like the response! POWERFUL!/
  /Of course, knowing what is missing is going to be our job. Analyze what we've collected through the interview so far./
- /Generate new
 
 ** Craft Brewing Terse Expert
 To create an accurate production schedule, we would need the lead time for each production step
