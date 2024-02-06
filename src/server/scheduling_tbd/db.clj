@@ -291,17 +291,17 @@
     (if (.exists (io/file backup-file))
       (let [cfg (-> @proj-base-cfg (assoc-in [:store :path]
                                              (str (-> @proj-base-cfg :store :base-path)
-                                                  (name :craft-beer-brewery-scheduling))))]
+                                                  (name id))))]
         (when (d/database-exists? cfg) (d/delete-database cfg))
         (d/create-database cfg)
         (register-db id cfg)
         (let [conn (connect-atm id)]
           (d/transact conn db-schema-proj)
           (d/transact conn (->> backup-file slurp edn/read-string)))
-        true)
-          )
-    (log/error "Not recreating DB because backup file does not exist:" backup-file)))
-
+        )
+        (log/error "Not recreating DB because backup file does not exist:" backup-file)))
+     )
+    
 (defn recreate-project-dbs!
   "Recreate a DB for each project using EDN files."
   []
@@ -435,6 +435,7 @@
   "Make a config for each project and register it."
   []
   (doseq [{:project/keys [id dir]} (list-projects)]
+    (log/info id dir)
     (register-db id {:store {:backend :file :path dir
                              :keep-history? false
                              :schema-flexibility :write}})))
