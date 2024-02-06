@@ -23,7 +23,7 @@ Please describe the main +production+ scheduling challenge you face.
 
 /We aim to design scheduling systems for production AND services./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 The main production scheduling challenge is balancing the demand for various beer types with available brewing capacity,
 while also considering the fermentation and aging process times, packaging schedules, and the need to optimize the use of resources
 such as labor, equipment, and ingredients.
@@ -47,7 +47,7 @@ It responds with "flow shop model" /Flow, job shop, and well-known process can b
 Is it fair to say that the production steps involve malting, milling, mashing, lautering, boiling, fermenting, brighting, and bottling?
 /Proabably should have specified *Y/N would be fine.* and then caught the NO rather than asking directly like I had./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 /....Because now I have to keep in mind that the question was essentialy Y/N and and that this is not a YES./
 
 Almost.
@@ -67,7 +67,7 @@ How many products (beers) do you run simultaneously?
  /of check boxes. If they don't check a box, we might as why./
  /We might also ask whether "all of the above are in the correct order for the process", or some such thing./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 /Two things I find annoying here:/
 
 This can vary widely between breweries depending on their size and capabilities,
@@ -88,7 +88,7 @@ Each of these beers may have different production schedules and resource require
 * TBD - Principal resources for each step
 What is the principal resource used in each of the steps?
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Here are the principal resources used in each step of the production process:
 
  | Task         | Resources                                                                                                                                              |
@@ -110,7 +110,7 @@ How long do each of these steps take?
 /This is part of part of separating the wheat from the chaff (model abstaction over trivial tasks)./
 /Because this is a "well-known process", we could have done this in the background, presented it, and ask if they found it objectionable./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 The time required for each step can vary based on the beer style, the scale of the operation, and the specific equipment used, but here’s a general guideline
 
  | Task         | Duration                                                                                                                             |
@@ -132,7 +132,7 @@ There is just one product type flowing through each of these steps at a time, ri
 
 /Maybe I shouldn't have asked this until after the next question, which flows better with the previous question about task times./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 In most small to medium-sized breweries, typically only one beer type is produced through each of the main brewing stages at a time due to equipment and space limitations.
 However, there can be multiple batches at different stages of production simultaneously.
 For instance, a new batch could be mashing while another is fermenting and yet another is being packaged.
@@ -143,7 +143,7 @@ By a wide margin, the lengthy steps are fermenting and conditioning.
 As a first attempt at specifying a scheduling system for your operations, would it be okay if
 we consider the first few steps (milling, mashing, lautering, boiling, and cooling) as one big step called "preparation"? (Just a Y/N answer would be fine.)
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Yes.
 
 * TBD - I ask a Y/N (about WIP) and get a No.
@@ -155,13 +155,13 @@ The product must go from one step to the next. Is that correct? (Just a Y/N answ
 
 /Re: +It sounds to me+, we won't anthropomorphize like this! My mistake./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 No.
 
 * TBD - Okay, why did you say no? *Best part of this scenario!*
 Okay. Why did you say no?
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 /Generally speaking, this exchanges provides the hardest challenge of the experiment./
 /Specifically, TBD's planner (not really it is just me) is on a task to eliminate the possibility of buffered WIP from its model of the production mechanism and/
 /the expert seems to be objecting./
@@ -193,7 +193,7 @@ though this is less ideal due to the risk of infection and quality loss.
 Is it okay if we consider storage in the hot liquor tank part of the preparation step we talked about? (Y/N would be fine.)
 /If this comes up again, it will be owing to the user mentioning it again, after first MiniZinc implementation./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Yes.
 
 * TBD - Resolution of the 2nd exception raised by the expert
@@ -201,7 +201,7 @@ Likewise could we consider storage in the conditioning tank part of the conditio
 
 /This will just happen. The product will sit in the tank until you can package it./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Yes.
 
 * TBD - Contribute to CONOPS presentation
@@ -209,7 +209,7 @@ Okay, then for a first pass at our scheduling system,
 I'd like to suggest that we schedule simultaneous batches through preparation, fermentation, conditioning and packaging.
 Does that sound about right to you? (Y/N would be fine.)
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Yes.
 
 * TBD - How many actual resources?
@@ -217,7 +217,7 @@ Great! You said earlier that you could run about 10 products simultaneously.
 So that suggests a certain number of principal resources for preparation, fermenting, conditioning, and packaging.
 How many of each of those resource do you actually have?
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 The specific number of resources would depend on our actual facility size and production capacity, but for the sake of this example, let's define it as follows:
 
 /There you go again...Get real!/
@@ -232,7 +232,7 @@ It's also important to balance tank utilization to ensure continuous production.
 * TBD - Batch sizes equal?
 Are all your batches the same size?
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 In a real-world scenario, batch sizes can vary due to different equipment capacities, product demand, and beer styles.
 However, for simplicity in scheduling, let's assume that all of our batches are of the same size,
 which aligns with a standardized production approach that many breweries adopt for consistency and efficiency.
@@ -240,7 +240,7 @@ which aligns with a standardized production approach that many breweries adopt f
 * TBD - Fermentation tanks all equal size?
 Are all your fermentation tanks the same size?
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 For the sake of simplicity and uniformity in our scheduling system, let's assume that all fermentation tanks are the same size,
 allowing any batch to be fermented in any tank without capacity issues.
 This is a common scenario for many craft breweries, although in reality, there might be variations.
@@ -249,7 +249,7 @@ This is a common scenario for many craft breweries, although in reality, there m
 Does it make sense to you (in your business) for us to create a hypothetical demand scenario for your beer products?
 We will use it to illustrate how the scheduling system works. (A simple Y/N would be fine.)
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Yes.
 
 * TBD - Request for demand schedule
@@ -258,7 +258,7 @@ Great! Provide me with such a demand schedule, naming the product, quantity and 
  /Note: Any place where we ask for table oriented-data, we ought allow them to fill it out on-line, or upload a table./
  /We'd display an example table./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Here's a hypothetical demand schedule for our craft beer products:
 
  | Product              | Quantity    | Due date      |
@@ -284,7 +284,7 @@ seasonal beers, and variable processing times.
 Great! However, I see that you only need 2000 Liters of Saisson, yet 6000 Liters of IPA (India Pale Ale).
 Do all your (hypothetical) conditioning and fermenting tanks accommodate 6000 Liters, or do we have to split these up into batches?
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 For the purposes of this scheduling system, if we’re assuming that all of our tanks are the same size and all batches are of the same size,
 then it would be logical to design them to accommodate the maximum typical batch size.
 In this case, if we often produce batches of 6000 liters, all the conditioning and fermentation tanks should be able to hold at least this amount.
@@ -295,7 +295,7 @@ However, if the tanks are smaller or if variety in batch sizes is common in our 
 Is it okay then that we assume for now that there is a one-to-one correspondence between each item in the demand schedule and a batch?
 That is, we schedule batches. (A Y/N would be fine.)
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Yes.
 
 * TBD - Can you guess what is missing?
@@ -305,7 +305,7 @@ on the hypothetical resources you described, there is a bit more information we'
  /I'm just playing around here, but I like the response! POWERFUL!/
  /Of course, knowing what is missing is going to be our job. Analyze what we've collected through the interview so far./
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 To create an accurate production schedule, we would need the lead time for each production step
 (preparation, fermentation, conditioning, and packaging), /Note that it is using my recommendations task names just fine./
 the availability of resources (like preparation area, tanks, and packaging lines), and the potential for overlap in production stages.
@@ -321,7 +321,7 @@ For each such product, tell me
 (3) how much time you expect it to occupy each downstream resource in its process plan.
 In doing this, make up resource names like brightTank3 and fermentationTank7, etc.
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Let's create a scenario with products currently in process using a variety of resources: /Yes it really said this./
 
 Product: Farmhouse Ale Resource:
@@ -356,7 +356,7 @@ Also, keep in mind that there will be turnaround times for cleaning and setup wh
 * TBD - Ask for task times for the new jobs
 Super. Now provide processing times for preparation, fermenting, conditioning, and packaging for the 10 products in the demand schedule you provided earlier.
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Below are the processing times for preparation, fermenting, conditioning, and packaging for the 10 products in the demand schedule:
 
 Amber Ale
@@ -428,7 +428,7 @@ The first draft of the scheduling system we will build together will schedule pr
 production process (packaging) a few days before it is to be shipped to customers.
 You will be able to specify for each product how many days before shipment you will want it to be ready. Does all of this sound okay to you?
 
-** Craft Brewing Terse Expert
+** Craft Brewing Terse Expert Response
 Yes, this approach sounds reasonable.
 It allows for a buffer period to handle any unforeseen delays in production and ensures that the product is ready for distribution in a timely manner.
 This can also provide additional time for the product to settle post-packaging and for organizing logistics for shipment.
