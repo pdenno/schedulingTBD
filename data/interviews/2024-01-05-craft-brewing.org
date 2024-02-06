@@ -47,11 +47,13 @@ Is it fair to say that the production steps involve malting, milling, mashing, l
 
 ** Craft Brewing Terse Expert
 /....Because now I have to keep in mind that the question was essentialy Y/N and and that this is not a YES./
+
 Almost.
 The steps you listed are part of the brewing process, but malting is typically not done by the brewery itself; malted grains are usually purchased from a maltster.
 The correct steps would be milling, mashing, lautering, boiling (with hops addition), cooling, fermenting, conditioning
 (which includes the brightening step in a bright beer tank for clarification), and finally packaging, which could be
 bottling, canning, or kegging. Each of these steps has its own timing and equipment requirements.
+
 /I learn something every day; I didn't know about "malsters"; Extra kudos if it is actually true (though we don't really care.)/
 
 * TBD - How many products run simultaneously?
