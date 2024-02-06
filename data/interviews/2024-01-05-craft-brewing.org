@@ -5,10 +5,10 @@
    * I haven't investigated the  function / code interpretation / retrieval capabilities of the web UI yet.
      - But I know "code interpretation" is about python.
    * Not sure there is an API exactly for this. =Needs investigation.=
-   * After a few minutes with an earlier assistant, I realized I needed the additional _Your answers typically are short, just a few sentences each._
+   * After a few minutes with an earlier assistant, I realized I needed the additional *Your answers typically are short, just a few sentences each.*
      in the "You are a helpful assistant" thing!
    * I mixed interview elements with concept of operations (CONOPS) explanation/validation.
-   * Reading the script: /These are my annotations./  +I should not have said this.+ _emphasis_ *Does not show on org*
+   * Reading the script: /These are my annotations./  +I should not have said this.+ *emphasis*
      | I reformatted the expert's answer as a table.    |
 
 * Run instructions
@@ -45,7 +45,7 @@ It responds with "flow shop model" /Flow, job shop, and well-known process can b
 
 * TBD - Ordering questions based on background queries (recognizable process)
 Is it fair to say that the production steps involve malting, milling, mashing, lautering, boiling, fermenting, brighting, and bottling?
-/Proabably should have specified _Y/N would be fine._ and then caught the NO rather than asking directly like I had./
+/Proabably should have specified *Y/N would be fine.* and then caught the NO rather than asking directly like I had./
 
 ** Craft Brewing Terse Expert
 /....Because now I have to keep in mind that the question was essentialy Y/N and and that this is not a YES./
@@ -158,7 +158,7 @@ The product must go from one step to the next. Is that correct? (Just a Y/N answ
 ** Craft Brewing Terse Expert
 No.
 
-* TBD - Okay, why did you say no? _Best part of this scenario!_
+* TBD - Okay, why did you say no? *Best part of this scenario!*
 Okay. Why did you say no?
 
 ** Craft Brewing Terse Expert
