@@ -13,6 +13,7 @@
   We run several products simultaneously and simply would like to be able to have the beer bottled and ready
   to ship as near as possible to the dates defined in our sales plan.]"}))
 
+;;; ToDo: This works when I run it by hand, but not when I run it through Kaocha.
 (deftest query-llm-tests
   (testing "Testing a simple query with different LLMs."
     (is (let [res (query-llm proj-summary-msgs {:model "gpt-4"})]

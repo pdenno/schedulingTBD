@@ -25,6 +25,15 @@
       (d/connect db-cfg)
       (log/warn "DB is registered but does not exist."))))
 
+(defn datahike-schema
+  "Create a Datahike-compatible schema from the above."
+  [schema]
+  (reduce-kv (fn [r k v]
+               (conj r (-> v
+                           (dissoc :mm/info)
+                           (assoc :db/ident k))))
+             []
+             schema))
 ;;; ToDo:
 ;;;  - cljs complains about not finding x/element-nss, which I don't see in the  0.2.0-alpha8 source at all.
 ;;;    (Yet it does work in clj!) I suppose reading xml isn't something I need in cljs, but it would be

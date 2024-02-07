@@ -3,11 +3,21 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [datahike.api                 :as d]
-   [scheduling-tbd.shop :as shop :refer [rew2db]]
+   [scheduling-tbd.shop :as shop :refer [rew2db db-schema-shop2+]]
+   [scheduling-tbd.planner :as plan]
    [scheduling-tbd.llm  :as llm]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm]]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema]]
    [scheduling-tbd.util :as util]
    [taoensso.timbre     :as log]))
+
+(def test-cfg {:store {:backend :mem :keep-history? false :schema-flexibility :write}})
+
+(defn make-test-db!
+  "In memory DB for testing planning domain management"
+  [config]
+  (when (d/database-exists? config) (d/delete-database config))
+  (d/create-database config)
+  (d/transact (d/connect config) (datahike-schema db-schema-shop2+)))
 
 (def kiwi-domain
   '(defdomain basic-example
@@ -18,6 +28,16 @@
                ((!drop ?x) (!pickup ?y))
                ((have ?y))
                ((!drop ?y) (!pickup ?x))))))
+
+(deftest round-trip-kiwi
+  (testing "Testing a simple round trip from lisp to db to lisp."
+    (make-test-db! test-cfg)
+    (->> kiwi-domain rew2db vector (d/transact (d/connect test-cfg)))
+    (let [dom-id (d/q '[:find ?eid . :where [?eid :domain/name "basic-example"]]
+                      @(d/connect test-cfg))
+          db-obj (sutil/resolve-db-id {:db/id dom-id} (d/connect test-cfg) #{:db/id})
+          res (shop/rew2shop db-obj)]
+      (is (= kiwi-domain res)))))
 
 (def sample-method
   '(:method
@@ -57,6 +77,9 @@
              (!!assert ((dest ?a ?c2)))
              (:immediate upper-move-aircraft-no-style ?a ?c2)
              (:immediate debark ?p ?a ?c2))))
+
+
+
 
 
 ;;; ToDo:  WRONG! Both of them. I don't have time for this now.
@@ -426,6 +449,9 @@
        shop/canon2db
        shop/write-obj))
 
+(defn tryme-2canon []
+  (-> plan/process-interview shop/edn2canonical))
+
 (def diag (atom []))
 
 (defn compare-domains
@@ -443,6 +469,7 @@
             (log/info "\n\nNot equal: \n " s1 "\n " s2))))
       @ok?)))
 
+;;; ToDo: This only works because it is only checking methods. I still have to implement axioms and operators.
 (defn tryme []
   (compare-domains zeno (shop/db2canon "ZENO")))
 

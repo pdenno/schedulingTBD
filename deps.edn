@@ -10,6 +10,9 @@
            org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"}
            io.djy/ezzmq                        {:mvn/version "0.8.2"}
            io.replikativ/datahike              {:mvn/version "0.6.1538"} ; 1552 is available.
+           metosin/muuntaja                    {:mvn/version "0.6.8"}
+           metosin/reitit                      {:mvn/version "0.6.0"}
+           metosin/ring-http-response          {:mvn/version "0.9.3"}
            mount/mount                         {:mvn/version "0.1.17"}
            net.clojars.wkok/openai-clojure     {:mvn/version "0.11.1"}
            org.apache.logging.log4j/log4j-api  {:mvn/version "2.21.1"} ; ToDo: Move logging to :dev.
@@ -19,8 +22,13 @@
            org.clojure/data.codec              {:mvn/version "0.1.1"}
            org.clojure/data.json               {:mvn/version "2.4.0"}
            org.clojure/data.xml                {:mvn/version "0.2.0-alpha8"}
-           org.clojure/data.zip                {:mvn/version "1.0.0"}}
-
+           org.clojure/data.zip                {:mvn/version "1.0.0"}
+           ring/ring-defaults                  {:mvn/version "0.4.0"}
+           ring/ring-jetty-adapter             {:mvn/version "1.11.0-beta2"}  ;; These were 1.10.0
+           ring/ring-core                      {:mvn/version "1.11.0-beta2"}  ;; I switched to try org.ring-clojure/ring-websocket-async
+           ring/ring-devel                     {:mvn/version "1.11.0-beta2"}  ;; Of course, both could have been accommodated.
+           ring-cors/ring-cors                 {:mvn/version "0.1.13"}
+           selmer/selmer                       {:mvn/version "1.12.59"}} ; Used for home.html.
 
  ;; See .dir-locals.el for some defaults on CIDER C-c M-j
  :aliases {:dev          {:extra-paths    ["src/server" "test" "env/dev" "resources"]
@@ -34,25 +42,15 @@
                                            lilactown/helix                 {:mvn/version "0.2.0"}
                                            org.clojure/java.classpath      {:mvn/version "1.0.0"}
                                            ;;pjstadig/humane-test-output   {:mvn/version "0.11.0"}
-                                           metosin/muuntaja                {:mvn/version "0.6.8"}
                                            nrepl/nrepl                     {:mvn/version "1.1.0"}
-                                           org.clojure/tools.namespace     {:mvn/version "1.4.4"}
-                                           metosin/reitit                  {:mvn/version "0.6.0"}
-                                           metosin/ring-http-response      {:mvn/version "0.9.3"}
-                                           ring/ring-defaults              {:mvn/version "0.4.0"}
-                                           ring/ring-jetty-adapter         {:mvn/version "1.11.0-beta2"}  ;; These were 1.10.0
-                                           ring/ring-core                  {:mvn/version "1.11.0-beta2"}  ;; I switched to try org.ring-clojure/ring-websocket-async
-                                           ring/ring-devel                 {:mvn/version "1.11.0-beta2"}  ;; Of course, both could have been accommodated.
-                                           ring-cors/ring-cors             {:mvn/version "0.1.13"}
-                                           selmer/selmer                   {:mvn/version "1.12.59"}}} ; Used for home.html.
+                                           org.clojure/tools.namespace     {:mvn/version "1.4.4"}}}
 
-           :test      {:extra-paths    ["test" "env/dev"] ; clojure -X:dev:test
-                       :extra-deps
-                       {io.github.cognitect-labs/test-runner
-                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-                       ;; :main-opts ["-m" "cognitect.test-runner"]
-                       :exec-fn cognitect.test-runner.api/test
-                       :exec-args {:patterns [".*-test.*"]}}
+           :test       {:extra-paths    ["src/server" "test" "env/dev"]
+                        :main-opts      ["-m" "kaocha.runner"]
+                        :extra-deps     {lambdaisland/kaocha          {:mvn/version "1.87.1366"}
+                                         ;; Since I'm running from the command line, bin/koacha, need to repeat these.
+                                         com.lambdaisland/classpath   {:mvn/version "0.4.44"}
+                                         org.clojure/tools.namespace  {:mvn/version "1.4.4"}}}
 
            :app       {:extra-paths ["src/app" "src/server" "test"] ; src/server has shared util.cljc
                        :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.25.10"}

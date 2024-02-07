@@ -1,5 +1,6 @@
 (ns scheduling-tbd.db
-  "System and project database schemas and database initialization."
+  "System and project database schemas and database initialization.
+   There are other databases, see for example, shop.clj."
   (:require
    [clojure.core :as c]
    [clojure.edn  :as edn]
@@ -10,9 +11,8 @@
    [clojure.string               :as str]
    [datahike.api                 :as d]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.shop :as shop :refer [db-schema-shop2+]]
    [scheduling-tbd.util  :as util :refer [now]]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm]]
+   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema]]
    [taoensso.timbre :as log])
   (:import
    java.time.LocalDateTime))
@@ -177,17 +177,7 @@
 
 (def diag (atom nil))
 
-(defn datahike-schema
-  "Create a Datahike-compatible schema from the above."
-  [schema]
-  (reduce-kv (fn [r k v]
-               (conj r (-> v
-                           (dissoc :mm/info)
-                           (assoc :db/ident k))))
-             []
-             schema))
-
-(def db-schema-sys  (datahike-schema (merge  db-schema-shop2+ db-schema-sys+)))
+(def db-schema-sys  (datahike-schema db-schema-sys+))
 (def db-schema-proj (datahike-schema db-schema-proj+))
 
 ;;; Atom for configuration map used for connecting to the system db.
@@ -464,5 +454,5 @@
     {:sys-cfg @sys-db-cfg
      :proj-base @proj-base-cfg}))
 
-(defstate database-cfgs
+(defstate sys&proj-database-cfgs
   :start (init-db-cfgs))

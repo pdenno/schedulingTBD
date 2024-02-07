@@ -2,18 +2,30 @@
   "Rewrite SHOP planning domain structures to db structures.
    Rewrite db structures to SHOP planning domain (defdomain) structures."
   (:require
+   [clojure.edn          :as edn]
+   [clojure.java.io      :as io]
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
    [datahike.api         :as d]
-   [datahike.pull-api    :as dp]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm not-nothing]]
+   ;[datahike.pull-api    :as dp]
+   [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm not-nothing datahike-schema]]
    [taoensso.timbre      :as log]))
 
-;;; Terminology used in this file:
-;;;   edn       - a simple EDN rendering of the planning domain used in exploratory programming.
-;;;               The way to get from this to a SHOP2 lispy defdomain is (-> edn edn2canonical canon2shop)
-;;;   canonical - an EDN rendering of the file suitable for storage in datahike. Specifically, it adds :canon/pos to ::db.cardinality/many data
-;;;               so that ordering won't be lost.
+;;; Why so much fuss with planning domain structures?
+;;; Answer: It might be temporary, but for the time being, we need lispy structures to run SHOP.
+;;;         However, the lispy structures are really difficult to write AND MODIFY; they have "positional semantics" and no keywords.
+;;;
+;;;  Consequently, there are three forms to the planning domain data:
+;;;   edn       - a simple EDN rendering used in exploratory programming.
+;;;               The way to get from EDN to a SHOP2 lispy defdomain is (-> edn edn2canonical canon2shop)
+;;;
+;;;   canonical - a plan domain structured that separates the SHOP2 lispy domain into its elements (operators, methods, and axioms),
+;;;               but for those elements just provides :canon/code which holds the corresponding elements SHOP2 lispy structure.
+;;;               You can get canonical by calling db2canon. What you get is good for testing translation and not much else.
+;;;
+;;;  db         - structures conforming to db-schema-shop2+, a datahike schema. These parse the lispy stuff into elementary
+;;;               content such as
 ;;;
 ;;; Use of SHOP2 might be temporary, but use of planning domains is probably going to stick around.
 ;;; In our usage, we develop plan structure with EDN and then canonicalize it before storage.
@@ -53,7 +65,7 @@
          seq?
          #(= (nth % 0) :method)
          #(s/valid? ::atom (nth % 1))
-         #(s/valid? ::method-rhs-pairs (nthrest % 2))))
+         #(s/valid? ::method-rhsides (nthrest % 2))))
 
 (s/def ::operator
   (s/and #(reset! diag {:operator %})
@@ -92,7 +104,7 @@
 ;;;                               ((at ?a ?somecity)
 ;;;                                (travel-cost-info ?a ?somecity ?c ?cost ?style)))
 ;;;               ((move-aircraft ?a ?somecity ?c ?style)))
-(s/def ::method-rhs-pairs
+(s/def ::method-rhsides
   (s/and seq?
          (fn [pairs]
            (letfn [(cond-good? [x]
@@ -370,7 +382,7 @@
 (defrew2db :domain [exp]
   (let [[_ name elems] exp
         cnt (atom 0)]
-    (-> {:domain/name name :sys/typ :domain}
+    (-> {:domain/name (str name) :sys/typ :domain}
         (assoc :domain/elems (vec (for [e elems]
                                     (-> (rew2db e)
                                         (assoc :sys/pos (swap! cnt inc)))))))))
@@ -383,7 +395,7 @@
   (let [[_ head & pairs] body]
     {:sys/body (-> {:sys/typ :method}
                    (assoc :method/head      (rew2db head :atom))
-                   (assoc :method/rhs-pairs (rew2db pairs :method-rhs-pairs)))}))
+                   (assoc :method/rhs       (rew2db pairs :method-rhsides)))}))
 
 ;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>])
 (defrew2db :operator [body]
@@ -465,20 +477,23 @@
                        vec))})
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
-(defrew2db :method-rhs-pairs [pairs]
-  (loop [res []
-         terms (vec pairs)]
-    (if (empty? terms)
-      res
-      (if (symbol? (nth terms 0))
-        (recur (conj res (cond-> {:method/case-name (nth terms 0)}
-                           (not-empty (nth terms 1)) (assoc :method/preconditions (rew2db (nth terms 1) :method-precond))
-                           (not-empty (nth terms 2)) (assoc :method/task-list     (rew2db (nth terms 2) :task-list))))
-               (subvec terms 3))
-        (recur (conj res (cond-> {}
-                           (not-empty (nth terms 0)) (assoc :method/preconditions (rew2db (nth terms 0) :method-precond))
-                           (not-empty (nth terms 1)) (assoc :method/task-list     (rew2db (nth terms 1) :task-list))))
-               (subvec terms 2))))))
+(defrew2db :method-rhsides [rhs] ; this does the [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk
+  (let [res (loop [res []
+                   triples (vec rhs)]
+              (if (empty? triples)
+                res
+                (if (symbol? (nth triples 0))
+                  (recur (conj res (cond-> {:method/case-name (nth triples 0)}
+                                     (not-empty (nth triples 1)) (assoc :method/preconditions (rew2db (nth triples 1) :method-precond))
+                                     (not-empty (nth triples 2)) (assoc :method/task-list     (rew2db (nth triples 2) :task-list))))
+                         (subvec triples 3))
+                  (recur (conj res (cond-> {}
+                                     (not-empty (nth triples 0)) (assoc :method/preconditions (rew2db (nth triples 0) :method-precond))
+                                     (not-empty (nth triples 1)) (assoc :method/task-list     (rew2db (nth triples 1) :task-list))))
+                         (subvec triples 2)))))]
+    (let [cnt (atom 0)]
+      (for [r res]
+        (assoc r :sys/pos (swap! cnt inc))))))
 
 (defrew2db :method-precond [c]
   (cond (-> c (nth 0) seq?)         (mapv #(rew2db % :atom) c)
@@ -742,7 +757,7 @@
    ;; ----------------------- conjunction
    :conjunction/terms
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the terms that are part of a conjunctive expression."} ; ToDo: need a :term/pos or something like that.
+        :doc "the terms that are part of a conjunctive expression."} ; ToDo: need a :sys/pos or something like that.
 
    ;; ----------------------- domain
    :domain/name
@@ -802,7 +817,7 @@
    :method/preconditions
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "atoms indicating what must be true in order to apply the method."}
-   :method/rhs-pairs
+   :method/rhs
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "Pairs of conditions and action of a method."}
    :method/task-list
@@ -935,9 +950,9 @@
        (rew2shop e))))
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
-(defrew2shop :method [{:method/keys [head rhs-pairs]}]
+(defrew2shop :method [{:method/keys [head rhs]}]
   `(:method ~(rew2shop head :atom)
-            ~@(mapcat #(rew2shop % :rhs-pair) rhs-pairs))) ; ToDo: Needs :sys/pos.
+            ~@(mapcat #(rew2shop % :rhs-pair) (sort-by :sys/pos rhs)))) ; Actually rhs=multiple rh sides.
 
 (defrew2shop :axiom [{:axiom/keys [head rhs]}]
   (let [h (rew2shop head :atom)]
@@ -1002,7 +1017,7 @@
       (conj res case-name)
       res)))
 
-(defrew2shop :task-list [{:task-list/keys [elems] :as exp}]
+(defrew2shop :task-list [{:task-list/keys [elems]}]
   (->> elems (sort-by :sys/pos) (map rew2shop)))
 
 (defrew2shop :task-atom [{:task/keys [immediate?] :atom/keys [predicate roles]}]
@@ -1068,7 +1083,7 @@
     (sutil/resolve-db-id {:db/id eid} (connect-atm :system) #{:db/id})))
 
 (defn db2canon
-  "Rewrite the named DB structure (a :db.unique/identity) to canonical."
+  "Rewrite the named DB structure (a :db.unique/identity) to a map of SHOP2 lispy structures called 'canonical'."
   [name]
   (when-let [obj (db-entry-for name)]
     (let [cnt (atom 0)]
@@ -1096,23 +1111,47 @@
         (contains? exp :operator/name) "operator"))
 
 ;;; ------------------------ edn2canonical ------------------------------
+(def edn-cnt-atm (atom 0))
+
+(defn edn2canon-method
+  "Restructure EDN into canonical (which is more lisp-like)."
+  [e base-name]
+  (-> e
+      (assoc :canon/pos (swap! edn-cnt-atm inc))
+      (assoc :method/name (str base-name "." (-> e :method/head first)))
+      (assoc :canon/code
+             `(:method
+               ~(:method/head e)
+               ~@(mapcat (fn [p]
+                           (if-let [cname (:method/case-name p)]
+                             `(~(symbol cname)
+                               ~(if-let [pc (-> p :method/preconditions seq)] pc ())
+                               ~(-> p :method/task-list seq))
+                             `(~(if-let [pc (-> p :method/preconditions seq)] pc ())
+                               ~(-> p :method/task-list seq))))
+                         (:method/rhsides e))))
+      (dissoc :method/rhsides)))
+
+;;; ToDo: Implement the next two.
+(defn edn2canon-operator
+  "Restructure EDN into canonical (which is more lisp-like)."
+  [e base-name])
+
+(defn edn2canon-axiom
+  "Restructure EDN into canonical (which is more lisp-like)."
+  [e base-name])
+
 (defn edn2canonical
-  "Rewrite the EDN as canonical."
-  [{:domain/keys [name] :as edn}]
-  (let [cnt (atom 0)]
+  "Rewrite the EDN structure as canonical, which is less lispy."
+  [edn]
+  (reset! edn-cnt-atm 0)
+  (let [base-name (:domain/name edn)]
     (update edn :domain/elems
             #(for [e %]
-               (cond (contains? e :method/head)
-                     (-> e
-                         (assoc :canon/pos (swap! cnt inc))
-                         (assoc :method/name (str name "." (-> e :method/head first)))
-                         (assoc :canon/code
-                                `(:method
-                                  ~(:method/head e)
-                                  ~@(for [p (:method/rhs-pairs e)]
-                                      (-> (into [(or (:rhs/case-name p) "")]
-                                                `(~(:method/precondition p)))
-                                          (into `(~(:rhs/terms p)))))))))))))
+               (cond (contains? e :method/head)   (edn2canon-method e base-name)
+                     (contains? e :operator/head) (edn2canon-operator e base-name)
+                     (contains? e :axiom/head)    (edn2canon-axiom e base-name))))))
+
 
 ;;; ------------------------ DB Stuff -------------------------
 ;;; ToDo: This is probably not necessary! I had :db.unique where it should not be.
@@ -1135,3 +1174,43 @@
         conn (connect-atm :system)]
     (doseq [x lookup-refs] (d/transact conn [x]))
     (d/transact conn [obj])))
+
+;;; Currently this loads zeno, just for testing.
+(defn recreate-planning-domains-db!
+  "Recreate the plans db from .edn data. It uses the connect-atm, which is already established."
+  [config]
+  (if (.exists (io/file "data/planning-domains/zeno-travel.edn")) ; <=================== Loading zeno.
+    (do (log/info "Recreating the planning domains database.")
+        (when (d/database-exists? config)
+          (d/delete-database config))
+        (d/create-database config)
+        (register-db :plans config)
+        (let [conn (connect-atm :plans)]
+          (d/transact conn (datahike-schema db-schema-shop2+))
+          (d/transact conn (-> "data/planning-domains/zeno-travel.edn" ; <============ Loading zeno.
+                               slurp
+                               edn/read-string
+                               rew2db))))
+        true)
+    (log/error "Not recreating planning domains DB: No backup file."))
+
+;;; -------------------- Starting and stopping -------------------------
+(defn init-db-cfg
+  "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:base-path).
+   Recreate the system database if sys-db-cfg.recreate-db? = true."
+  []
+  (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB")) ; "/opt/scheduling" typically.
+                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
+                                          "\nCreate a directory 'planning-domains' under it.") {})))
+        ;; https://cljdoc.org/d/io.replikativ/datahike/0.6.1545/doc/datahike-database-configuration
+        config {:store {:backend :file :path (str base-dir "/planning-domains")}
+                :keep-history? false
+                ;;:attribute-refs? true ; With this I can't transact lookup-refs!
+                :recreate-db? true ; <=== If true, it will recreate the plans DB.
+                :schema-flexibility :write}]
+    (when (:recreate-db? config)
+      (recreate-planning-domains-db! config)) ; This adds the schema and planning domains.
+    {:plan-db-cfg config}))
+
+(defstate plans-db-cfg
+  :start (init-db-cfg))

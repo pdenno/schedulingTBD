@@ -10,7 +10,7 @@
   (:import
    [java.util Date]))
 
-(def diag (atom {}))
+(def diag (atom {:orig :val}))
 
 (defn healthcheck
   [_request]
@@ -23,6 +23,7 @@
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."
   [request]
+  (log/info "get-conversation start..")
   (let [{:keys [project-id]} (-> request :query-params keywordize-keys)]
     (log/info "get-conversation for" project-id)
     (if-let [conn-atm (-> project-id keyword connect-atm)]

@@ -64,10 +64,6 @@
 
 ;;; Another challenge is the crappy positional syntax of defdomain, though I think I have a solution for that in the DB.
 
-;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>]?)
-;;; Method:   (:method   <head> [<case-name>? <pre-conds> <task-list>]+)
-;;; Problem   (defproblem <problem-name> <domain-name> (<ground-atom>*)  (<task>+))
-
 ;;; ToDo: This should go away when SHOP2 is replaced.
 (def special-method
   "This is used to stop the planner for update from analysis."
@@ -79,23 +75,23 @@
   '{:domain/name "process-interview"
     :domain/elems [;; (characterize-process ?proj)
                    {:method/head (characterize-process ?proj)
-                    :method/rhs-pairs [{:method/case-name "ordinary"
-                                        :rhs/terms [(!start-interview  ?proj) (get-process-steps ?proj) (get-wip ?proj)]}]}
+                    :method/rhsides [{:method/case-name "ordinary"
+                                      :method/task-list [(!start-interview  ?proj) (get-process-steps ?proj) (get-wip ?proj)]}]}
 
                    ;; (get-process-steps ?proj)
                    {:method/head (get-process-steps ?proj)
-                    :method/rhs-pairs [{:method/case-name "well-known"
-                                        :method/preconditions [(well-known-process ?proj)]
-                                        :rhs/terms [(!yes-no-process-steps ?proj)]}
-                                       {:rhs/case-name "unknown"
-                                        :method/preconditions [(unknown-process ?proj)]
-                                        :rhs/terms [(!query-process-steps ?proj)]}]}
+                    :method/rhsides [{:method/case-name "well-known"
+                                      :method/preconditions [(well-known-process ?proj)]
+                                      :method/task-list [(!yes-no-process-steps ?proj)]}
+                                     {:method/case-name "unknown"
+                                      :method/preconditions [(unknown-process ?proj)]
+                                      :method/task-list [(!query-process-steps ?proj)]}]}
 
                    ;; (get-wip ?proj)
                    {:method/head (get-wip ?proj)
-                    :method/rhs-pairs [{:method/case-name "ordinary"
-                                        :method/preconditions [(project-name ?proj)]
-                                        :rhs/terms [(!query-for-wip-spreadsheet ?proj)]}]}
+                    :method/rhsides [{:method/case-name "ordinary"
+                                      :method/preconditions [(project-name ?proj)]
+                                      :method/task-list [(!query-for-wip-spreadsheet ?proj)]}]}
 
                    ;; (:operator (!start-interview ?proj) ((starting project-init)) () ((stop-plan)))
                    {:operator/head (!start-interview ?proj)
@@ -130,6 +126,9 @@
       (update :domain/elems (fn [elems] (mapv #(if (contains? % :method/head) (update % :method/rhs-pairs conj special-method) %)
                                                 elems)))))
 
+;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>]?)
+;;; Method:   (:method   <head> [<case-name>? <pre-conds> <task-list>]+)
+;;; Problem   (defproblem <problem-name> <domain-name> (<ground-atom>*)  (<task>+))
 (def process-interview-lisp
   "This is to run a stubbed-in interview to acquire process knowledge."
   {:domain
