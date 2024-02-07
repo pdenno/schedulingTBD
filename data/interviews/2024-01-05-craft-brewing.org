@@ -4,12 +4,12 @@
    * I'm using gpt-4-1104-preview.
    * I haven't investigated the  function / code interpretation / retrieval capabilities of the web UI yet.
      - But I know "code interpretation" is about python.
-   * Not sure there is an API exactly for this. =Needs investigation.=
    * After a few minutes with an earlier assistant, I realized I needed the additional *Your answers typically are short, just a few sentences each.*
      in the "You are a helpful assistant" thing!
-   * I mixed interview elements with concept of operations (CONOPS) explanation/validation.
-   * Each section (each new question) starts with 'TBD'. TBD would be the scheduling TBD software, but right now it is just me, Peter,
+   * Not sure there is an API exactly for this. =Needs investigation.=
+   * Each section (each new question) starts with 'TBD'. TBD would be the schedulingTBD software, but right now it is just me, Peter,
      writing that text into a GPT Playground. I took the output, which was [[https://platform.openai.com/playground?assistant=asst_rloUcbsn34Ctajed90ILdGBt&mode=assistant&thread=thread_VYDCgBTyJvpTeKNrMGS8CC0J][URL to this work]] and rewrote it as this .org file.
+   * I mixed interview elements with concept of operations (CONOPS) explanation/validation.
    * Reading the script: /These are my annotations./  +I should not have said this.+ *emphasis*
      | I reformatted the expert's answer as a table.    |
 
