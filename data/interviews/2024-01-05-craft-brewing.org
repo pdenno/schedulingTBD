@@ -2,11 +2,14 @@
    * [2024-01-05 Fri] experiment.
      - [[https://platform.openai.com/playground?assistant=asst_rloUcbsn34Ctajed90ILdGBt&mode=assistant&thread=thread_VYDCgBTyJvpTeKNrMGS8CC0J][URL to this work]], probably only works from my login.
    * I'm using gpt-4-1104-preview.
-   * I haven't investigated the  function / code interpretation / retrieval capabilities of the web UI yet.
+   * I'm using a OpenAI Playground
+     - Note that Playgrounds do in-context learning (about what we are discussing). I don't know that there is an API to these.
+       They do run against an API-key, so if they don't have and API yet, maybe they will soon. Having this is moderately important.
+       =Needs investigation.=
+   * Regarding setting up the agent, I haven't investigated the  function / code interpretation / retrieval capabilities of the web UI yet.
      - But I know "code interpretation" is about python.
    * After a few minutes with an earlier assistant, I realized I needed the additional *Your answers typically are short, just a few sentences each.*
-     in the "You are a helpful assistant" thing!
-   * Not sure there is an API exactly for this. =Needs investigation.=
+     in the system instruction.
    * Each section (each new question) starts with 'TBD'. TBD would be the schedulingTBD software, but right now it is just me, Peter,
      writing that text into a GPT Playground. I took the output, which was [[https://platform.openai.com/playground?assistant=asst_rloUcbsn34Ctajed90ILdGBt&mode=assistant&thread=thread_VYDCgBTyJvpTeKNrMGS8CC0J][URL to this work]] and rewrote it as this .org file.
    * I mixed interview elements with concept of operations (CONOPS) explanation/validation.
@@ -282,7 +285,7 @@ seasonal beers, and variable processing times.
 
 * TBD - Tank capacity differences
  /Here I'm using the word hypothetical in ways I wouldn't bother with a human./
- 
+
 Great! However, I see that you only need 2000 Liters of Saisson, yet 6000 Liters of IPA (India Pale Ale).
 Do all your (hypothetical) conditioning and fermenting tanks accommodate 6000 Liters, or do we have to split these up into batches?
 
