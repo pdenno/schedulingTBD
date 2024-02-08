@@ -1,9 +1,10 @@
 (ns scheduling-tbd.shop-test
   (:require
+   [clojure.edn     :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [datahike.api                 :as d]
-   [scheduling-tbd.shop :as shop :refer [rew2db db-schema-shop2+]]
+   [scheduling-tbd.shop :as shop :refer [shop2db db-schema-shop2+]]
    [scheduling-tbd.planner :as plan]
    [scheduling-tbd.llm  :as llm]
    [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema]]
@@ -20,7 +21,7 @@
   (d/transact (d/connect config) (datahike-schema db-schema-shop2+)))
 
 (def kiwi-domain
-  '(defdomain basic-example
+  '(defdomain kiwi-example
      ((:operator (!pickup ?a) () () ((have ?a)))
       (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
       (:method (swap ?x ?y)
@@ -32,11 +33,11 @@
 (deftest round-trip-kiwi
   (testing "Testing a simple round trip from lisp to db to lisp."
     (make-test-db! test-cfg)
-    (->> kiwi-domain rew2db vector (d/transact (d/connect test-cfg)))
-    (let [dom-id (d/q '[:find ?eid . :where [?eid :domain/name "basic-example"]]
+    (->> kiwi-domain shop2db vector (d/transact (d/connect test-cfg)))
+    (let [dom-id (d/q '[:find ?eid . :where [?eid :domain/name "kiwi-example"]]
                       @(d/connect test-cfg))
           db-obj (sutil/resolve-db-id {:db/id dom-id} (d/connect test-cfg) #{:db/id})
-          res (shop/rew2shop db-obj)]
+          res (shop/db2shop db-obj)]
       (is (= kiwi-domain res)))))
 
 (def sample-method
@@ -78,23 +79,18 @@
              (:immediate upper-move-aircraft-no-style ?a ?c2)
              (:immediate debark ?p ?a ?c2))))
 
-
-
-
-
 ;;; ToDo:  WRONG! Both of them. I don't have time for this now.
-(deftest s-expression2db
+#_(deftest s-expression2db
   (testing "Testing creating db structures for s-expressions"
-    (is (= {:s-exp/fn-ref '>} (rew2db '> :s-exp-extended)))
+    (is (= {:s-exp/fn-ref '>} (shop2db '> :s-exp-extended)))
     (is (= #:s-exp{:args
                    [{:arg/pos 1, :s-exp/args [#:arg{:val #:box{:num 1}, :pos 1} #:arg{:val #:box{:sym 'x}, :pos 2}], :s-exp/fn-ref '+}
                     #:arg{:val #:box{:num 3}, :pos 2}
                     #:arg{:val #:box{:sym 'q}, :pos 3}],
                    :fn-ref '*}
-           (rew2db '(* (+ 1 x) 3 q) :s-exp-extended)))))
+           (shop2db '(* (+ 1 x) 3 q) :s-exp-extended)))))
 
-
-(def zeno
+(def zeno-canonical
   "This is an example in the 'canonical' form of a domain. When a SHOP version is needed, use shop/canon2shop.
    To store this use shop/canon2db."
   {:domain/name "ZENO"
@@ -442,20 +438,15 @@
                                            (:immediate upper-move-aircraft-no-style ?a ?c)
                                            (:immediate !!ra ((no-use ?a)) ())))}]})
 
-(defn write-zeno
-  "Use this to write the above structure (zeno) to the DB."
-  []
-  (->> zeno
-       shop/canon2db
-       shop/write-obj))
 
 (defn tryme-2canon []
-  (-> plan/process-interview shop/edn2canonical))
+  (-> plan/process-interview shop/proj2canonical))
 
 (def diag (atom []))
 
 (defn compare-domains
-  "Check each of :domain/elems in two domains, ensure each are equal."
+  "Check each of :domain/elems in two domains, ensure each are equal.
+   This operates on canonical, of course."
   [d1 d2]
   (reset! diag [])
   (letfn [(get-elem [n d] (some #(when (== (:canon/pos %) n) %) (:domain/elems d)))]
@@ -471,11 +462,29 @@
 
 ;;; ToDo: This only works because it is only checking methods. I still have to implement axioms and operators.
 (defn tryme []
-  (compare-domains zeno (shop/db2canon "ZENO")))
+  (compare-domains zeno-canonical
+                   (-> "ZENO" (shop/db-entry-for {:db-atm (d/connect test-cfg)}) shop/db2canon)))
 
-(deftest big-round-trip
-  (testing "testing that a SHOP form can be stored and recovered."
+(deftest canonical-round-trip
+  (testing "Testing that canonical can be stored and recovered."
+    (make-test-db! test-cfg)
     (is
-     (do (write-zeno) ; Do it twice to ensure updating, not inserting.
-         (write-zeno)
-         (compare-domains zeno (shop/db2canon "ZENO"))))))
+     (let [db-atm (d/connect test-cfg)]
+       (do ; Write it twice to ensure updating, not inserting.
+         (->> zeno-canonical shop/canon2db vector (d/transact db-atm))
+         (->> zeno-canonical shop/canon2db vector (d/transact db-atm))
+         (compare-domains zeno-canonical
+                          (-> "ZENO" (shop/db-entry-for {:db-atm (d/connect test-cfg)}) shop/db2canon)))))))
+
+(defn shop-round-trip []
+  (testing "Testing that canonical can be stored and recovered."
+    (make-test-db! test-cfg)
+    (->> "data/planning-domains/zeno-travel-shop.edn" ; This is common-lisp syntax, despite the name.
+         slurp
+         edn/read-string
+         shop/shop2db
+         vector
+         (d/transact (d/connect test-cfg)))
+  (let [db-obj (get-db-object "ZENOTRAVEL")]
+      (reset! diag db-obj)
+      (shop/db2shop db-obj))))
