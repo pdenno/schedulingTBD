@@ -48,16 +48,19 @@
   (let [project-id (db/current-project-id)
         msg-id (db/next-msg-id project-id)]
     (db/inc-msg-id! project-id)
-    (db/message-form msg-id :system response-text)))
+    (db/message-form msg-id :system response-text))
+)
 
 ;;; ToDo: This will be updated to do some sort of planning POMDP, etc.
 (defn plan-response
   "Top-level function to respond to a user's message."
   [user-text]
-  (log/info "Got user-text")
+  (log/info "Testing user input")
   (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
     (-> question llm/llm-directly wrap-response) ; These are intentionally Not tracked in the DB.
-    (op-start-project user-text))) ; ToDo: Temporary!  <========================================
+    (op-start-project user-text) ; ToDo: Temporary!  <========================================
+  )
+) 
 
 (defn reply
   "Handler function for http://api/user-says."

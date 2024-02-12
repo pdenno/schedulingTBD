@@ -21,10 +21,14 @@
   "Return a connection atom for the DB."
   [k]
   (when-let [db-cfg (get @databases-atm k)]
-    (log/info db-cfg)
+    (log/info "Connecting to " db-cfg)
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
-      (log/warn "DB is registered but does not exist."))))
+      (log/warn "DB is registered but does not exist."))
+    )
+)
+
+
 
 ;;; ToDo:
 ;;;  - cljs complains about not finding x/element-nss, which I don't see in the  0.2.0-alpha8 source at all.

@@ -3,17 +3,17 @@
          :name "SYSTEM"}
 
 #:project{:dir
-          "/opt/scheduling/projects/craft-beer-brewery-scheduling",
+          "./opt/scheduling/projects/craft-beer-brewery-scheduling",
           :id :craft-beer-brewery-scheduling,
           :name "craft-beer-brewery-scheduling"}
 
 #:project{:dir
-          "/opt/scheduling/projects/aluminium-foil-production-scheduling",
+          "./opt/scheduling/projects/aluminium-foil-production-scheduling",
           :id :aluminium-foil-production-scheduling,
           :name "Aluminium foil production scheduling"}
 
 #:project{:dir
-          "/opt/scheduling/projects/snowboards-production-scheduling",
+          "./opt/scheduling/projects/snowboards-production-scheduling",
           :id :snowboards-production-scheduling,
           :name "Snowboards production scheduling"}
 

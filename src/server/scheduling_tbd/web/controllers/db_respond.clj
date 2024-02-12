@@ -10,7 +10,7 @@
   (:import
    [java.util Date]))
 
-(def diag (atom {}))
+(def diag (atom {:orig :val}))
 
 (defn healthcheck
   [_request]
@@ -24,13 +24,17 @@
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."
   [request]
   (let [{:keys [project-id]} (-> request :query-params keywordize-keys)]
-    (log/info "get-conversation for" project-id)
+   (log/info "get-conversation for" project-id)
     (if-let [conn-atm (-> project-id keyword connect-atm)]
-      (let [msgs (-> (d/q '[:find [?e ...] :where [?e :message/id]] @conn-atm) sort)]
+      (let [msgs (-> (d/q '[:find [?e ...] :where [?e :message/id]] @conn-atm) sort)
+            check (reset! diag {:msgs msgs :connect-atm conn-atm})]
         (http/ok
          {:conv-for project-id
           :conv (mapv #(sutil/resolve-db-id {:db/id %} conn-atm) msgs)}))
-      (http/not-found))))
+      (http/not-found)
+    )
+  )
+)
 
 (defn list-projects
   "Return a map containing :current-project and :others, which is a sorted list of every other project in the DB."

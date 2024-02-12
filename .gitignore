@@ -23,6 +23,7 @@ resources/js
 public/js
 /opt/
 .DS_Store
+/.vscode
 
 node_modules/
 .shadow-cljs/
