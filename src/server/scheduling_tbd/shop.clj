@@ -55,6 +55,13 @@
   (and (symbol? x)
        (= \! (-> x name first))))
 
+(defn method-name
+  "SHOP methods AND AXIOMS can overload the predicate.
+   Returns a string that concatenates the formal parameters and values."
+  [meth-sig]
+  (->> (interpose "_" meth-sig) (apply str)))
+
+
 ;;; ======================= SHOP2 Grammar ================================================================
 ;;;------ toplevel forms ----
 (s/def ::domain
@@ -345,7 +352,7 @@
                        #(is-var? (nth % 3))))
 
 ;;;======================================= Rewriting to DB elements
-(def ^:dynamic *debugging?* true)
+(def ^:dynamic *debugging?* false)
 (def tags   (atom []))
 (def locals (atom [{}]))
 
@@ -381,7 +388,7 @@
     (s/valid? ::axiom    exp)       :axiom
     (s/valid? ::logical-exp exp)    :logical-exp ; Essentially, has its own similar dispatch function.
     (contains? exp :sys/body)       :body
-    :else (throw (ex-info "No dispatch value for exp" {:exp exp}))))
+    :else (throw (ex-info "shop2db-dispatch: No dispatch value for exp" {:exp exp}))))
 
 (defmulti shop2db #'shop2db-dispatch)
 
@@ -391,7 +398,7 @@
         cnt (atom 0)]
     (-> {:domain/name (str name) :sys/typ :domain}
         (assoc :domain/elems (vec (for [e elems]
-                                    (-> (shop2db e {:domain-name name})
+                                    (-> (shop2db e {:domain-name (str name)})
                                         (assoc :sys/pos (swap! cnt inc)))))))))
 
 ;;; (shop2db '(:method (transport-person ?p ?c) Case1 ((at ?p ?c)) Case2 ((also ?p ?x)) ()) :method)
@@ -400,10 +407,16 @@
   (s/assert ::method body)
   (clear-rewrite!)
   (let [[_ head & pairs] body]
-    {:method/name (str domain-name "." (first head))
-     :sys/body (-> {:sys/typ :method}
-                   (assoc :method/head      (shop2db head :atom))
-                   (assoc :method/rhs       (shop2db pairs :method-rhsides)))}))
+    (let [res {:method/name (str domain-name "." (method-name head))
+               :sys/body (-> {:sys/typ :method}
+                             (assoc :method/head      (shop2db head :atom))
+                             (assoc :method/rhs       (shop2db pairs :method-rhsides)))}]
+      (if-let [case-name (-> res :sys/body :method/rhs first :method/case-name)]
+        ;; Uniqueness is not well thought through in SHOP! If there is any case-name whatsoever, add THE FIRST to the name.
+        ;; It appears from the zeno example that method signatures might include both formal parameters and sometimes case names.
+        ;; I don't think we care, since we are handing the thing to SHOP to deal with, but we need unique for the DB.
+        (update res :method/name #(str % "." case-name))
+        res))))
 
 ;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>])
 (defshop2db :operator [body & {:keys [domain-name]}]
@@ -428,7 +441,7 @@
                                   pos 1
                                   res []]
                              (cond (empty? exps)              res
-                                   (symbol? (nth exps 0))     (recur
+                                   (symbol? (nth exps 0))     (recur ; Has case-name
                                                                (subvec exps 2)
                                                                (inc pos)
                                                                (conj res (cond-> {:rhs/case-name (nth exps 0)}
@@ -441,7 +454,9 @@
                                                                  (conj res (-> {:sys/pos pos}
                                                                                (assoc :rhs/terms (shop2db (nth exps 0) :logical-exp))))
                                                                  res))))]
-    {:axiom/name (str domain-name "." (first head))
+    {:axiom/name (if-let [case-name (-> rhs first :rhs/case-name)]
+                   (str domain-name "." (method-name head) "." case-name)
+                   (str domain-name "." (method-name head)))
      :sys/body (cond-> {:sys/typ :axiom
                         :axiom/head (shop2db head :atom)}
                  (not-empty rhs)    (assoc :axiom/rhs rhs))}))
@@ -937,7 +952,9 @@
         (contains? exp :box/num)                         :box
         (contains? exp :box/str)                         :box
         (contains? exp :s-exp/arg-val)                   :arg-val
-        :else (throw (ex-info "No dispatch value for exp" {:exp exp}))))
+        :else
+        (do (reset! diag exp)
+            (throw (ex-info "db2shop-dispatch: No dispatch value for exp" {:exp exp})))))
 
 (defmulti db2shop #'db2shop-dispatch)
 
@@ -1182,7 +1199,7 @@
                 :recreate-db? true ; <=== If true, it will recreate the plans DB.
                 :schema-flexibility :write}]
     (when (:recreate-db? config)
-      (recreate-planning-domains-db! config)) ; This adds the schema and planning domains.
+      #_(recreate-planning-domains-db! config)) ; This adds the schema and planning domains. <================================= TEMP
     {:plan-db-cfg config}))
 
 (defstate plans-db-cfg

@@ -1,20 +1,22 @@
 (ns scheduling-tbd.shop-test
   (:require
-   [clojure.edn     :as edn]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
-   [datahike.api                 :as d]
-   [scheduling-tbd.shop :as shop :refer [shop2db db-schema-shop2+]]
-   [scheduling-tbd.planner :as plan]
-   [scheduling-tbd.llm  :as llm]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema]]
-   [scheduling-tbd.util :as util]
-   [taoensso.timbre     :as log]))
+   [clojure.edn             :as edn]
+   [clojure.spec.alpha      :as s]
+   [clojure.string          :as str]
+   [clojure.test            :refer [deftest is testing]]
+   [datahike.api            :as d]
+   [datahike.pull-api       :as dp]
+   [scheduling-tbd.shop     :as shop :refer [shop2db db-schema-shop2+]]
+   [scheduling-tbd.planner  :as plan]
+   [scheduling-tbd.llm      :as llm]
+   [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema]]
+   [scheduling-tbd.util     :as util]
+   [taoensso.timbre         :as log]))
 
 (def test-cfg {:store {:backend :mem :keep-history? false :schema-flexibility :write}})
 
 (defn make-test-db!
-  "In memory DB for testing planning domain management"
+  "In memory DB for testing planning domain management. Preloads the schema."
   [config]
   (when (d/database-exists? config) (d/delete-database config))
   (d/create-database config)
@@ -93,17 +95,17 @@
 (def zeno-canonical
   "This is an example in the 'canonical' form of a domain. When a SHOP version is needed, use shop/canon2shop.
    To store this use shop/canon2db."
-  {:domain/name "ZENO"
+  {:domain/name "zenotravel"
    :domain/elems [{:canon/pos 1
-                   :axiom/name "zeno.same"
+                   :axiom/name "zenotravel.same_?x_?x"
                    :canon/code '(:- (same ?x ?x) ())}
 
                   {:canon/pos 2
-                   :axiom/name "zeno.different"
+                   :axiom/name "zenotravel.different_?x_?y"
                    :canon/code '(:- (different ?x ?y) ((not (same ?x ?y))))}
 
                   {:canon/pos 3
-                   :axiom/name "zeno.possible-person-in"
+                   :axiom/name "zenotravel.possible-person-in_?city"
                    :canon/code '(:- (possible-person-in ?city)
                                     ((person ?p)
                                      (at ?p ?city)
@@ -111,7 +113,7 @@
                                      (different ?city2 ?city)))}
 
                   {:canon/pos 4
-                   :operator/name "zeno.!!cost"
+                   :operator/name "zenotravel.!!cost"
                    :canon/code '(:operator (!!cost ?end)
                                               ((maxtime ?max) ; Since ?max isn't bound in the head, I supose this is a query.
                                                (assign ?newmax (eval (if (< ?max ?end) ?end ?max))))
@@ -121,14 +123,14 @@
                                               (- ?newmax ?max))}
 
                   {:canon/pos 5
-                   :method/name "zeno.board"
+                   :method/name "zenotravel.board_?p_?a_?c"
                    :canon/code '(:method (board ?p ?a ?c)
                                           ((write-time ?a ?start))
                                           ((!board ?p ?a ?c ?start 1)
                                            (:immediate !!cost (call (function '+) ?start 1))))}
 
                   {:canon/pos 6
-                   :operator/name "zeno.!board"
+                   :operator/name "zenotravel.!board"
                    :canon/code '(:operator (!board ?p ?a ?c ?start ?duration)
                                               ((person ?p)
                                                (aircraft ?a)
@@ -149,14 +151,14 @@
                                               0.001)}
 
                   {:canon/pos 7
-                   :method/name "zeno.debark"
+                   :method/name "zenotravel.debark_?p_?a_?c"
                    :canon/code '(:method (debark ?p ?a ?c)
                                           ((write-time ?a ?start))
                                           ((!debark ?p ?a ?c ?start 1)
                                            (:immediate !!cost (call (function '+) ?start 1))))}
 
                   {:canon/pos 8
-                   :operator/name "zeno.!debark"
+                   :operator/name "zenotravel.!debark"
                    :canon/code '(:operator (!debark ?p ?a ?c ?start ?duration)
                                               ((person ?p)
                                                (aircraft ?a)
@@ -176,7 +178,7 @@
                                               0.001)}
 
                   {:canon/pos 9
-                   :method/name "zeno.refuel"
+                   :method/name "zenotravel.refuel_?a_?c"
                    :canon/code '(:method (refuel ?a ?c)
                                           ((write-time ?a ?start)
                                            (read-time ?a ?pmax)
@@ -192,7 +194,7 @@
                                            (:immediate !!cost ?end)))}
 
                   {:canon/pos 10
-                   :operator/name "zeno.!refuel"
+                   :operator/name "zenotravel.!refuel"
                    :canon/code '(:operator (!refuel ?a ?c ?start ?duration)
                                               ((aircraft ?a)
                                                (city ?c)
@@ -204,7 +206,7 @@
                                               0.001)}
 
                   {:canon/pos 11
-                   :method/name "zeno.zoom"
+                   :method/name "zenotravel.zoom_?a_?c1_?c2"
                    :canon/code '(:method (zoom ?a ?c1 ?c2)
                                           ((write-time ?a ?astart)
                                            (read-time ?a ?pmax)
@@ -222,7 +224,7 @@
                                            (:immediate !!cost ?end)))}
 
                   {:canon/pos 12
-                   :operator/name "zeno.!zoom"
+                   :operator/name "zenotravel.!zoom"
                    :canon/code '(:operator (!zoom ?a ?c1 ?c2 ?start ?duration)
                                               ((aircraft ?a)
                                                (city ?c1)
@@ -246,7 +248,7 @@
                                               0.001)}
 
                   {:canon/pos 13
-                   :method/name "zeno.fly"
+                   :method/name "zenotravel.fly_?a_?c1_?c2"
                    :canon/code '(:method (fly ?a ?c1 ?c2)
                                           ((write-time ?a ?astart)
                                            (read-time ?a ?pmax)
@@ -265,7 +267,7 @@
                                            (:immediate !!cost ?end)))}
 
                   {:canon/pos 14
-                   :operator/name "zeno.!fly"
+                   :operator/name "zenotravel.!fly"
                    :canon/code '(:operator (!fly ?a ?c1 ?c2 ?start ?duration)
                                               ((aircraft ?a)
                                                (city ?c1)
@@ -286,7 +288,7 @@
                                               0.001)}
 
                   {:canon/pos 15
-                   :operator/name "zeno.!!preprocessing"
+                   :operator/name "zenotravel.!!preprocessing"
                    :canon/code '(:operator (!!preprocessing ?problem-name)
                                               ((totaltime-coeff ?tc)
                                                (fuelused-coeff ?fc)
@@ -297,7 +299,7 @@
                                               0)}
 
                   {:canon/pos 16
-                   :operator/name "zeno.!!assert"
+                   :operator/name "zenotravel.!!assert"
                    :canon/code '(:operator (!!assert ?g)
                                               ()
                                               ()
@@ -305,7 +307,7 @@
                                               0)}
 
                   {:canon/pos 17
-                   :operator/name "zeno.!!ra"
+                   :operator/name "zenotravel.!!ra"
                    :canon/code '(:operator (!!ra ?D ?A)
                                               ()
                                               ?D
@@ -313,12 +315,12 @@
                                               0)}
 
                   {:canon/pos 18
-                   :method/name "zeno.transport-person.Case1"
+                   :method/name "zenotravel.transport-person_?p_?c.Case1"
                    :canon/code '(:method (transport-person ?p ?c)
                                           Case1 ((at ?p ?c)) ())}
 
                   {:canon/pos 19
-                   :method/name "zeno.transport-person.Case2"
+                   :method/name "zenotravel.transport-person_?p_?c2.Case2"
                    :canon/code '(:method (transport-person ?p ?c2)
                                           Case2 (:sort-by ?num >
                                                           ((at ?p ?c1)
@@ -330,8 +332,8 @@
                                                                                  (:immediate upper-move-aircraft-no-style ?a ?c2)
                                                                                  (:immediate debark ?p ?a ?c2)))}
                   {:canon/pos 20
-                   :method/name "zeno.transport-person.Case3"
-                   :canon/code '(:method (transport-person ?p ?c2)
+                   :method/name "zenotravel.transport-person_?p_?c2.Case3"
+                   :canon/code '(:method (transport-person ?p ?c2)  ; Note that won't get a unique name here if just use shop/method-name; same as above.
                                           Case3 (:sort-by ?cost <
                                                           ((at ?p ?c1)
                                                            (aircraft ?a)
@@ -349,13 +351,13 @@
                                                                                                           (:immediate debark ?p ?a ?c2)))}
 
                   {:canon/pos 21
-                   :method/name "zeno.upper-move-aircraft"
+                   :method/name "zenotravel.upper-move-aircraft_?a_?c_?style.Case1"
                    :canon/code '(:method (upper-move-aircraft ?a ?c ?style)
                                           Case1 ((at ?a ?c)) ()
                                           Case2 ((at ?a ?somecity))     ((move-aircraft ?a ?somecity ?c ?style)))}
 
                   {:canon/pos 22
-                   :method/name "zeno.upper-move-aircraft-no-style"
+                   :method/name "zenotravel.upper-move-aircraft-no-style_?a_?c.Case1"
                    :canon/code '(:method (upper-move-aircraft-no-style ?a ?c)
                                           Case1 ((at ?a ?c)) ()
                                           Case2 (:sort-by ?cost <
@@ -363,7 +365,7 @@
                                                            (travel-cost-info ?a ?somecity ?c ?cost ?style)))   ((move-aircraft ?a ?somecity ?c ?style)))}
 
                   {:canon/pos 23
-                   :axiom/name "zeno.travel-cost-info.slow"
+                   :axiom/name "zenotravel.travel-cost-info_?a_?from_?to_?cost_slow.CASE1"
                    :canon/code '(:- (travel-cost-info ?a ?from ?to ?cost slow)
                                     CASE1 ((capacity ?a ?cap)
                                            (distance ?from ?to ?dist)
@@ -381,7 +383,7 @@
                                            (assign ?cost (float (/ (+ (* *tc* 2) (* *fc* (* ?dist ?burn))) 1)))))}
 
                   {:canon/pos 24
-                   :axiom/name "zeno.travel-cost-info.fast"
+                   :axiom/name "zenotravel.travel-cost-info_?a_?from_?to_?cost_fast.CASE1"
                    :canon/code '(:- (travel-cost-info ?a ?from ?to ?cost fast)
                                     CASE1 ((capacity ?a ?cap)
                                            (distance ?from ?to ?dist)
@@ -405,7 +407,7 @@
                                            (assign ?cost (float (/ (+ (* *tc* 2) (* *fc* (* ?dist ?burn))) 1)))))}
 
                   {:canon/pos 25
-                   :method/name "zeno.move-aircraft-slow"
+                   :method/name "zenotravel.move-aircraft_?a_?c1_?c2_slow"
                    :canon/code '(:method (move-aircraft ?a ?c1 ?c2 slow)
                                           ((fuel ?a ?fuel)
                                            (distance ?c1 ?c2 ?dist)
@@ -418,7 +420,7 @@
                                            (:immediate fly ?a ?c1 ?c2)))}
 
                   {:canon/pos 26
-                   :method/name "zeno.move-aircraft-fast"
+                   :method/name "zenotravel.move-aircraft_?a_?c1_?c2_fast"
                    :canon/code '(:method (move-aircraft ?a ?c1 ?c2 fast)
                                           ((fuel ?a ?fuel)
                                            (distance ?c1 ?c2 ?dist)
@@ -431,7 +433,7 @@
                                            (:immediate zoom ?a ?c1 ?c2)))}
 
                   {:canon/pos 27
-                   :method/name "zeno.transport-aircraft"
+                   :method/name "zenotravel.transport-aircraft_?a_?c"
                    :canon/code '(:method (transport-aircraft ?a ?c)
                                           ((not (no-use ?a)))
                                           ((!!assert ((no-use ?a)))
@@ -448,14 +450,12 @@
   "Check each of :domain/elems in two domains, ensure each are equal.
    This operates on canonical, of course."
   [d1 d2]
-  (reset! diag [])
   (letfn [(get-elem [n d] (some #(when (== (:canon/pos %) n) %) (:domain/elems d)))]
     (let [ok? (atom true)]
       (doseq [pos (->> d1 :domain/elems (map :canon/pos) sort)]
         (let [s1  (get-elem pos d1)
               s2  (get-elem pos d2)]
           (when-not (= s1 s2)
-            (swap! diag conj [s1 s2])
             (reset! ok? false)
             (log/info "\n\nNot equal: \n " s1 "\n " s2))))
       @ok?)))
@@ -463,7 +463,7 @@
 ;;; ToDo: This only works because it is only checking methods. I still have to implement axioms and operators.
 (defn tryme []
   (compare-domains zeno-canonical
-                   (-> "ZENO" (shop/db-entry-for {:db-atm (d/connect test-cfg)}) shop/db2canon)))
+                   (-> "zenotravel" (shop/db-entry-for {:db-atm (d/connect test-cfg)}) shop/db2canon)))
 
 (deftest canonical-round-trip
   (testing "Testing that canonical can be stored and recovered."
@@ -474,10 +474,10 @@
          (->> zeno-canonical shop/canon2db vector (d/transact db-atm))
          (->> zeno-canonical shop/canon2db vector (d/transact db-atm))
          (compare-domains zeno-canonical
-                          (-> "ZENO" (shop/db-entry-for {:db-atm (d/connect test-cfg)}) shop/db2canon)))))))
+                          (-> "zenotravel" (shop/db-entry-for {:db-atm (d/connect test-cfg)}) shop/db2canon)))))))
 
-(defn shop-round-trip []
-  (testing "Testing that canonical can be stored and recovered."
+(deftest shop-round-trip
+  (testing "Testing that canonical can be stored from shop syntax and recovered."
     (make-test-db! test-cfg)
     (->> "data/planning-domains/zeno-travel-shop.edn" ; This is common-lisp syntax, despite the name.
          slurp
@@ -485,6 +485,19 @@
          shop/shop2db
          vector
          (d/transact (d/connect test-cfg)))
-  (let [db-obj (get-db-object "ZENOTRAVEL")]
+    (let [db-obj (shop/db-entry-for "zenotravel" {:db-atm (d/connect test-cfg)})]
       (reset! diag db-obj)
-      (shop/db2shop db-obj))))
+      (is (compare-domains
+           zeno-canonical
+           (shop/db2canon db-obj))))))
+
+(defn ttt []
+  (make-test-db! test-cfg)
+  (->> "data/planning-domains/zeno-travel-shop.edn" ; This is common-lisp syntax, despite the name.
+       slurp
+       edn/read-string
+       shop/shop2db
+       vector
+       (d/transact (d/connect test-cfg)))
+  (let [db-obj (shop/db-entry-for "zenotravel" {:db-atm (d/connect test-cfg)})]
+    (shop/db2canon db-obj)))

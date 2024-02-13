@@ -3,7 +3,7 @@
 ;;; This doesn't use:
 ;;; - and (logical expressions are implicit when nested)
 ;;; - :task (an optional keyword that can be the first element of a task atom).
-(defdomain ZENOTRAVEL ((:- (same ?x ?x) ())
+(defdomain zenotravel ((:- (same ?x ?x) ())
                         (:- (different ?x ?y) ((not (same ?x ?y))))
                         (:- (possible-person-in ?city) ((person ?p) (at ?p ?city) (goal ?p ?city2) (different ?city2 ?city)))
                         (:operator (!!cost ?end)
@@ -133,7 +133,7 @@
                                   (!!assert ((dest ?a ?c2)))
                                   (:immediate upper-move-aircraft-no-style ?a ?c2)
                                   (:immediate debark ?p ?a ?c2)))
-                        (:method (transport-person ?p ?c2)
+                        (:method (transport-person ?p ?c2) ; Note that this has the same shop/method-name as the one just above. Need to use case names!
                                  Case3 (:sort-by ?cost < ; function!
                                                  ((at ?p ?c1)
                                                   (aircraft ?a)

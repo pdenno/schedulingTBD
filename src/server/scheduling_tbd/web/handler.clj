@@ -1,4 +1,4 @@
-b(ns scheduling-tbd.web.handler
+(ns scheduling-tbd.web.handler
   "HTTP router and handlers. Currently you have to user/restart (or similar) for changes to be seen."
   (:require
    [ajax.core :refer [GET POST]] ; for debugging
