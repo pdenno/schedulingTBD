@@ -75,15 +75,13 @@
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
 (s/def ::method
-  (s/and #(reset! diag {:method %})
-         seq?
+  (s/and seq?
          #(= (nth % 0) :method)
          #(s/valid? ::atom (nth % 1))
          #(s/valid? ::method-rhsides (nthrest % 2))))
 
 (s/def ::operator
-  (s/and #(reset! diag {:operator %})
-         seq?
+  (s/and seq?
          #(or (== (count %) 5) (== (count %) 6))
          #(= (nth % 0) :operator)
          #(s/valid? ::atom (nth % 1))
@@ -95,8 +93,7 @@
 
 ;;; (:- a [name1] E1 [name2] E2 [name3] E3 ... [namen] En)
 (s/def ::axiom
-  (s/and ;#(reset! diag {:axiom %})
-         seq?
+  (s/and seq?
          #(= (nth % 0) :-)
          #(s/valid? ::atom (nth % 1))
          #(if (= '(()) (nthrest % 2))
@@ -352,7 +349,7 @@
                        #(is-var? (nth % 3))))
 
 ;;;======================================= Rewriting to DB elements
-(def ^:dynamic *debugging?* false)
+(def debugging? (atom false))
 (def tags   (atom []))
 (def locals (atom [{}]))
 
@@ -366,14 +363,14 @@
 ;;; This grammar has only a few top-level entry points: defdomain, :method :operator and :axiom.
 (defmacro defshop2db [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
   `(defmethod shop2db ~tag [~obj & [~@more-args]]
-     (when *debugging?* (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
+     (when @debugging? (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
      (swap! locals #(into [{}] %))
      (let [res# (do ~@body)
            result# (if (seq? res#) (doall res#) res#)]
      (swap! tags   #(-> % rest vec))
      (swap! locals #(-> % rest vec))
-     (do (when *debugging?*
+     (do (when @debugging?
            (println (cl-format nil "~A<-- ~A returns ~S" (sutil/nspaces (count @tags)) ~tag result#)))
          result#))))
 
@@ -438,22 +435,22 @@
   (clear-rewrite!)
   (let [[_ head & exps] body
         rhs (loop [exps (vec exps)
-                                  pos 1
-                                  res []]
-                             (cond (empty? exps)              res
-                                   (symbol? (nth exps 0))     (recur ; Has case-name
-                                                               (subvec exps 2)
-                                                               (inc pos)
-                                                               (conj res (cond-> {:rhs/case-name (nth exps 0)}
-                                                                           true                     (assoc :sys/pos pos)
-                                                                           (not-empty (nth exps 1)) (assoc :rhs/terms (shop2db (nth exps 1) :logical-exp)))))
-                                   :else                      (recur
-                                                               (subvec exps 1)
-                                                               (inc pos)
-                                                               (if (not-empty (nth exps 0))
-                                                                 (conj res (-> {:sys/pos pos}
-                                                                               (assoc :rhs/terms (shop2db (nth exps 0) :logical-exp))))
-                                                                 res))))]
+                   pos 1
+                   res []]
+              (cond (empty? exps)              res
+                    (symbol? (nth exps 0))     (recur ; Has case-name
+                                                (subvec exps 2)
+                                                (inc pos)
+                                                (conj res (cond-> {:rhs/case-name (nth exps 0)}
+                                                            true                     (assoc :sys/pos pos)
+                                                            (not-empty (nth exps 1)) (assoc :rhs/terms (shop2db (nth exps 1) :logical-exp)))))
+                    :else                      (recur
+                                                (subvec exps 1)
+                                                (inc pos)
+                                                (if (not-empty (nth exps 0))
+                                                  (conj res (-> {:sys/pos pos}
+                                                                (assoc :rhs/terms (shop2db (nth exps 0) :logical-exp))))
+                                                  (conj res {:box/empty-list "empty list"})))))]
     {:axiom/name (if-let [case-name (-> rhs first :rhs/case-name)]
                    (str domain-name "." (method-name head) "." case-name)
                    (str domain-name "." (method-name head)))
@@ -546,10 +543,10 @@
           (assoc :sort-by/exp (shop2db lexp :logical-exp))))))
 
 (defn box [v]
-  (cond (number? v)  {:box/num v}
-        (string? v)  {:box/str v}
-        (symbol? v)  {:box/sym v}
-        :else        v))
+  (cond (number? v)       {:box/num v}
+        (string? v)       {:box/str v}
+        (symbol? v)       {:box/sym v}
+        :else             v))
 
 (defshop2db :d-list [exp]
   (let [exp (if (seq? exp) (vec exp) (vector exp))
@@ -757,6 +754,9 @@
    :box/sym
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol
         :doc "a construct to wrap primitive types when the type cannot be anticipated and therefore a :db.type/ref is used"}
+   :box/empty-list
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a construct to wrap primitive types when the type cannot be anticipated and therefore a :db.type/ref is used"}
 
    ;; ----------------------- call
    :call/fn
@@ -927,14 +927,14 @@
 ;;;=============================== Serialization (DB structures to SHOP common-lisp s-expressions) ================================================
 (defmacro defdb2shop [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
   `(defmethod db2shop ~tag [~obj & [~@more-args]]
-     (when *debugging?* (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
+     (when @debugging? (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
      (swap! locals #(into [{}] %))
      (let [res# (do ~@body)
            result# (if (seq? res#) (doall res#) res#)]
      (swap! tags   #(-> % rest vec))
      (swap! locals #(-> % rest vec))
-     (do (when *debugging?*
+     (do (when @debugging?
            (println (cl-format nil "~A<-- ~A returns ~S" (sutil/nspaces (count @tags)) ~tag result#)))
          result#))))
 
@@ -951,9 +951,10 @@
         (contains? exp :box/sym)                         :box
         (contains? exp :box/num)                         :box
         (contains? exp :box/str)                         :box
+        (contains? exp :box/empty-list)                  :box
         (contains? exp :s-exp/arg-val)                   :arg-val
         :else
-        (do (reset! diag exp)
+        (do (when-not (empty? exp) (reset! diag exp))
             (throw (ex-info "db2shop-dispatch: No dispatch value for exp" {:exp exp})))))
 
 (defmulti db2shop #'db2shop-dispatch)
@@ -978,6 +979,7 @@
       `(:- ~h ()))))
 
 (defdb2shop :operator [{:operator/keys [head preconds d-list a-list cost] :as exp}]
+  (reset! diag exp)
   (let [pre (map db2shop (->> preconds (sort-by :sys/pos) (map :precond/exp)))
         del (map db2shop (->> d-list   (sort-by :sys/pos)))
         add (map db2shop (->> a-list   (sort-by :sys/pos)))
@@ -995,17 +997,21 @@
 
 (defdb2shop :simple-type [exp] exp)
 
-(defdb2shop :rhs [{:rhs/keys [terms case-name]}]
-  (let [res (db2shop terms)] ; ToDo: terms is a misnomer. Uses :sys/typ :conjunction.
-    (if case-name
-      `(~case-name ~res)
-      res)))
+
+(defdb2shop :rhs [{:rhs/keys [terms case-name] :box/keys [empty-list]}]
+  (if empty-list
+    '()
+    (let [res (db2shop terms)] ; ToDo: terms is a misnomer. Uses :sys/typ :conjunction.
+      (if case-name
+        `(~case-name ~res)
+        res))))
 
 (defdb2shop :atom [{:atom/keys [predicate roles] :exp/keys [negated?]}]
   (let [atom `(~predicate ~@(map db2shop (->> roles (sort-by :sys/pos) (map :role/val))))]
     (if negated? `(~'not ~atom) atom)))
 
-(defdb2shop :box [{:box/keys [sym num str]}] (or sym num str))
+(defdb2shop :box [{:box/keys [sym num str empty-list]}]
+  (if empty-list '() (or sym num str)))
 
 (defdb2shop :conjunction [{:conjunction/keys [terms]}]
   (map db2shop terms))
@@ -1073,7 +1079,7 @@
   {:domain/name name
    :sys/typ :domain
    :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
-                          (-> (shop2db  (:canon/code %))
+                          (-> (shop2db  (:canon/code %) {:domain-name name})
                               (assoc :sys/typ (keyword (code-type %)))
                               (assoc :sys/pos (:canon/pos %))
                               (assoc name-attr (get % name-attr))))
@@ -1104,7 +1110,7 @@
         (contains? exp :operator/name) "operator"))
 
 (defn db2canon
-  "Rewrite the named DB structure (a :db.unique/identity) to a map of SHOP2 lispy structures called 'canonical'."
+  "Use db2shop to create from db-style maps a map structure where the :domain/elems are individual methods, operators and axioms."
   [db-obj]
   (let [cnt (atom 0)]
     (cond (contains? db-obj :domain/name) {:domain/name (:domain/name db-obj)

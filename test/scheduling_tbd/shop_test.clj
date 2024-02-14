@@ -500,4 +500,5 @@
        vector
        (d/transact (d/connect test-cfg)))
   (let [db-obj (shop/db-entry-for "zenotravel" {:db-atm (d/connect test-cfg)})]
+    db-obj
     (shop/db2canon db-obj)))

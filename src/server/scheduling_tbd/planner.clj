@@ -9,6 +9,8 @@
    [taoensso.timbre :as log]))
 
 (def planner-endpoint "tcp://*:31726")
+(def planner-executable "I put the planner executable in the project directory" "./pzmq-shop3-2024-02-15")
+(def diag (atom nil))
 
 ;;; ------ explainlib & clara rules exploration -----------------------
 (def shop2-example
@@ -213,23 +215,21 @@
           (do (log/error "Planner fails test.") :fails-test))
         result))))
 
-;;;(defn init-planner [])
 
 (defn init-planner
   "Start the planner. This relies on environment variable PLANNER_SBCL, which is just
    the name of the SBCL core file. That file is expected to be in the project directory."
   []
-  (if-let [planner-path (-> (System/getenv) (get "PLANNER_SBCL"))] ; ToDo: maybe use system.edn instead.
-    (do (log/info "Starting planner. Expected at" (str "./" planner-path))
-        (future (sh "/usr/bin/sbcl"
-                    "--core"
-                    (str "./" planner-path)
-                    "--non-interactive"
-                    "--disable-debugger"))
-        (Thread/sleep 2000)
-        (test-planner!))
-    (do (log/error "PLANNER_SBCL environment var not set.")
-        :fails-env)))
+  (try (future (sh "/usr/bin/sbcl"
+                   "--core"
+                   planner-executable
+                   "--non-interactive"
+                   "--disable-debugger"))
+       (catch Exception e
+         (log/error (:message e))
+         (throw (ex-info "Running planner didn't work." {:error e}))))
+  (Thread/sleep 2000)
+  (test-planner!))
 
 (defstate plan-server
   :start (init-planner)
