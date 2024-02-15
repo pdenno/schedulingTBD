@@ -61,6 +61,13 @@
   [meth-sig]
   (->> (interpose "_" meth-sig) (apply str)))
 
+(defn code-type
+  "For use mostly with :domain/elems, return one of 'method', 'axiom' or 'operator' based
+   on what the expression contains. The actual :sys/typ of these is in the :sys/body."
+  [exp]
+  (cond (contains? exp :method/name)   "method"
+        (contains? exp :axiom/name)    "axiom"
+        (contains? exp :operator/name) "operator"))
 
 ;;; ======================= SHOP2 Grammar ================================================================
 ;;;------ toplevel forms ----
@@ -384,7 +391,6 @@
     (s/valid? ::operator exp)       :operator
     (s/valid? ::axiom    exp)       :axiom
     (s/valid? ::logical-exp exp)    :logical-exp ; Essentially, has its own similar dispatch function.
-    (contains? exp :sys/body)       :body
     :else (throw (ex-info "shop2db-dispatch: No dispatch value for exp" {:exp exp}))))
 
 (defmulti shop2db #'shop2db-dispatch)
@@ -393,10 +399,11 @@
 (defshop2db :domain [exp]
   (let [[_ name elems] exp
         cnt (atom 0)]
-    (-> {:domain/name (str name) :sys/typ :domain}
-        (assoc :domain/elems (vec (for [e elems]
-                                    (-> (shop2db e {:domain-name (str name)})
-                                        (assoc :sys/pos (swap! cnt inc)))))))))
+    {:domain/name (str name)
+     :sys/body (-> {:sys/typ :domain}
+                   (assoc :domain/elems (vec (for [e elems]
+                                               (-> (shop2db e {:domain-name (str name)})
+                                                   (assoc :sys/pos (swap! cnt inc)))))))}))
 
 ;;; (shop2db '(:method (transport-person ?p ?c) Case1 ((at ?p ?c)) Case2 ((also ?p ?x)) ()) :method)
 ;;; Method: (:method <head> [label]
@@ -585,9 +592,10 @@
 (defn seq2sexp [s]
   (cond (seq? s) (cond-> {:s-exp/fn-ref (first s) :sys/typ :s-exp}
                    (-> s rest not-empty) (assoc :s-exp/args (let [cnt (atom 0)]
-                                                              (for [a (rest s)]
-                                                                (->  (shop2db a :s-exp-arg)
-                                                                     (assoc :sys/pos (swap! cnt inc)))))))
+                                                              (-> (for [a (rest s)]
+                                                                    (->  (shop2db a :s-exp-arg)
+                                                                         (assoc :sys/pos (swap! cnt inc))))
+                                                                  vec))))
         (or (number? s) (string? s) (symbol? s)) (box s)))
 
 ;;; This currently does not handle quoted things.
@@ -903,7 +911,7 @@
 
    :sys/typ
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
-        :doc "a keyword indicating the type of the object; it is used to select a serialization method."}
+        :doc "an unqualified keyword indicating the type of the object; it is used to select a serialization method."}
    :sys/pos
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long,
         :doc "the position of the element in the paren't attribute's collection."}
@@ -947,6 +955,7 @@
   (cond specified                                        specified
         (and (map? exp) (contains? exp :sys/typ))        (:sys/typ exp)
         (or (symbol? exp) (number? exp) (string? exp))   :simple-type
+        (contains? exp :domain/name)                     :domain
         (contains? exp :sys/body)                        :body ; This is used, at least in the shop-round-trip test.
         (contains? exp :box/sym)                         :box
         (contains? exp :box/num)                         :box
@@ -959,9 +968,9 @@
 
 (defmulti db2shop #'db2shop-dispatch)
 
-(defdb2shop :domain [{:domain/keys [name elems]}]
+(defdb2shop :domain [{:domain/keys [name] :sys/keys [body]}]
   `(~'defdomain ~(symbol name)
-    ~(for [e (sort-by :sys/pos elems)]
+    ~(for [e (sort-by :sys/pos (-> body :domain/elems))]
        (db2shop e))))
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
@@ -1071,19 +1080,18 @@
   `(~'forall ~(map db2shop vars) ~(map db2shop conditions) ~(map db2shop consequences)))
 
 ;;; ------------------------ Top-level manipulation -----------------------------------
-(declare code-type)
 (defn canon2db
   "Given a canonical structure, create the corresponding DB structure.
    :canon/pos of each element of :domain/elems is :sys/pos in the DB."
   [{:domain/keys [name elems]}]
   {:domain/name name
-   :sys/typ :domain
-   :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
-                          (-> (shop2db  (:canon/code %) {:domain-name name})
-                              (assoc :sys/typ (keyword (code-type %)))
-                              (assoc :sys/pos (:canon/pos %))
-                              (assoc name-attr (get % name-attr))))
-                       (sort-by :canon/pos elems))})
+   :sys/body {:sys/typ :domain
+              :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
+                                     (-> (shop2db  (:canon/code %) {:domain-name name})
+                                         #_(assoc :sys/typ (keyword (code-type %)))
+                                         (assoc :sys/pos (:canon/pos %))
+                                         (assoc name-attr (get % name-attr))))
+                                  (sort-by :canon/pos elems))}})
 
 (defn canon2shop
   "Rewrite 'canonical' (which is SHOP form embeddded in EDN) as SHOP."
@@ -1104,17 +1112,12 @@
                       name)]
     (sutil/resolve-db-id {:db/id eid} db-atm #{:db/id})))
 
-(defn code-type [exp]
-  (cond (contains? exp :method/name)   "method"
-        (contains? exp :axiom/name)    "axiom"
-        (contains? exp :operator/name) "operator"))
-
 (defn db2canon
   "Use db2shop to create from db-style maps a map structure where the :domain/elems are individual methods, operators and axioms."
   [db-obj]
   (let [cnt (atom 0)]
     (cond (contains? db-obj :domain/name) {:domain/name (:domain/name db-obj)
-                                           :domain/elems (-> (for [e (->> db-obj :domain/elems (sort-by :sys/pos))]
+                                           :domain/elems (-> (for [e (->> db-obj :sys/body :domain/elems (sort-by :sys/pos))]
                                                                (let [name-attr (keyword (code-type e) "name")]
                                                                  (reset! diag e)
                                                                  (-> {:canon/pos (swap! cnt inc)}

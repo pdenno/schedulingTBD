@@ -22,75 +22,78 @@
   (d/create-database config)
   (d/transact (d/connect config) (datahike-schema db-schema-shop2+)))
 
-(def kiwi-domain
-  '(defdomain kiwi-example
-     ((:operator (!pickup ?a) () () ((have ?a)))
-      (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
-      (:method (swap ?x ?y)
-               ((have ?x))
-               ((!drop ?x) (!pickup ?y))
-               ((have ?y))
-               ((!drop ?y) (!pickup ?x))))))
+(deftest axiom-round-trip
+  (testing "Testing whether axioms can be round tripped."
+    (testing "Testing starting with shop object."
+      (let [axiom-shop '(:- (same ?x ?x) ())]
+        (is (= axiom-shop (-> axiom-shop shop/shop2db shop/db2shop)))))
+    (testing "Testing starting with db object."
+      (let [axiom-db '{:axiom/name ".same_?x_?x",
+                       :sys/body
+                       {:sys/typ :axiom,
+                        :axiom/head
+                        {:sys/typ :atom, :atom/predicate same, :atom/roles [{:role/val #:box{:sym ?x}, :sys/pos 1} {:role/val #:box{:sym ?x}, :sys/pos 2}]},
+                        :axiom/rhs [#:box{:empty-list "empty list"}]}}]
+        (is (= axiom-db (-> axiom-db shop/db2shop shop/shop2db)))))))
 
-(deftest round-trip-kiwi
-  (testing "Testing a simple round trip from lisp to db to lisp."
-    (make-test-db! test-cfg)
-    (->> kiwi-domain shop2db vector (d/transact (d/connect test-cfg)))
-    (let [dom-id (d/q '[:find ?eid . :where [?eid :domain/name "kiwi-example"]]
-                      @(d/connect test-cfg))
-          db-obj (sutil/resolve-db-id {:db/id dom-id} (d/connect test-cfg) #{:db/id})
-          res (shop/db2shop db-obj)]
-      (is (= kiwi-domain res)))))
+(deftest method-round-trip
+  (testing "Testing whether method can be round tripped."
+    (testing "Testing starting with shop object."
+      (let [method-shop '(:method (transport-aircraft ?a ?c)
+                                  ((not (no-use ?a)))
+                                  ((!!assert ((no-use ?a)))
+                                   (:immediate upper-move-aircraft-no-style ?a ?c)
+                                   (:immediate !!ra ((no-use ?a)) ())))]
+        (is (= method-shop (-> method-shop shop/shop2db shop/db2shop)))))
+    (testing "Testing starting with db object."
+      (let [method-db (-> "test/data/method-db-example-1.edn" slurp read-string)]
+        (is (= method-db (-> method-db shop/db2shop shop/shop2db)))))))
 
-(def sample-method
-  '(:method
-    (transport-person ?p ?c2) ; head
-    ((at ?p ?c1)  ; precondition
-     (aircraft ?a)
-     (at ?a ?c3)
-     (different ?c1 ?c3))
-    ((move-aircraft ?a ?c1) ; subtasks
-     (board ?p ?a ?c1)
-     (move-aircraft ?a ?c2)
-     (debark ?p ?a ?c2))))
+(deftest operator-round-trip
+  (testing "Testing whether operator can be round tripped."
+    (testing "Testing starting with shop object."
+      (let [operator-shop '(:operator (!!cost ?end)
+                                      ((maxtime ?max)
+                                       (assign ?newmax (eval (if (< ?max ?end) ?end ?max))))
+                                      ((maxtime ?max))
+                                      ((maxtime ?newmax))
+                                      (- ?newmax ?max))]
+        (is (= operator-shop (-> operator-shop shop/shop2db shop/db2shop)))))
+    (testing "Testing starting with db object."
+      (let [operator-db (-> "test/data/operator-db-example-1.edn" slurp read-string)]
+        (is (= operator-db (-> operator-db shop/db2shop shop/shop2db)))))))
 
-(def sample-operator
-  '(:operator (!!cost ?end)
-
-              ((maxtime ?max) ; Since ?max isn't bound in the head, I supose this is a query.
-               (assign ?newmax (eval (if (< ?max ?end) ?end ?max))))
-
-              ((maxtime ?max))
-              ((maxtime ?newmax))
-              (- ?newmax ?max)))
-
-(def big-method
-  '(:method (transport-person ?p ?c2)
-            (:sort-by ?cost < ((at ?p ?c1)
-                               (aircraft ?a)
-                               (at ?a ?c3)
-                               (different ?c1 ?c3)
-                               (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
-                               (imply ((different ?c3 ?c1)) (not (possible-person-in ?c3)))
-                               (travel-cost-info ?a ?c3 ?c1 ?cost ?style)))
-
-            ((!!assert ((dest ?a ?c1)))
-             (:immediate upper-move-aircraft ?a ?c1 ?style)
-             (:immediate board ?p ?a ?c1)
-             (!!assert ((dest ?a ?c2)))
-             (:immediate upper-move-aircraft-no-style ?a ?c2)
-             (:immediate debark ?p ?a ?c2))))
-
-;;; ToDo:  WRONG! Both of them. I don't have time for this now.
-#_(deftest s-expression2db
-  (testing "Testing creating db structures for s-expressions"
-    (is (= {:s-exp/fn-ref '>} (shop2db '> :s-exp-extended)))
-    (is (= #:s-exp{:args
-                   [{:arg/pos 1, :s-exp/args [#:arg{:val #:box{:num 1}, :pos 1} #:arg{:val #:box{:sym 'x}, :pos 2}], :s-exp/fn-ref '+}
-                    #:arg{:val #:box{:num 3}, :pos 2}
-                    #:arg{:val #:box{:sym 'q}, :pos 3}],
-                   :fn-ref '*}
-           (shop2db '(* (+ 1 x) 3 q) :s-exp-extended)))))
+(deftest domain-round-trip
+  (let [domain-shop '(defdomain kiwi-example
+                       ((:operator (!pickup ?a) () () ((have ?a)))
+                        (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
+                        (:method (swap ?x ?y)
+                                 ((have ?x))
+                                 ((!drop ?x) (!pickup ?y))
+                                 ((have ?y))
+                                 ((!drop ?y) (!pickup ?x)))))
+        domain-db (-> "test/data/domain-db-example-1.edn" slurp read-string)]
+    (testing "Testing whether a domain can be round tripped."
+      (testing "Testing starting with a shop object."
+        (is (= domain-shop (-> domain-shop shop/shop2db shop/db2shop))))
+      (testing "Testing starting with a db object."
+        (is (= domain-db (-> domain-db shop/db2shop shop/shop2db))))
+      (testing "Testing with a :mem DB; starting with a db object."
+        (make-test-db! test-cfg)
+        (->> domain-db vector (d/transact (d/connect test-cfg)))
+        (let [dom-id (d/q '[:find ?eid . :where [?eid :domain/name "kiwi-example"]]
+                          @(d/connect test-cfg))
+              db-obj (sutil/resolve-db-id {:db/id dom-id} (d/connect test-cfg) #{:db/id})
+              res (shop/db2shop db-obj)]
+          (is (= domain-shop res))))
+      (testing "Testing with a :mem DB; starting with a shop object."
+        (make-test-db! test-cfg)
+        (->> domain-shop shop2db vector (d/transact (d/connect test-cfg)))
+        (let [dom-id (d/q '[:find ?eid . :where [?eid :domain/name "kiwi-example"]]
+                          @(d/connect test-cfg))
+              db-obj (sutil/resolve-db-id {:db/id dom-id} (d/connect test-cfg) #{:db/id})
+              res (shop/db2shop db-obj)]
+          (is (= domain-shop res)))))))
 
 (def zeno-canonical
   "This is an example in the 'canonical' form of a domain. When a SHOP version is needed, use shop/canon2shop.
@@ -460,11 +463,6 @@
             (log/info "\n\nNot equal: \n " s1 "\n " s2))))
       @ok?)))
 
-;;; ToDo: This only works because it is only checking methods. I still have to implement axioms and operators.
-(defn tryme []
-  (compare-domains zeno-canonical
-                   (-> "zenotravel" (shop/db-entry-for {:db-atm (d/connect test-cfg)}) shop/db2canon)))
-
 (deftest canonical-round-trip
   (testing "Testing that canonical can be stored and recovered."
     (make-test-db! test-cfg)
@@ -501,4 +499,14 @@
        (d/transact (d/connect test-cfg)))
   (let [db-obj (shop/db-entry-for "zenotravel" {:db-atm (d/connect test-cfg)})]
     db-obj
-    (shop/db2canon db-obj)))
+    #_(shop/db2canon db-obj)))
+
+(defn all-tests
+  "cider-test-run-ns-tests, C-c C-t n, isn't recognizing all the tests!"
+  []
+  (log/info "axiom round trip"       (axiom-round-trip))
+  (log/info "method round trip"      (method-round-trip))
+  (log/info "operator round trip"    (operator-round-trip))
+  (log/info "domain round trip"      (domain-round-trip))
+  (log/info "shop round trip"        (shop-round-trip))
+  (log/info "canonical round trip"   (canonical-round-trip)))
