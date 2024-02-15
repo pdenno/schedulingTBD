@@ -1,16 +1,13 @@
 (ns scheduling-tbd.shop-test
   (:require
    [clojure.edn             :as edn]
-   [clojure.spec.alpha      :as s]
-   [clojure.string          :as str]
+   [clojure.spec.alpha   :as s]  ; Keep around for debugging
    [clojure.test            :refer [deftest is testing]]
    [datahike.api            :as d]
-   [datahike.pull-api       :as dp]
+   ;[datahike.pull-api       :as dp] ; Keep around for debugging
    [scheduling-tbd.shop     :as shop :refer [shop2db db-schema-shop2+]]
    [scheduling-tbd.planner  :as plan]
-   [scheduling-tbd.llm      :as llm]
-   [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema]]
-   [scheduling-tbd.util     :as util]
+   [scheduling-tbd.sutil    :as sutil :refer [datahike-schema]]
    [taoensso.timbre         :as log]))
 
 (def test-cfg {:store {:backend :mem :keep-history? false :schema-flexibility :write}})
@@ -477,7 +474,7 @@
 (deftest shop-round-trip
   (testing "Testing that canonical can be stored from shop syntax and recovered."
     (make-test-db! test-cfg)
-    (->> "data/planning-domains/zeno-travel-shop.edn" ; This is common-lisp syntax, despite the name.
+    (->> "test/data/zeno-travel-shop.edn" ; This is common-lisp syntax, despite the name.
          slurp
          edn/read-string
          shop/shop2db
@@ -488,6 +485,34 @@
       (is (compare-domains
            zeno-canonical
            (shop/db2canon db-obj))))))
+
+#_(deftest proj-round-trip []
+  (testing "Testing whether proj data is handled correctly."
+    (make-test-db! test-cfg)
+    (let [proj-obj (-> "data/planning-domains/test-domain.edn" slurp edn/read-string)
+          db-obj (-> proj-obj
+                     shop/proj2canon
+                     shop/canon2db
+                     vector)]
+      (d/transact (d/connect test-cfg) db-obj)
+      (let [db-obj (shop/db-entry-for "test-pi" {:db-atm (d/connect test-cfg)})]
+        (is (= proj-obj (shop/db2proj db-obj)))))))
+
+
+(defn proj-round-trip []
+  (testing "Testing whether proj data is handled correctly."
+    (make-test-db! test-cfg)
+    (let [proj-obj (-> "data/planning-domains/test-domain.edn" slurp edn/read-string)
+          db-obj (-> proj-obj
+                     shop/proj2canon
+                     shop/canon2db
+                     vector)]
+      (d/transact (d/connect test-cfg) db-obj)
+      (let [db-obj (shop/db-entry-for "test-pi" {:db-atm (d/connect test-cfg)})]
+        (shop/db2proj db-obj)
+        @shop/diag))))
+
+
 
 (defn ttt []
   (make-test-db! test-cfg)
@@ -501,6 +526,7 @@
     db-obj
     #_(shop/db2canon db-obj)))
 
+;;; Specifically, I think it sometimes fails to report a test had been run when that test fails.
 (defn all-tests
   "cider-test-run-ns-tests, C-c C-t n, isn't recognizing all the tests!"
   []

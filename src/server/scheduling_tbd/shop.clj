@@ -313,7 +313,7 @@
         :enforce        ::enforce
         :setof          ::setof))
 
-;;; AKA logical-atom, can't have a call-term or a eval-term
+;;; AKA logical-atom, can't have a call-term or an eval-term
 (s/def ::atom (s/and seq?
                      #(symbol? (nth % 0))
                      #(every? (fn [t] (s/valid? ::term t)) (rest %))))
@@ -368,7 +368,11 @@
 
 ;;; This is simpler than RM's rewrite, which relied on :typ from parse and called 'rewrite-meth' using it.
 ;;; This grammar has only a few top-level entry points: defdomain, :method :operator and :axiom.
-(defmacro defshop2db [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+(defmacro defshop2db
+  "Macro to wrap methods for translating shop to database format."
+  {:clj-kondo/lint-as 'clojure.core/fn
+   :arglists '([tag [obj & more-args] & body])} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
+  [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
   `(defmethod shop2db ~tag [~obj & [~@more-args]]
      (when @debugging? (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
@@ -384,6 +388,7 @@
 (defn shop2db-dispatch
   "Allow calls of two forms: (shop2db exp) (shop2db exp :some-method-key)."
   [exp & [specified]]
+  (reset! diag {:exp exp})
   (cond ;; Optional 2nd argument specifies method to call. Order matters!
     (keyword? specified)            specified,
     (s/valid? ::domain   exp)       :domain
@@ -521,8 +526,9 @@
                                      (not-empty (nth triples 1)) (assoc :method/task-list     (shop2db (nth triples 1) :task-list))))
                          (subvec triples 2)))))]
     (let [cnt (atom 0)]
-      (for [r res]
-        (assoc r :sys/pos (swap! cnt inc))))))
+      (-> (for [r res]
+            (assoc r :sys/pos (swap! cnt inc)))
+          vec))))
 
 (defshop2db :method-precond [c]
   (cond (-> c (nth 0) seq?)         (mapv #(shop2db % :atom) c)
@@ -933,7 +939,11 @@
         :doc "when true, indicates that the atoms in task-list can be performed in any order. Ordered is the default."}})
 
 ;;;=============================== Serialization (DB structures to SHOP common-lisp s-expressions) ================================================
-(defmacro defdb2shop [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+(defmacro defdb2shop
+  "Macro to wrap methods for translating databse to shop format."
+  {:clj-kondo/lint-as 'clojure.core/fn
+   :arglists '([tag [obj & more-args] & body])} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
+  [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
   `(defmethod db2shop ~tag [~obj & [~@more-args]]
      (when @debugging? (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
@@ -1005,7 +1015,6 @@
 (defdb2shop :body [exp] (-> exp :sys/body db2shop)) ; This is used, at least in the shop-round-trip test.
 
 (defdb2shop :simple-type [exp] exp)
-
 
 (defdb2shop :rhs [{:rhs/keys [terms case-name] :box/keys [empty-list]}]
   (if empty-list
@@ -1130,38 +1139,59 @@
             {name-attr (get db-obj name-attr)
              :canon/code (-> db-obj :sys/body db2shop)}))))
 
-;;; ------------------------ proj2canonical ------------------------------
+;;; ------------------------ proj2 to/from canonical ------------------------------
 (def proj-cnt-atm (atom 0))
 
 (defn proj2canon-method
   "Restructure PROJ into canonical (which is more lisp-like)."
   [e base-name]
-  (-> e
+  (-> {}
       (assoc :canon/pos (swap! proj-cnt-atm inc))
-      (assoc :method/name (str base-name "." (-> e :method/head first)))
+      (assoc :method/name (cond-> (str base-name "." (-> e :method/head method-name))
+                            (-> e :method/rhsides first :method/case-name) (str "." (-> e :method/rhsides first :method/case-name))))
       (assoc :canon/code
              `(:method
                ~(:method/head e)
                ~@(mapcat (fn [p]
                            (if-let [cname (:method/case-name p)]
                              `(~(symbol cname)
-                               ~(if-let [pc (-> p :method/preconditions seq)] pc ())
+                               ~(if-let [pc (-> p :method/preconds seq)] pc ())
                                ~(-> p :method/task-list seq))
-                             `(~(if-let [pc (-> p :method/preconditions seq)] pc ())
+                             `(~(if-let [pc (-> p :method/preconds seq)] pc ())
                                ~(-> p :method/task-list seq))))
                          (:method/rhsides e))))
       (dissoc :method/rhsides)))
 
-;;; ToDo: Implement the next two.
 (defn proj2canon-operator
   "Restructure PROJ into canonical (which is more lisp-like)."
-  [e base-name])
+  [e base-name]
+  (-> {}
+      (assoc :canon/pos (swap! proj-cnt-atm inc))
+      (assoc :operator/name (str base-name "." (-> e :operator/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
+      (assoc :canon/code
+             `(:operator
+               ~(:operator/head e)
+               ~(into '()(:operator/preconds e))
+               ~(into '()(:operator/d-list e))
+               ~(into '()(:operator/a-list e))))))
 
 (defn proj2canon-axiom
   "Restructure PROJ into canonical (which is more lisp-like)."
-  [e base-name])
+  [e base-name]
+    (-> {}
+      (assoc :canon/pos (swap! proj-cnt-atm inc))
+      (assoc :axiom/name (str base-name "." (-> e :axiom/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
+      (assoc :canon/code
+             `(:-
+               ~(:axiom/head e)
+               ~@(mapcat (fn [rside]
+                           (if-let [cname (:axiom/case-name rside)]
+                             `(~(symbol cname)
+                               ~(if-let [rhs (-> rside :axiom/rhs seq)] rhs ()))
+                             `(~(if-let [rhs (-> rside :axiom/rhs seq)] rhs ()))))
+                         (:axiom/rhsides e))))))
 
-(defn proj2canonical
+(defn proj2canon
   "Rewrite the PROJ structure as canonical, which is less lispy."
   [proj]
   (reset! proj-cnt-atm 0)
@@ -1173,12 +1203,18 @@
                      (contains? e :axiom/head)    (proj2canon-axiom e base-name))))))
 
 
+(defn db2proj
+  "Rewrite the DB object as a proj object."
+  [db-obj]
+  (log/info "db2proj NYI") ; <==========================================================
+  (reset! diag db-obj))
+
 ;;; ------------------------ DB Stuff -------------------------
 ;;; Currently this loads zeno, just for testing.
 (defn recreate-planning-domains-db!
   "Recreate the plans db from .edn data. It uses the connect-atm, which is already established."
   [config]
-  (if (.exists (io/file "data/planning-domains/zeno-travel.edn")) ; <=================== Loading zeno.
+  (if (.exists (io/file "data/planning-domains/domains.edn")) ; ToDo: This will need to be better someday soon.
     (do (log/info "Recreating the planning domains database.")
         (when (d/database-exists? config)
           (d/delete-database config))
@@ -1186,12 +1222,13 @@
         (register-db :planning-domains config)
         (let [conn (connect-atm :planning-domains)]
           (d/transact conn (datahike-schema db-schema-shop2+))
-          (d/transact conn (-> "data/planning-domains/zeno-travel.edn" ; <============ Loading zeno.
-                               slurp
-                               edn/read-string
-                               shop2db))))
+          (d/transact conn (->> "data/planning-domains/domains.edn"
+                                slurp
+                                edn/read-string
+                                (mapv proj2canon)
+                                (mapv canon2db))))
         true)
-    (log/error "Not recreating planning domains DB: No backup file."))
+    (log/error "Not recreating planning domains DB: No backup file.")))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-db-cfg
@@ -1204,11 +1241,10 @@
         ;; https://cljdoc.org/d/io.replikativ/datahike/0.6.1545/doc/datahike-database-configuration
         config {:store {:backend :file :path (str base-dir "/planning-domains")}
                 :keep-history? false
-                ;;:attribute-refs? true ; With this I can't transact lookup-refs!
                 :recreate-db? true ; <=== If true, it will recreate the plans DB.
                 :schema-flexibility :write}]
     (when (:recreate-db? config)
-      #_(recreate-planning-domains-db! config)) ; This adds the schema and planning domains. <================================= TEMP
+      (recreate-planning-domains-db! config))
     {:plan-db-cfg config}))
 
 (defstate plans-db-cfg

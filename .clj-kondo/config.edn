@@ -1,4 +1,5 @@
 ;;; https://github.com/borkdude/clj-kondo/blob/master/doc/config.md
 {:project-root-uri "file:///home/msid/pdenno/Documents/git/schedulingTBD"
- :lint-as {scheduling-tbd.shop/defdb2shop  clojure.core/defmacro
-           scheduling-tbd.shop/defshop2db    clojure.core/defmacro}}
+ ;; I tried
+ #_#_:lint-as {scheduling-tbd.shop/defdb2shop  clojure.core/defmacro
+               scheduling-tbd.shop/defshop2db    clojure.core/defmacro}}

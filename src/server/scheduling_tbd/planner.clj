@@ -74,54 +74,6 @@
     :rhs/terms [(!update-plan-state ?proj)]})
 
 (def process-interview
-  '{:domain/name "process-interview"
-    :domain/elems [;; (characterize-process ?proj)
-                   {:method/head (characterize-process ?proj)
-                    :method/rhsides [{:method/case-name "ordinary"
-                                      :method/task-list [(!start-interview  ?proj) (get-process-steps ?proj) (get-wip ?proj)]}]}
-
-                   ;; (get-process-steps ?proj)
-                   {:method/head (get-process-steps ?proj)
-                    :method/rhsides [{:method/case-name "well-known"
-                                      :method/preconditions [(well-known-process ?proj)]
-                                      :method/task-list [(!yes-no-process-steps ?proj)]}
-                                     {:method/case-name "unknown"
-                                      :method/preconditions [(unknown-process ?proj)]
-                                      :method/task-list [(!query-process-steps ?proj)]}]}
-
-                   ;; (get-wip ?proj)
-                   {:method/head (get-wip ?proj)
-                    :method/rhsides [{:method/case-name "ordinary"
-                                      :method/preconditions [(project-name ?proj)]
-                                      :method/task-list [(!query-for-wip-spreadsheet ?proj)]}]}
-
-                   ;; (:operator (!start-interview ?proj) ((starting project-init)) () ((stop-plan)))
-                   {:operator/head (!start-interview ?proj)
-                    :operator/preconds [(starting project-init)]
-                    :operator/a-list [(stop-plan)]}
-
-                   ;; (:operator (!yes-no-process-steps ?proj) ((proj-name ?proj) (well-known-process ?proj)) () ((have-process-steps ?proj)))
-                   {:operator/head (!yes-no-process-steps ?proj)
-                    :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
-                    :operator/a-list [(have-process-steps ?proj)]}
-
-                   ;; (:operator (!query-process-steps ?proj)  ((proj-name ?proj) (system-model flow)) () ((have-process-steps ?proj)))
-                   {:operator/head (!query-process-steps ?proj)
-                    :operator/preconds [(proj-name ?proj) (system-model flow)]
-                    :operator/a-list [(have-process-steps ?proj)]}
-
-                   ;; (:operator (!yes-no-process-durations ?proj)  ((proj-name ?proj) (well-known-process ?proj)) () ((have-process-durs ?proj)))
-                   {:operator/head (!yes-no-process-durations ?proj)
-                    :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
-                    :operator/a-list [(have-process-durs ?proj)]}
-
-                   ;; (:operator (!query-for-wip-spreadsheet ?proj) ((proj-name ?proj) (have-process-steps ?proj)) () ((have-wip ?proj)))
-                   {:operator/head (!query-for-wip-spreadsheet ?proj)
-                    :operator/preconds [(proj-name ?proj) (have-process-steps ?proj)]
-                    :operator/a-list [(have-wip ?proj)]}
-
-                   ;; (:operator (!update-plan-state ?proj) () () ())))"
-                   {:operator/head (!update-plan-state ?proj)}]})
 
 (defn tryme []
   (-> process-interview
