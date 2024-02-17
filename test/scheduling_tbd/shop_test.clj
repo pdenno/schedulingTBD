@@ -6,11 +6,11 @@
    [datahike.api            :as d]
    ;[datahike.pull-api       :as dp] ; Keep around for debugging
    [scheduling-tbd.shop     :as shop :refer [shop2db db-schema-shop2+]]
-   [scheduling-tbd.planner  :as plan]
    [scheduling-tbd.sutil    :as sutil :refer [datahike-schema]]
    [taoensso.timbre         :as log]))
 
 (def test-cfg {:store {:backend :mem :keep-history? false :schema-flexibility :write}})
+(def diag (atom []))
 
 (defn make-test-db!
   "In memory DB for testing planning domain management. Preloads the schema."
@@ -440,12 +440,6 @@
                                            (:immediate upper-move-aircraft-no-style ?a ?c)
                                            (:immediate !!ra ((no-use ?a)) ())))}]})
 
-
-(defn tryme-2canon []
-  (-> plan/process-interview shop/proj2canonical))
-
-(def diag (atom []))
-
 (defn compare-domains
   "Check each of :domain/elems in two domains, ensure each are equal.
    This operates on canonical, of course."
@@ -486,7 +480,7 @@
            zeno-canonical
            (shop/db2canon db-obj))))))
 
-#_(deftest proj-round-trip []
+(deftest proj-round-trip []
   (testing "Testing whether proj data is handled correctly."
     (make-test-db! test-cfg)
     (let [proj-obj (-> "data/planning-domains/test-domain.edn" slurp edn/read-string)
@@ -496,23 +490,10 @@
                      vector)]
       (d/transact (d/connect test-cfg) db-obj)
       (let [db-obj (shop/db-entry-for "test-pi" {:db-atm (d/connect test-cfg)})]
+        (reset! diag {:db-obj db-obj
+                      :proj-obj-golden proj-obj
+                      :proj-obj-computed (shop/db2proj db-obj)})
         (is (= proj-obj (shop/db2proj db-obj)))))))
-
-
-(defn proj-round-trip []
-  (testing "Testing whether proj data is handled correctly."
-    (make-test-db! test-cfg)
-    (let [proj-obj (-> "data/planning-domains/test-domain.edn" slurp edn/read-string)
-          db-obj (-> proj-obj
-                     shop/proj2canon
-                     shop/canon2db
-                     vector)]
-      (d/transact (d/connect test-cfg) db-obj)
-      (let [db-obj (shop/db-entry-for "test-pi" {:db-atm (d/connect test-cfg)})]
-        (shop/db2proj db-obj)
-        @shop/diag))))
-
-
 
 (defn ttt []
   (make-test-db! test-cfg)

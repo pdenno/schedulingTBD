@@ -92,7 +92,7 @@
          #(or (== (count %) 5) (== (count %) 6))
          #(= (nth % 0) :operator)
          #(s/valid? ::atom (nth % 1))
-         #(s/valid? ::operator-preconditions (nth % 2))
+         #(s/valid? ::operator-preconds (nth % 2))
          #(s/valid? ::del-list (nth % 3))
          #(s/valid? ::add-list (nth % 4))
          (s/or :no-cost #(== (count %) 5) ; BTW, cost is 1 if not specified.
@@ -141,7 +141,7 @@
                                                    (s/valid? ::tasks (nth terms 1)))
                                               (subvec terms 2)))))))))
 
-(s/def ::operator-preconditions
+(s/def ::operator-preconds
   (s/and seq?
          #(every? (fn [c] (s/valid? ::precondition c)) %)))
 
@@ -388,7 +388,6 @@
 (defn shop2db-dispatch
   "Allow calls of two forms: (shop2db exp) (shop2db exp :some-method-key)."
   [exp & [specified]]
-  (reset! diag {:exp exp})
   (cond ;; Optional 2nd argument specifies method to call. Order matters!
     (keyword? specified)            specified,
     (s/valid? ::domain   exp)       :domain
@@ -455,7 +454,8 @@
                                                 (inc pos)
                                                 (conj res (cond-> {:rhs/case-name (nth exps 0)}
                                                             true                     (assoc :sys/pos pos)
-                                                            (not-empty (nth exps 1)) (assoc :rhs/terms (shop2db (nth exps 1) :logical-exp)))))
+                                                            (not-empty (nth exps 1)) (assoc :rhs/terms (shop2db (nth exps 1) :logical-exp))
+                                                            true                     (assoc :sys/typ :rhs))))
                     :else                      (recur
                                                 (subvec exps 1)
                                                 (inc pos)
@@ -518,28 +518,32 @@
                 res
                 (if (symbol? (nth triples 0))
                   (recur (conj res (cond-> {:method/case-name (nth triples 0)}
-                                     (not-empty (nth triples 1)) (assoc :method/preconditions (shop2db (nth triples 1) :method-precond))
-                                     (not-empty (nth triples 2)) (assoc :method/task-list     (shop2db (nth triples 2) :task-list))))
+                                     (not-empty (nth triples 1)) (assoc :method/preconds  (shop2db (nth triples 1) :method-precond))
+                                     (not-empty (nth triples 2)) (assoc :method/task-list (shop2db (nth triples 2) :task-list))))
                          (subvec triples 3))
                   (recur (conj res (cond-> {}
-                                     (not-empty (nth triples 0)) (assoc :method/preconditions (shop2db (nth triples 0) :method-precond))
-                                     (not-empty (nth triples 1)) (assoc :method/task-list     (shop2db (nth triples 1) :task-list))))
+                                     (not-empty (nth triples 0)) (assoc :method/preconds  (shop2db (nth triples 0) :method-precond))
+                                     (not-empty (nth triples 1)) (assoc :method/task-list (shop2db (nth triples 1) :task-list))))
                          (subvec triples 2)))))]
     (let [cnt (atom 0)]
       (-> (for [r res]
             (assoc r :sys/pos (swap! cnt inc)))
           vec))))
-
+;                                           (mapv #(shop2db % :atom) c)
 (defshop2db :method-precond [c]
-  (cond (-> c (nth 0) seq?)         (mapv #(shop2db % :atom) c)
-        (-> c (nth 0) (= :sort-by)) (shop2db c :sort-by)
-        (-> c (nth 0) (= :first))   (shop2db c :first)
-        :else (throw (ex-info "Invalid method precondition" {:exp c}))))
+  (let [cnt (atom 0)]
+    (cond (-> c (nth 0) seq?)         (-> (for [x c]
+                                            (-> (shop2db x :atom)
+                                                (assoc :sys/pos (swap! cnt inc))))
+                                          vec)
+          (-> c (nth 0) (= :sort-by)) (shop2db c :sort-by)
+          (-> c (nth 0) (= :first))   (shop2db c :first)
+          :else (throw (ex-info "Invalid method precondition" {:exp c})))))
 
 (defshop2db :operator-preconds [exp]
   (let [cnt (atom 0)] ; Ordinary conjunct of :logical-exp
     (-> (for [pc exp]
-          (-> {:precond/exp (shop2db pc :logical-exp)}
+          (-> (shop2db pc :logical-exp)
               (assoc :sys/pos (swap! cnt inc))))
         vec)))
 
@@ -640,17 +644,21 @@
   (-> (shop2db (nth exp 1) :logical-exp)
       (assoc :exp/negated? true)))
 
-;;; ToDo: Make the next two ordered
-(defshop2db :conjunct [exp]
+#_(defshop2db :conjunct [exp]
   (let [res (mapv #(shop2db % :logical-exp) exp)]
     (-> (if (empty? res)
-          {:conjunction/shop-empty-list? true}
+          {:conjunction/shop-empty-list? true} ; ToDo: Don't do it this way. In translation from the DB return a '() if that is what is needed. (shop-empty-list? was NYI anyway...)
           {:conjunction/terms res})
         (assoc :sys/typ :conjunction))))
 
+;;; ToDo: Make the next two ordered
+(defshop2db :conjunct [exp]
+  (-> {:sys/typ :conjunct}
+      (assoc :conjunct/terms (mapv #(shop2db % :logical-exp) exp))))
+
 (defshop2db :disjunct [exp]
-  (-> {:sys/typ :disjunction}
-      (assoc :disjunction/terms (mapv #(shop2db % :logical-exp) (rest exp)))))
+  (-> {:sys/typ :disjunct}
+      (assoc :disjunct/terms (mapv #(shop2db % :logical-exp) (rest exp)))))
 
 ;;;    (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
 (defshop2db :universal [exp]
@@ -780,10 +788,15 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "The arguments of th the call term"}
 
-   ;; ----------------------- conjunction
-   :conjunction/terms
+   ;; ----------------------- conjunction/disjunction
+   :conjunct/terms
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the terms that are part of a conjunctive expression."} ; ToDo: need a :sys/pos or something like that.
+
+   :disjunct/terms
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "the terms that are part of a disjunctive expression."} ; ToDo: need a :sys/pos or something like that.
+
 
    ;; ----------------------- domain
    :domain/name
@@ -840,7 +853,7 @@
    :method/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
            :doc "a DB-unique name for the method; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
-   :method/preconditions
+   :method/preconds
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "atoms indicating what must be true in order to apply the method."}
    :method/rhs
@@ -869,11 +882,6 @@
    :operator/preconds
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "preconditions of the operation"}
-
-   ;; ---------------------- preconditions
-   :precond/exp
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "the expression of a precondition (for a method or operator)."}
 
    ;; ---------------------- rhs
    :rhs/case-name
@@ -959,7 +967,7 @@
 (defn db2shop-dispatch
   "Allow calls of two forms: (db2shop exp) (db2shop exp :some-method-key).
    Things with :sys/typ:
-   :assignment :atom :axiom :call-term :conjunction :disjunction :domain :eval :implication :list-term :method
+   :assignment :atom :axiom :call-term :conjunct :disjunct :domain :eval :implication :list-term :method
    :op-call :op-universal :operator :s-exp :sort-by :task-list :universal."
   [exp & [specified]]
   (cond specified                                        specified
@@ -972,6 +980,7 @@
         (contains? exp :box/str)                         :box
         (contains? exp :box/empty-list)                  :box
         (contains? exp :s-exp/arg-val)                   :arg-val
+        (contains? exp :rhs/terms)                       :rhs-terms
         :else
         (do (when-not (empty? exp) (reset! diag exp))
             (throw (ex-info "db2shop-dispatch: No dispatch value for exp" {:exp exp})))))
@@ -998,8 +1007,7 @@
       `(:- ~h ()))))
 
 (defdb2shop :operator [{:operator/keys [head preconds d-list a-list cost] :as exp}]
-  (reset! diag exp)
-  (let [pre (map db2shop (->> preconds (sort-by :sys/pos) (map :precond/exp)))
+  (let [pre (map db2shop (->> preconds (sort-by :sys/pos)))
         del (map db2shop (->> d-list   (sort-by :sys/pos)))
         add (map db2shop (->> a-list   (sort-by :sys/pos)))
         res `(:operator
@@ -1031,8 +1039,18 @@
 (defdb2shop :box [{:box/keys [sym num str empty-list]}]
   (if empty-list '() (or sym num str)))
 
-(defdb2shop :conjunction [{:conjunction/keys [terms]}]
+(defdb2shop :conjunct [{:conjunct/keys [terms]}]
   (map db2shop terms))
+
+(defdb2shop :disjunct [{:disjunct/keys [terms]}]
+  `(or ~@(map db2shop terms)))
+
+(defdb2shop :rhs-terms [{:rhs/keys [terms]}]
+  (if (and (map? terms) (or (contains? terms :conjunct/terms) (contains? terms :disjunct/terms)))
+    (if (contains? terms :conjunct/terms)
+      (map db2shop (:conjunct/terms terms))
+      `(or ~@(map db2shop (:disjunct/terms terms))))
+  (map db2shop terms)))
 
 (defdb2shop :eval [{:eval/keys [form]}] (db2shop form)) ; It is just an s-exp, I think.
 
@@ -1045,10 +1063,10 @@
 (defdb2shop :assignment [{:assign/keys [var exp]}]
   `(~'assign ~var ~(db2shop exp)))
 
-(defdb2shop :rhs-pair [{:method/keys [case-name preconditions task-list]}]
-  (let [pres (if (-> preconditions vector?)
-               (->> preconditions (sort-by :sys/pos) (map db2shop))
-               (if (empty? preconditions) '() (db2shop preconditions)))
+(defdb2shop :rhs-pair [{:method/keys [case-name preconds task-list]}]
+  (let [pres (if (-> preconds vector?)
+               (->> preconds (sort-by :sys/pos) (map db2shop))
+               (if (empty? preconds) '() (db2shop preconds)))
         pres (if (= :sort-by (-> pres first first)) (first pres) pres) ; :sort-by is different!
         res `(~pres ~(db2shop task-list :task-list))]
     (if case-name
@@ -1097,7 +1115,6 @@
    :sys/body {:sys/typ :domain
               :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
                                      (-> (shop2db  (:canon/code %) {:domain-name name})
-                                         #_(assoc :sys/typ (keyword (code-type %)))
                                          (assoc :sys/pos (:canon/pos %))
                                          (assoc name-attr (get % name-attr))))
                                   (sort-by :canon/pos elems))}})
@@ -1128,7 +1145,6 @@
     (cond (contains? db-obj :domain/name) {:domain/name (:domain/name db-obj)
                                            :domain/elems (-> (for [e (->> db-obj :sys/body :domain/elems (sort-by :sys/pos))]
                                                                (let [name-attr (keyword (code-type e) "name")]
-                                                                 (reset! diag e)
                                                                  (-> {:canon/pos (swap! cnt inc)}
                                                                      (assoc name-attr (get e name-attr))
                                                                      (assoc :canon/code (db2shop e)))))
@@ -1162,6 +1178,11 @@
                          (:method/rhsides e))))
       (dissoc :method/rhsides)))
 
+(defn lisp-seq
+  "Return the collection as a seq."
+  [x]
+  (if (empty? x) '() (seq x)))
+
 (defn proj2canon-operator
   "Restructure PROJ into canonical (which is more lisp-like)."
   [e base-name]
@@ -1171,9 +1192,9 @@
       (assoc :canon/code
              `(:operator
                ~(:operator/head e)
-               ~(into '()(:operator/preconds e))
-               ~(into '()(:operator/d-list e))
-               ~(into '()(:operator/a-list e))))))
+               ~(-> e :operator/preconds lisp-seq)
+               ~(-> e :operator/d-list   lisp-seq)
+               ~(-> e :operator/a-list   lisp-seq)))))
 
 (defn proj2canon-axiom
   "Restructure PROJ into canonical (which is more lisp-like)."
@@ -1202,12 +1223,49 @@
                      (contains? e :operator/head) (proj2canon-operator e base-name)
                      (contains? e :axiom/head)    (proj2canon-axiom e base-name))))))
 
+(defn db2proj-axiom
+  "Rewrite an axiom to proj form."
+  [obj]
+  (let [{:axiom/keys [head rhs]} (:sys/body obj)]
+    (cond-> {:axiom/head      (db2shop head)}
+      rhs (assoc :axiom/rhsides
+                 (mapv (fn [r]
+                         (cond-> {:axiom/rhs (-> r :rhs/terms db2shop)} ; It is a conjunct.
+                           (:rhs/case-name r) (assoc :axiom/case-name (-> r :rhs/case-name str))))
+                       rhs)))))
+
+(defn db2proj-method
+  "Rewrite an method to proj form."
+  [obj]
+  (-> {:method/head (db2shop (-> obj :sys/body :method/head))}
+      (assoc :method/rhsides
+             (mapv (fn [rhs]
+                     (let [{:method/keys [case-name preconds task-list]} rhs]
+                       (cond-> {}
+                         case-name  (assoc :method/case-name (str case-name))
+                         preconds   (assoc :method/preconds  (mapv db2shop preconds))
+                         true       (assoc :method/task-list (db2shop task-list)))))
+                     (-> obj :sys/body :method/rhs)))))
+
+(defn db2proj-operator
+  "Rewrite an operator to proj form."
+  [obj]
+  (let [{:operator/keys [head preconds d-list a-list]} (:sys/body obj)]
+    (cond-> {:operator/head (db2shop head)}
+      preconds     (assoc :operator/preconds (->> preconds (sort-by :sys/pos) (mapv db2shop)))
+      d-list       (assoc :operator/d-list   (->> d-list   (sort-by :sys/pos) (mapv db2shop)))
+      a-list       (assoc :operator/a-list   (->> a-list   (sort-by :sys/pos) (mapv db2shop))))))
 
 (defn db2proj
   "Rewrite the DB object as a proj object."
   [db-obj]
-  (log/info "db2proj NYI") ; <==========================================================
-  (reset! diag db-obj))
+  `{:domain/name ~(-> db-obj :domain/name str)
+    :domain/elems ~(mapv (fn [elem]
+                           (let [etyp (-> elem :sys/body :sys/typ)]
+                             (cond (= :axiom    etyp)    (db2proj-axiom elem),
+                                   (= :method   etyp)    (db2proj-method elem),
+                                   (= :operator etyp)    (db2proj-operator elem))))
+                         (-> db-obj :sys/body :domain/elems))})
 
 ;;; ------------------------ DB Stuff -------------------------
 ;;; Currently this loads zeno, just for testing.
