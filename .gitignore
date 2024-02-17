@@ -10,8 +10,12 @@ pom.xml.asc
 /checkouts/
 .nrepl-port
 .cpcache/
+.clj-kondo/inline-configs
 .clj-kondo/.cache
+.clj-kondo/.lock
 .clj-kondo/babashka
+.clj-kondo/com.fulcrologic
+.clj-kondo/cnuernber
 .clj-kondo/com.wsscode
 .clj-kondo/funcool
 .clj-kondo/lilactown

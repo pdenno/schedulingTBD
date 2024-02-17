@@ -12,26 +12,6 @@
 (def planner-executable "I put the planner executable in the project directory" "./pzmq-shop3-2024-02-15")
 (def diag (atom nil))
 
-;;; ------ explainlib & clara rules exploration -----------------------
-(def shop2-example
-  "This is an example from usage from the SHOP2 documentation."
-  {:domain
-   "(defdomain basic-example
-     ((:operator (!pickup ?a) () () ((have ?a)))
-      (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
-      (:method (swap ?x ?y)
-        ((have ?x))
-        ((!drop ?x) (!pickup ?y))
-        ((have ?y))
-        ((!drop ?y) (!pickup ?x)))))"
-   :problem
-   "(defproblem problem1 basic-example
-      ((have banjo)) ((swap banjo kiwi)))"
-   :find-plans
-   "(find-plans 'problem1 :verbose :plans)"
-   :answer
-   ["(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))"]})
-
 ;;; The feasibility of a plan, deciding whether it will be returned from find-plans, depends on pre-conditions.
 ;;; So attention must be paid to the state of the world created through operator add and delete lists.
 ;;;
@@ -64,78 +44,85 @@
 ;;; Every operator that calls out for analysis would add (stop-plan), every method has a special case for stop-plan.
 ;;; Still, there is the issue of how not to repeat what you've done on replanning. I think that requires no-op if you already have what is needed.
 
-;;; Another challenge is the crappy positional syntax of defdomain, though I think I have a solution for that in the DB.
-
-;;; ToDo: This should go away when SHOP2 is replaced.
 (def special-method
   "This is used to stop the planner for update from analysis."
   '{:rhs/case-name "special"
     :method/preconditions [(stop-plan)]
     :rhs/terms [(!update-plan-state ?proj)]})
 
-(def process-interview
+;;; Other things to try:
+;;; (zmq/send-msg socket "(shop-trace :operators)") ; Useless, would need further integration with shop2.
+;;; (zmq/receive-msg socket {:stringify true})
 
-(defn tryme []
-  (-> process-interview
-      (update :domain/elems (fn [elems] (mapv #(if (contains? % :method/head) (update % :method/rhs-pairs conj special-method) %)
-                                                elems)))))
-
-;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>]?)
-;;; Method:   (:method   <head> [<case-name>? <pre-conds> <task-list>]+)
-;;; Problem   (defproblem <problem-name> <domain-name> (<ground-atom>*)  (<task>+))
-(def process-interview-lisp
-  "This is to run a stubbed-in interview to acquire process knowledge."
-  {:domain
-   "(defdomain process-interview
-     ((:method (characterize-process ?proj)
-           ordinary ()  ((!start-interview  ?proj)
-                         (get-process-steps ?proj)
-                         (get-wip           ?proj)))
-      (:method (get-process-steps ?proj)
-           well-known ((well-known-process ?proj))         ((!yes-no-process-steps ?proj))
-           unknown    ((unknown-process ?proj))            ((!query-process-steps ?proj))
-           special    ((stop-plan))                        ((!update-plan-state ?proj)))
-      (:method (get-wip ?proj)
-           ordinary   ((project-name ?proj))               ((!query-for-wip-spreadsheet ?proj))
-           special    ((stop-plan))                        ((!update-plan-state ?proj)))
-
-      (:operator (!start-interview ?proj) ((starting project-init)) () ((stop-plan)))
-      (:operator (!yes-no-process-steps ?proj)      ((proj-name ?proj) (well-known-process ?proj)) () ((have-process-steps ?proj)))
-      (:operator (!query-process-steps ?proj)       ((proj-name ?proj) (system-model flow)) ()        ((have-process-steps ?proj)))
-      (:operator (!yes-no-process-durations ?proj)  ((proj-name ?proj) (well-known-process ?proj)) () ((have-process-durs ?proj)))
-      (:operator (!query-for-wip-spreadsheet ?proj) ((proj-name ?proj) (have-process-steps ?proj)) () ((have-wip ?proj)))
-      (:operator (!update-plan-state ?proj) () () ())))"
-   :problem
-   "(defproblem interview-problem process-interview
-      ((starting project-init))
-       ((characterize-process project-init)))"
-   :find-plans
-   "(find-plans 'interview-problem :which :all :verbose :long-plans :plan-tree t)"})
-
-(defn tryme []
+(defn plan
+  "Communicate to shop3 whatever is specified in the arguments, which may include one or more of:
+      1) providing a new planning domain,
+      2) providing a new problem, and
+      3) execute something, e.g. finding plans for a problem.
+   Return result of execution if (3) is provided, otherwise result from (2) or (1)."
+  [{:keys [domain problem execute]}]
   (zmq/with-new-context
     (let [socket (zmq/socket :req {:connect planner-endpoint})]
-      (zmq/send-msg socket (:domain process-interview-lisp))
-      (zmq/receive-msg socket {:stringify true})
-      (zmq/send-msg socket (:problem process-interview-lisp))
-      (zmq/receive-msg socket {:stringify true})
-      ;;(zmq/send-msg socket "(shop-trace :operators)") ; Useless, would need further integration with shop2.
-      ;;(zmq/receive-msg socket {:stringify true})
-      (zmq/send-msg socket (:find-plans process-interview-lisp))
-      (zmq/receive-msg socket {:stringify true}))))
-
-
-
-;;; ====================================================
-;;; ========================== SHOP3  ==================
-;;; ====================================================
-;;; -------------------------- Composing a planning domain  ------------------
-
-;;; -------------------------- Composing a planning problem  ------------------
-
+      (when domain
+        (zmq/send-msg socket (-> domain shop/proj2canon shop/canon2shop str))
+        (zmq/receive-msg socket {:stringify true}))
+      (when problem
+        (zmq/send-msg socket (str problem))
+        (zmq/receive-msg socket {:stringify true}))
+      (when execute
+        (zmq/send-msg socket (str execute))
+        (zmq/receive-msg socket {:stringify true})))))
 
 ;;; -------------------------- Starting, stopping, and testing ------------------
 ;;;(defn quit-planner! [])
+(def shop2-example
+  "This is an example from usage from the SHOP2 documentation. It is used to test communication with the planner."
+  {:domain '#:domain{:elems
+                     [#:operator{:head (!pickup ?a), :a-list [(have ?a)]}
+                      #:operator{:head (!drop ?a), :preconds [(have ?a)], :d-list [(have ?a)]}
+                      #:method{:head (swap ?x ?y),
+                               :rhsides
+                               [#:method{:preconds [(have ?x)], :task-list ((!drop ?x) (!pickup ?y))}
+                                #:method{:preconds [(have ?y)], :task-list ((!drop ?y) (!pickup ?x))}]}],
+                     :name "basic-example"}
+   :problem '(defproblem problem1 basic-example
+               ((have banjo))         ; This is state data.
+               ((swap banjo kiwi)))   ; This is some method
+   :execute '(find-plans 'problem1 :verbose :plans)
+   :answer '[(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))]})
+
+(defn test-the-planner
+  "Define a planning domain. Define a problem. Find plans for the problem.
+   Check that the plan matches what is expected."
+  []
+  (log/info "test-planner...")
+  (let [{:keys [domain problem execute answer]} shop2-example
+        result (try (plan {:domain  domain
+                           :problem problem
+                           :execute execute})
+                    (catch Exception e
+                      (log/warn (str "Exception in planner: " (.getMessage e)))
+                      :planning-exception))]
+    (cond (and (not-empty result)
+               (every? string? result)
+               (= (->> result (mapv read-string)) answer))   (do (log/info "Planner passes test.") :passes)
+          (= result :planning-failure)                       (do (log/error "Planning exception")  :planning-failure)
+          :else                                              (do (log/error "Planner fails test.") :fails-test))))
+
+(defn init-planner!
+  "Start the planner. This relies on environment variable PLANNER_SBCL, which is just
+   the name of the SBCL core file. That file is expected to be in the project directory."
+  []
+  (try (future (sh "/usr/bin/sbcl"
+                   "--core"
+                   planner-executable
+                   "--non-interactive"
+                   "--disable-debugger"))
+       (catch Exception e
+         (log/error (:message e))
+         (throw (ex-info "Running planner didn't work." {:error e}))))
+  (Thread/sleep 2000)
+  (test-the-planner))
 
 (defn quit-planner!
   "Quit the planner. It can be restarted with a shell command through mount."
@@ -149,40 +136,6 @@
       (do (log/info "Planner terminated as requested.") :stopped)
       (do (log/warn "Planner state unknown. (It may not have been running.)") :unknown))))
 
-(defn test-planner!
-  "Define a planning domain. Define a problem. Find plans for the problem.
-   Check that the plan matches what is expected."
-  []
-  (log/info "test-planner...")
-  (zmq/with-new-context
-    (let [socket (zmq/socket :req {:connect planner-endpoint})]
-      (zmq/send-msg socket (:domain shop2-example))
-      (zmq/receive-msg socket {:stringify true})
-      (zmq/send-msg socket (:problem shop2-example))
-      (zmq/receive-msg socket {:stringify true})
-      (zmq/send-msg socket (:find-plans shop2-example))
-      (let [result (zmq/receive-msg socket {:stringify true})]
-        (if (= (:answer shop2-example) result)
-          (do (log/info "Planner passes test.") :passes)
-          (do (log/error "Planner fails test.") :fails-test))
-        result))))
-
-
-(defn init-planner
-  "Start the planner. This relies on environment variable PLANNER_SBCL, which is just
-   the name of the SBCL core file. That file is expected to be in the project directory."
-  []
-  (try (future (sh "/usr/bin/sbcl"
-                   "--core"
-                   planner-executable
-                   "--non-interactive"
-                   "--disable-debugger"))
-       (catch Exception e
-         (log/error (:message e))
-         (throw (ex-info "Running planner didn't work." {:error e}))))
-  (Thread/sleep 2000)
-  (test-planner!))
-
 (defstate plan-server
-  :start (init-planner)
+  :start (init-planner!)
   :stop (quit-planner!))
