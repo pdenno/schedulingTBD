@@ -6,10 +6,10 @@
    [clojure.java.io      :as io]
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
-   [datahike.api         :as d]
-   ;[datahike.pull-api    :as dp]
+   [datahike.api         :as d] ;[datahike.pull-api    :as dp]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm not-nothing datahike-schema]]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema
+                                           not-nothing register-db]]
    [taoensso.timbre      :as log]))
 
 ;;; Why so much fuss with planning domain structures?
@@ -370,7 +370,7 @@
 ;;; This grammar has only a few top-level entry points: defdomain, :method :operator and :axiom.
 (defmacro defshop2db
   "Macro to wrap methods for translating shop to database format."
-  {:clj-kondo/lint-as 'clojure.core/fn
+  {:clj-kondo/lint-as 'clojure.core/fn ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
    :arglists '([tag [obj & more-args] & body])} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
   [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
   `(defmethod shop2db ~tag [~obj & [~@more-args]]
@@ -414,17 +414,17 @@
 (defshop2db :method [body & {:keys [domain-name]}]
   (s/assert ::method body)
   (clear-rewrite!)
-  (let [[_ head & pairs] body]
-    (let [res {:method/name (str domain-name "." (method-name head))
-               :sys/body (-> {:sys/typ :method}
-                             (assoc :method/head      (shop2db head :atom))
-                             (assoc :method/rhs       (shop2db pairs :method-rhsides)))}]
-      (if-let [case-name (-> res :sys/body :method/rhs first :method/case-name)]
-        ;; Uniqueness is not well thought through in SHOP! If there is any case-name whatsoever, add THE FIRST to the name.
-        ;; It appears from the zeno example that method signatures might include both formal parameters and sometimes case names.
-        ;; I don't think we care, since we are handing the thing to SHOP to deal with, but we need unique for the DB.
-        (update res :method/name #(str % "." case-name))
-        res))))
+  (let [[_ head & pairs] body
+        res {:method/name (str domain-name "." (method-name head))
+             :sys/body (-> {:sys/typ :method}
+                           (assoc :method/head      (shop2db head :atom))
+                           (assoc :method/rhs       (shop2db pairs :method-rhsides)))}]
+    (if-let [case-name (-> res :sys/body :method/rhs first :method/case-name)]
+      ;; Uniqueness is not well thought through in SHOP! If there is any case-name whatsoever, add THE FIRST to the name.
+      ;; It appears from the zeno example that method signatures might include both formal parameters and sometimes case names.
+      ;; I don't think we care, since we are handing the thing to SHOP to deal with, but we need unique for the DB.
+      (update res :method/name #(str % "." case-name))
+      res)))
 
 ;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>])
 (defshop2db :operator [body & {:keys [domain-name]}]
@@ -524,12 +524,12 @@
                   (recur (conj res (cond-> {}
                                      (not-empty (nth triples 0)) (assoc :method/preconds  (shop2db (nth triples 0) :method-precond))
                                      (not-empty (nth triples 1)) (assoc :method/task-list (shop2db (nth triples 1) :task-list))))
-                         (subvec triples 2)))))]
-    (let [cnt (atom 0)]
-      (-> (for [r res]
-            (assoc r :sys/pos (swap! cnt inc)))
-          vec))))
-;                                           (mapv #(shop2db % :atom) c)
+                         (subvec triples 2)))))
+        cnt (atom 0)]
+    (-> (for [r res]
+          (assoc r :sys/pos (swap! cnt inc)))
+        vec)))
+
 (defshop2db :method-precond [c]
   (let [cnt (atom 0)]
     (cond (-> c (nth 0) seq?)         (-> (for [x c]
@@ -1006,7 +1006,7 @@
           `(:- ~h ~rew1)))
       `(:- ~h ()))))
 
-(defdb2shop :operator [{:operator/keys [head preconds d-list a-list cost] :as exp}]
+(defdb2shop :operator [{:operator/keys [head preconds d-list a-list cost]}]
   (let [pre (map db2shop (->> preconds (sort-by :sys/pos)))
         del (map db2shop (->> d-list   (sort-by :sys/pos)))
         add (map db2shop (->> a-list   (sort-by :sys/pos)))
@@ -1095,7 +1095,7 @@
 (defdb2shop :op-call [exp]
   (db2shop exp :call-term))
 
-(defdb2shop :op-universal [{:op-forall/keys [vars condition consequences]}]
+(defdb2shop :op-universal [{:op-forall/keys [condition consequences]}]
   `(~'forall (map db2shop vars)
     ~(db2shop condition)
     ~(map db2shop consequences)))
@@ -1306,4 +1306,5 @@
     {:plan-db-cfg config}))
 
 (defstate plans-db-cfg
+  :invalid-state :bogus ; Should warn: "lifecycle functions can only contain `:start` and `:stop`. illegal function found: "
   :start (init-db-cfg))

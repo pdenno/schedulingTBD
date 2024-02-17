@@ -64,8 +64,11 @@
   (zmq/with-new-context
     (let [socket (zmq/socket :req {:connect planner-endpoint})]
       (when domain
-        (zmq/send-msg socket (-> domain shop/proj2canon shop/canon2shop str))
-        (zmq/receive-msg socket {:stringify true}))
+        (try (let [shop-plan (-> domain shop/proj2canon shop/canon2shop str)]
+               (zmq/send-msg socket shop-plan)
+               (zmq/receive-msg socket {:stringify true}))
+             (catch Exception e
+               (log/info "Plan proj-format did not compile or load." {:msg (.message e)}))))
       (when problem
         (zmq/send-msg socket (str problem))
         (zmq/receive-msg socket {:stringify true}))
@@ -113,11 +116,7 @@
   "Start the planner. This relies on environment variable PLANNER_SBCL, which is just
    the name of the SBCL core file. That file is expected to be in the project directory."
   []
-  (try (future (sh "/usr/bin/sbcl"
-                   "--core"
-                   planner-executable
-                   "--non-interactive"
-                   "--disable-debugger"))
+  (try (future (sh planner-executable "--non-interactive" "--disable-debugger"))
        (catch Exception e
          (log/error (:message e))
          (throw (ex-info "Running planner didn't work." {:error e}))))

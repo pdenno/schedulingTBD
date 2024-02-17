@@ -2,9 +2,7 @@
   "Scheduling domain prompts."
   (:require
    [scheduling-tbd.llm           :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil         :refer [connect-atm get-api-key]]
-   [clojure.string               :as str]
-   [taoensso.timbre              :as log]))
+   [clojure.string               :as str]))
 
 (def diag (atom nil))
 

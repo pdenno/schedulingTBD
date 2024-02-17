@@ -14,7 +14,7 @@
 ;;;       not focusing on the raw materials supply chain, but rather the process steps being scheduled.
 ;;;       I could use the SHOP3 stuff for this, but it might be better to look elsewhere.
 
-(def diag (atom {}))
+;(def diag (atom {}))
 
 (defn op-start-project
   "Summarize user-text as a project name. Execute plan operations to start a project about user-text."
