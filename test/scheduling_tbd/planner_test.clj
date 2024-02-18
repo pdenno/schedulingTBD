@@ -128,7 +128,7 @@
                 ((plan-state started))
                 ((plan-state stopped)))
 
-     (:method (print-current-state)
+     (:method (print-current-state)       ; <========================= Useful!
        ((eval (print-current-state))) ())
 
      (:method (print-current-tasks)

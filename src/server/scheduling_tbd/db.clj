@@ -42,7 +42,8 @@
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
    To eliminate confusion and need for back pointers, each project has its own db."
-  {;; ---------------------- message
+  {
+   ;; ---------------------- message
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent, either :user or :system, issuing the message."}
@@ -93,6 +94,26 @@
    :summary/next-msg-id ; ToDo: Remove this. Datalog can do it easy.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc "The ID (a natural number) to be assigned to the next message written (either side of conversation)."}
+
+   ;; ---------------------- surrogate
+   :surrogate/id ; Could this and :surrogate/thread be combined?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
+        :doc "A string that uniquely identifies this surrogate, for example, 'craft beer-1'."}
+
+   :surrogate/subject-of-expertise
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The short string identifying what this surrogate is good at minus the verb, which is in the system instruction.
+              For example, this might just be 'craft beer'."}
+
+   :surrogate/thread ; Could this and :surrogate/id be combined?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant thread associated with this project. The surrogate is assistant is "}
+
+   :surrogate/system-instruction
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The complete instruction provided in configuring an OpenAI (or similar) assistant.
+              Typically this substitutes the subject-of-expertise into a template string."}
+
    ;; ---------------------- task type (Of course these are not planner tasks!)
    :task-t/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
