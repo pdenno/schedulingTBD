@@ -114,6 +114,10 @@
         :doc "The complete instruction provided in configuring an OpenAI (or similar) assistant.
               Typically this substitutes the subject-of-expertise into a template string."}
 
+   :surrogate/openai-obj-str
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Stringified EDN for what OpenAI returns when an assistant is created."}
+
    ;; ---------------------- task type (Of course these are not planner tasks!)
    :task-t/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
@@ -407,13 +411,13 @@
 ;;;    3) (db/recreate-system-db!)
 (defn create-proj-db!
   "Create a project database for the argument project."
-  [proj-info]
+  [proj-info & {:keys [] :as additional-info}]
   (if (s/valid? ::project-info proj-info)
     (let [challenge-intro (:segment/challenge-intro proj-info) ; This is a HIM thing.
           {:project/keys [id name] :as new-proj-info}
           (if-not challenge-intro (unique-proj proj-info) proj-info) ; we'll force overwrite of HIM projects.
           dir (str (-> @proj-base-cfg :store :base-path) (clojure.core/name id))]
-      (when-not (-> dir java.io.File. .isDirectory) (-> dir .java.ioFile. .mkdir))
+      (when-not (-> dir java.io.File. .isDirectory) (-> dir java.io.File. .mkdir))
       ;; ToDo: :project/id is unique. Don't wipe out an existing project. User could be starting over. Maybe add a number.
       (let [proj-cfg (assoc @proj-base-cfg :store {:backend :file :path dir})] ; drops :base-path too.
         (when (d/database-exists? proj-cfg) (d/delete-database proj-cfg))
@@ -429,6 +433,8 @@
                                     (-> intro-prompt
                                         (assoc :message/time (now))
                                         (assoc :message/id 1))]})
+        (when (not-empty additional-info)
+          (d/transact conn {:tx-data (vector additional-info)}))
         (when challenge-intro (add-msg id challenge-intro :user))
         (add-msg id (format "Great! We'll call your project '%s'." name) :system)
         ;; Add knowledge of this project to the system db.
