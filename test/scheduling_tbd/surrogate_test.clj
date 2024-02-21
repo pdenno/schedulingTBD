@@ -5,9 +5,8 @@
    [clojure.edn             :as edn]
    [clojure.string          :as str]
    [clojure.test            :refer [deftest is testing]]
-   [datahike.api            :as d]       ; Store thread.
-   [scheduling-tbd.db       :as proj-db]
-   [scheduling-tbd.sutil    :refer [get-api-key connect-atm]]
+   [scheduling-tbd.db       :as db]
+   [scheduling-tbd.sutil    :as sutil :refer [get-api-key connect-atm resolve-db-id db-cfg-map]]
    [taoensso.timbre :as log]
    [wkok.openai-clojure.api :as openai]))
 
@@ -24,7 +23,8 @@
 
 (def beer-example
   "Example data for running an interview (sans planner computing the questions)."
-  {:surrogate/id "craft-beer-surrogate-1"
+  {:project/name "Craft beer surrogate"
+   :surrogate/id :craft-beer-surrogate-1
    :surrogate/subject-of-expertise "craft beer"
 
    ;; This is data/interviews/2024-01-05-craft-brewing.org with some improvements. There is more in that interview, but
@@ -55,47 +55,58 @@
     "Your processes do not have a place to store work-in-process product?
      The product must go from one step to the next? Is that correct? (Just a Y/N answer would be fine.)"]})
 
+
 ;;; (openai/list-assistants {:limit 3})
 ;;; ToDo: First check that it doesn't exist.
-(def surrogate-example
-  (if (-> (db/list-projects)
-  (if-let [key (get-api-key :llm)]
-    (openai/create-assistant {:name         "Example Assistant from Clojure: Beer"
-                              :model        "gpt-4-1106-preview"
-                                  :instructions (format system-instruction  (:surrogate/subject-of-expertise beer-example))
-                              :tools        [{:type "code_interpreter"}]} ; Will be good for csv and xslx, at least.
-                             {:api-key key})
-    (log/warn "Couldn't get OpenAI API key.")))
 
 (defn create-project-db-for-surrogate
   "Create a project DB for the surrogate:
-    - pname can be :surrogate/id
-    - assistant is the object returned from OpenAI for openai/create-assistant.
-    - additional - is a map of other information you want to add to the project db."
-  [pname assistant & {:keys [] :as additional}]
-  (proj-db/create-proj-db!
-   {:project/name pname
-    :project/id   (-> pname str/lower-case (str/replace #"\s+" "-") keyword)}
+    - pid: project id;  can be (name :surrogate/id)
+    - assistant:  the object returned from OpenAI for openai/create-assistant.
+    - additional:  a map of other information you want to add to the project db.
+    Return its root entity id (an integer)."
+  [pid pname assistant additional]
+  (db/create-proj-db!
+   {:project/id pid
+    :project/name pname}
    (merge additional
-          {:surrogate/openai-obj-str (str assistant)})))
+          {:surrogate/id pid
+           :surrogate/openai-obj-str (str assistant)})
+   {:force? true}))
 
-(defn tryme []
-  (create-project-db-for-surrogate
-   (:surrogate/id beer-example )
-   surrogate
-   (-> beer-example (dissoc :tbd/prompts))))
+(defonce assist
+  (let [key (get-api-key :llm)]
+    (openai/create-assistant {:name         "Example Assistant from Clojure: Beer"
+                              :model        "gpt-4-1106-preview"
+                              :instructions (format system-instruction  (:surrogate/subject-of-expertise beer-example))
+                              :tools        [{:type "code_interpreter"}]} ; Will be good for csv and xslx, at least.
+                             {:api-key key})))
 
-;;;===================================================
-;;; ToDo: These need investigation
-;;;===================================================
+
+(defn tryme
+  "If I can't find this assistant in the DB, I create it again."
+  []
+  (let [pid :craft-beer-surrogate]
+    (if (db/project-exists? pid)
+      (-> (db-cfg-map pid) (assoc :project/id pid))
+      ;; Otherwise create a new assistant.
+      (create-project-db-for-surrogate pid
+                                       (:project/name beer-example)
+                                       assist
+                                       {:surrogate/subject-of-expertise "craft beer"
+                                        :surrogate/system-instruction (format system-instruction  (:surrogate/subject-of-expertise beer-example))}))
+    (log/warn "Couldn't get OpenAI API key.")))
+
+;;; ===================== Possibly useful functions ============================================
 (defn list-assistants
   []
   (if-let [key (get-api-key :llm)]
-    (openai/list-assistants {:limit 3} {:api key})
+    (openai/list-assistants {:limit 30} {:api-key key})
     (log/warn "Couldn't get OpenAI API key.")))
 
+;;; I probably don't need this.
 (defn get-assistant [_name]
   (if-let [key (get-api-key :llm)]
     (openai/retrieve-assistant {:assistant_id "asst_4x0LHJut8YDuMrMQnFrVaTtt"}
-                               {:api key})
+                               {:api-key key})
     (log/warn "Couldn't get OpenAI API key.")))

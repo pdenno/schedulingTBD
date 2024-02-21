@@ -8,8 +8,7 @@
    [clojure.spec.alpha   :as s]
    [datahike.api         :as d] ;[datahike.pull-api    :as dp]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema
-                                           not-nothing register-db]]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema not-nothing register-db db-cfg-map]]
    [taoensso.timbre      :as log]))
 
 ;;; Why so much fuss with planning domain structures?
@@ -1271,13 +1270,13 @@
 ;;; Currently this loads zeno, just for testing.
 (defn recreate-planning-domains-db!
   "Recreate the plans db from .edn data. It uses the connect-atm, which is already established."
-  [config]
+  [cfg]
   (if (.exists (io/file "data/planning-domains/domains.edn")) ; ToDo: This will need to be better someday soon.
     (do (log/info "Recreating the planning domains database.")
-        (when (d/database-exists? config)
-          (d/delete-database config))
-        (d/create-database config)
-        (register-db :planning-domains config)
+        (when (d/database-exists? cfg)
+          (d/delete-database cfg))
+        (d/create-database cfg)
+        (register-db :planning-domains cfg)
         (let [conn (connect-atm :planning-domains)]
           (d/transact conn (datahike-schema db-schema-shop2+))
           (d/transact conn (->> "data/planning-domains/domains.edn"
@@ -1288,22 +1287,17 @@
         true)
     (log/error "Not recreating planning domains DB: No backup file.")))
 
+(def recreate-db? false)
+
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-db-cfg
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:base-path).
    Recreate the system database if sys-db-cfg.recreate-db? = true."
   []
-  (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB")) ; "/opt/scheduling" typically.
-                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
-                                          "\nCreate a directory 'planning-domains' under it.") {})))
-        ;; https://cljdoc.org/d/io.replikativ/datahike/0.6.1545/doc/datahike-database-configuration
-        config {:store {:backend :file :path (str base-dir "/planning-domains")}
-                :keep-history? false
-                :recreate-db? true ; <=== If true, it will recreate the plans DB.
-                :schema-flexibility :write}]
-    (when (:recreate-db? config)
-      (recreate-planning-domains-db! config))
-    {:plan-db-cfg config}))
+  (when recreate-db?
+    (let [cfg (db-cfg-map :planning-domains)]
+      (recreate-planning-domains-db! cfg)
+      {:plan-db-cfg cfg})))
 
 (defstate plans-db-cfg
   :invalid-state :bogus ; Should warn: "lifecycle functions can only contain `:start` and `:stop`. illegal function found: "

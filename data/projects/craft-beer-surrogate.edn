@@ -1,0 +1,23 @@
+[
+#:summary{:name "SUMMARY", :next-msg-id 2}
+
+#:project{:id :craft-beer-surrogate, :name "Craft beer surrogate"}
+
+#:message{:content
+          [#:msg-text{:string
+                      "Describe your scheduling problem in a few sentences or "}
+           #:msg-link{:text "learn more about how this works",
+                      :uri "http://localhost:3300/learn-more"}
+           #:msg-text{:string "."}],
+          :from :system,
+          :id 1,
+          :time #inst "2024-02-21T23:21:34.301-00:00"}
+
+#:surrogate{:id :craft-beer-surrogate,
+            :openai-obj-str
+            "{:description nil, :file_ids [], :name \"Example Assistant from Clojure: Beer\", :tools [{:type \"code_interpreter\"}], :instructions \"You manage a company that makes craft beer.\\n   You are an expert in production of the company's products and management of its supply chains.\\n   You help me by answering questions that will allow us together to build a scheduling systems for your company.\\n   Your answers typically are short, just a few sentences each.\", :id \"asst_igV9Z8M5zI1Y2Xc954YEKvSi\", :metadata {}, :object \"assistant\", :created_at 1708557007, :model \"gpt-4-1106-preview\"}",
+            :subject-of-expertise "craft beer",
+            :system-instruction
+            "You manage a company that makes craft beer.\n   You are an expert in production of the company's products and management of its supply chains.\n   You help me by answering questions that will allow us together to build a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each."}
+
+]

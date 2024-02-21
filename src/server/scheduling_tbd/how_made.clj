@@ -14,7 +14,7 @@
    [scheduling-tbd.db       :as proj-db]
    [scheduling-tbd.domain   :as dom]
    [scheduling-tbd.llm      :as llm]
-   [scheduling-tbd.sutil    :as sutil :refer [connect-atm]]
+   [scheduling-tbd.sutil    :as sutil :refer [connect-atm db-cfg-map]]
    [taoensso.timbre :as log]))
 
 (def him-schema+
@@ -274,27 +274,25 @@
   [seg-name]
   (if-let [intro (->> (segment-intros)
                       (some #(when (= seg-name (:segment/name %)) (:segment/intro %))))]
-    (let [pname (-> seg-name (str " production scheduling"))]
+    (let [pname (-> seg-name (str " segment scheduling"))]
       (proj-db/create-proj-db!
        {:project/name pname
-        :project/id   (-> pname str/lower-case (str/replace #"\s+" "-") keyword)
-        :segment/challenge-intro intro}))
-    (log/error "Project by that name not found:" seg-name)))
+        :project/id   (-> pname str/lower-case (str/replace #"\s+" "-") keyword)}
+       {}
+       {:force? true :make-current? false})
+      (proj-db/add-msg :him (:segment/challenge-intro intro) :user))
+    (log/error "HIM segment by that name not found:" seg-name)))
+
+(def rebuild-him? "True if mount/init should rebuild the How It's Made database." false)
 
 ;;; ------------------- Starting and stopping ---------------
 (defn init-him
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
    Recreate the system database if sys-db-cfg.rebuild-db? = true."
   []
-  (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB"))
-                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
-                                          "\nCreate directories 'projects' and 'system' under it.") {})))
-        him-cfg {:store {:backend :file :path (str base-dir "/etc/other-dbs/him")}
-                 :keep-history? false
-                 :rebuild-db? false ; <=========================
-                 :schema-flexibility :write}]
+  (let [him-cfg (db-cfg-map :him)]
     (sutil/register-db :him him-cfg)
-    (when (:rebuild-db? him-cfg) (create-him-db him-cfg))
+    (when rebuild-him? (create-him-db him-cfg))
     him-cfg))
 
 (defstate him-cfg

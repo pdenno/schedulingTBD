@@ -7,37 +7,45 @@
    [clojure.instant]
    [clojure.java.io              :as io]
    [clojure.pprint       :refer [pprint]]
+   [clojure.set                  :as set]
    [clojure.spec.alpha           :as s]
    [clojure.string               :as str]
    [datahike.api                 :as d]
+   [datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.util  :as util :refer [now]]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema]]
+   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id]]
    [taoensso.timbre :as log])
   (:import
    java.time.LocalDateTime))
+
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
      - The project's name and db directory
      - Planning domains, methods, operators, and axioms"
   {;; ---------------------- project
-   :project/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
-        :doc "a keyword matching the one in the same named property of a project database"}
+   :project/deleted?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "a boolean marking the projected as no longer existing.
+              It won't be written to backup. The DB will be moved under the 'deleted' directory."}
    :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
         :doc "a string naming a subdirectory containing a project."}
+   :project/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
+        :doc "a keyword matching the one in the same named property of a project database"}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string, same as the :project/name in the project's DB.."}
 ;;; ---------------------- system
-   :system/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
-        :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
    :system/current-project-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
-        :doc "a keyword naming the current project; set by user using UI, it is one of the :project/id values in this DB."}})
+        :doc "a keyword naming the current project; set by user using UI, it is one of the :project/id values in this DB."}
+   :system/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
+        :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}})
+
 
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
@@ -71,6 +79,10 @@
            :doc "A text string as part of :message/content."}
 
    ;; ---------------------- project
+   :project/deleted?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "a boolean marking the projected as no longer existing.
+              It won't be written to backup. The DB will be moved under the 'deleted' directory."}
    :project/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a lowercase kebab-case keyword naming a project; unique to the project."}
@@ -97,7 +109,7 @@
 
    ;; ---------------------- surrogate
    :surrogate/id ; Could this and :surrogate/thread be combined?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A string that uniquely identifies this surrogate, for example, 'craft beer-1'."}
 
    :surrogate/subject-of-expertise
@@ -106,7 +118,7 @@
               For example, this might just be 'craft beer'."}
 
    :surrogate/thread ; Could this and :surrogate/id be combined?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "An OpenAI assistant thread associated with this project. The surrogate is assistant is "}
 
    :surrogate/system-instruction
@@ -200,14 +212,15 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The sentence from user description best describing the scheduling objective."}})
 
+(def db-object-ids
+  (reduce-kv (fn [res k v] (if (= :db.unique/identity (:db/unique v)) (conj res k) res))
+             []
+             db-schema-proj+))
+
 (def diag (atom nil))
 
 (def db-schema-sys  (datahike-schema db-schema-sys+))
 (def db-schema-proj (datahike-schema db-schema-proj+))
-
-;;; Atom for configuration map used for connecting to the system db.
-;;; It is set by alter-var-root code in this namespace."
-(defonce sys-db-cfg (atom nil))
 
 ;;; Atom for the configuration map used for connecting to the project db.
 (defonce proj-base-cfg (atom nil))
@@ -222,12 +235,22 @@
        @(connect-atm :system)))
 
 (defn project-exists?
+  "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
+   (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
   [proj-id]
   (assert (keyword? proj-id))
-  (d/q '[:find ?e .
-         :in $ ?proj-id
-         :where [?e :project/id ?proj-id]]
-       @(connect-atm :system) proj-id))
+  (when (d/q '[:find ?e .
+               :in $ ?proj-id
+               :where
+               [?e :project/id ?proj-id]
+               (not [?e :project/deleted? true])]
+             @(connect-atm :system) proj-id)
+    (d/q '[:find ?e .
+           :in $ ?proj-id
+           :where
+           [?e :project/id ?proj-id]]
+;           (not [?e :project/deleted? true])]
+         @(connect-atm proj-id) proj-id)))
 
 (defn set-current-project
   "Get the current project from the system database."
@@ -238,14 +261,38 @@
                 :system/current-project-id proj-id}]))
 
 (defn list-projects
-  "Return a vector of maps describing each project known by the system DB."
-  []
-  (d/q '[:find ?proj-id ?proj-dir
-         :keys project/id :project/dir
-         :where
-         [?e :project/id  ?proj-id]
-         [?e :project/dir ?proj-dir]]
-       @(connect-atm :system)))
+  "Return a vector of keywords maps describing each project known by the system DB."
+  ([] (list-projects {:from-storage? false}))
+  ([{:keys [from-storage?]}]
+   (if from-storage?
+     (if-let [base-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
+       (let [files (-> base-dir (str "/projects/") clojure.java.io/file .listFiles)]
+         (mapv #(-> % .getName keyword) files))
+       (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases.") {})))
+     ;; Otherwise we list using system db. These are the 'legitmate' projects (they aren't :project/deleted? = true).
+     (d/q '[:find [?proj-id ...]
+            :where
+            [?e :project/id  ?proj-id]
+            (not [?e :project/deleted? true])]
+          @(connect-atm :system)))))
+
+;;; ToDo: Add structure to this as the structure develops.
+(defn show-project
+  "Return a vector of project content.
+   Default content is :summary/name :project/id :message/content."
+  ([pid] (show-project pid db-object-ids))
+  ([pid props]
+   (when-let [conn (connect-atm pid)]
+     (let [eids (mapcat #(d/q '[:find [?e ...]
+                                :in $ ?prop-name
+                                :where [?e ?prop-name]]
+                              @conn
+                              %) props)]
+       (->> eids
+            sort
+            ;;(dp/pull-many @conn '[*])
+            (mapv #(resolve-db-id {:db/id %} conn))
+            vec)))))
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
@@ -255,7 +302,7 @@
         s (with-out-str
             (println "[")
             (doseq [ent-id  (sutil/root-entities conn-atm)]
-              (let [obj (sutil/resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
+              (let [obj (resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
                 ;; Write content except schema elements and transaction markers.
                 (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
                   (pprint obj)
@@ -279,7 +326,7 @@
             s (with-out-str
                 (println "[")
                 (doseq [ent-id  (sutil/root-entities conn-atm)]
-                  (let [obj (sutil/resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
+                  (let [obj (resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
                     ;; Write content except schema elements and transaction markers.
                     (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
                       (pprint obj)
@@ -292,14 +339,15 @@
   "Recreate the system database from an EDN file."
   [& {:keys [target-dir] :or {target-dir "data/"}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
-    (do (log/info "Recreating the system database.")
-        (when (d/database-exists? @sys-db-cfg) (d/delete-database @sys-db-cfg))
-        (d/create-database @sys-db-cfg)
-        (register-db :system @sys-db-cfg)
-        (let [conn (connect-atm :system)]
-          (d/transact conn db-schema-sys)
-          (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
-        true)
+    (let [cfg (db-cfg-map :system)]
+      (log/info "Recreating the system database.")
+      (when (d/database-exists? cfg) (d/delete-database cfg))
+      (d/create-database cfg)
+      (register-db :system cfg)
+      (let [conn (connect-atm :system)]
+        (d/transact conn db-schema-sys)
+        (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
+      cfg)
     (log/error "Not recreating system DB: No backup file.")))
 
 (defn recreate-project-db!
@@ -307,24 +355,35 @@
   [id]
   (let [backup-file (format "data/projects/%s.edn" (name id))]
     (if (.exists (io/file backup-file))
-      (let [cfg (-> @proj-base-cfg (assoc-in [:store :path]
-                                             (str (-> @proj-base-cfg :store :base-path)
-                                                  (name :craft-beer-brewery-scheduling))))]
+      (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB"))
+                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
+                                          "\nCreate directories 'projects' and 'system' under it.") {})))
+            cfg (-> db-template
+                    (assoc-in [:store :path] (str base-dir "/projects/" (name id)))
+                    (assoc    :base-dir base-dir))]
         (when (d/database-exists? cfg) (d/delete-database cfg))
         (d/create-database cfg)
         (register-db id cfg)
         (let [conn (connect-atm id)]
           (d/transact conn db-schema-proj)
           (d/transact conn (->> backup-file slurp edn/read-string)))
-        true)
+        cfg)
     (log/error "Not recreating DB because backup file does not exist:" backup-file))))
 
-(defn recreate-project-dbs!
-  "Recreate a DB for each project using EDN files."
+(defn recreate-dbs!
+  "Recreate the system DB on storage from backup.
+   For each project it lists, recreate it from backup if such backup exists."
   []
-  (log/info "Recreating project databases.")
-  (doseq [proj (list-projects)]
-    (recreate-project-db! (:project/id proj))))
+  (recreate-system-db!)
+  (doseq [pid (list-projects)]
+    (recreate-project-db! pid)))
+
+(defn unknown-projects
+  "Return a vector of directories that the system DB does not know."
+  []
+  (set/difference
+   (set (list-projects {:from-storage? true}))
+   (set (list-projects))))
 
 ;;; ----------------------- Creating a project DB ----------------------
 (defn unique-proj
@@ -393,6 +452,17 @@
       msg)
     (log/info "Project does not exist" {:id project-id})))
 
+(defn add-project
+  "Add the argument project (a db-cfg map) to the system database."
+  ([id proj-name dir] (add-project id proj-name dir {:make-current? true}))
+  ([id proj-name dir opts]
+   (d/transact (connect-atm :system)
+               {:tx-data [(cond-> {:system/name "SYSTEM"}
+                            (:make-current? opts) (assoc :system/current-project-id id))
+                          {:project/id id
+                           :project/name proj-name
+                           :project/dir dir}]})))
+
 (def intro-prompt
   "This is the DB form of the first message of a conversation."
   #:message{:from :system,
@@ -402,84 +472,76 @@
                        :msg-link/text "learn more about how this works"}
                       {:msg-text/string "."}]})
 
-(s/def ::project-info (s/keys :req [:project/id :project/name]
-                              :opt [:segment/challenge-intro])) ; Used for HIM only.
+(s/def ::project-info (s/keys :req [:project/id :project/name]))
 
 ;;; BTW, I don't have a good way to delete the project yet from the system-db.
 ;;;    1) (db/backup-system-db)
 ;;;    2) Edit the .edn to remove the project.
 ;;;    3) (db/recreate-system-db!)
 (defn create-proj-db!
-  "Create a project database for the argument project."
-  [proj-info & {:keys [] :as additional-info}]
-  (if (s/valid? ::project-info proj-info)
-    (let [challenge-intro (:segment/challenge-intro proj-info) ; This is a HIM thing.
-          {:project/keys [id name] :as new-proj-info}
-          (if-not challenge-intro (unique-proj proj-info) proj-info) ; we'll force overwrite of HIM projects.
-          dir (str (-> @proj-base-cfg :store :base-path) (clojure.core/name id))]
-      (when-not (-> dir java.io.File. .isDirectory) (-> dir java.io.File. .mkdir))
-      ;; ToDo: :project/id is unique. Don't wipe out an existing project. User could be starting over. Maybe add a number.
-      (let [proj-cfg (assoc @proj-base-cfg :store {:backend :file :path dir})] ; drops :base-path too.
-        (when (d/database-exists? proj-cfg) (d/delete-database proj-cfg))
-        (d/create-database proj-cfg)
-        (register-db id proj-cfg))
-      ;; Add to project db
-      (let [conn (connect-atm id)]
-        (d/transact conn db-schema-proj)
-        (d/transact conn {:tx-data [{:summary/name "SUMMARY"
-                                     :summary/next-msg-id 2} ; 2 if challenge-intro, no problem if not.
-                                    {:project/id id
-                                     :project/name name}
-                                    (-> intro-prompt
-                                        (assoc :message/time (now))
-                                        (assoc :message/id 1))]})
-        (when (not-empty additional-info)
-          (d/transact conn {:tx-data (vector additional-info)}))
-        (when challenge-intro (add-msg id challenge-intro :user))
-        (add-msg id (format "Great! We'll call your project '%s'." name) :system)
-        ;; Add knowledge of this project to the system db.
-        (d/transact (connect-atm :system)
-                    {:tx-data [{:system/name "SYSTEM"
-                                :system/current-project-id id}
-                               {:project/id   id
-                                :project/name name
-                                :project/dir dir}]})
-        (log/info "Created project database for" (:project/name new-proj-info))
-        true))
-    (throw (ex-info "Project database must provide :proj/name and :proj/id"
-                    {:proj-info proj-info}))))
+  "Create a project database for the argument project.
+   The project-info map must include :project/id and :project/name."
+  ([proj-info] (create-proj-db! proj-info {}))
+  ([proj-info additional-info] (create-proj-db! proj-info additional-info {:intro? true}))
+  ([proj-info additional-info opts]
+   (s/assert ::project-info proj-info)
+   (let [{:project/keys [id name]} (if (:force? opts) proj-info (unique-proj proj-info))
+         cfg (db-cfg-map :project id)]
+     (when-not (-> cfg :store :path java.io.File. .isDirectory)
+       (-> cfg :store :path java.io.File. .mkdir))
+     (when (d/database-exists? cfg) (d/delete-database cfg))
+     (d/create-database cfg)
+     (register-db id cfg)
+     ;; Add to project db
+     (d/transact (connect-atm id) db-schema-proj)
+     (d/transact (connect-atm id) {:tx-data [{:summary/name "SUMMARY"
+                                              :summary/next-msg-id 2} ; 2 if challenge-intro, no problem if not.
+                                             {:project/id id
+                                              :project/name name}
+                                             (-> intro-prompt
+                                                 (assoc :message/time (now))
+                                                 (assoc :message/id 1))]})
+     (when (not-empty additional-info)
+       (d/transact (connect-atm id) {:tx-data (vector additional-info)}))
+     (when (:intro? opts) (add-msg id (format "Great! We'll call your project '%s'." name) :system))
+     ;; Add knowledge of this project to the system db.
+     (add-project id name (-> cfg :store :path) opts)
+     (log/info "Created project database for" id)
+     (assoc cfg :project/id id))))
+
+(defn delete-project
+  "Remove project from the system DB and move its project directory to the the deleted directory.
+   Both the :system and project databases can have a :project/deleted? attribute."
+  [pid]
+  (if (and (some #(= % pid) (list-projects {:from-storage? true}))
+           (some #(= % pid) (list-projects)))
+    (let [cfg (db-cfg-map :project pid)
+          source (-> cfg :store :path)
+          filename (-> source io/file .getName)
+          target (str (:base-dir cfg) "/deleted/" filename)
+          eid (project-exists? pid)
+          sys-proj-eid (d/q `[find ?e . :where [?e :project/id ~pid]] (connect-atm :system))]
+      (log/warn "Deleting project" pid (str ". (Moving it to" target ")"))
+      (d/transact (connect-atm :system) [[:db/add sys-proj-eid :project/deleted? true]])
+      (d/transact (connect-atm pid)     [[:db/add eid          :project/deleted? true]])
+      (sutil/deregister-db pid)
+      (log/warn "Moving project" pid "to " target)
+      (sutil/move-file source target))
+    (log/warn "Delete-project: Project not found:" pid)))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs
   "Make a config for each project and register it."
   []
-  (doseq [{:project/keys [id dir]} (list-projects)]
-    (register-db id {:store {:backend :file :path dir
-                             :keep-history? false
-                             :schema-flexibility :write}})))
+  (doseq [id (list-projects {:from-storage? true})]
+    (register-db id (db-cfg-map :project id))))
 
 (defn init-db-cfgs
-  "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:base-path).
-   Recreate the system database if sys-db-cfg.recreate-db? = true."
+  "Register DBs using "
   []
-  (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB")) ; "/opt/scheduling" typically.
-                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
-                                          "\nCreate directories 'projects' and 'system' under it.") {})))]
-    ;; https://cljdoc.org/d/io.replikativ/datahike/0.6.1545/doc/datahike-database-configuration
-    (reset! proj-base-cfg {:store {:backend :file :base-path (str base-dir "/projects/")}
-                           :schema-flexibility :write})
-    (reset! sys-db-cfg {:store {:backend :file :path (str base-dir "/system")}
-                        :keep-history? false
-                        ;:attribute-refs? true ; With this I can't transact lookup-refs!
-                        :recreate-dbs? false ; <=== If true, it will recreate the system DB and project directories too.
-                        :schema-flexibility :write})
-    (register-db :system @sys-db-cfg)
-    (when (-> sys-db-cfg deref :recreate-dbs?)
-      (recreate-system-db!)
-      (recreate-project-dbs!))
-    (register-project-dbs)
-    {:sys-cfg @sys-db-cfg
-     :proj-base @proj-base-cfg}))
+  (register-project-dbs)
+  (register-db :system (db-cfg-map :system))
+  {:sys-cfg (db-cfg-map :system)})
 
 (defstate sys&proj-database-cfgs
   :start (init-db-cfgs))
