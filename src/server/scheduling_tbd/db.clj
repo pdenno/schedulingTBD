@@ -355,12 +355,7 @@
   [id]
   (let [backup-file (format "data/projects/%s.edn" (name id))]
     (if (.exists (io/file backup-file))
-      (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB"))
-                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
-                                          "\nCreate directories 'projects' and 'system' under it.") {})))
-            cfg (-> db-template
-                    (assoc-in [:store :path] (str base-dir "/projects/" (name id)))
-                    (assoc    :base-dir base-dir))]
+      (let [cfg (db-cfg-map :project id)]
         (when (d/database-exists? cfg) (d/delete-database cfg))
         (d/create-database cfg)
         (register-db id cfg)
@@ -480,7 +475,11 @@
 ;;;    3) (db/recreate-system-db!)
 (defn create-proj-db!
   "Create a project database for the argument project.
-   The project-info map must include :project/id and :project/name."
+   The project-info map must include :project/id and :project/name.
+     proj-info  - map containing at least :project/id and :project/name.
+     additional - a vector of maps to add to the database.
+     opts -  {:force? - overwrite project with same name.
+              :make-current? - focus of work in UI.}"
   ([proj-info] (create-proj-db! proj-info {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {:intro? true}))
   ([proj-info additional-info opts]
@@ -502,7 +501,7 @@
                                                  (assoc :message/time (now))
                                                  (assoc :message/id 1))]})
      (when (not-empty additional-info)
-       (d/transact (connect-atm id) {:tx-data (vector additional-info)}))
+       (d/transact (connect-atm id) additional-info))
      (when (:intro? opts) (add-msg id (format "Great! We'll call your project '%s'." name) :system))
      ;; Add knowledge of this project to the system db.
      (add-project id name (-> cfg :store :path) opts)

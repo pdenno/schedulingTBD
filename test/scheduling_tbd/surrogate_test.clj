@@ -69,9 +69,9 @@
   (db/create-proj-db!
    {:project/id pid
     :project/name pname}
-   (merge additional
+   [(merge additional
           {:surrogate/id pid
-           :surrogate/openai-obj-str (str assistant)})
+           :surrogate/openai-obj-str (str assistant)})]
    {:force? true}))
 
 (defonce assist
@@ -102,6 +102,12 @@
   []
   (if-let [key (get-api-key :llm)]
     (openai/list-assistants {:limit 30} {:api-key key})
+    (log/warn "Couldn't get OpenAI API key.")))
+
+(defn delete-assistant
+  [id]
+  (if-let [key (get-api-key :llm)]
+    (openai/delete-assistant {:assistant_id id} {:api-key key})
     (log/warn "Couldn't get OpenAI API key.")))
 
 ;;; I probably don't need this.
