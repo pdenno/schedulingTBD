@@ -32,30 +32,10 @@
         new-proj {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"}]
      (->> proj-infos
           (filter #(not= cid (:project/id %)))
-          (sort-by :project/name)
+          (sort-by :project/name) ; ToDo: This sort does not appear to be working.
           (into [current new-proj])
           (map :project/id)
           clj->js)))
-
-;;; This is WIP
-;;; https://zenoo.github.io/mui-theme-creator/
-#_(def my-themeOptions
-  (clj->js {:pallet {:mode "light"
-                     :primary   {:main "#3f51b5"}
-                     :secondary {:main "#f50057"}}}))
-
-#_(def useStyles
-  (createTheme
-   (fn [theme]
-     (clj->js
-      {:root
-       {"boxShadow" "none"}
-
-       :flexGrow
-       {:flexGrow 1}
-
-       :signOutButton
-       {:maginLeft ((.-spacing theme) 1)}}))))
 
 ;;; current-project and content of the others vector are keywords.
 ;;; As a rule, we keep data as it is maintained in the DB until we need a string for React.
@@ -83,3 +63,23 @@
                                     (change-proj-fn proj))))}
             (for [p @menu-list]
               ($ MenuItem {:key p :value p} (proj-id2nice p))))))))
+
+;;; This is WIP
+;;; https://zenoo.github.io/mui-theme-creator/
+#_(def my-themeOptions
+  (clj->js {:pallet {:mode "light"
+                     :primary   {:main "#3f51b5"}
+                     :secondary {:main "#f50057"}}}))
+
+#_(def useStyles
+  (createTheme
+   (fn [theme]
+     (clj->js
+      {:root
+       {"boxShadow" "none"}
+
+       :flexGrow
+       {:flexGrow 1}
+
+       :signOutButton
+       {:maginLeft ((.-spacing theme) 1)}}))))

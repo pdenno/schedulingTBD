@@ -45,7 +45,7 @@
           others (->> (db/list-projects)
                       (filter #(not= % cid))
                       (map  #(-> % (db/get-project #{:project/id}) first))
-                      (mapv #(name&id %)))]
+                      (map #(name&id %)))]
     (log/info "Call to list-projects")
     (http/ok
      (cond-> {}
