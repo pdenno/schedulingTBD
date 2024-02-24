@@ -14,7 +14,14 @@
 ;;;       not focusing on the raw materials supply chain, but rather the process steps being scheduled.
 ;;;       I could use the SHOP3 stuff for this, but it might be better to look elsewhere.
 
-;(def diag (atom {}))
+(def diag (atom {}))
+
+(def intro-message
+  "The first message of a conversation."
+  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
+   {:msg-link/uri "http://localhost:3300/learn-more"
+    :msg-link/text "learn more about how this works"}
+   {:msg-text/string "."}])
 
 (defn op-start-project
   "Summarize user-text as a project name. Execute plan operations to start a project about user-text."

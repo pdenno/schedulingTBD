@@ -90,15 +90,7 @@
 (defn add-msg [msg-list msg]
   (-> msg-list js->clj (conj msg) clj->js))
 
-(def intro-message
-  "The first message of a conversation."
-  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
-   {:msg-link/uri "http://localhost:3300/learn-more"
-    :msg-link/text "learn more about how this works"}
-   {:msg-text/string "."}])
-
 ;;; ------------------- web-socket ------------------------------
-
 (def client-id "A random uuid naming this client. It changes on disconnect." (str (random-uuid)))
 (def ws-url (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
 (def channel (atom nil))
@@ -116,26 +108,20 @@
     (log/error "Couldn't send ping; channel isn't open.")))
 
 ;;; ========================= Component ===============================
-#_(defn resize
-  "Set dimension of the EditorView for share."
-  [parent width height]
-  ;(share/resize parent width height)
-  (when-let [view (get-in @util/component-refs [editor-name :view])]
-    (when-let [dom (j/get view :dom)]
-      (when width  (j/assoc-in! dom    [:style :width]  (str width  "px")))
-      (when height
-        (j/assoc-in! dom [:style :height] (str height "px"))))))
+(defn make-resize-fns
+  "These are used by ShareUpDown. The argument is a Hook state variable set- function."
+  [set-height-fn]
+  {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-
-
-(defnc Chat [{:keys [box-height conv-map] :or {box-height 600}}]
+(defnc Chat [{:keys [chat-height conv-map]}]
   (let [[msg-list set-msg-list] (hooks/use-state (->> conv-map :conv (mapv msg2rce) clj->js)) ; ToDo: Not clear why this doesn't set msg-list...
         [progress set-progress] (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
         [user-text     set-user-text]   (hooks/use-state "")
         [system-text set-system-text]   (hooks/use-state "")
+        [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         input-ref (hooks/use-ref nil)
-        box-ref (hooks/use-ref nil)]
+        resize-fns (make-resize-fns set-box-height)]
     (hooks/use-effect [conv-map] ;... and this is necessary.
       (set-msg-list (->> conv-map :conv (mapv msg2rce) clj->js)))
     (letfn [(connect! []  ; I think this has to be here owing to scoping restrictions on hooks functions,... ToDo: Can't I pass it in?
@@ -162,11 +148,6 @@
           (-> (dba/user-says user-text)
               (p/then #(set-msg-list (->> % msg2rce (add-msg msg-list))))
               (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %))))))
-      ;; -------------- Get ref for box for resizing
-      (hooks/use-effect [conv-map] ; Could be anything, I think.
-        (when-let [parent (j/get box-ref :current)]
-          (log/info "Setting box-ref!")
-          (swap! util/component-refs #(assoc % "chat-box" {:parent parent}))))
       ;; -------------- progress stuff (currentl not hooked up)
       (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
         (reset! progress-atm 0)
@@ -179,37 +160,15 @@
                        (set-progress (reset! progress-atm percent)))))
                  200)))
       ;; ----------------- component UI structure.
-      #_($ Stack {:direction "column" :spacing "0px"}
-         ($ Box {:sx (clj->js {:overflowY "auto" ; :sx was :style
-                               :display "flex"
-                               :flexGrow 1
-                               :maxHeight 300 ; (- height 100)
-                               :flexDirection "column"})}
-            ($ rce/MessageList {:dataSource msg-list}))
-         ($ LinearProgress {:variant "determinate" :value progress})
-         ($ Stack {:direction "row" :spacing "0px"}
-            ($ rce/Input {:referance input-ref ; <==== Yes, rilly!
-                          :value user-text
-                          :placeholder "Type here..."
-                          :multiline true})
-            ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
-                                       (when-let [text (not-empty (j/get iref :value))]
-                                         (set-msg-list (add-msg msg-list (rce-msg :user text)))
-                                         (j/assoc! iref :value "")
-                                         (set-user-text text)))}
-               ($ Send))))
-;;; WIP ============================================================================
-     ($ ShareUpDown
-         {:init-height 800
+      ($ ShareUpDown
+         {:init-height chat-height
+          :share-fns resize-fns
           :up
-          ($ Box {:ref box-ref
-                  :sx ; This work!
+          ($ Box {:sx ; This work!
                   #js {:overflowY "auto"
-                       :display "flex" ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
+                       :display "flex"    ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
                        :height box-height ; When set small enough, scroll bars appear.
-                       :flexGrow 1 ; ToDo: Do I need this? See https://developer.mozilla.org/en-US/docs/Web/CSS/flex-grow
                        :flexDirection "column"
-                       ;;:alignItems "stretch"
                        :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
              ($ rce/MessageList  {:dataSource msg-list
                                   :style #js {:alignItems "stretch" ; ; :style is helix for non-MUI things. I think(!)

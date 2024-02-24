@@ -10,6 +10,7 @@
  ;; https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#lint-a-custom-macro-like-a-built-in-macro --- Use defn, not defmacro.
  :lint-as {#_#_scheduling-tbd.shop/defdb2shop        clojure.core/defn  ; These aren't needed; I did them in-line. (See shop.clj)
            #_#_scheduling-tbd.shop/defshop2db        clojure.core/defn
+           applied-science.js-interop/defn           clojure.core/defn
            mount.core/defstate                       clj-kondo.lint-as/def-catch-all   ; Because the hook is not working!
            ezzmq.core/with-new-context               clojure.core/defmacro             ; I haven't seen defmacro being used; this 'works' as well as def-catch-all.
            #_#_ezzmq.core/with-new-context               clj-kondo.lint-as/def-catch-all}} ; A macro, but not investigated; clojure.core/defn doesn't fix it.

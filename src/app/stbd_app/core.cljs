@@ -1,29 +1,24 @@
 (ns stbd-app.core
   (:require
    [applied-science.js-interop :as j]
-   [clojure.string :as str]
    [helix.core :as helix :refer [defnc $ <>]]
    [helix.hooks :as hooks]
    ["@codemirror/view" :as view]
    ["@mui/material/Box$default" :as Box]
-   ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/colors" :as colors]
    ["@mui/material/CssBaseline$default" :as CssBaseline]
-   ["@mui/material/LinearProgress$default" :as LinearProgress]
    ["@mui/material/Stack$default" :as Stack]
    ["@mui/material/styles" :as styles] ; See it used here: https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
    ["@mui/material/Typography$default" :as Typography]
    [promesa.core :as p]
    ["react-dom/client" :as react-dom]
-   ["react-router-dom" :as router :refer [useSearchParams]]
    [scheduling-tbd.util :as sutil]
-   [stbd-app.components.chat :as chat :refer [Chat]]
+   [stbd-app.components.chat :as chat :refer [Chat]] ; clojure-lsp error? I use it!
    [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.db-access :as dba]
    [stbd-app.util :as util]
-   [stbd-app.wsock :as wsock]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
 (def diag (atom {}))
@@ -35,6 +30,8 @@
   (atom nil))
 (def progress-atm "Percent allowed duration for eval-cell. 100% is a timeout." (atom 0))
 
+;;; ToDo: So many problems with this. (Does ANY of it work?).
+;;; Example of using style in helix (a gist): https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
 (def app-theme
   (styles/createTheme
    (j/lit {:palette {:background {:paper "#F0F0F0"}
@@ -100,6 +97,7 @@
                      (js/window.clearInterval @progress-handle)))))
   nil)
 
+;;; ---------- Codemirror stuff from RADmapper; not used yet -------------------
 (defn add-result-action
   "Return the keymap updated with the partial for :on-result, I think!" ;<===
   [{:keys [on-result progress-bool]}]
@@ -160,15 +158,15 @@
     (+ @progress-atm 2)))
 
 (defnc Top [{:keys [width height]}]
-  (let [banner-height 42
+  (let [banner-height 58 ; was 42 hmmm...
         [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
         [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
         [conversation set-conversation]       (hooks/use-state {:conv [] :conv-for "nobody"})
-        useful-height (- height banner-height)
-        chat-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
-        code-editor-height   (int (* useful-height 0.5))]    ; <================================== Ignored?
+        useful-height (int (- height banner-height))
+        chat-side-height useful-height
+        code-side-height useful-height]
     (hooks/use-effect :once ; Need to set :max-height of resizable editors after everything is created.
-                      (editor/resize-finish "code-editor" nil code-editor-height))
+                      (editor/resize-finish "code-editor" nil code-side-height))
     (hooks/use-effect :once
        (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
            (p/then #(do
@@ -181,7 +179,7 @@
     (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
               (log/info "--------- Calling change-project: p =" p)
               (when (not= proj p)
-                (dba/set-current-project p) ; <===================== Correct this on server.
+                (dba/set-current-project p)
                 (set-proj p)))]
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
@@ -193,19 +191,19 @@
              :height banner-height}
             ($ Stack {:direction "row"}
                "schedulingTBD"
-               ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
+               ($ Box
+                  ($ SelectProject {:current-proj proj :proj-infos proj-infos :change-proj-fn change-project}))))
          ($ ShareLeftRight
-            {:left  ($ Stack {:direction "column"}
-                       ($ SelectProject {:current-proj proj :proj-infos proj-infos :change-proj-fn change-project})
-                       ($ chat/Chat {:height chat-height :conv-map conversation}))
+            {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
+                       ($ chat/Chat {:chat-height chat-side-height :conv-map conversation}))
              :right ($ ShareUpDown
-                       {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.
+                       {:init-height code-side-height
                         :up ($ Editor {:name "code-editor"
-                                       :height code-editor-height})
+                                       :height code-side-height})
                         :dn ($ Box)
                         :share-fns (:right-share top-share-fns)})
              :share-fns (:left-share top-share-fns)
-             :lf-pct 0.50 ; <=================================
+             :lf-pct 0.50
              :init-width width})))))
 
 (defnc app []
