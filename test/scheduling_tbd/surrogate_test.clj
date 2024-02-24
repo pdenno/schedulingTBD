@@ -82,7 +82,6 @@
                               :tools        [{:type "code_interpreter"}]} ; Will be good for csv and xslx, at least.
                              {:api-key key})))
 
-
 (defn tryme
   "If I can't find this assistant in the DB, I create it again."
   []

@@ -36,18 +36,21 @@
 (defn list-projects
   "Return a map containing :current-project and :others, which is a sorted list of every other project in the DB."
   [_request]
-  (let [current-project (db/current-project-id)
-        others (as-> (db/list-projects) ?o
-                 (map :project/id ?o)
-                 (set ?o)
-                 (disj ?o current-project)
-                 (sort ?o)
-                 (vec ?o))]
-    (log/info "Call to get-projects")
+  (letfn [(name&id [obj] (reduce-kv (fn [m k v] (if (#{:project/name :project/id} k) (assoc m k v) m)) {} obj))]
+    (let [current-project (-> (db/current-project-id)
+                              (db/get-project #{:project/id}) ; a vector of DB entity containing :project/id
+                              first
+                              name&id)
+          cid    (:project/id current-project)
+          others (->> (db/list-projects)
+                      (filter #(not= % cid))
+                      (map  #(-> % (db/get-project #{:project/id}) first))
+                      (mapv #(name&id %)))]
+    (log/info "Call to list-projects")
     (http/ok
      (cond-> {}
        current-project    (assoc :current-project current-project)
-       (not-empty others) (assoc :others others)))))
+       (not-empty others) (assoc :others others))))))
 
 (defn set-current-project
   [request]

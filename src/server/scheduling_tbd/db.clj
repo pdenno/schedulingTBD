@@ -277,10 +277,10 @@
           @(connect-atm :system)))))
 
 ;;; ToDo: Add structure to this as the structure develops.
-(defn show-project
+(defn get-project
   "Return a vector of project content.
    Default content is :summary/name :project/id :message/content."
-  ([pid] (show-project pid db-object-ids))
+  ([pid] (get-project pid db-object-ids))
   ([pid props]
    (when-let [conn (connect-atm pid)]
      (let [eids (mapcat #(d/q '[:find [?e ...]

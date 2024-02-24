@@ -161,8 +161,8 @@
 
 (defnc Top [{:keys [width height]}]
   (let [banner-height 42
-        [proj set-proj]                       (hooks/use-state nil)
-        [others set-others]                   (hooks/use-state nil)
+        [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
+        [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
         [conversation set-conversation]       (hooks/use-state {:conv [] :conv-for "nobody"})
         useful-height (- height banner-height)
         chat-height (- useful-height banner-height 20) ; ToDo: 20 (a gap before the editor starts)
@@ -171,17 +171,17 @@
                       (editor/resize-finish "code-editor" nil code-editor-height))
     (hooks/use-effect :once
        (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
-           (p/then #(do (set-proj (:current-project %))
-                        (set-others (:others %))))))
+           (p/then #(do
+                      (set-proj-infos (conj (:others %) (:current-project %)))
+                      (set-proj (:current-project %))))))
     (hooks/use-effect [proj]
       (when proj
-        (-> (dba/get-conversation (name proj))
+        (-> (dba/get-conversation proj)
             (p/then #(set-conversation %)))))
-    (letfn [(change-project [p]
-              ;(log/info "--------- Calling change-project -------")
+    (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
+              (log/info "--------- Calling change-project: p =" p)
               (when (not= proj p)
-                (dba/set-current-project p)
-                (set-others (-> (replace {p proj} others) sort))
+                (dba/set-current-project p) ; <===================== Correct this on server.
                 (set-proj p)))]
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
@@ -196,7 +196,7 @@
                ($ Box {:minWidth (- width 320)}))) ; I'm amazed this sorta works! The 320 depends on the width of "RADmapper".
          ($ ShareLeftRight
             {:left  ($ Stack {:direction "column"}
-                       ($ SelectProject {:current-project proj :others others :change-project-fn change-project})
+                       ($ SelectProject {:current-proj proj :proj-infos proj-infos :change-proj-fn change-project})
                        ($ chat/Chat {:height chat-height :conv-map conversation}))
              :right ($ ShareUpDown
                        {:init-height (- useful-height 20) ; ToDo: Not sure why the 20 is needed.

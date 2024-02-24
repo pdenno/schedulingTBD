@@ -375,21 +375,20 @@
 
 
 
-
-
-
      .rce-container-mlist {
 	 position: relative;
 	 background: #f0e699;
 	 display: flex;
+	 <!-- POD: So far, nothing using  align-items: stretch; -->
      }
 
      .rce-mlist {
-	 display: block;
+	 display: block;             <!-- POD: If you make this flex, boxes will be added horizontally. -->
 	 background: #f0e699;
 	 overflow: auto;
 	 position: relative;
 	 flex: 1;
+	<!-- POD: So far, nothing using  align-items: stretch; -->
      }
 
      .rce-mlist-down-button {

@@ -5,8 +5,9 @@
    [promesa.core :as p]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
+;;; project-infos are maps with keys :project/name and :project/id, at least.
 (defn get-project-list
-  "Return a promise that will resolve to a map {:current-project <keyword> :others [<keyword>...]}."
+  "Return a promise that will resolve to a map {:current-project <project-info> :others [<project-info>...]}."
   []
   (let [prom (p/deferred)]
     (GET "/api/list-projects"
@@ -18,11 +19,11 @@
     prom))
 
 (defn set-current-project
-  [project-id]
-  (log/info "Call to db-set-current-project: project-id =" project-id)
+  [{:project/keys [id]}]
+  (log/info "Call to db-set-current-project: project-id =" id)
   (let [prom (p/deferred)]
-    (POST (str "/api/set-current-project?project-id=" (name project-id))
-          {:params {:project-id project-id} ; ToDo: Really not sure about this!
+    (POST (str "/api/set-current-project?project-id=" (name id))
+          {:params {:project-id id} ; ToDo: Really not sure about this!
            :timeout 2000
            :handler (fn [resp] (p/resolve! prom resp))
            :error-handler (fn [{:keys [status status-text]}]
@@ -32,10 +33,10 @@
 
 (defn get-conversation
   "Return a promise that will resolve to the vector of a maps describing the complete conversation so far."
-  [project-id]
-  (log/info "Call to get-conversation for" project-id)
+  [{:project/keys [id]}]
+  (log/info "Call to get-conversation for" id)
   (let [prom (p/deferred)]
-    (GET (str "/api/get-conversation?project-id=" project-id)
+    (GET (str "/api/get-conversation?project-id=" (name id))
          {:timeout 3000
           :handler (fn [resp] (p/resolve! prom resp))
           :error-handler (fn [{:keys [status status-text]}]

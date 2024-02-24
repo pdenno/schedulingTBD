@@ -13,6 +13,7 @@
 #_(defn fn? [arg] ; I didn't see this in the docs!
   (= "Function" (j/get-in arg [:constructor :name])))
 
+;;; ToDo: Is there are idiomatic React way to do this? (Find way around structure.)
 (def component-refs
   "Some components instances are named and their refs stored here."
   (atom  {}))

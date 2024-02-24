@@ -80,8 +80,9 @@
                                :json-schema/default "LLM: What's the capital of Iowa?"}))
 
 ;;; -------- (devl/ajax-test "/api/list-projects" [])
-(s/def ::others (s/coll-of keyword?))
-(s/def ::current-project keyword?)
+(s/def ::others (s/coll-of map?))
+(s/def ::current-project map?)
+
 (s/def ::list-projects-response (s/keys :req-un [::others ::current-project]))
 (s/def ::projects (st/spec {:spec (s/coll-of string?)
                             :name "projects"
