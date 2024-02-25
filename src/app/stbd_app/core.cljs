@@ -21,7 +21,7 @@
    [stbd-app.util :as util]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
-(def diag (atom {}))
+(def ^:diag diag (atom {}))
 
 (declare get-user-data get-user-code)
 

@@ -19,7 +19,7 @@
    [stbd-app.util       :as util]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 ;;; -------------------- This stuff maybe for later (its from RADmapper) ---------------------------
 (def progress-handle

@@ -10,7 +10,7 @@
    [taoensso.timbre         :as log]))
 
 (def test-cfg {:store {:backend :mem :keep-history? false :schema-flexibility :write}})
-(def diag (atom []))
+(def ^:my-diag diag (atom []))
 
 (defn make-test-db!
   "In memory DB for testing planning domain management. Preloads the schema."

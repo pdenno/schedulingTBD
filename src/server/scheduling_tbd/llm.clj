@@ -15,7 +15,7 @@
    [clojure.string               :as str]
    [taoensso.timbre              :as log]))
 
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 (def factors-enumeration nil)
 
@@ -34,8 +34,6 @@
    {:id "gpt-3.5-turbo-instruct-0914", :created 1694122472, :owned_by "system"}]
 
 (def chat-model? #{"gpt-3.5-turbo", "gpt-3.5-turbo-0301", "gpt-3.5-turbo-16k", "gpt-3.5-turbo-16k-0613", "gpt-3.5-turbo-0613", "gpt-4-0613", "gpt-4-0314", "gpt-4"})
-
-(def diag (atom nil))
 
 (defn query-llm
   "Return a Clojure map that is read from the string created by the LLM given the vector of messages that is the argument."

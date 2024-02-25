@@ -10,7 +10,7 @@
   (:import
    [java.util Date]))
 
-(def diag (atom {:orig :val}))
+(def ^:diag diag (atom {:orig :val}))
 
 (defn healthcheck
   [_request]

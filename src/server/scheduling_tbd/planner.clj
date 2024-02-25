@@ -10,7 +10,7 @@
 
 (def planner-endpoint "tcp://*:31726")
 (def planner-executable "I put the planner executable in the project directory" "./pzmq-shop3-2024-02-15")
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 ;;; The feasibility of a plan, deciding whether it will be returned from find-plans, depends on pre-conditions.
 ;;; So attention must be paid to the state of the world created through operator add and delete lists.

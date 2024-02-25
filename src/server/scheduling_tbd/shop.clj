@@ -39,7 +39,7 @@
 
 ;;; ToDo: Next line makes a choice that has global consequences, so maybe wrap the SHOP translation code in something that toggles this.
 (s/check-asserts true)
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 (defn is-var?
   "Return true if the argument is a symbol beginning with ?"

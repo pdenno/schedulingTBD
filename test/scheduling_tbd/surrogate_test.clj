@@ -10,6 +10,8 @@
    [taoensso.timbre :as log]
    [wkok.openai-clojure.api :as openai]))
 
+(def ^:diag diag (atom nil))
+
 ;;; A challenge for this is that the surrogate is free to whatever it likes but we don't yet have
 ;;; all the tools needed to make sense of what it is saying (the meta-theoretical tools, etc.).
 
