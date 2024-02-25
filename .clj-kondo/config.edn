@@ -1,13 +1,14 @@
 ;;; https://github.com/borkdude/clj-kondo/blob/master/doc/config.md
 
-{:project-root-uri "file:///home/pdenno/Documents/git/schedulingTBD"
+{:project-root-uri "file:///home/pdenno/Documents/git/schedulingTBD" ; ToDo: Fix this!
 
  :linters {:mount/defstate      {:level :warning}
            :mount.core/defstate {:level :warning} ; Guessing. Not what ethpran did.
 
            ;; unused-referred-var is about :refer. https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md#unused-referred-var
            :unused-referred-var {:exclude {taoensso.timbre [error debug info log]
-                                           ajax.core [GET POST]}} ; Needs investigation; what it says is unresolved var.
+                                           clojure.test    [deftest is testing]
+                                           ajax.core       [GET POST]}} ; Needs investigation; what it says is unresolved var.
 
            ;; :exclude-patterns is for bindings, not vars. See https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md
            #_#_:unused-binding {:exclude-patterns ["^recreate.*" "^unknown-projects" "^backup.*"]}
@@ -16,8 +17,8 @@
 
            ;; https://clojure-lsp.io/settings/#clojure-lspunused-public-var
            :clojure-lsp/unused-public-var {:level :warning
-                                           :exclude #{scheduling-tbd.db/backup-proj-dbs
-                                                      scheduling-tbd.db/backup-system-db
+                                           :exclude #{scheduling-tbd.db/backup-proj-dbs    ; These are things that can be called by the developer.
+                                                      scheduling-tbd.db/backup-system-db   ; I suppose another way to do this is just put ^:diag on them.
                                                       scheduling-tbd.db/proj-base-cfg
                                                       scheduling-tbd.db/delete-project
                                                       scheduling-tbd.db/recreate-dbs!

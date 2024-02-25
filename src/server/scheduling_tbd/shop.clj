@@ -6,7 +6,7 @@
    [clojure.java.io      :as io]
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
-   [datahike.api         :as d] ;[datahike.pull-api    :as dp]
+   [datahike.api         :as d]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema not-nothing register-db db-cfg-map]]
    [taoensso.timbre      :as log]))
@@ -796,11 +796,15 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the terms that are part of a disjunctive expression."} ; ToDo: need a :sys/pos or something like that.
 
-
    ;; ----------------------- domain
    :domain/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
-        :doc "a DB-unique name for the domain."}
+        :doc "a DB-unique name for the domain. The name is appended to everything in :domain/elems, so keep it short.
+              For better description use plan/name or plan/description."}
+   :domain/description
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,  :mm/info {:extra? true}
+        :doc "a desciption of domain. This isn't part of SHOP"}
+
    :domain/elems
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "The methods, operators and axioms of the domain."}
@@ -1109,14 +1113,15 @@
 (defn canon2db
   "Given a canonical structure, create the corresponding DB structure.
    :canon/pos of each element of :domain/elems is :sys/pos in the DB."
-  [{:domain/keys [name elems]}]
-  {:domain/name name
-   :sys/body {:sys/typ :domain
-              :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
-                                     (-> (shop2db  (:canon/code %) {:domain-name name})
-                                         (assoc :sys/pos (:canon/pos %))
-                                         (assoc name-attr (get % name-attr))))
-                                  (sort-by :canon/pos elems))}})
+  [{:domain/keys [name elems description]}]
+  (cond-> {:domain/name name
+           :sys/body {:sys/typ :domain
+                      :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
+                                             (-> (shop2db  (:canon/code %) {:domain-name name})
+                                                 (assoc :sys/pos (:canon/pos %))
+                                                 (assoc name-attr (get % name-attr))))
+                                          (sort-by :canon/pos elems))}}
+    description (assoc :domain/description description)))
 
 (defn canon2shop
   "Rewrite 'canonical' (which is SHOP form embeddded in EDN) as SHOP."
@@ -1287,17 +1292,19 @@
         true)
     (log/error "Not recreating planning domains DB: No backup file.")))
 
-(def recreate-db? false)
+(def recreate-planning-domain-db?
+  "If true it will recreate the Datahike database; it won't add any domains; that's done in the planner."
+  false)
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-db-cfg
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:base-path).
    Recreate the system database if sys-db-cfg.recreate-db? = true."
   []
-  (when recreate-db?
-    (let [cfg (db-cfg-map :planning-domains)]
-      (recreate-planning-domains-db! cfg)
-      {:plan-db-cfg cfg})))
+  (let [cfg (db-cfg-map :planning-domains)]
+    (register-db :planning-domains cfg)
+    (when recreate-planning-domain-db?  (recreate-planning-domains-db! cfg))
+    {:plan-db-cfg cfg}))
 
 (defstate plans-db-cfg
   :invalid-state :bogus ; Should warn: "lifecycle functions can only contain `:start` and `:stop`. illegal function found: "

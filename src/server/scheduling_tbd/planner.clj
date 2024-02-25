@@ -1,12 +1,15 @@
 (ns scheduling-tbd.planner
   "Planning, currently including SHOP3 planner."
   (:require
+   [clojure.edn          :as edn]
    [clojure.java.shell :refer [sh]]
+   [datahike.pull        :as d]
    ;;[explainlib.core    :as exp]
-   [scheduling-tbd.shop :as shop]
-   [ezzmq.core :as zmq]             ; SHOP3
-   [mount.core :as mount :refer [defstate]]
-   [taoensso.timbre :as log]))
+   [scheduling-tbd.shop  :as shop]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm]]
+   [ezzmq.core           :as zmq]             ; SHOP3
+   [mount.core           :as mount :refer [defstate]]
+   [taoensso.timbre      :as log]))
 
 (def planner-endpoint "tcp://*:31726")
 (def planner-executable "I put the planner executable in the project directory" "./pzmq-shop3-2024-02-15")
@@ -111,6 +114,19 @@
                (= (->> result (mapv read-string)) answer))   (do (log/info "Planner passes test.") :passes)
           (= result :planning-failure)                       (do (log/error "Planning exception")  :planning-failure)
           :else                                              (do (log/error "Planner fails test.") :fails-test))))
+
+;;; (load-domain "data/planning-domains/process-interview.edn")
+(defn ^:diag load-domain
+  "Load a planning domain into the database."
+  [path & {:keys [force?]}]
+  (if-let [conn (connect-atm :planning-domains)]
+    (-> path
+        slurp
+        edn/read-string
+        shop/canon2db
+        #_vector
+        #_(d/transact conn))
+    (log/warn "Not loading domain:" path "planning-domains DB does not exist.")))
 
 (defn init-planner!
   "Start the planner. This relies on environment variable PLANNER_SBCL, which is just
