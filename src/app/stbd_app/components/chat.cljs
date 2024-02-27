@@ -212,8 +212,8 @@
                        ;;:alignItems "stretch"
                        :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
              ($ rce/MessageList  {:dataSource msg-list
-                                  :style #js {:alignItems "stretch" ; ; :style is helix for non-MUI things. I think(!)
-                                              :display "flex"}}))
+                                  :style #js {:alignItems "stretch" ; :style is helix for non-MUI things. I think(!)
+                                              :display "flex"}}))   ; "stretch" is just for horizontal??? ToDo: Everything here ignored?
           :dn
           ($ Stack {:direction "column"}
                  ($ LinearProgress {:variant "determinate" :value progress})
