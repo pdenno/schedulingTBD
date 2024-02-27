@@ -3,15 +3,16 @@
   (:require
    [clojure.edn          :as edn]
    [clojure.java.shell   :refer [sh]]
-   [clojure.pprint       :refer [cl-format pprint]]
+   [clojure.pprint       :refer [cl-format]]
+   [clojure.string       :as str]
    [datahike.api         :as d]
    ;;[explainlib.core    :as exp]
-   [scheduling-tbd.shop  :as shop]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm resolve-db-id]]
    [ezzmq.message        :as zmq]
    [ezzmq.context        :as zmq-ctx]
    [ezzmq.socket         :as zmq-sock]
    [mount.core           :as mount :refer [defstate]]
+   [scheduling-tbd.shop  :as shop]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
    [taoensso.timbre      :as log]))
 
 (def planner-endpoint-port 31888)
@@ -57,9 +58,21 @@
     :method/preconditions [(stop-plan)]
     :rhs/terms [(!update-plan-state ?proj)]})
 
-;;; Other things to try:
-;;; (zmq/send-msg socket "(shop-trace :operators)") ; Useless, would need further integration with shop2.
-;;; (zmq/receive-msg socket {:stringify true})
+(defn parse-planner-result
+  "Owing mostly to the messaging with strings, the SHOP planner currently comes back with something
+   that has to be cleaned up and interepreted. This takes the string and returns a map with up to three
+   values: (1) the form returned (:form), (2) output to std-out (:std-out), and (3) output to err-out (:err-out)."
+  [s]
+  (let [[result std err] (str/split s #"BREAK-HERE")
+        [success result] (re-matches #"^\((.*)$" result)
+        form (if success
+               (try (read-string result) (catch Exception _e :error/unreadable))
+               :error/uninterpretable)
+        ;; ToDo: Investigate this bug.
+        err (if (= err " )") nil err)]
+    {:form form
+     :std-out std
+     :err-out err}))
 
 (defn plan
   "Communicate to shop3 whatever is specified in the arguments, which may include one or more of:
@@ -67,20 +80,22 @@
       2) :problem - providing a new problem, and
       3) :execute - finding plans for a problem, etc. (See the docs.)
    Return result of execution if (3) is provided, otherwise result from (2) or (1)."
-  [{:keys [domain problem execute]}]
+  [{:keys [domain problem execute verbose?] :or {verbose? true}}]
   (zmq-ctx/with-new-context
     (let [socket (zmq-sock/socket :req {:connect planner-endpoint})]
       (letfn [(wrap-send [data task]
                 (try  (zmq/send-msg socket (str data))
                       (catch Exception e (log/info "plan: zmq exception or send."
-                                                   {:task task :msg (.message e)}))))
+                                                   {:task task :msg (.getMessage e)}))))
               (wrap-recv [task]
-                (try (let [res (zmq/receive-msg socket {:stringify true})]
-                       (if (= res [":BAD-INPUT"])
-                         (log/error "plan: SHOP exception on task:" task)
-                         res))
+                (try (let [res (zmq/receive-msg socket {:stringify true})
+                           {:keys [form std-out err-out]} (-> res first parse-planner-result)]
+                       (when verbose?
+                         (when std-out (log/info "Planner std-out:" std-out))
+                         (when err-out (log/warn "Planner error-out:" err-out)))
+                       form)
                      (catch Exception e (log/info "plan: zmq exception or recv."
-                                                  {:task task :msg (.message e)}))))]
+                                                  {:task task :msg (.getMessage e)}))))]
         (when domain
           (wrap-send domain :define-domain)
           (wrap-recv        :define-domain))
@@ -122,6 +137,7 @@
         shop/db2shop)
     (log/error "Domain" domain-name "not found.")))
 
+;;; (step-discussion "pi")
 (defn ^:diag step-discussion
   "Compute the next step of the discussion for the given planning domain.
    This runs the planner and updates the planning domain by advancing
@@ -164,6 +180,9 @@
   (plan {:execute '(shop-untrace)}))
 
 ;;; ========================= Starting, stopping, and testing ===================================
+;;; ToDo: Currently shop-planner.lisp returns a string of the content wrapped in parenthesis,
+;;;       and I haven't looked into why that is. Also BREAK-HERE could be more obscure.
+
 ;;;(plan kiwi-example) ==> ["(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))"]
 (def kiwi-example
   "This is an example from usage from the SHOP2 documentation. It is used to test communication with the planner."
@@ -177,29 +196,9 @@
                         ((!drop ?y) (!pickup ?x)))))
    :problem '(defproblem problem1 kiwi-example
                ((have banjo))         ; This is state data.
-               ((swap banjo kiwi)))   ; This is some method.
+               ((swap banjo kiwi)))   ; This is a method.
    :execute '(find-plans 'problem1 :verbose :plans)
-   :answer '[(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))]})
-
-#_(defn test-the-planner
-  "Define a planning domain. Define a problem. Find plans for the problem.
-   Check that the plan matches what is expected."
-  []
-  (log/info "test-planner...")
-  (let [{:keys [answer]} kiwi-example
-        fut (future (try (plan kiwi-example)
-                         (catch Exception e
-                           (log/warn (str "Exception in planner: " (.getMessage e)))
-                           :planning-failure)))
-        result (deref fut 2000 :timeout)]
-    (cond (= result :timeout)                                (log/error "Planning test timeout")
-          (= result :planning-failure)                       (log/error "Planning exception")
-          (and (not-empty result)
-               (every? string? result)
-               (= (->> result (mapv read-string)) answer))   (log/info "Planner passes test.")
-
-          :else                                              (log/error "Planner fails test:" result))
-    result))
+   :answer '(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))})
 
 (defn test-the-planner
   "Define a planning domain. Define a problem. Find plans for the problem.
@@ -207,22 +206,20 @@
   []
   (log/info "test-planner...")
   (let [{:keys [answer]} kiwi-example
-        result (try (plan kiwi-example)
-                    (catch Exception e
-                      (log/warn (str "Exception in planner: " (.getMessage e)))
-                      :planning-failure))]
-    (cond (= result :timeout)                                (log/error "Planning test timeout")
-          (= result :planning-failure)                       (log/error "Planning exception")
-          (and (not-empty result)
-               (every? string? result)
-               (= (->> result (mapv read-string)) answer))   (log/info "Planner passes test.")
-
-          :else                                              (log/error "Planner fails test:" result))
+        fut (future (try (plan kiwi-example)
+                         (catch Exception e
+                           (log/error (str "Exception in planner: " (.getMessage e)))
+                           :planning-failure)))
+        result (deref fut 2000 :timeout)
+        result (if (keyword? result) result (-> result first parse-planner-result))]
+    (cond (= result :timeout)                     (log/error "Planning test timeout")
+          (= result :planning-failure)            (log/error "Planning exception")
+          (= answer (:form result))               (log/info  "Planner passes test.")
+          :else                                   (log/error "Planner fails test:" result))
     result))
 
 ;;; ToDo: Check for free port.
 (def endpoint "The port at which the SHOP2 planner can be reached." 31777)
-
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!
