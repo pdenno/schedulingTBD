@@ -43,6 +43,6 @@
   "author": "Peter Denno",
   "license": "ISC",
   "devDependencies": {
-    "shadow-cljs": "^2.22.8"
+    "shadow-cljs": "^2.27.4"
   }
 }

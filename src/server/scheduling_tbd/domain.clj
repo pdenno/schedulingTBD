@@ -4,7 +4,7 @@
    [scheduling-tbd.llm           :as llm :refer [query-llm]]
    [clojure.string               :as str]))
 
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 ;;; ------------------------------- project name --------------------------------------
 ;;; The user would be prompted: "Tell us what business you are in and what your scheduling problem is."

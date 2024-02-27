@@ -13,7 +13,7 @@
 ;;; I'm writing this mostly as though the server handles multiple clients.
 ;;; I think it is just a little less error-prone this way while doing development.
 
-(def diag (atom {}))
+(def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique ID provided by the client." (atom {}))
 (def current-client-id "UUID identifying client. Text above notwithstanding, this is a single-user idea." (atom nil))
 
@@ -40,7 +40,7 @@
 
 (defn ping-diag
   "Create a ping confirmation for use in middle of a round-trip."
-  [{:keys [client-id ping-id]}]
+  [{:keys [_client-id _ping-id]}]
   ;(log/info "Ping" ping-id "from" client-id)
   {:dispatch-key :ping-confirm})
 
@@ -59,12 +59,11 @@
     (do (close-ws-channels id)
         (let [{:keys [in out err]} (make-ws-channels id)]
           (log/info "Starting websocket handler for " id (now))
-          (go (try
+          (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
                 (loop []
                   (when-let [msg (<! in)]
                     (>! out (-> msg edn/read-string dispatch str)) ; For round-trip messages from client.
-                    (recur)))
-                #_(finally (close-ws-channels id))))
+                    (recur))))
           {:ring.websocket/listener (wsa/websocket-listener in out err)}))
     (log/error "Websocket client did not provide id.")))
 
@@ -74,7 +73,7 @@
    :msg msg-text
    :timestamp (now)})
 
-(defn ws-send-client
+(defn ^:diag ws-send-client
   "Send the argument message to the specified client or current-client-id.
    This is only used for server-initiated interactions.
    Example usage: (ws-send-client \"Hello, world!\")."

@@ -11,14 +11,13 @@
    [clojure.spec.alpha           :as s]
    [clojure.string               :as str]
    [datahike.api                 :as d]
-   [datahike.pull-api            :as dp]
+   ;[datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.util  :as util :refer [now]]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id]]
-   [taoensso.timbre :as log])
+   [taoensso.timbre :as log :refer [debug]])
   (:import
    java.time.LocalDateTime))
-
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
@@ -217,8 +216,7 @@
              []
              db-schema-proj+))
 
-(def diag (atom nil))
-
+(def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
 (def db-schema-proj (datahike-schema db-schema-proj+))
 
@@ -368,6 +366,7 @@
 (defn recreate-dbs!
   "Recreate the system DB on storage from backup.
    For each project it lists, recreate it from backup if such backup exists."
+  {:clj-kondo/lint-as 'clojure.core/defn}
   []
   (recreate-system-db!)
   (doseq [pid (list-projects)]

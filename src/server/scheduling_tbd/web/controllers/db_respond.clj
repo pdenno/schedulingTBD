@@ -10,7 +10,7 @@
   (:import
    [java.util Date]))
 
-(def diag (atom {:orig :val}))
+(def ^:diag diag (atom {:orig :val}))
 
 (defn healthcheck
   [_request]
@@ -45,7 +45,7 @@
           others (->> (db/list-projects)
                       (filter #(not= % cid))
                       (map  #(-> % (db/get-project #{:project/id}) first))
-                      (mapv #(name&id %)))]
+                      (map #(name&id %)))]
     (log/info "Call to list-projects")
     (http/ok
      (cond-> {}

@@ -10,6 +10,8 @@
    [taoensso.timbre :as log]
    [wkok.openai-clojure.api :as openai]))
 
+(def ^:diag diag (atom nil))
+
 ;;; A challenge for this is that the surrogate is free to whatever it likes but we don't yet have
 ;;; all the tools needed to make sense of what it is saying (the meta-theoretical tools, etc.).
 
@@ -78,14 +80,14 @@
   (let [key (get-api-key :llm)]
     (openai/create-assistant {:name         "Example Assistant from Clojure: Beer"
                               :model        "gpt-4-1106-preview"
-                              :instructions (format system-instruction  (:surrogate/subject-of-expertise beer-example))
+                              :instructions (format system-instruction (:surrogate/subject-of-expertise beer-example))
                               :tools        [{:type "code_interpreter"}]} ; Will be good for csv and xslx, at least.
                              {:api-key key})))
 
 (defn tryme
   "If I can't find this assistant in the DB, I create it again."
   []
-  (let [pid :craft-beer-surrogate]
+  (let [pid :craft-beer-surrogate-1]
     (if (db/project-exists? pid)
       (-> (db-cfg-map pid) (assoc :project/id pid))
       ;; Otherwise create a new assistant.
@@ -95,6 +97,8 @@
                                        {:surrogate/subject-of-expertise "craft beer"
                                         :surrogate/system-instruction (format system-instruction  (:surrogate/subject-of-expertise beer-example))}))
     (log/warn "Couldn't get OpenAI API key.")))
+
+
 
 ;;; ===================== Possibly useful functions ============================================
 (defn list-assistants
