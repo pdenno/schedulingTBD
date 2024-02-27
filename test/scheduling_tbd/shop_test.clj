@@ -70,7 +70,7 @@
                                  ((have ?y))
                                  ((!drop ?y) (!pickup ?x)))))
         domain-db (-> "test/data/domain-db-example-1.edn" slurp read-string)]
-    (testing "Testing whether a domain can be round tripped."
+    (testing "Testing whether a domain in proj format can be round tripped."
       (testing "Testing starting with a shop object."
         (is (= domain-shop (-> domain-shop shop/shop2db shop/db2shop))))
       (testing "Testing starting with a db object."

@@ -2,17 +2,21 @@
   "Planning, currently including SHOP3 planner."
   (:require
    [clojure.edn          :as edn]
-   [clojure.java.shell :refer [sh]]
-   [datahike.pull        :as d]
+   [clojure.java.shell   :refer [sh]]
+   [clojure.pprint       :refer [cl-format pprint]]
+   [datahike.api         :as d]
    ;;[explainlib.core    :as exp]
    [scheduling-tbd.shop  :as shop]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm]]
-   [ezzmq.core           :as zmq]             ; SHOP3
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm resolve-db-id]]
+   [ezzmq.message        :as zmq]
+   [ezzmq.context        :as zmq-ctx]
+   [ezzmq.socket         :as zmq-sock]
    [mount.core           :as mount :refer [defstate]]
    [taoensso.timbre      :as log]))
 
-(def planner-endpoint "tcp://*:31726")
-(def planner-executable "I put the planner executable in the project directory" "./pzmq-shop3-2024-02-15")
+(def planner-endpoint-port 31888)
+(def planner-endpoint (format "tcp://*:%s" planner-endpoint-port))
+(def planner-executable "I put the planner executable in the project directory" "./pzmq-shop3-2024-02-24")
 (def ^:diag diag (atom nil))
 
 ;;; The feasibility of a plan, deciding whether it will be returned from find-plans, depends on pre-conditions.
@@ -59,83 +63,179 @@
 
 (defn plan
   "Communicate to shop3 whatever is specified in the arguments, which may include one or more of:
-      1) providing a new planning domain,
-      2) providing a new problem, and
-      3) execute something, e.g. finding plans for a problem.
+      1) :domain  - a domain in shop format (an s-expression).
+      2) :problem - providing a new problem, and
+      3) :execute - finding plans for a problem, etc. (See the docs.)
    Return result of execution if (3) is provided, otherwise result from (2) or (1)."
   [{:keys [domain problem execute]}]
-  (zmq/with-new-context
-    (let [socket (zmq/socket :req {:connect planner-endpoint})]
-      (when domain
-        (try (let [shop-plan (-> domain shop/proj2canon shop/canon2shop str)]
-               (zmq/send-msg socket shop-plan)
-               (zmq/receive-msg socket {:stringify true}))
-             (catch Exception e
-               (log/info "Plan proj-format did not compile or load." {:msg (.message e)}))))
-      (when problem
-        (zmq/send-msg socket (str problem))
-        (zmq/receive-msg socket {:stringify true}))
-      (when execute
-        (zmq/send-msg socket (str execute))
-        (zmq/receive-msg socket {:stringify true})))))
+  (zmq-ctx/with-new-context
+    (let [socket (zmq-sock/socket :req {:connect planner-endpoint})]
+      (letfn [(wrap-send [data task]
+                (try  (zmq/send-msg socket (str data))
+                      (catch Exception e (log/info "plan: zmq exception or send."
+                                                   {:task task :msg (.message e)}))))
+              (wrap-recv [task]
+                (try (let [res (zmq/receive-msg socket {:stringify true})]
+                       (if (= res [":BAD-INPUT"])
+                         (log/error "plan: SHOP exception on task:" task)
+                         res))
+                     (catch Exception e (log/info "plan: zmq exception or recv."
+                                                  {:task task :msg (.message e)}))))]
+        (when domain
+          (wrap-send domain :define-domain)
+          (wrap-recv        :define-domain))
+        (when problem
+          (wrap-send problem :define-problem)
+          (wrap-recv         :define-problem))
+        (when execute
+          (wrap-send execute :execute)
+          (wrap-recv         :execute))))))
 
-;;; -------------------------- Starting, stopping, and testing ------------------
-;;;(defn quit-planner! [])
-(def shop2-example
+;;; (load-domain "data/planning-domains/process-interview.edn")
+(defn ^:diag load-domain
+  "Load a planning domain into the database."
+  [path & {:keys [_force?] :or {_force? true}}] ; ToDo: check if exists.
+  (if-let [conn (connect-atm :planning-domains)]
+    (->> path
+         slurp
+         edn/read-string
+         shop/proj2canon
+         shop/canon2db
+         vector
+         (d/transact conn))
+    (log/warn "Not loading domain:" path "planning-domains DB does not exist.")))
+
+(defn domain-eid
+  "Return the argument domain-name's entity ID."
+  [domain-name]
+  (d/q '[:find ?eid .
+         :in $ ?dname
+         :where [?eid :domain/name ?dname]]
+       @(connect-atm :planning-domains)
+       domain-name))
+
+(defn get-domain
+  "Return the domain in SHOP format."
+  [domain-name]
+  (if-let [eid (domain-eid domain-name)]
+    (-> (resolve-db-id {:db/id eid} (connect-atm :planning-domains))
+        shop/db2shop)
+    (log/error "Domain" domain-name "not found.")))
+
+(defn ^:diag step-discussion
+  "Compute the next step of the discussion for the given planning domain.
+   This runs the planner and updates the planning domain by advancing
+   the stop-plan pre-condition. Argument is a :domain/name (a string)."
+  [domain-name]
+  (let [domain (get-domain domain-name)]
+    (plan {:domain domain
+           :problem '(defproblem  process-interview pi
+                       () ; This is state data.
+                       ((characterize-process unknown-proj)))
+           :execute '(find-plans 'process-interview :verbose :plans)})))
+
+;;; Section 5.6 Debugging Suggestions
+;;; When you have a problem that does not solve as expected, the following general recipe may help you home in on bugs in your domain definition:
+;;;
+;;; 1. Start by doing (SHOP-TRACE :TASKS) and then try FIND-PLANS again.
+;;; 2. In many cases, the domain will be written so that there will be little or no backtracking.
+;;;    In this case, examine the output of the traced call to FIND-PLANS and look for the first backtracking point.
+;;; 3. The above process should help you identify a particular task, either a primitive or a complex task, as a likely problem spot.
+;;;    If it’s a primitive task, the next step is to examine the operator definition. If it’s a complex task, you should
+;;;    check the method definitions. If you have any trouble identifying which method definition is relevant,
+;;;    you can use (SHOP-TRACE :METHODS) to further focus your attention.
+;;; 4. If visual inspection of method and operator definitions does not reveal the problem, you most likely have problems
+;;;    with precondition expressions. In this case, try using (SHOP-TRACE :GOALS), rerunning FIND-PLANS and check to see
+;;;    what’s happened when your problem method or operator’s preconditions are checked.
+;;;
+;;; This recipe has proven effective for finding the vast majority of bugs in SHOP2 domains.
+(defn ^:diag shop-trace
+  "Set tracing to :tasks (default) or :methods :goals"
+  ([]     (plan {:execute (list 'shop-trace)}))
+  ([what]
+   (let [choices #{:tasks :methods :goals}]
+     (if (choices what)
+       (plan {:execute (list 'shop-trace what)})
+       (log/info "shop-trace takes one of :tasks :methods :goals (or no args to see what is being traced).")))))
+
+(defn ^:diag shop-untrace
+  "Turn of shop tracing."
+  []
+  (plan {:execute '(shop-untrace)}))
+
+;;; ========================= Starting, stopping, and testing ===================================
+;;;(plan kiwi-example) ==> ["(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))"]
+(def kiwi-example
   "This is an example from usage from the SHOP2 documentation. It is used to test communication with the planner."
-  {:domain '#:domain{:elems
-                     [#:operator{:head (!pickup ?a), :a-list [(have ?a)]}
-                      #:operator{:head (!drop ?a), :preconds [(have ?a)], :d-list [(have ?a)]}
-                      #:method{:head (swap ?x ?y),
-                               :rhsides
-                               [#:method{:preconds [(have ?x)], :task-list ((!drop ?x) (!pickup ?y))}
-                                #:method{:preconds [(have ?y)], :task-list ((!drop ?y) (!pickup ?x))}]}],
-                     :name "basic-example"}
-   :problem '(defproblem problem1 basic-example
+  {:domain '(defdomain kiwi-example
+              ((:operator (!pickup ?a) () () ((have ?a)))
+               (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
+               (:method (swap ?x ?y)
+                        ((have ?x))
+                        ((!drop ?x) (!pickup ?y))
+                        ((have ?y))
+                        ((!drop ?y) (!pickup ?x)))))
+   :problem '(defproblem problem1 kiwi-example
                ((have banjo))         ; This is state data.
-               ((swap banjo kiwi)))   ; This is some method
+               ((swap banjo kiwi)))   ; This is some method.
    :execute '(find-plans 'problem1 :verbose :plans)
    :answer '[(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))]})
+
+#_(defn test-the-planner
+  "Define a planning domain. Define a problem. Find plans for the problem.
+   Check that the plan matches what is expected."
+  []
+  (log/info "test-planner...")
+  (let [{:keys [answer]} kiwi-example
+        fut (future (try (plan kiwi-example)
+                         (catch Exception e
+                           (log/warn (str "Exception in planner: " (.getMessage e)))
+                           :planning-failure)))
+        result (deref fut 2000 :timeout)]
+    (cond (= result :timeout)                                (log/error "Planning test timeout")
+          (= result :planning-failure)                       (log/error "Planning exception")
+          (and (not-empty result)
+               (every? string? result)
+               (= (->> result (mapv read-string)) answer))   (log/info "Planner passes test.")
+
+          :else                                              (log/error "Planner fails test:" result))
+    result))
 
 (defn test-the-planner
   "Define a planning domain. Define a problem. Find plans for the problem.
    Check that the plan matches what is expected."
   []
   (log/info "test-planner...")
-  (let [{:keys [domain problem execute answer]} shop2-example
-        result (try (plan {:domain  domain
-                           :problem problem
-                           :execute execute})
+  (let [{:keys [answer]} kiwi-example
+        result (try (plan kiwi-example)
                     (catch Exception e
                       (log/warn (str "Exception in planner: " (.getMessage e)))
-                      :planning-exception))]
-    (cond (and (not-empty result)
+                      :planning-failure))]
+    (cond (= result :timeout)                                (log/error "Planning test timeout")
+          (= result :planning-failure)                       (log/error "Planning exception")
+          (and (not-empty result)
                (every? string? result)
-               (= (->> result (mapv read-string)) answer))   (do (log/info "Planner passes test.") :passes)
-          (= result :planning-failure)                       (do (log/error "Planning exception")  :planning-failure)
-          :else                                              (do (log/error "Planner fails test.") :fails-test))))
+               (= (->> result (mapv read-string)) answer))   (log/info "Planner passes test.")
 
-;;; (load-domain "data/planning-domains/process-interview.edn")
-(defn ^:diag load-domain
-  "Load a planning domain into the database."
-  [path & {:keys [force?]}]
-  (if-let [conn (connect-atm :planning-domains)]
-    (-> path
-        slurp
-        edn/read-string
-        shop/canon2db
-        #_vector
-        #_(d/transact conn))
-    (log/warn "Not loading domain:" path "planning-domains DB does not exist.")))
+          :else                                              (log/error "Planner fails test:" result))
+    result))
 
+;;; ToDo: Check for free port.
+(def endpoint "The port at which the SHOP2 planner can be reached." 31777)
+
+
+;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!
   "Start the planner. This relies on environment variable PLANNER_SBCL, which is just
    the name of the SBCL core file. That file is expected to be in the project directory."
   []
-  (try (future (sh planner-executable "--non-interactive" "--disable-debugger"))
-       (catch Exception e
-         (log/error (:message e))
-         (throw (ex-info "Running planner didn't work." {:error e}))))
+  (try
+    (let [cmd-arg (cl-format nil "'(setf shop3-zmq::*endpoint* ~S)'" planner-endpoint)]
+      ;; --eval does not work!
+      (future (sh planner-executable "--non-interactive" "--disable-debugger" "--eval"  cmd-arg)))
+    (catch Exception e
+      (log/error (:message e))
+      (throw (ex-info "Running planner didn't work." {:error e}))))
   (Thread/sleep 2000)
   (test-the-planner))
 
@@ -143,8 +243,8 @@
   "Quit the planner. It can be restarted with a shell command through mount."
   []
   (let [fut (future
-              (zmq/with-new-context
-                (let [socket (zmq/socket :req {:connect planner-endpoint})]
+              (zmq-ctx/with-new-context
+                (let [socket (zmq-sock/socket :req {:connect planner-endpoint})]
                   (zmq/send-msg socket "(sb-ext:exit)")
                   (zmq/receive-msg socket {:stringify true}))))]
     (if (= [":bye!"] (deref fut 3000 :timeout))

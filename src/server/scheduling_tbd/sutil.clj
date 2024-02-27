@@ -56,10 +56,11 @@
 (defn connect-atm
   "Return a connection atom for the DB."
   [k]
-  (when-let [db-cfg (get @databases-atm k)]
+  (if-let [db-cfg (get @databases-atm k)]
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
-      (log/warn "DB is registered but does not exist."))))
+      (log/error "DB is registered but does not exist:" k))
+    (log/error "No such DB:" k)))
 
 (defn datahike-schema
   "Create a Datahike-compatible schema from the above."
