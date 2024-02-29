@@ -4,6 +4,10 @@
 ;;; Thus instead of (stop-plan) all over the place, we place editing information into the domain that is used to prune off
 ;;; parts of the domain that aren't relevant given state.
 
+;;; So far I can put these :keep edit notations on:
+;;;   - :domain/elems
+;;;   - :method/rhsides
+
 ;;; In this design, you don't worry about :method/preconds and :operator/preconds except among sibling choices.
 ;;; I think I'll have :keep/conds and :prune/conds.
 
@@ -11,70 +15,64 @@
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
  :domain/elems [;; (characterize-process ?proj)
                 {:method/head (characterize-process ?proj)
-                 :method/rhsides [{:keep/conds [(not (ongoing-discussion ?proj))]
-                                   :keep/body
-                                   {:method/case-name "from-scratch"
-                                    :method/task-list [(!initial-question ?proj)]}}
+                 :method/rhsides [{:method/case-name "from-scratch"
+                                   :method/preconds [(not (ongoing-discussion ?proj))]
+                                   :method/task-list [(!initial-question ?proj)]}
 
-                                  {:keep/conds [(ongoing-discussion ?proj)]
-                                   :keep/body
                                    {:method/case-name "ongoing-discussion"
+                                    :method/preconds [(ongoing-discussion ?proj)]
                                     :method/task-list [(!inject-project-name ?proj)      ; "inject" means we'll add this proposition from outside the planner.
                                                        (!test-well-known-process ?proj)  ; "test" means we MIGHT add a proposition such as (well-know-process beer-brewing).
-                                                       (!test-process-class ?proj)]}}]}
+                                                       (!test-process-class ?proj)]}]}
 
                 ;; ====== (not (ongoing-discussion ?proj)) ===============================
                 ;; (!initial-question ?proj)
-                {:keep/conds [(not (ongoing-discussion ?proj))]  ; --------------------------------- Keep
-                 :keep/body
-                 {:operator/head (!initial-question ?proj)
-                  :operator/a-list [(inject-for project-name ?proj)
-                                    (inject-for ongoing-discussion ?proj)     ; inject-for! is metadata on the proposition (rest of the form) saying we will  have that when we are done with this operation
-                                    (inject-for! well-known-process ?proj)    ; inject-for means we might have such a proposition.
-                                    (inject-for process-class ?proj)]}}
-
+                {:operator/head (!initial-question ?proj)
+                 :operator/preconds [(not (ongoing-discussion ?proj))]
+                 :operator/a-list [(inject-for project-name ?proj)
+                                   (inject-for ongoing-discussion ?proj)     ; inject-for! is metadata on the proposition (rest of the form) saying we will  have that when we are done with this operation
+                                   (inject-for! well-known-process ?proj)    ; inject-for means we might have such a proposition.
+                                   (inject-for process-class ?proj)]}
 
 
                 ;; ====== (ongoing-discussion ?proj)) ===============================
-                ;; (get-process-steps ?proj)
-                {:keep/conds [(ongoing-discussion ?proj)]      ; ; --------------------------------- Keep
-                 :keep/body [{:method/head (get-process-steps ?proj)
-                              :method/rhsides [{:method/case-name "well-known"
-                                                :method/preconds [(well-known-process ?proj)]
-                                                :method/task-list [(!yes-no-process-steps ?proj)]}
-                                               {:method/case-name "unknown"
-                                                :method/preconds [(unknown-process ?proj)]
-                                                :method/task-list [(!query-process-steps ?proj)]}]}
+                {:method/head (get-process-steps ?proj)
+                 :method/rhsides [{:method/case-name "well-known"
+                                   :method/preconds [(well-known-process ?proj)]
+                                   :method/task-list [(!yes-no-process-steps ?proj)]}
+                                  {:method/case-name "unknown"
+                                   :method/preconds [(unknown-process ?proj)]
+                                   :method/task-list [(!query-process-steps ?proj)]}]}
 
-                             ;; (get-wip ?proj)
-                             {:method/head (get-wip ?proj)
-                              :method/rhsides [{:method/case-name "ordinary"
-                                                :method/preconds [(project-name ?proj)]
-                                                :method/task-list [(!query-for-wip-spreadsheet ?proj)]}]}
+                ;; (get-wip ?proj)
+                {:method/head (get-wip ?proj)
+                 :method/rhsides [{:method/case-name "ordinary"
+                                   :method/preconds [(project-name ?proj)]
+                                   :method/task-list [(!query-for-wip-spreadsheet ?proj)]}]}
 
-                             ;; (!yes-no-process-steps ?proj)
-                             {:operator/head (!yes-no-process-steps ?proj)
-                              :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
-                              :operator/a-list [(have-process-steps ?proj)]}
+                ;; (!yes-no-process-steps ?proj)
+                {:operator/head (!yes-no-process-steps ?proj)
+                 :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
+                 :operator/a-list [(have-process-steps ?proj)]}
 
-                             ;; (!query-process-steps ?proj)
-                             {:operator/head (!query-process-steps ?proj)
-                              :operator/preconds [(proj-name ?proj) (system-model flow)]
-                              :operator/a-list [(have-process-steps ?proj)]}
+                ;; (!query-process-steps ?proj)
+                {:operator/head (!query-process-steps ?proj)
+                 :operator/preconds [(proj-name ?proj) (system-model flow)]
+                 :operator/a-list [(have-process-steps ?proj)]}
 
-                             ;; (!yes-no-process-durations ?proj)
-                             {:operator/head (!yes-no-process-durations ?proj)
-                              :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
-                              :operator/a-list [(have-process-durs ?proj)]}
+                ;; (!yes-no-process-durations ?proj)
+                {:operator/head (!yes-no-process-durations ?proj)
+                 :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
+                 :operator/a-list [(have-process-durs ?proj)]}
 
-                             ;; (!query-for-wip-spreadsheet ?proj)
-                             {:operator/head (!query-for-wip-spreadsheet ?proj)
-                              :operator/preconds [(proj-name ?proj) (have-process-steps ?proj)]
-                              :operator/a-list [(have-wip ?proj)]}
+                ;; (!query-for-wip-spreadsheet ?proj)
+                {:operator/head (!query-for-wip-spreadsheet ?proj)
+                 :operator/preconds [(proj-name ?proj) (have-process-steps ?proj)]
+                 :operator/a-list [(have-wip ?proj)]}
 
-                             ;; (:- (same ?x ?x) ())
-                             {:axiom/head (same ?x ?x)}
+                ;; (:- (same ?x ?x) ())
+                {:axiom/head (same ?x ?x)}
 
-                             ;; (:- (different ?x ?y) ((not (same ?x ?y))))
-                             {:axiom/head (different ?x ?y)
-                              :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}]}]}
+                ;; (:- (different ?x ?y) ((not (same ?x ?y))))
+                {:axiom/head (different ?x ?y)
+                 :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}]}

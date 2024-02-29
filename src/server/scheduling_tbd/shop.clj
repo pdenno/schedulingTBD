@@ -1123,12 +1123,6 @@
                                           (sort-by :canon/pos elems))}}
     description (assoc :domain/description description)))
 
-(defn canon2shop
-  "Rewrite 'canonical' (which is SHOP form embeddded in EDN) as SHOP."
-  [{:domain/keys [name elems]}]
-  `(~'defdomain ~(symbol name)
-    ~(->> elems (sort-by :canon/pos) (map :canon/code))))
-
 (defn db-entry-for
   "Return the named DB structure. name is string and db.unique/identity"
   [name & {:keys [db-atm] :or {db-atm (connect-atm :planning-domains)}}]
@@ -1227,6 +1221,15 @@
                      (contains? e :operator/head) (proj2canon-operator e base-name)
                      (contains? e :axiom/head)    (proj2canon-axiom e base-name))))))
 
+(defn proj2shop
+  "The argument is a planning domain in proj format.
+   Return it translated to SHOP format."
+  [proj]
+  (-> proj
+      proj2canon
+      canon2db
+      db2shop))
+
 (defn db2proj-axiom
   "Rewrite an axiom to proj form."
   [obj]
@@ -1292,7 +1295,7 @@
         true)
     (log/error "Not recreating planning domains DB: No backup file.")))
 
-(def recreate-planning-domain-db?
+(def recreate-planning-domains-db?
   "If true it will recreate the Datahike database; it won't add any domains; that's done in the planner."
   false)
 
@@ -1303,7 +1306,7 @@
   []
   (let [cfg (db-cfg-map :planning-domains)]
     (register-db :planning-domains cfg)
-    (when recreate-planning-domain-db?  (recreate-planning-domains-db! cfg))
+    (when recreate-planning-domains-db?  (recreate-planning-domains-db! cfg))
     {:plan-db-cfg cfg}))
 
 (defstate plans-db-cfg

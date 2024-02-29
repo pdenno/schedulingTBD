@@ -4,7 +4,9 @@
    [clojure.edn          :as edn]
    [clojure.java.shell   :refer [sh]]
    [clojure.pprint       :refer [cl-format]]
+   [clojure.spec.alpha           :as s]
    [clojure.string       :as str]
+   [clojure.core.unify   :as uni]
    [datahike.api         :as d]
    ;;[explainlib.core    :as exp]
    [ezzmq.message        :as zmq]
@@ -12,6 +14,7 @@
    [ezzmq.socket         :as zmq-sock]
    [mount.core           :as mount :refer [defstate]]
    [scheduling-tbd.shop  :as shop]
+   [scheduling-tbd.specs :as specs]
    [scheduling-tbd.sutil :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
    [taoensso.timbre      :as log]))
 
@@ -52,14 +55,8 @@
 ;;; Every operator that calls out for analysis would add (stop-plan), every method has a special case for stop-plan.
 ;;; Still, there is the issue of how not to repeat what you've done on replanning. I think that requires no-op if you already have what is needed.
 
-(def special-method
-  "This is used to stop the planner for update from analysis."
-  '{:rhs/case-name "special"
-    :method/preconditions [(stop-plan)]
-    :rhs/terms [(!update-plan-state ?proj)]})
-
 (defn parse-planner-result
-  "Owing mostly to the messaging with strings, the SHOP planner currently comes back with something
+  "Owing mostly to the use of strings in messaging, the SHOP planner currently comes back with something
    that has to be cleaned up and interepreted. This takes the string and returns a map with up to three
    values: (1) the form returned (:form), (2) output to std-out (:std-out), and (3) output to err-out (:err-out)."
   [s]
@@ -131,11 +128,85 @@
 
 (defn get-domain
   "Return the domain in SHOP format."
-  [domain-name]
-  (if-let [eid (domain-eid domain-name)]
-    (-> (resolve-db-id {:db/id eid} (connect-atm :planning-domains))
-        shop/db2shop)
-    (log/error "Domain" domain-name "not found.")))
+  [domain-name & {:keys [form] :or {form :proj}}]
+  (let [db-obj (if-let [eid (domain-eid domain-name)]
+                 (resolve-db-id {:db/id eid} (connect-atm :planning-domains))
+                 (log/error "Domain" domain-name "not found."))]
+    (case form
+      :db     db-obj
+      :proj   (shop/db2proj db-obj)
+      :shop   (shop/db2shop db-obj)
+      :canon  (shop/db2canon db-obj))))
+
+(defn condition-satisfies?
+  "Return true if the positive condition argument unifies with any fact,
+   OR if the negative condition argument unifies with no fact.
+   Facts are always positive literals."
+  [condition facts]
+  (s/assert ::specs/proposition condition)
+  (if (s/valid? ::specs/negated-proposition condition)
+    (let [ncond (second condition)]
+      (not-any? #(uni/unify ncond %) facts))
+    (some #(uni/unify condition %) facts)))
+
+(defn satisfies-facts?
+  "Return true if every condition, (a atomic predicate or one negated by (not <predicate>),
+   the things in :method/preconds and :operator/preconds, unifies with the argument facts."
+  [conditions facts]
+  (every? #(condition-satisfies? % facts) conditions))
+
+(defn prune-operators
+  "The argument is a vector of planning domain elements (axioms, methods, operators).
+   Return a vector with operators that do not satisfy the facts removed."
+  [elems facts]
+  (->> elems
+       (remove #(and (contains? % :operator/head)
+                     (not (satisfies-facts? (:operator/preconds %) facts))))
+       vec))
+
+(defn prune-method-rhsides
+  "Check the :method/preconds of the RHS against the argument facts and if
+   they do not all unify, remove this RHS.
+   Returns the filterv vector of this test."
+  [rhsides facts]
+  (filterv #(satisfies-facts? (:method/preconds %) facts) rhsides))
+
+(defn prune-domain
+  "Return the domain with some operators and methods RHS removed.
+   What is removed are those element for which none of the argument facts unify.
+   The facts argument is a collection of atoms in the logic sense, that is,
+   flat s-expressions representing propositions."
+  [domain facts]
+  (letfn [(pd [obj]
+            (cond (and (map? obj) (contains? obj :domain/id))        (-> (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
+                                                                         ;; This part examines :operator/preconds.
+                                                                         (update obj :domain/elems #(prune-operators % facts)))
+                  (and (map? obj) (contains? obj :axiom/head))       (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
+                  (and (map? obj) (contains? obj :method/head))      (update obj :method/rhsides #(prune-method-rhsides % facts))
+                  (vector? obj)                                      (mapv pd obj)
+                  (seq? obj)                                         (map pd obj)
+                  :else                                              obj))]
+    (pd domain)))
+
+(def facts "A vector of state-space facts."
+  (atom []))
+
+;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
+(defn update-facts
+  "Update the facts by adding, deleting or resetting to empty.
+     facts - a vector of ::specs/positive-proposition.
+     a map - with keys :add and :delete being collections of :specs/positive-proposition.
+             These need not be ground propositions; everything that unifies with a
+             form in delete will be deleted.
+             A variable in the add list will be treated as a skolem.
+             reset? is truthy."
+  [facts {:keys [add delete reset?]}]
+  (assert (every? (s/valid? ::specs/positive-proposition %) facts))
+  (cond-> (if reset? [] facts)
+    delete (->>
+            (remove (fn [fact] (any? #(uni/unify fact %) delete)))
+            vec)
+    add    (->)))
 
 ;;; (step-discussion "pi")
 (defn ^:diag step-discussion
@@ -143,9 +214,14 @@
    This runs the planner and updates the planning domain by advancing
    the stop-plan pre-condition. Argument is a :domain/name (a string)."
   [domain-name]
-  (let [domain (get-domain domain-name)]
+  (let [facts (atom [])
+        domain (-> domain-name
+                   (get-domain {:form :proj})
+                   (prune-domain @facts)
+                   (shop/proj2shop))]
+    (reset! diag domain)
     (plan {:domain domain
-           :problem '(defproblem  process-interview pi
+           :problem '(defproblem process-interview pi
                        () ; This is state data.
                        ((characterize-process unknown-proj)))
            :execute '(find-plans 'process-interview :verbose :plans)})))
@@ -206,16 +282,11 @@
   []
   (log/info "test-planner...")
   (let [{:keys [answer]} kiwi-example
-        fut (future (try (plan kiwi-example)
-                         (catch Exception e
-                           (log/error (str "Exception in planner: " (.getMessage e)))
-                           :planning-failure)))
-        result (deref fut 2000 :timeout)
-        result (if (keyword? result) result (-> result first parse-planner-result))]
-    (cond (= result :timeout)                     (log/error "Planning test timeout")
-          (= result :planning-failure)            (log/error "Planning exception")
-          (= answer (:form result))               (log/info  "Planner passes test.")
-          :else                                   (log/error "Planner fails test:" result))
+        result (plan kiwi-example)]
+    (cond (= result :timeout)                  (log/error "Planning test timeout")
+          (= result :planning-failure)         (log/error "Planning exception")
+          (= answer result)                    (log/info  "Planner passes test.")
+          :else                                (log/error "Planner fails test:" result))
     result))
 
 ;;; ToDo: Check for free port.
