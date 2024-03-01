@@ -2,7 +2,7 @@
 
 ;;; We operate on this structure -- or its DB equivalent (to be decided) -- by inserting calls to (!stop-plan) after calls
 ;;; to (!update-plan-state), which are also inserted as we go.
-{:domain/name "test-pi"  ; We keep this around for testing.
+{:domain/ename "test-pi"  ; We keep this around for testing.
  :domain/elems [;; (characterize-process ?proj)...
                 {:method/head (characterize-process ?proj)
                  :method/rhsides [{:method/case-name "ordinary"

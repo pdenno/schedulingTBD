@@ -1,21 +1,21 @@
-{:domain/name "kiwi-example",
+{:domain/ename "kiwi-example",
  :sys/body
  {:sys/typ :domain,
   :domain/elems
-  [{:operator/name "kiwi-example.!pickup",
+  [{:operator/ename "kiwi-example.!pickup",
     :sys/body
     {:sys/typ :operator,
      :operator/head {:sys/typ :atom, :atom/predicate !pickup, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]},
      :operator/a-list [{:sys/typ :atom, :atom/predicate have, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}], :sys/pos 1}]},
     :sys/pos 1}
-   {:operator/name "kiwi-example.!drop",
+   {:operator/ename "kiwi-example.!drop",
     :sys/body
     {:sys/typ :operator,
      :operator/head {:sys/typ :atom, :atom/predicate !drop, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}]},
      :operator/preconds [{:sys/typ :atom, :atom/predicate have, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}], :sys/pos 1}],
      :operator/d-list [{:sys/typ :atom, :atom/predicate have, :atom/roles [{:role/val #:box{:sym ?a}, :sys/pos 1}], :sys/pos 1}]},
     :sys/pos 2}
-   {:method/name "kiwi-example.swap_?x_?y",
+   {:method/ename "kiwi-example.swap_?x_?y",
     :sys/body
     {:sys/typ :method,
      :method/head

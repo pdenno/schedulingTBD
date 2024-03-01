@@ -11,8 +11,10 @@
 ;;; In this design, you don't worry about :method/preconds and :operator/preconds except among sibling choices.
 ;;; I think I'll have :keep/conds and :prune/conds.
 
-{:domain/name "pi"  ; This is appended to every :domain/element, so we keep it short.
+{:domain/ename "pi"  ; This is appended to every :domain/element, so we keep it short.
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
+ :domain/problem "(defproblem process-interview pi () ((characterize-process unknown-proj)))"
+ :domain/execute "(find-plans 'process-interview :verbose :plans)"
  :domain/elems [;; (characterize-process ?proj)
                 {:method/head (characterize-process ?proj)
                  :method/rhsides [{:method/case-name "from-scratch"

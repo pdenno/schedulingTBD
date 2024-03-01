@@ -20,7 +20,7 @@
 ;;;
 ;;;   canonical - a plan domain structured that separates the SHOP2 lispy domain into its elements (operators, methods, and axioms),
 ;;;               but for those elements just provides :canon/code which holds the corresponding elements SHOP2 lispy structure.
-;;;               You can get canonical by calling db2canon with a unique string (:domain/name, :method/name, :operator/name, or :axiom/name).
+;;;               You can get canonical by calling db2canon with a unique string (:domain/ename, :method/ename, :operator/ename, or :axiom/ename).
 ;;;               Canonical is good for testing translation because it factors into the individual methods, operators and axioms.
 ;;;               It doesn't have any other uses, I think.
 ;;;
@@ -64,9 +64,9 @@
   "For use mostly with :domain/elems, return one of 'method', 'axiom' or 'operator' based
    on what the expression contains. The actual :sys/typ of these is in the :sys/body."
   [exp]
-  (cond (contains? exp :method/name)   "method"
-        (contains? exp :axiom/name)    "axiom"
-        (contains? exp :operator/name) "operator"))
+  (cond (contains? exp :method/ename)   "method"
+        (contains? exp :axiom/ename)    "axiom"
+        (contains? exp :operator/ename) "operator"))
 
 ;;; ======================= SHOP2 Grammar ================================================================
 ;;;------ toplevel forms ----
@@ -402,7 +402,7 @@
 (defshop2db :domain [exp]
   (let [[_ name elems] exp
         cnt (atom 0)]
-    {:domain/name (str name)
+    {:domain/ename (str name)
      :sys/body (-> {:sys/typ :domain}
                    (assoc :domain/elems (vec (for [e elems]
                                                (-> (shop2db e {:domain-name (str name)})
@@ -414,7 +414,7 @@
   (s/assert ::method body)
   (clear-rewrite!)
   (let [[_ head & pairs] body
-        res {:method/name (str domain-name "." (method-name head))
+        res {:method/ename (str domain-name "." (method-name head))
              :sys/body (-> {:sys/typ :method}
                            (assoc :method/head      (shop2db head :atom))
                            (assoc :method/rhs       (shop2db pairs :method-rhsides)))}]
@@ -422,7 +422,7 @@
       ;; Uniqueness is not well thought through in SHOP! If there is any case-name whatsoever, add THE FIRST to the name.
       ;; It appears from the zeno example that method signatures might include both formal parameters and sometimes case names.
       ;; I don't think we care, since we are handing the thing to SHOP to deal with, but we need unique for the DB.
-      (update res :method/name #(str % "." case-name))
+      (update res :method/ename #(str % "." case-name))
       res)))
 
 ;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>])
@@ -430,7 +430,7 @@
   (s/assert ::operator body)
   (clear-rewrite!)
   (let [[_ head preconds dlist alist & [cost]] body]
-    {:operator/name (str domain-name "." (first head))
+    {:operator/ename (str domain-name "." (first head))
      :sys/body (cond-> {:sys/typ :operator}
                  true                   (assoc :operator/head (shop2db head :atom))
                  (not-nothing preconds) (assoc :operator/preconds (shop2db preconds :operator-preconds))
@@ -462,7 +462,7 @@
                                                   (conj res (-> {:sys/pos pos}
                                                                 (assoc :rhs/terms (shop2db (nth exps 0) :logical-exp))))
                                                   (conj res {:box/empty-list "empty list"})))))]
-    {:axiom/name (if-let [case-name (-> rhs first :rhs/case-name)]
+    {:axiom/ename (if-let [case-name (-> rhs first :rhs/case-name)]
                    (str domain-name "." (method-name head) "." case-name)
                    (str domain-name "." (method-name head)))
      :sys/body (cond-> {:sys/typ :axiom
@@ -732,7 +732,7 @@
   "Defines schema elements about shop2 constructs.
    This is combined with the project-oriented schema elements to define the schema for the system (as opposed to schema for a project).
    The schema contains three 'name' attributes that are :db.unique/identity unique and not part of the serialization for shop3.
-   These are :method/name, :operator/name and :axiom/name. (In contrast, :domain/name IS part of the shop3 serialization.)
+   These are :method/ename, :operator/ename and :axiom/ename. (In contrast, :domain/ename IS part of the shop3 serialization.)
    The purpose of these is to allow DB-based management of in plan elements in the context of authoring and refining through the UI.
    A naming convention is used for these three where the name of the domain is prefixed with a dot; thus 'zeno."
   {;; ---------------------- assignment
@@ -758,7 +758,7 @@
    :axiom/head
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the LHS atom of the axiom."}
-   :axiom/name
+   :axiom/ename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity,
         :doc "A DB-unique name for the axiom"}
    :axiom/rhs
@@ -797,10 +797,10 @@
         :doc "the terms that are part of a disjunctive expression."} ; ToDo: need a :sys/pos or something like that.
 
    ;; ----------------------- domain
-   :domain/name
+   :domain/ename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
         :doc "a DB-unique name for the domain. The name is appended to everything in :domain/elems, so keep it short.
-              For better description use plan/name or plan/description."}
+              For better description use plan/name or plan/description. 'ename' so that we can still use 'name'!"}
    :domain/description
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,  :mm/info {:extra? true}
         :doc "a desciption of domain. This isn't part of SHOP"}
@@ -808,6 +808,14 @@
    :domain/elems
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "The methods, operators and axioms of the domain."}
+
+   :domain/execute
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+        :doc "A string that reads to a SHOP-style s-expression defining what is typically being executed, e.g. find-plans."}
+
+   :domain/problem
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+        :doc "A string that reads to a SHOP-style s-expression associating a planning goal and states with a domain."}
 
    ;; ---------------------- logical expression
    :exp/negated?
@@ -853,7 +861,7 @@
    :method/case-name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol,
         :doc "a name for the method case; the name is unique only in the context of this method."}
-   :method/name
+   :method/ename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
            :doc "a DB-unique name for the method; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
    :method/preconds
@@ -879,7 +887,7 @@
    :operator/head
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the head atom of an operation."}
-   :operator/name
+   :operator/ename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
         :doc "a DB-unique name for the operation; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
    :operator/preconds
@@ -976,7 +984,7 @@
   (cond specified                                        specified
         (and (map? exp) (contains? exp :sys/typ))        (:sys/typ exp)
         (or (symbol? exp) (number? exp) (string? exp))   :simple-type
-        (contains? exp :domain/name)                     :domain
+        (contains? exp :domain/ename)                    :domain
         (contains? exp :sys/body)                        :body ; This is used, at least in the shop-round-trip test.
         (contains? exp :box/sym)                         :box
         (contains? exp :box/num)                         :box
@@ -990,8 +998,8 @@
 
 (defmulti db2shop #'db2shop-dispatch)
 
-(defdb2shop :domain [{:domain/keys [name] :sys/keys [body]}]
-  `(~'defdomain ~(symbol name)
+(defdb2shop :domain [{:domain/keys [ename] :sys/keys [body]}]
+  `(~'defdomain ~(symbol ename)
     ~(for [e (sort-by :sys/pos (-> body :domain/elems))]
        (db2shop e))))
 
@@ -1113,25 +1121,27 @@
 (defn canon2db
   "Given a canonical structure, create the corresponding DB structure.
    :canon/pos of each element of :domain/elems is :sys/pos in the DB."
-  [{:domain/keys [name elems description]}]
-  (cond-> {:domain/name name
+  [{:domain/keys [ename elems description problem execute]}]
+  (cond-> {:domain/ename ename
            :sys/body {:sys/typ :domain
-                      :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
-                                             (-> (shop2db  (:canon/code %) {:domain-name name})
+                      :domain/elems (mapv #(let [name-attr (keyword (code-type %) "ename")]
+                                             (-> (shop2db  (:canon/code %) {:domain-name ename})
                                                  (assoc :sys/pos (:canon/pos %))
                                                  (assoc name-attr (get % name-attr))))
                                           (sort-by :canon/pos elems))}}
-    description (assoc :domain/description description)))
+    description (assoc :domain/description description)
+    problem     (assoc :domain/problem     (str problem))
+    execute     (assoc :domain/execute     (str execute))))
 
 (defn db-entry-for
   "Return the named DB structure. name is string and db.unique/identity"
   [name & {:keys [db-atm] :or {db-atm (connect-atm :planning-domains)}}]
   (when-let [eid (d/q '[:find ?e .
                         :in $ ?name
-                        :where (or [?e :method/name ?name]
-                                   [?e :operator/name ?name]
-                                   [?e :axiom/name ?name]
-                                   [?e :domain/name ?name])]
+                        :where (or [?e :method/ename ?name]
+                                   [?e :operator/ename ?name]
+                                   [?e :axiom/ename ?name]
+                                   [?e :domain/ename ?name])]
                       @db-atm
                       name)]
     (sutil/resolve-db-id {:db/id eid} db-atm #{:db/id})))
@@ -1139,19 +1149,19 @@
 (defn db2canon
   "Use db2shop to create from db-style maps a map structure where the :domain/elems are individual methods, operators and axioms."
   [db-obj]
-  (let [cnt (atom 0)]
-    (cond (contains? db-obj :domain/name) {:domain/name (:domain/name db-obj)
-                                           :domain/elems (-> (for [e (->> db-obj :sys/body :domain/elems (sort-by :sys/pos))]
-                                                               (let [name-attr (keyword (code-type e) "name")]
-                                                                 (-> {:canon/pos (swap! cnt inc)}
-                                                                     (assoc name-attr (get e name-attr))
-                                                                     (assoc :canon/code (db2shop e)))))
-                                                             vec)}
-          ;; This one is just used in debugging, I think.
-          (#{"method" "axiom" "operator"} (code-type db-obj))
-          (let [name-attr (keyword (code-type db-obj) "name")]
-            {name-attr (get db-obj name-attr)
-             :canon/code (-> db-obj :sys/body db2shop)}))))
+  (assert (every? #(contains? db-obj %) [:domain/ename :sys/body]))
+  (let [cnt (atom 0)
+        {:domain/keys [description problem execute]} db-obj]
+    (cond-> {:domain/ename (:domain/ename db-obj)
+             :domain/elems (-> (for [e (->> db-obj :sys/body :domain/elems (sort-by :sys/pos))]
+                                 (let [name-attr (keyword (code-type e) "ename")]
+                                   (-> {:canon/pos (swap! cnt inc)}
+                                       (assoc name-attr (get e name-attr))
+                                       (assoc :canon/code (db2shop e)))))
+                               vec)}
+      problem (assoc :domain/problem (edn/read-string problem))
+      execute (assoc :domain/execute (edn/read-string execute))
+      execute (assoc :domain/description description))))
 
 ;;; ------------------------ proj2 to/from canonical ------------------------------
 (def proj-cnt-atm (atom 0))
@@ -1161,7 +1171,7 @@
   [e base-name]
   (-> {}
       (assoc :canon/pos (swap! proj-cnt-atm inc))
-      (assoc :method/name (cond-> (str base-name "." (-> e :method/head method-name))
+      (assoc :method/ename (cond-> (str base-name "." (-> e :method/head method-name))
                             (-> e :method/rhsides first :method/case-name) (str "." (-> e :method/rhsides first :method/case-name))))
       (assoc :canon/code
              `(:method
@@ -1186,7 +1196,7 @@
   [e base-name]
   (-> {}
       (assoc :canon/pos (swap! proj-cnt-atm inc))
-      (assoc :operator/name (str base-name "." (-> e :operator/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
+      (assoc :operator/ename (str base-name "." (-> e :operator/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
       (assoc :canon/code
              `(:operator
                ~(:operator/head e)
@@ -1199,7 +1209,7 @@
   [e base-name]
     (-> {}
       (assoc :canon/pos (swap! proj-cnt-atm inc))
-      (assoc :axiom/name (str base-name "." (-> e :axiom/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
+      (assoc :axiom/ename (str base-name "." (-> e :axiom/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
       (assoc :canon/code
              `(:-
                ~(:axiom/head e)
@@ -1214,12 +1224,17 @@
   "Rewrite the PROJ structure as canonical, which is less lispy."
   [proj]
   (reset! proj-cnt-atm 0)
-  (let [base-name (:domain/name proj)]
-    (update proj :domain/elems
-            #(for [e %]
-               (cond (contains? e :method/head)   (proj2canon-method e base-name)
-                     (contains? e :operator/head) (proj2canon-operator e base-name)
-                     (contains? e :axiom/head)    (proj2canon-axiom e base-name))))))
+  (let [{:domain/keys [ename problem execute]} proj
+        base-name ename]
+    (cond-> proj
+      base-name (assoc :domain/ename base-name)
+      problem   (assoc :domain/problem problem)
+      execute   (assoc :domain/execute execute)
+      true      (update :domain/elems
+                        #(for [e %]
+                           (cond (contains? e :method/head)   (proj2canon-method e base-name)
+                                 (contains? e :operator/head) (proj2canon-operator e base-name)
+                                 (contains? e :axiom/head)    (proj2canon-axiom e base-name)))))))
 
 (defn proj2shop
   "The argument is a planning domain in proj format.
@@ -1263,16 +1278,21 @@
       d-list       (assoc :operator/d-list   (->> d-list   (sort-by :sys/pos) (mapv db2shop)))
       a-list       (assoc :operator/a-list   (->> a-list   (sort-by :sys/pos) (mapv db2shop))))))
 
+
 (defn db2proj
   "Rewrite the DB object as a proj object."
-  [db-obj]
-  `{:domain/name ~(-> db-obj :domain/name str)
-    :domain/elems ~(mapv (fn [elem]
-                           (let [etyp (-> elem :sys/body :sys/typ)]
-                             (cond (= :axiom    etyp)    (db2proj-axiom elem),
-                                   (= :method   etyp)    (db2proj-method elem),
-                                   (= :operator etyp)    (db2proj-operator elem))))
-                         (-> db-obj :sys/body :domain/elems))})
+  [{:domain/keys [ename description execute problem] :sys/keys [body]}]
+  (cond-> {}
+    ename        (assoc :domain/ename ename)
+    description  (assoc :domain/description description)
+    problem      (assoc :domain/problem (edn/read-string problem))
+    execute      (assoc :domain/execute (edn/read-string execute))
+    true         (assoc :domain/elems (mapv (fn [elem]
+                                              (let [etyp (-> elem :sys/body :sys/typ)]
+                                                (cond (= :axiom    etyp)    (db2proj-axiom elem),
+                                                      (= :method   etyp)    (db2proj-method elem),
+                                                      (= :operator etyp)    (db2proj-operator elem))))
+                                            (-> body :domain/elems)))))
 
 ;;; ------------------------ DB Stuff -------------------------
 ;;; Currently this loads zeno, just for testing.

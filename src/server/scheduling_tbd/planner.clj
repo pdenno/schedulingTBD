@@ -4,19 +4,20 @@
    [clojure.edn          :as edn]
    [clojure.java.shell   :refer [sh]]
    [clojure.pprint       :refer [cl-format]]
-   [clojure.spec.alpha           :as s]
-   [clojure.string       :as str]
-   [clojure.core.unify   :as uni]
-   [datahike.api         :as d]
-   ;;[explainlib.core    :as exp]
-   [ezzmq.message        :as zmq]
-   [ezzmq.context        :as zmq-ctx]
-   [ezzmq.socket         :as zmq-sock]
-   [mount.core           :as mount :refer [defstate]]
-   [scheduling-tbd.shop  :as shop]
-   [scheduling-tbd.specs :as specs]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
-   [taoensso.timbre      :as log]))
+   [clojure.spec.alpha       :as s]
+   [clojure.string           :as str]
+   [clojure.core.unify       :as uni]
+   [datahike.api             :as d]
+   ;;[explainlib.core        :as exp]
+   [ezzmq.message            :as zmq]
+   [ezzmq.context            :as zmq-ctx]
+   [ezzmq.socket             :as zmq-sock]
+   [mount.core               :as mount :refer [defstate]]
+   [scheduling-tbd.operators :as ops]
+   [scheduling-tbd.shop      :as shop]
+   [scheduling-tbd.specs     :as specs]
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
+   [taoensso.timbre          :as log]))
 
 (def planner-endpoint-port 31888)
 (def planner-endpoint (format "tcp://*:%s" planner-endpoint-port))
@@ -63,7 +64,7 @@
   (let [[result std err] (str/split s #"BREAK-HERE")
         [success result] (re-matches #"^\((.*)$" result)
         form (if success
-               (try (read-string result) (catch Exception _e :error/unreadable))
+               (try (edn/read-string result) (catch Exception _e :error/unreadable))
                :error/uninterpretable)
         ;; ToDo: Investigate this bug.
         err (if (= err " )") nil err)]
@@ -122,7 +123,7 @@
   [domain-name]
   (d/q '[:find ?eid .
          :in $ ?dname
-         :where [?eid :domain/name ?dname]]
+         :where [?eid :domain/ename ?dname]]
        @(connect-atm :planning-domains)
        domain-name))
 
@@ -188,43 +189,77 @@
                   :else                                              obj))]
     (pd domain)))
 
-(def facts "A vector of state-space facts."
-  (atom []))
+(def facts "A set of state-space facts."
+  (atom #{}))
 
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
+;;;       For the time being, I'm just adding uniquely
 (defn update-facts
   "Update the facts by adding, deleting or resetting to empty.
-     facts - a vector of ::specs/positive-proposition.
+     facts - a set of ::specs/positive-proposition.
      a map - with keys :add and :delete being collections of :specs/positive-proposition.
              These need not be ground propositions; everything that unifies with a
              form in delete will be deleted.
              A variable in the add list will be treated as a skolem.
              reset? is truthy."
   [facts {:keys [add delete reset?]}]
-  (assert (every? (s/valid? ::specs/positive-proposition %) facts))
-  (cond-> (if reset? [] facts)
-    delete (->>
-            (remove (fn [fact] (any? #(uni/unify fact %) delete)))
-            vec)
-    add    (->)))
+  (assert set? facts)
+  (assert (every? #(s/valid? ::specs/positive-proposition %) facts))
+  (as-> (if reset? #{} facts) ?f
+    (if delete
+      (->> ?f (remove (fn [fact] (some #(uni/unify fact %) delete))) set)
+      ?f)
+    (if add (into ?f add) ?f)))
 
-;;; (step-discussion "pi")
-(defn ^:diag step-discussion
-  "Compute the next step of the discussion for the given planning domain.
+(defn translate-plans
+  "Translate plans from SHOP format, which is upper-case symbols with cost,
+   to lowercase symbols. Additionally when regarding the operation name,
+   the resulting symbol is ns-qualified in the operators namespace."
+  [plans]
+  (->> plans
+       (map first)
+       (map (fn [op] (map #(if (symbol? %) (-> % name str/lower-case symbol) %) op)))
+       (mapv #(conj (rest %) (->> % first name (symbol "ops"))))))
+
+;;; ToDo: The operators called from execute-plan are typically long-running.
+;;;       There is need, therefore, for means to deal with this (IN THE DB, I think).
+;;;       Specifically, there is the need for "restart", in the sense that we can kill
+;;;       the app and restart it with the same "last question" and unachieved operators
+;;;       awaiting responses.
+(defn execute-plan
+  "Execute the operators of the plan, producing side-effects such as asking the user
+   and fact-updates (a map of :add and :delete vectors of propositions)."
+  [plans facts]
+  (reset! diag plans)
+  (log/info "execute-plan: plan =" plan)
+  (log/info "execute-plan: facts =" facts)
+  (let [plan (translate-plans plans)]
+    {}))
+
+;;; (interview-loop "pi")
+(defn ^:diag interview-loop
+  "Incrementally compute the next step of the discussion for the given planning domain.
    This runs the planner and updates the planning domain by advancing
    the stop-plan pre-condition. Argument is a :domain/name (a string)."
-  [domain-name]
-  (let [facts (atom [])
-        domain (-> domain-name
-                   (get-domain {:form :proj})
-                   (prune-domain @facts)
-                   (shop/proj2shop))]
-    (reset! diag domain)
-    (plan {:domain domain
-           :problem '(defproblem process-interview pi
-                       () ; This is state data.
-                       ((characterize-process unknown-proj)))
-           :execute '(find-plans 'process-interview :verbose :plans)})))
+  [domain-name & {:keys [start-facts limit]
+                  :or {start-facts #{}, limit 2}}]
+  (let [domain-proj (-> domain-name (get-domain {:form :proj}))
+        problem (:domain/problem domain-proj)
+        execute (:domain/execute domain-proj)]
+    (loop [facts start-facts
+           domain (-> domain-proj (prune-domain facts) shop/proj2shop)
+           cnt   1]
+      (if (>= cnt limit)
+        facts
+        (let [plans (plan {:domain domain :problem problem :execute execute})
+              fact-updates (execute-plan plans facts)
+              new-facts (update-facts facts fact-updates)]
+          (log/info "plans =" plans)
+          (log/info "fact-updates =" fact-updates)
+          (log/info "new-facts =" new-facts)
+          (recur new-facts
+                 (-> new-facts (prune-domain domain) shop/proj2shop)
+                 (inc cnt)))))))
 
 ;;; Section 5.6 Debugging Suggestions
 ;;; When you have a problem that does not solve as expected, the following general recipe may help you home in on bugs in your domain definition:

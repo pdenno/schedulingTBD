@@ -1,5 +1,5 @@
 ;;; This doesn't have a top-level :sys/pos
-{:operator/name ".!!cost",
+{:operator/ename ".!!cost",
     :sys/body
     {:operator/a-list [{:atom/predicate maxtime, :atom/roles [{:role/val #:box{:sym ?newmax}, :sys/pos 1}], :sys/pos 1, :sys/typ :atom}],
      :operator/cost
