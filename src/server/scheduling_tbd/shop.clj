@@ -372,7 +372,7 @@
   {:clj-kondo/lint-as 'clojure.core/fn ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
    :arglists '([tag [obj & more-args] & body])} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
   [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod shop2db ~tag [~obj & [~@more-args]]
+   `(defmethod shop2db ~tag [~obj & [~@more-args]]
      (when @debugging? (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
      (swap! locals #(into [{}] %))
@@ -692,7 +692,7 @@
     (cond-> {:sys/typ :task-atom}
       true               (assoc :atom/predicate pred)
       (not-empty terms)  (assoc :atom/roles (-> (let [cnt (atom 0)]
-                                                 (for [v terms]
+                                                  (for [v terms]
                                                    {:role/val (box (shop2db v :task-term))
                                                     :sys/pos (swap! cnt inc)}))
                                                 vec)))))

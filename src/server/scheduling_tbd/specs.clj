@@ -16,3 +16,12 @@
 (s/def ::proposition
   (s/or :positive ::positive-proposition
         :negated  ::negated-proposition))
+
+(s/def :edits/add    (s/and set? (s/coll-of ::proposition)))
+(s/def :edits/delete (s/and set? (s/coll-of ::proposition)))
+
+(s/def :step/operator keyword?)
+(s/def :step/args coll?)
+
+(s/def ::plan-step (s/keys :req-un [:step/operator :step/args]))
+(s/def ::state-edits (s/keys :req-un [:edits/add :edits/delete]))

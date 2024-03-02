@@ -13,7 +13,7 @@
    [ezzmq.context            :as zmq-ctx]
    [ezzmq.socket             :as zmq-sock]
    [mount.core               :as mount :refer [defstate]]
-   [scheduling-tbd.operators :as ops]
+   [scheduling-tbd.operators :as op]
    [scheduling-tbd.shop      :as shop]
    [scheduling-tbd.specs     :as specs]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
@@ -189,9 +189,6 @@
                   :else                                              obj))]
     (pd domain)))
 
-(def facts "A set of state-space facts."
-  (atom #{}))
-
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
 ;;;       For the time being, I'm just adding uniquely
 (defn update-facts
@@ -218,8 +215,11 @@
   [plans]
   (->> plans
        (map first)
-       (map (fn [op] (map #(if (symbol? %) (-> % name str/lower-case symbol) %) op)))
-       (mapv #(conj (rest %) (->> % first name (symbol "ops"))))))
+       (mapv #(let[[op & args] %]
+                (-> {}
+                    (assoc :operator (->> op name str/lower-case keyword))
+                    (assoc :args (mapv (fn [arg] (if (symbol? arg) (-> arg name str/lower-case symbol) arg))
+                                       args)))))))
 
 ;;; ToDo: The operators called from execute-plan are typically long-running.
 ;;;       There is need, therefore, for means to deal with this (IN THE DB, I think).
@@ -228,19 +228,38 @@
 ;;;       awaiting responses.
 (defn execute-plan
   "Execute the operators of the plan, producing side-effects such as asking the user
-   and fact-updates (a map of :add and :delete vectors of propositions)."
+   and fact-updates (a map of :add and :delete vectors of propositions).
+   Returns a ::specs/state-edits object that is the effect of running the plan."
   [plans facts]
-  (reset! diag plans)
-  (log/info "execute-plan: plan =" plan)
-  (log/info "execute-plan: facts =" facts)
   (let [plan (translate-plans plans)]
-    {}))
+    (log/info "execute-plan: plan =" plan)
+    (reduce (fn [res plan-step]
+              (s/assert ::specs/plan-step plan-step)
+              (assoc res :updates (op/run-op plan-step facts res)))
+            {:add #{} :delete #{}} ; The form of an empty ::specs/state-edits.
+            plan)))
 
 ;;; (interview-loop "pi")
 (defn ^:diag interview-loop
-  "Incrementally compute the next step of the discussion for the given planning domain.
-   This runs the planner and updates the planning domain by advancing
-   the stop-plan pre-condition. Argument is a :domain/name (a string)."
+  "Run a conversation with the users. Specifically,
+     (1) Create a proj-format planning domain by applying prune-domain against start-facts and the named domain (domain-name).
+     (2) Run the :domain/problem & :domain/execute to produce one or more plans. (For now take the first plan computed.)
+     (3) Iteratively run the steps of the plan (operators), each of which can query the user through the UI and modify the state-edits map.
+         For example, running a plan operator may involve asking the user a question, an analysis of which adds propositions to the
+         :add set of the state-edits map.
+     (4) The state-edits resulting from this plan is then used by prune-domain to produce a NEW planning domain.
+         Iteratively such new planning domains are processed through steps 1-3. This continues until no more plans can be generated.
+
+   The motivation for interatively running steps 1-3 (rather than running to completion in a more comprehensive planning domain)
+   is that planning is required to be dynamic and on-line; what is learned through asynchronous discussion (a collection of propositions)
+   determines how the planning domain can be pruned. By this means, 'effective planning domains' are much simpler and of smaller scope
+   than the all-encompassing 'canonical plan' stored in the planning domains DB.
+
+   Conceptually, interview-loop is a long-running process; it could run for months.
+   Implementationally, it can be stopped and restarted from project DB data, which captures the substance of the entire discussion to date.
+   Particularly, the DB content captures a state vector which serves as start-facts in restarting the interview-loop after 'hibernation'.
+
+   FWIW, the function returns the state achieved, a collection of :specs/proposition."
   [domain-name & {:keys [start-facts limit]
                   :or {start-facts #{}, limit 2}}]
   (let [domain-proj (-> domain-name (get-domain {:form :proj}))
@@ -248,17 +267,18 @@
         execute (:domain/execute domain-proj)]
     (loop [facts start-facts
            domain (-> domain-proj (prune-domain facts) shop/proj2shop)
-           cnt   1]
-      (if (>= cnt limit)
+           cnt 1]
+      (if (>= cnt limit) ; This is for testing, and maybe safety.
         facts
         (let [plans (plan {:domain domain :problem problem :execute execute})
-              fact-updates (execute-plan plans facts)
-              new-facts (update-facts facts fact-updates)]
+              {:keys [updates]} (execute-plan plans facts)
+              new-facts (update-facts facts updates)]
           (log/info "plans =" plans)
-          (log/info "fact-updates =" fact-updates)
+          (log/info "fact-updates =" updates)
           (log/info "new-facts =" new-facts)
+          (reset! diag {:new-facts new-facts :domain domain})
           (recur new-facts
-                 (-> new-facts (prune-domain domain) shop/proj2shop)
+                 (->> new-facts (prune-domain domain-proj) shop/proj2shop)
                  (inc cnt)))))))
 
 ;;; Section 5.6 Debugging Suggestions
