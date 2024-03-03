@@ -1,4 +1,5 @@
 (ns scheduling-tbd.specs
+  "This provides Clojure specs used throughout the project."
   (:require
    [clojure.spec.alpha           :as s]))
 

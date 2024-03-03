@@ -35,5 +35,6 @@
 (defoperator :!initial-question [plan-step facts state-edits]
   (log/info "!initial-question: plan-step =" plan-step "facts =" facts "state-edits =" state-edits)
   (let [{:keys [args]} plan-step]
-    (-> state-edits
-        (update :add conj `(~'ongoing-discussion ~@args)))))
+    {:from :!initial-question
+     :delete #{}
+     :add #{`(~'ongoing-discussion ~@args)}}))

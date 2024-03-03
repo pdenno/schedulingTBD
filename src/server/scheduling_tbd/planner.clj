@@ -1,5 +1,5 @@
 (ns scheduling-tbd.planner
-  "Planning, currently including SHOP3 planner."
+  "This provides functions to prune a planning domain and run an interview."
   (:require
    [clojure.edn          :as edn]
    [clojure.java.shell   :refer [sh]]
@@ -16,7 +16,7 @@
    [scheduling-tbd.operators :as op]
    [scheduling-tbd.shop      :as shop]
    [scheduling-tbd.specs     :as specs]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
    [taoensso.timbre          :as log]))
 
 (def planner-endpoint-port 31888)
@@ -169,8 +169,18 @@
   "Check the :method/preconds of the RHS against the argument facts and if
    they do not all unify, remove this RHS.
    Returns the filterv vector of this test."
-  [rhsides facts]
-  (filterv #(satisfies-facts? (:method/preconds %) facts) rhsides))
+  [elems facts]
+  (->> elems
+       (mapv (fn [elem]
+               (if-not (contains? elem :method/head) ; It is an operator or axiom; don't touch it.
+                 elem
+                 (update elem :method/rhsides
+                         (fn [rhsides]
+                           (filterv (fn [rhs] (satisfies-facts? (:method/preconds rhs) facts)) rhsides))))))
+       ;; If there are no qualifying rhsides, remove the methode entirely.
+       (filterv #(if-not (contains? % :method/head)
+                   true
+                   (-> % :method/rhsides not-empty)))))
 
 (defn prune-domain
   "Return the domain with some operators and methods RHS removed.
@@ -178,8 +188,34 @@
    The facts argument is a collection of atoms in the logic sense, that is,
    flat s-expressions representing propositions."
   [domain facts]
+  (-> domain
+      (update :domain/elems #(prune-operators % facts))
+      (update :domain/elems #(prune-method-rhsides % facts))))
+
+#_(defn prune-domain ; First try
+  "Return the domain with some operators and methods RHS removed.
+   What is removed are those element for which none of the argument facts unify.
+   The facts argument is a collection of atoms in the logic sense, that is,
+   flat s-expressions representing propositions."
+  [domain facts]
   (letfn [(pd [obj]
-            (cond (and (map? obj) (contains? obj :domain/id))        (-> (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
+            (cond (and (map? obj) (contains? obj :domain/ename))     (update obj :domain/elems #(mapv pd %))
+                  (and (map? obj) (contains? obj :operator/head))    (update obj :domain/elems #(prune-operators % facts)) ; WRONG!
+                  (and (map? obj) (contains? obj :axiom/head))       (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
+                  (and (map? obj) (contains? obj :method/head))      (update obj :method/rhsides #(prune-method-rhsides % facts))
+                  (vector? obj)                                      (mapv pd obj)
+                  (seq? obj)                                         (map pd obj)
+                  :else                                              obj))]
+    (pd domain)))
+
+#_(defn prune-domain ; Original
+  "Return the domain with some operators and methods RHS removed.
+   What is removed are those element for which none of the argument facts unify.
+   The facts argument is a collection of atoms in the logic sense, that is,
+   flat s-expressions representing propositions."
+  [domain facts]
+  (letfn [(pd [obj]
+            (cond (and (map? obj) (contains? obj :domain/ename))     (-> (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
                                                                          ;; This part examines :operator/preconds.
                                                                          (update obj :domain/elems #(prune-operators % facts)))
                   (and (map? obj) (contains? obj :axiom/head))       (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
@@ -188,6 +224,7 @@
                   (seq? obj)                                         (map pd obj)
                   :else                                              obj))]
     (pd domain)))
+
 
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
 ;;;       For the time being, I'm just adding uniquely
@@ -229,14 +266,14 @@
 (defn execute-plan
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
-   Returns a ::specs/state-edits object that is the effect of running the plan."
+   Returns a vector ::specs/state-edits object that is the effect of running the plan."
   [plans facts]
   (let [plan (translate-plans plans)]
     (log/info "execute-plan: plan =" plan)
     (reduce (fn [res plan-step]
               (s/assert ::specs/plan-step plan-step)
-              (assoc res :updates (op/run-op plan-step facts res)))
-            {:add #{} :delete #{}} ; The form of an empty ::specs/state-edits.
+              (conj res (op/run-op plan-step facts res)))
+            [{:from :start :add #{} :delete #{} }] ; The form of an empty ::specs/state-edits.
             plan)))
 
 ;;; (interview-loop "pi")
@@ -252,8 +289,8 @@
 
    The motivation for interatively running steps 1-3 (rather than running to completion in a more comprehensive planning domain)
    is that planning is required to be dynamic and on-line; what is learned through asynchronous discussion (a collection of propositions)
-   determines how the planning domain can be pruned. By this means, 'effective planning domains' are much simpler and of smaller scope
-   than the all-encompassing 'canonical plan' stored in the planning domains DB.
+   determines how the planning domain can be pruned. By this means, 'effective planning domains' are produce which are much simpler and
+   of smaller scope than the all-encompassing 'canonical plan' stored in the planning domains DB.
 
    Conceptually, interview-loop is a long-running process; it could run for months.
    Implementationally, it can be stopped and restarted from project DB data, which captures the substance of the entire discussion to date.
@@ -261,24 +298,27 @@
 
    FWIW, the function returns the state achieved, a collection of :specs/proposition."
   [domain-name & {:keys [start-facts limit]
-                  :or {start-facts #{}, limit 2}}]
-  (let [domain-proj (-> domain-name (get-domain {:form :proj}))
-        problem (:domain/problem domain-proj)
-        execute (:domain/execute domain-proj)]
+                  :or {start-facts #{}, limit 3}}]
+  (let [canon-proj (-> domain-name (get-domain {:form :proj}))
+        problem (:domain/problem canon-proj)
+        execute (:domain/execute canon-proj)]
     (loop [facts start-facts
-           domain (-> domain-proj (prune-domain facts) shop/proj2shop)
+           domain (-> canon-proj (prune-domain facts) shop/proj2shop)
            cnt 1]
       (if (>= cnt limit) ; This is for testing, and maybe safety.
         facts
         (let [plans (plan {:domain domain :problem problem :execute execute})
-              {:keys [updates]} (execute-plan plans facts)
-              new-facts (update-facts facts updates)]
+              updates (execute-plan plans facts)
+              ;; update the fact set in the order operators were applied.
+              new-facts (reduce (fn [res update] (update-facts res update)) facts updates)
+              pruned-proj (prune-domain canon-proj new-facts)
+              new-domain (shop/proj2shop pruned-proj)]
           (log/info "plans =" plans)
           (log/info "fact-updates =" updates)
           (log/info "new-facts =" new-facts)
-          (reset! diag {:new-facts new-facts :domain domain})
+          (reset! diag {:canon-proj canon-proj :new-facts new-facts :pruned-proj pruned-proj :new-domain new-domain})
           (recur new-facts
-                 (->> new-facts (prune-domain domain-proj) shop/proj2shop)
+                 new-domain
                  (inc cnt)))))))
 
 ;;; Section 5.6 Debugging Suggestions
