@@ -20,7 +20,7 @@
    ["react" :as react]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 ;;; https://codemirror.net/docs/ref/#state.ChangeSpec
 ;;; Because the selectors will be prefixed with a scope class, rules that directly match the editor's wrapper element -- to which

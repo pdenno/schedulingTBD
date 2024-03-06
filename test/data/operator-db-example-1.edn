@@ -1,0 +1,30 @@
+;;; This doesn't have a top-level :sys/pos
+{:operator/ename ".!!cost",
+    :sys/body
+    {:operator/a-list [{:atom/predicate maxtime, :atom/roles [{:role/val #:box{:sym ?newmax}, :sys/pos 1}], :sys/pos 1, :sys/typ :atom}],
+     :operator/cost
+     {:s-exp/args [{:s-exp/arg-val #:box{:sym ?newmax}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?max}, :sys/pos 2}],
+      :s-exp/fn-ref -,
+      :sys/typ :s-exp},
+     :operator/d-list [{:atom/predicate maxtime, :atom/roles [{:role/val #:box{:sym ?max}, :sys/pos 1}], :sys/pos 1, :sys/typ :atom}],
+     :operator/head {:atom/predicate !!cost, :atom/roles [{:role/val #:box{:sym ?end}, :sys/pos 1}], :sys/typ :atom},
+     :operator/preconds
+     [{:atom/predicate maxtime, :atom/roles [{:role/val #:box{:sym ?max}, :sys/pos 1}], :sys/typ :atom, :sys/pos 1}
+      {:assign/exp
+       {:s-exp/args
+        [{:s-exp/args
+          [{:s-exp/args [{:s-exp/arg-val #:box{:sym ?max}, :sys/pos 1} {:s-exp/arg-val #:box{:sym ?end}, :sys/pos 2}],
+            :s-exp/fn-ref <,
+            :sys/pos 1,
+            :sys/typ :s-exp}
+           {:s-exp/arg-val #:box{:sym ?end}, :sys/pos 2}
+           {:s-exp/arg-val #:box{:sym ?max}, :sys/pos 3}],
+          :s-exp/fn-ref if,
+          :sys/pos 1,
+          :sys/typ :s-exp}],
+        :s-exp/fn-ref eval,
+        :sys/typ :s-exp},
+       :assign/var ?newmax,
+       :sys/typ :assignment
+       :sys/pos 2}]
+     :sys/typ :operator}}

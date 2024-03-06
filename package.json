@@ -1,5 +1,5 @@
 {
-  "name": "radmapper",
+  "name": "SchedulingTBD",
   "version": "1.0.0",
   "description": "schedulingTBD",
   "main": "index.js",
@@ -25,7 +25,7 @@
     "npm": "^9.7.2",
     "platform": "1.3.5",
     "react": "^18.2.0",
-    "react-chat-elements": "^12.0.10",
+    "react-chat-elements": "^12.0.14",
     "react-dom": "^18.2.0",
     "react-refresh": "^0.14.0",
     "react-router-dom": "^6.8.2",
@@ -34,15 +34,15 @@
     "ws": "^7.5.9"
   },
   "scripts": {
-    "stbd-client": "shadow-cljs -d nrepl/nrepl:1.0.0 -d cider/piggieback:0.5.3 -d cider/cider-nrepl:0.43.1 watch frontend",
+    "stbd-client": "shadow-cljs -d nrepl/nrepl:1.0.0 -d cider/piggieback:0.5.3 -d cider/cider-nrepl:0.45.0 watch frontend",
     "release": "shadow-cljs release frontend",
-    "kaochaSTBD": "shadow-cljs -d nrepl/nrepl:1.0.0 -d cider/piggieback:0.5.3 -d cider/cider-nrepl:0.43.1 watch kaochaSTBD",
-    "CLJSTBD": "clj -A:dev -Sdeps '{:deps {nrepl/nrepl {:mvn/version \"1.0.0\"} cider/cider-nrepl {:mvn/version \"0.43.1\"}} :aliases {:cider/nrepl {:main-opts [\"-m\" \"nrepl.cmdline\" \"--middleware\" \"[cider.nrepl/cider-middleware]\"]}}}' -M:cider/nrepl",
-    "build-repl": "clj -A:build -Sdeps '{:deps {nrepl/nrepl {:mvn/version \"1.0.0\"} cider/cider-nrepl {:mvn/version \"0.43.1\"}} :aliases {:cider/nrepl {:main-opts [\"-m\" \"nrepl.cmdline\" \"--middleware\" \"[cider.nrepl/cider-middleware]\"]}}}' -M:cider/nrepl"
+    "kaochaSTBD": "shadow-cljs -d nrepl/nrepl:1.0.0 -d cider/piggieback:0.5.3 -d cider/cider-nrepl:0.45.0 watch kaochaSTBD",
+    "CLJSTBD": "clj -A:dev -Sdeps '{:deps {nrepl/nrepl {:mvn/version \"1.0.0\"} cider/cider-nrepl {:mvn/version \"0.45.0\"}} :aliases {:cider/nrepl {:main-opts [\"-m\" \"nrepl.cmdline\" \"--middleware\" \"[cider.nrepl/cider-middleware]\"]}}}' -M:cider/nrepl",
+    "build-repl": "clj -A:build -Sdeps '{:deps {nrepl/nrepl {:mvn/version \"1.0.0\"} cider/cider-nrepl {:mvn/version \"0.45.0\"}} :aliases {:cider/nrepl {:main-opts [\"-m\" \"nrepl.cmdline\" \"--middleware\" \"[cider.nrepl/cider-middleware]\"]}}}' -M:cider/nrepl"
   },
   "author": "Peter Denno",
   "license": "ISC",
   "devDependencies": {
-    "shadow-cljs": "^2.22.8"
+    "shadow-cljs": "^2.27.4"
   }
 }

@@ -1,0 +1,74 @@
+;;; This is a vector of 'proj' structure. See shop.clj.
+
+;;; We operate on this structure -- or its DB equivalent (to be decided) -- by inserting calls to (!stop-plan) after calls
+;;; to (!update-plan-state), which are also inserted as we go.
+{:domain/ename "test-pi"  ; We keep this around for testing.
+ :domain/elems [;; (characterize-process ?proj)...
+                {:method/head (characterize-process ?proj)
+                 :method/rhsides [{:method/case-name "ordinary"
+                                   :method/task-list [(!start-interview  ?proj) (get-process-steps ?proj) (get-wip ?proj)]}]}
+
+                ;; (get-process-steps ?proj)...
+                {:method/head (get-process-steps ?proj)
+                 :method/rhsides [{:method/case-name "well-known"
+                                   :method/preconds [(well-known-process ?proj)]
+                                   :method/task-list [(!yes-no-process-steps ?proj)]}
+                                  {:method/case-name "unknown"
+                                   :method/preconds [(unknown-process ?proj)]
+                                   :method/task-list [(!query-process-steps ?proj)]}]}
+
+                ;; (get-wip ?proj)...
+                {:method/head (get-wip ?proj)
+                 :method/rhsides [{:method/case-name "ordinary"
+                                   :method/preconds [(project-name ?proj)]
+                                   :method/task-list [(!query-for-wip-spreadsheet ?proj)]}]}
+
+                ;; (:operator (!start-interview ?proj) ((starting project-init)) () ((stop-plan)))
+                {:operator/head (!start-interview ?proj)
+                 :operator/preconds [(starting project-init)]
+                 :operator/a-list [(stop-plan)]}
+
+                ;; (:operator (!yes-no-process-steps ?proj) ((proj-name ?proj) (well-known-process ?proj)) () ((have-process-steps ?proj)))
+                {:operator/head (!yes-no-process-steps ?proj)
+                 :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
+                 :operator/a-list [(have-process-steps ?proj)]}
+
+                ;; (:operator (!query-process-steps ?proj)  ((proj-name ?proj) (system-model flow)) () ((have-process-steps ?proj)))
+                {:operator/head (!query-process-steps ?proj)
+                 :operator/preconds [(proj-name ?proj) (system-model flow)]
+                 :operator/a-list [(have-process-steps ?proj)]}
+
+                ;; (:operator (!yes-no-process-durations ?proj)  ((proj-name ?proj) (well-known-process ?proj)) () ((have-process-durs ?proj)))
+                {:operator/head (!yes-no-process-durations ?proj)
+                 :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
+                 :operator/a-list [(have-process-durs ?proj)]}
+
+                ;; (:operator (!query-for-wip-spreadsheet ?proj) ((proj-name ?proj) (have-process-steps ?proj)) () ((have-wip ?proj)))
+                {:operator/head (!query-for-wip-spreadsheet ?proj)
+                 :operator/preconds [(proj-name ?proj) (have-process-steps ?proj)]
+                 :operator/a-list [(have-wip ?proj)]}
+
+                ;; (:operator (!update-plan-state ?proj) () () ())))"
+                {:operator/head (!update-plan-state ?proj)}
+
+                {:axiom/head (travel-cost-info ?a ?from ?to ?cost slow)
+                 :axiom/rhsides [{:axiom/case-name "CASE1"
+                                  :axiom/rhs ((capacity ?a ?cap) (distance ?from ?to ?dist)
+                                              (slow-burn ?a ?burn) (eval (< ?cap (* ?dist ?burn)))
+                                              (assign ?cost most-positive-fixnum))}
+                                 {:axiom/case-name "CASE2"
+                                  :axiom/rhs ((distance ?from ?to ?dist) (fuel ?a ?fuel)
+                                              (slow-burn ?a ?burn)
+                                              (eval (>= ?fuel (* ?dist ?burn)))
+                                              (assign ?cost (float (/
+                                                                    (+ *tc*
+                                                                       (* *fc*
+                                                                          (* ?dist ?burn)))
+                                                                    1))))}]}
+
+                ;; (:- (same ?x ?x) ())
+                {:axiom/head (same ?x ?x)}
+
+                ;; (:- (different ?x ?y) ((not (same ?x ?y))))
+                {:axiom/head (different ?x ?y)
+                 :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}]}

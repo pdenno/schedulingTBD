@@ -15,7 +15,7 @@
 ;;;   (2) Is there a way to factor out start-drag, stop-drag, and drag methods?
 ;;;   (3) pct-up on ShareUpDown.
 
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 (def mouse-down? "Should not be necessary, but it appears it is." (atom false))
 
 (defn resize

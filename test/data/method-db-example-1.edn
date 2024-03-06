@@ -1,0 +1,62 @@
+{:method/ename ".transport-aircraft_?a_?c",
+           :sys/body
+           {:sys/typ :method,
+            :method/head
+            {:sys/typ :atom,
+             :atom/predicate transport-aircraft,
+             :atom/roles
+             [{:role/val #:box{:sym ?a}, :sys/pos 1}
+              {:role/val #:box{:sym ?c}, :sys/pos 2}]},
+            :method/rhs
+            [{:method/preconds
+              [{:sys/typ :atom,
+                :atom/predicate not,
+                :atom/roles
+                [{:role/val
+                  {:sys/typ :list-term,
+                   :list/terms
+                   [{:list/val #:box{:sym no-use}, :sys/pos 1}
+                    {:list/val #:box{:sym ?a}, :sys/pos 2}]},
+                  :sys/pos 1}],
+                :sys/pos 1}],
+              :method/task-list
+              {:sys/typ :task-list,
+               :task-list/elems
+               [{:sys/typ :task-atom,
+                 :atom/predicate !!assert,
+                 :atom/roles
+                 [{:role/val
+                   {:sys/typ :list-term,
+                    :list/terms
+                    [{:list/val
+                      {:sys/typ :list-term,
+                       :list/terms
+                       [{:list/val #:box{:sym no-use}, :sys/pos 1}
+                        {:list/val #:box{:sym ?a}, :sys/pos 2}]},
+                      :sys/pos 1}]},
+                   :sys/pos 1}],
+                 :sys/pos 1}
+                {:sys/typ :task-atom,
+                 :atom/predicate upper-move-aircraft-no-style,
+                 :atom/roles
+                 [{:role/val #:box{:sym ?a}, :sys/pos 1}
+                  {:role/val #:box{:sym ?c}, :sys/pos 2}],
+                 :task/immediate? true,
+                 :sys/pos 2}
+                {:sys/typ :task-atom,
+                 :atom/predicate !!ra,
+                 :atom/roles
+                 [{:role/val
+                   {:sys/typ :list-term,
+                    :list/terms
+                    [{:list/val
+                      {:sys/typ :list-term,
+                       :list/terms
+                       [{:list/val #:box{:sym no-use}, :sys/pos 1}
+                        {:list/val #:box{:sym ?a}, :sys/pos 2}]},
+                      :sys/pos 1}]},
+                   :sys/pos 1}
+                  {:role/val {:sys/typ :list-term, :list/terms []}, :sys/pos 2}],
+                 :task/immediate? true,
+                 :sys/pos 3}]},
+              :sys/pos 1}]}}

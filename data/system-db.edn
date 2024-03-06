@@ -1,6 +1,5 @@
 [
-#:system{:current-project-id :snowboards-production-scheduling,
-         :name "SYSTEM"}
+#:system{:current-project-id :craft-beer-surrogate-1, :name "SYSTEM"}
 
 #:project{:dir
           "/opt/scheduling/projects/craft-beer-brewery-scheduling",
@@ -16,5 +15,9 @@
           "/opt/scheduling/projects/snowboards-production-scheduling",
           :id :snowboards-production-scheduling,
           :name "Snowboards production scheduling"}
+
+#:project{:dir "/opt/scheduling/projects/craft-beer-surrogate",
+          :id :craft-beer-surrogate,
+          :name "Craft beer surrogate"}
 
 ]

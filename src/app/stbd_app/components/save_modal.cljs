@@ -29,7 +29,7 @@
 
 (def white-style (clj->js {:color "background.paper"}))
 (def svr-prefix "http://localhost:3000/app/")
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 ;;; https://mui.com/material-ui/react-modal/
 (defnc SaveModal [{:keys [code-fn data-fn]}]

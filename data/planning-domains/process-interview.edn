@@ -1,0 +1,80 @@
+;;; This is a vector of 'proj' structure. See shop.clj.
+
+;;; This example is being used to explore the idea that we can use state information to prune the domain outside of SHOP.
+;;; Thus instead of (stop-plan) all over the place, we place editing information into the domain that is used to prune off
+;;; parts of the domain that aren't relevant given state.
+
+;;; So far I can put these :keep edit notations on:
+;;;   - :domain/elems
+;;;   - :method/rhsides
+
+;;; In this design, you don't worry about :method/preconds and :operator/preconds except among sibling choices.
+;;; I think I'll have :keep/conds and :prune/conds.
+
+{:domain/ename "pi"  ; This is appended to every :domain/element, so we keep it short.
+ :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
+ :domain/problem "(defproblem process-interview pi () ((characterize-process unknown-proj)))"
+ :domain/execute "(find-plans 'process-interview :verbose :plans)"
+ :domain/elems [;; (characterize-process ?proj)
+                {:method/head (characterize-process ?proj)
+                 :method/rhsides [{:method/case-name "from-scratch"
+                                   :method/preconds [(not (ongoing-discussion ?proj))]
+                                   :method/task-list [(!initial-question ?proj)]}
+
+                                   {:method/case-name "ongoing-discussion"
+                                    :method/preconds [(ongoing-discussion ?proj)]
+                                    :method/task-list [(!inject-project-name ?proj)      ; "inject" means we'll add this proposition from outside the planner.
+                                                       (!test-well-known-process ?proj)  ; "test" means we MIGHT add a proposition such as (well-know-process beer-brewing).
+                                                       (!test-process-class ?proj)]}]}
+
+                ;; ====== (not (ongoing-discussion ?proj)) ===============================
+                ;; (!initial-question ?proj)
+                {:operator/head (!initial-question ?proj)                    ; ToDo: Need a decision: For the time being, a-list is treated list ':operator/postconds'. It can be used to check
+                 :operator/preconds [(not (ongoing-discussion ?proj))]       ;       that the operator asserted some particular propositions. (I can see there being, for example, an
+                 :operator/a-list [(inject-for! project-name ?proj)          ;       (or (well-known-process ?proj) (unknown-process ?proj)).
+                                   (inject-for ongoing-discussion ?proj)
+                                   (inject-for! well-known-process ?proj)    ; inject-for! is metadata on the proposition (rest of the form) saying we will  have that when we are done with this operation
+                                   (inject-for process-class ?proj)]}        ; inject-for means we might have such a proposition.
+                                                                             ; ToDo: Replace inject-for(!)? with :operator/postconds.
+                                                                             ;       a-list and d-list will be used inside SHOP, if they are needed at all.
+                ;; ====== (ongoing-discussion ?proj) ===============================
+                {:method/head (get-process-steps ?proj)
+                 :method/rhsides [{:method/case-name "well-known"
+                                   :method/preconds [(well-known-process ?proj)]
+                                   :method/task-list [(!yes-no-process-steps ?proj)]}
+                                  {:method/case-name "unknown"
+                                   :method/preconds [(unknown-process ?proj)]
+                                   :method/task-list [(!query-process-steps ?proj)]}]}
+
+                ;; (get-wip ?proj)
+                {:method/head (get-wip ?proj)
+                 :method/rhsides [{:method/case-name "ordinary"
+                                   :method/preconds [(project-name ?proj)]
+                                   :method/task-list [(!query-for-wip-spreadsheet ?proj)]}]}
+
+                ;; (!yes-no-process-steps ?proj)
+                {:operator/head (!yes-no-process-steps ?proj)
+                 :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
+                 :operator/a-list [(have-process-steps ?proj)]}
+
+                ;; (!query-process-steps ?proj)
+                {:operator/head (!query-process-steps ?proj)
+                 :operator/preconds [(proj-name ?proj) (system-model flow)]
+                 :operator/a-list [(have-process-steps ?proj)]}
+
+                ;; (!yes-no-process-durations ?proj)
+                {:operator/head (!yes-no-process-durations ?proj)
+                 :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
+                 :operator/a-list [(have-process-durs ?proj)]}
+
+                ;; (!query-for-wip-spreadsheet ?proj)
+                {:operator/head (!query-for-wip-spreadsheet ?proj)
+                 :operator/preconds [(proj-name ?proj) (have-process-steps ?proj)]
+                 :operator/a-list [(have-wip ?proj)]}
+
+                ;; (:- (same ?x ?x) ())
+                {:axiom/head (same ?x ?x)}
+
+                ;; (:- (different ?x ?y) ((not (same ?x ?y))))
+                {:axiom/head (different ?x ?y)
+                 :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}]}

@@ -1,4 +1,40 @@
 ;;; https://github.com/borkdude/clj-kondo/blob/master/doc/config.md
-{:project-root-uri "file:///home/msid/pdenno/Documents/git/schedulingTBD"
- :lint-as {oscheduling-tbd.shop/defrewrite  clojure.core/defmacro}}
 
+{:project-root-uri "file:///home/pdenno/Documents/git/schedulingTBD" ; ToDo: Fix this!
+
+ :linters {:mount/defstate      {:level :warning}
+           :mount.core/defstate {:level :warning} ; Guessing. Not what ethpran did.
+
+           ;; unused-referred-var is about :refer. https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md#unused-referred-var
+           :unused-referred-var {:exclude {taoensso.timbre [error debug info log]
+                                           clojure.test    [deftest is testing]
+                                           ajax.core       [GET POST]}} ; Needs investigation; what it says is unresolved var.
+
+           ;; :exclude-patterns is for bindings, not vars. See https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md
+           #_#_:unused-binding {:exclude-patterns ["^recreate.*" "^unknown-projects" "^backup.*"]}
+
+           ;;------------ Some clojure-lsp things ---------------
+
+           ;; https://clojure-lsp.io/settings/#clojure-lspunused-public-var
+           :clojure-lsp/unused-public-var {:level :warning
+                                           :exclude #{scheduling-tbd.db/backup-proj-dbs    ; These are things that can be called by the developer.
+                                                      scheduling-tbd.db/backup-system-db   ; I suppose another way to do this is just put ^:diag on them.
+                                                      scheduling-tbd.db/proj-base-cfg
+                                                      scheduling-tbd.db/delete-project
+                                                      scheduling-tbd.db/recreate-dbs!
+                                                      scheduling-tbd.db/unknown-projects}
+                                           :exclude-when-contains-meta #{:diag}}}
+
+ ;; Gist for defstate: https://gist.github.com/ethpran/e1741a5c408aec831b5e3a7e24f40fea
+ :hooks   {:analyze-call {mount.core/defstate hooks.defstate/defstate}}
+
+ ;; https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#lint-a-custom-macro-like-a-built-in-macro --- Use defn, not defmacro.
+ :lint-as {#_#_scheduling-tbd.shop/defdb2shop        clojure.core/defn  ; These aren't needed; I did them in-line. (See shop.clj)
+           #_#_scheduling-tbd.shop/defshop2db        clojure.core/defn
+           applied-science.js-interop/defn           clojure.core/defn
+           mount.core/defstate                       clj-kondo.lint-as/def-catch-all   ; Because the hook is not working!
+           ezzmq.core/with-new-context               clojure.core/defmacro             ; I haven't seen defmacro being used; this 'works' as well as def-catch-all.
+           ajax.core/GET                             clojure.core/defn                 ; I haven't seen defmacro being used; this 'works' as well as def-catch-all.
+           #_#_ezzmq.core/with-new-context               clj-kondo.lint-as/def-catch-all}} ; A macro, but not investigated; clojure.core/defn doesn't fix it.
+
+;;; Hooks are used for macros for which :lint-as doesn't work. Currently mine for defstate doesn't work at all!

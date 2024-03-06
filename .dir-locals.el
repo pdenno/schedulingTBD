@@ -1,3 +1,4 @@
-((nil . ((cider-clojure-cli-parameters . "-A:dev")      ;; Supposedly this replaces cider-clojure-cli-global-options, but it seems to be ignored.
-	 (cider-clojure-cli-global-options . "-A:dev")  ;; Keep this!
+;;; M-x my-reload-dir-locals-for-all-buffer-in-this-directory when you update this.
+((nil . ((cider-clojure-cli-aliases . ":dev:test")
+	 (cider-clojure-cli-parameters . ":dev:test")
 	 (cider-default-cljs-repl . shadow))))

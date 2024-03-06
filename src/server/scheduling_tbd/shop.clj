@@ -1,18 +1,45 @@
 (ns scheduling-tbd.shop
-  "Rewrite SHOP structures to db structures.
-   Rewrite db structures to SHOP structures."
+  "Rewrite SHOP planning domain structures to db structures.
+   Rewrite db structures to SHOP planning domain (defdomain) structures."
   (:require
+   [clojure.edn          :as edn]
+   [clojure.java.io      :as io]
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
    [datahike.api         :as d]
-   [datahike.pull-api    :as dp]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm not-nothing]]
+   [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema not-nothing register-db db-cfg-map]]
    [taoensso.timbre      :as log]))
 
-;;; ToDo: Factor SHOP2 stuff to its own
+;;; Why so much fuss with planning domain structures?
+;;; Answer: The lispy shop structures are really difficult to write AND MODIFY; they have "positional semantics" and no keywords.
+;;;
+;;;  Consequently, there are four forms to the planning domain data:
+;;;   shop      - What the UMd planner SHOP2 takes as input. It is common lisp s-expressions.
+;;;               We can read these to the DB with shop2db.
+;;;
+;;;   canonical - a plan domain structured that separates the SHOP2 lispy domain into its elements (operators, methods, and axioms),
+;;;               but for those elements just provides :canon/code which holds the corresponding elements SHOP2 lispy structure.
+;;;               You can get canonical by calling db2canon with a unique string (:domain/ename, :method/ename, :operator/ename, or :axiom/ename).
+;;;               Canonical is good for testing translation because it factors into the individual methods, operators and axioms.
+;;;               It doesn't have any other uses, I think.
+;;;
+;;;  db         - structures conforming to db-schema-shop2+, a datahike schema.
+;;;               Since the DB only stores atomic data types and entity references, recovery requires reconstruction of canonical
+;;;
+;;;   proj      - a simple clojure map rendering used in exploratory programming. (proj = project, the schedulingTBD app).
+;;;               The way to get from proj to a SHOP2 lispy defdomain is (-> proj proj2canonical canon2shop)
+;;;               Currently, we don't yet have a way to generate proj form other than to write it in an IDE, but that is to be expected,
+;;;               it being how we develop plans. Some day maybe we have a GUI interface for something that manipulates these.
+;;;
+;;; The principal reasons for storing planning domains as fine-grained DB structures is to allow updating and plan repair.
+;;;
+;;; Use of SHOP2 might be temporary, but use of planning domains in canonical/db/proj is probably going to stick around.
+;;; In our usage, we develop plan structure with PROJ and then canonicalize it before storage.
+
 ;;; ToDo: Next line makes a choice that has global consequences, so maybe wrap the SHOP translation code in something that toggles this.
 (s/check-asserts true)
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 (defn is-var?
   "Return true if the argument is a symbol beginning with ?"
@@ -27,6 +54,20 @@
   (and (symbol? x)
        (= \! (-> x name first))))
 
+(defn method-name
+  "SHOP methods AND AXIOMS can overload the predicate.
+   Returns a string that concatenates the formal parameters and values."
+  [meth-sig]
+  (->> (interpose "_" meth-sig) (apply str)))
+
+(defn code-type
+  "For use mostly with :domain/elems, return one of 'method', 'axiom' or 'operator' based
+   on what the expression contains. The actual :sys/typ of these is in the :sys/body."
+  [exp]
+  (cond (contains? exp :method/ename)   "method"
+        (contains? exp :axiom/ename)    "axiom"
+        (contains? exp :operator/ename) "operator"))
+
 ;;; ======================= SHOP2 Grammar ================================================================
 ;;;------ toplevel forms ----
 (s/def ::domain
@@ -40,19 +81,17 @@
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
 (s/def ::method
-  (s/and #(reset! diag {:method %})
-         seq?
+  (s/and seq?
          #(= (nth % 0) :method)
          #(s/valid? ::atom (nth % 1))
-         #(s/valid? ::method-rhs-pairs (nthrest % 2))))
+         #(s/valid? ::method-rhsides (nthrest % 2))))
 
 (s/def ::operator
-  (s/and #(reset! diag {:operator %})
-         seq?
+  (s/and seq?
          #(or (== (count %) 5) (== (count %) 6))
          #(= (nth % 0) :operator)
          #(s/valid? ::atom (nth % 1))
-         #(s/valid? ::operator-preconditions (nth % 2))
+         #(s/valid? ::operator-preconds (nth % 2))
          #(s/valid? ::del-list (nth % 3))
          #(s/valid? ::add-list (nth % 4))
          (s/or :no-cost #(== (count %) 5) ; BTW, cost is 1 if not specified.
@@ -60,8 +99,7 @@
 
 ;;; (:- a [name1] E1 [name2] E2 [name3] E3 ... [namen] En)
 (s/def ::axiom
-  (s/and ;#(reset! diag {:axiom %})
-         seq?
+  (s/and seq?
          #(= (nth % 0) :-)
          #(s/valid? ::atom (nth % 1))
          #(if (= '(()) (nthrest % 2))
@@ -83,7 +121,7 @@
 ;;;                               ((at ?a ?somecity)
 ;;;                                (travel-cost-info ?a ?somecity ?c ?cost ?style)))
 ;;;               ((move-aircraft ?a ?somecity ?c ?style)))
-(s/def ::method-rhs-pairs
+(s/def ::method-rhsides
   (s/and seq?
          (fn [pairs]
            (letfn [(cond-good? [x]
@@ -102,7 +140,7 @@
                                                    (s/valid? ::tasks (nth terms 1)))
                                               (subvec terms 2)))))))))
 
-(s/def ::operator-preconditions
+(s/def ::operator-preconds
   (s/and seq?
          #(every? (fn [c] (s/valid? ::precondition c)) %)))
 
@@ -274,7 +312,7 @@
         :enforce        ::enforce
         :setof          ::setof))
 
-;;; AKA logical-atom, can't have a call-term or a eval-term
+;;; AKA logical-atom, can't have a call-term or an eval-term
 (s/def ::atom (s/and seq?
                      #(symbol? (nth % 0))
                      #(every? (fn [t] (s/valid? ::term t)) (rest %))))
@@ -317,7 +355,7 @@
                        #(is-var? (nth % 3))))
 
 ;;;======================================= Rewriting to DB elements
-(def ^:dynamic *debugging?* false)
+(def debugging? (atom false))
 (def tags   (atom []))
 (def locals (atom [{}]))
 
@@ -329,21 +367,25 @@
 
 ;;; This is simpler than RM's rewrite, which relied on :typ from parse and called 'rewrite-meth' using it.
 ;;; This grammar has only a few top-level entry points: defdomain, :method :operator and :axiom.
-(defmacro defrew2db [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod rew2db ~tag [~obj & [~@more-args]]
-     (when *debugging?* (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
+(defmacro defshop2db
+  "Macro to wrap methods for translating shop to database format."
+  {:clj-kondo/lint-as 'clojure.core/fn ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
+   :arglists '([tag [obj & more-args] & body])} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
+  [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+   `(defmethod shop2db ~tag [~obj & [~@more-args]]
+     (when @debugging? (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
      (swap! locals #(into [{}] %))
      (let [res# (do ~@body)
            result# (if (seq? res#) (doall res#) res#)]
      (swap! tags   #(-> % rest vec))
      (swap! locals #(-> % rest vec))
-     (do (when *debugging?*
+     (do (when @debugging?
            (println (cl-format nil "~A<-- ~A returns ~S" (sutil/nspaces (count @tags)) ~tag result#)))
          result#))))
 
-(defn rew2db-dispatch
-  "Allow calls of two forms: (rew2db exp) (rew2db exp :some-method-key)."
+(defn shop2db-dispatch
+  "Allow calls of two forms: (shop2db exp) (shop2db exp :some-method-key)."
   [exp & [specified]]
   (cond ;; Optional 2nd argument specifies method to call. Order matters!
     (keyword? specified)            specified,
@@ -352,331 +394,345 @@
     (s/valid? ::operator exp)       :operator
     (s/valid? ::axiom    exp)       :axiom
     (s/valid? ::logical-exp exp)    :logical-exp ; Essentially, has its own similar dispatch function.
-    (contains? exp :sys/body)       :body
-    :else (throw (ex-info "No dispatch value for exp" {:exp exp}))))
+    :else (throw (ex-info "shop2db-dispatch: No dispatch value for exp" {:exp exp}))))
 
-(defmulti rew2db #'rew2db-dispatch)
+(defmulti shop2db #'shop2db-dispatch)
 
 ;;;-------------------------------- Top-level methods
-(defrew2db :domain [exp]
+(defshop2db :domain [exp]
   (let [[_ name elems] exp
         cnt (atom 0)]
-    (-> {:domain/name name :sys/typ :domain}
-        (assoc :domain/elems (vec (for [e elems]
-                                    (-> (rew2db e)
-                                        (assoc :sys/pos (swap! cnt inc)))))))))
+    {:domain/ename (str name)
+     :sys/body (-> {:sys/typ :domain}
+                   (assoc :domain/elems (vec (for [e elems]
+                                               (-> (shop2db e {:domain-name (str name)})
+                                                   (assoc :sys/pos (swap! cnt inc)))))))}))
 
-;;; (rew2db '(:method (transport-person ?p ?c) Case1 ((at ?p ?c)) Case2 ((also ?p ?x)) ()) :method)
-(defrew2db :method [body]
+;;; (shop2db '(:method (transport-person ?p ?c) Case1 ((at ?p ?c)) Case2 ((also ?p ?x)) ()) :method)
+;;; Method: (:method <head> [label]
+(defshop2db :method [body & {:keys [domain-name]}]
   (s/assert ::method body)
   (clear-rewrite!)
-  (let [[_ head & pairs] body]
-    {:sys/body (-> {:sys/typ :method}
-                   (assoc :method/head      (rew2db head :atom))
-                   (assoc :method/rhs-pairs (rew2db pairs :method-rhs-pairs)))}))
+  (let [[_ head & pairs] body
+        res {:method/ename (str domain-name "." (method-name head))
+             :sys/body (-> {:sys/typ :method}
+                           (assoc :method/head      (shop2db head :atom))
+                           (assoc :method/rhs       (shop2db pairs :method-rhsides)))}]
+    (if-let [case-name (-> res :sys/body :method/rhs first :method/case-name)]
+      ;; Uniqueness is not well thought through in SHOP! If there is any case-name whatsoever, add THE FIRST to the name.
+      ;; It appears from the zeno example that method signatures might include both formal parameters and sometimes case names.
+      ;; I don't think we care, since we are handing the thing to SHOP to deal with, but we need unique for the DB.
+      (update res :method/ename #(str % "." case-name))
+      res)))
 
-(defrew2db :operator [body]
+;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>])
+(defshop2db :operator [body & {:keys [domain-name]}]
   (s/assert ::operator body)
   (clear-rewrite!)
   (let [[_ head preconds dlist alist & [cost]] body]
-    {:sys/body (cond-> {:sys/typ :operator}
-                 true                   (assoc :operator/head (rew2db head :atom))
-                 (not-nothing preconds) (assoc :operator/preconds (rew2db preconds :operator-preconds))
-                 (not-nothing dlist)    (assoc :operator/d-list   (rew2db dlist :d-list))
-                 (not-nothing alist)    (assoc :operator/a-list   (rew2db alist :a-list))
-                 cost (assoc :operator/cost (rew2db cost :s-exp-extended)))}))
+    {:operator/ename (str domain-name "." (first head))
+     :sys/body (cond-> {:sys/typ :operator}
+                 true                   (assoc :operator/head (shop2db head :atom))
+                 (not-nothing preconds) (assoc :operator/preconds (shop2db preconds :operator-preconds))
+                 (not-nothing dlist)    (assoc :operator/d-list   (shop2db dlist :d-list))
+                 (not-nothing alist)    (assoc :operator/a-list   (shop2db alist :a-list))
+                 cost (assoc :operator/cost (shop2db cost :s-exp-extended)))}))
 
 ;;; (:- a [name1] E1 [name2] E2 [name3] E3 ... [namen] En)
-;;;   (rew2db '(:- (same ?x ?x) ()) :axiom)
-(defrew2db :axiom [body]
+;;;   (shop2db '(:- (same ?x ?x) ()) :axiom)
+(defshop2db :axiom [body & {:keys [domain-name]}]
   (s/assert ::axiom body)
   (clear-rewrite!)
   (let [[_ head & exps] body
         rhs (loop [exps (vec exps)
-                                  pos 1
-                                  res []]
-                             (cond (empty? exps)              res
-                                   (symbol? (nth exps 0))     (recur
-                                                               (subvec exps 2)
-                                                               (inc pos)
-                                                               (conj res (cond-> {:rhs/case-name (nth exps 0)}
-                                                                           true                     (assoc :sys/pos pos)
-                                                                           (not-empty (nth exps 1)) (assoc :rhs/terms (rew2db (nth exps 1) :logical-exp)))))
-                                   :else                      (recur
-                                                               (subvec exps 1)
-                                                               (inc pos)
-                                                               (if (not-empty (nth exps 0))
-                                                                 (conj res (-> {:sys/pos pos}
-                                                                               (assoc :rhs/terms (rew2db (nth exps 0) :logical-exp))))
-                                                                 res))))]
-    {:sys/body (cond-> {:sys/typ :axiom
-                        :axiom/head (rew2db head :atom)}
+                   pos 1
+                   res []]
+              (cond (empty? exps)              res
+                    (symbol? (nth exps 0))     (recur ; Has case-name
+                                                (subvec exps 2)
+                                                (inc pos)
+                                                (conj res (cond-> {:rhs/case-name (nth exps 0)}
+                                                            true                     (assoc :sys/pos pos)
+                                                            (not-empty (nth exps 1)) (assoc :rhs/terms (shop2db (nth exps 1) :logical-exp))
+                                                            true                     (assoc :sys/typ :rhs))))
+                    :else                      (recur
+                                                (subvec exps 1)
+                                                (inc pos)
+                                                (if (not-empty (nth exps 0))
+                                                  (conj res (-> {:sys/pos pos}
+                                                                (assoc :rhs/terms (shop2db (nth exps 0) :logical-exp))))
+                                                  (conj res {:box/empty-list "empty list"})))))]
+    {:axiom/ename (if-let [case-name (-> rhs first :rhs/case-name)]
+                   (str domain-name "." (method-name head) "." case-name)
+                   (str domain-name "." (method-name head)))
+     :sys/body (cond-> {:sys/typ :axiom
+                        :axiom/head (shop2db head :atom)}
                  (not-empty rhs)    (assoc :axiom/rhs rhs))}))
 
-
 ;;;------- supporting methods ------------------------------
-(defrew2db :body [exp] (-> exp :sys/body rew2db))
+;;; This one is used on methods, operators, and axioms. See schema for :sys/body rationale.
+(defshop2db :body [exp] (-> exp :sys/body shop2db))
 
-(defrew2db :task-list [exp]
+(defshop2db :task-list [exp]
   (let [explicit (#{:ordered :unordered} (first exp))
         tasks (if explicit (rest exp) exp)
         cnt (atom 0)]
     (cond-> {:sys/typ :task-list
              :task-list/elems (-> (for [t tasks]
-                                    (-> (rew2db t :task-list-elem)
+                                    (-> (shop2db t :task-list-elem)
                                         (assoc :sys/pos (swap! cnt inc))))
                                   vec)}
       (= explicit :unordered)  (assoc :task-list/unordered? true))))
 
-(defrew2db :task-list-elem [exp]
+(defshop2db :task-list-elem [exp]
   (let [immediate? (= :immediate (first exp))
         exp (if immediate? (rest exp) exp)]
     (as-> exp ?e
-      (cond (s/valid? ::task-atom ?e)  (rew2db ?e :task-atom)
-            (s/valid? ::op-call   ?e)  (rew2db ?e :op-call)
+      (cond (s/valid? ::task-atom ?e)  (shop2db ?e :task-atom)
+            (s/valid? ::op-call   ?e)  (shop2db ?e :op-call)
             :else (throw (ex-info "Task is neither a task-atom or op-call" {:exp ?e})))
       (if immediate? (assoc ?e :task/immediate? true) ?e))))
 
-(defrew2db :op-call [exp]
+(defshop2db :op-call [exp]
   {:sys/typ :op-call
    :op-call/predicate (first exp)
    :op-call/args (let [cnt (atom 0)]
                    (-> (for [arg (rest exp)]
                          (if (s/valid? ::atom arg)
-                           (-> (rew2db arg :atom)
+                           (-> (shop2db arg :atom)
                                (assoc :sys/pos (swap! cnt inc)))
                            (-> {:sys/pos (swap! cnt inc)} ; Assumes it is a list of atoms.
                                (assoc :op-call/args (-> (let [ncnt (atom 0)]
                                                           (for [narg arg]
-                                                            (-> (rew2db narg :atom)
+                                                            (-> (shop2db narg :atom)
                                                                 (assoc :sys/pos (swap! ncnt inc)))))
                                                         vec)))))
                        vec))})
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
-(defrew2db :method-rhs-pairs [pairs]
-  (loop [res []
-         terms (vec pairs)]
-    (if (empty? terms)
-      res
-      (if (symbol? (nth terms 0))
-        (recur (conj res (cond-> {:method/case-name (nth terms 0)}
-                           (not-empty (nth terms 1)) (assoc :method/preconditions (rew2db (nth terms 1) :method-precond))
-                           (not-empty (nth terms 2)) (assoc :method/task-list     (rew2db (nth terms 2) :task-list))))
-               (subvec terms 3))
-        (recur (conj res (cond-> {}
-                           (not-empty (nth terms 0)) (assoc :method/preconditions (rew2db (nth terms 0) :method-precond))
-                           (not-empty (nth terms 1)) (assoc :method/task-list     (rew2db (nth terms 1) :task-list))))
-               (subvec terms 2))))))
+(defshop2db :method-rhsides [rhs] ; this does the [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk
+  (let [res (loop [res []
+                   triples (vec rhs)]
+              (if (empty? triples)
+                res
+                (if (symbol? (nth triples 0))
+                  (recur (conj res (cond-> {:method/case-name (nth triples 0)}
+                                     (not-empty (nth triples 1)) (assoc :method/preconds  (shop2db (nth triples 1) :method-precond))
+                                     (not-empty (nth triples 2)) (assoc :method/task-list (shop2db (nth triples 2) :task-list))))
+                         (subvec triples 3))
+                  (recur (conj res (cond-> {}
+                                     (not-empty (nth triples 0)) (assoc :method/preconds  (shop2db (nth triples 0) :method-precond))
+                                     (not-empty (nth triples 1)) (assoc :method/task-list (shop2db (nth triples 1) :task-list))))
+                         (subvec triples 2)))))
+        cnt (atom 0)]
+    (-> (for [r res]
+          (assoc r :sys/pos (swap! cnt inc)))
+        vec)))
 
-(defrew2db :method-precond [c]
-  (cond (-> c (nth 0) seq?)         (mapv #(rew2db % :atom) c)
-        (-> c (nth 0) (= :sort-by)) (rew2db c :sort-by)
-        (-> c (nth 0) (= :first))   (rew2db c :first)
-        :else (throw (ex-info "Invalid method precondition" {:exp c}))))
+(defshop2db :method-precond [c]
+  (let [cnt (atom 0)]
+    (cond (-> c (nth 0) seq?)         (-> (for [x c]
+                                            (-> (shop2db x :atom)
+                                                (assoc :sys/pos (swap! cnt inc))))
+                                          vec)
+          (-> c (nth 0) (= :sort-by)) (shop2db c :sort-by)
+          (-> c (nth 0) (= :first))   (shop2db c :first)
+          :else (throw (ex-info "Invalid method precondition" {:exp c})))))
 
-(defrew2db :operator-preconds [exp]
+(defshop2db :operator-preconds [exp]
   (let [cnt (atom 0)] ; Ordinary conjunct of :logical-exp
     (-> (for [pc exp]
-          (-> {:precond/exp (rew2db pc :logical-exp)}
+          (-> (shop2db pc :logical-exp)
               (assoc :sys/pos (swap! cnt inc))))
         vec)))
 
-(defrew2db :sort-by [exp]
+(defshop2db :sort-by [exp]
   (if (== 4 (count exp))
     (let [[_ var  fn-def lexp] exp]
       (-> {:sys/typ :sort-by
            :sort-by/var var}
-          (assoc :sort-by/fn  (rew2db fn-def :s-exp-extended))
-          (assoc :sort-by/exp (rew2db lexp :logical-exp))))
+          (assoc :sort-by/fn  (shop2db fn-def :s-exp-extended))
+          (assoc :sort-by/exp (shop2db lexp :logical-exp))))
     (let [[_ var lexp] exp]
       (-> {:sort-by/var var}
           (assoc :sort-by/fn {:s-exp/fn-ref '<})
-          (assoc :sort-by/exp (rew2db lexp :logical-exp))))))
+          (assoc :sort-by/exp (shop2db lexp :logical-exp))))))
 
 (defn box [v]
-  (cond (number? v)  {:box/num v}
-        (string? v)  {:box/str v}
-        (symbol? v)  {:box/sym v}
-        :else        v))
+  (cond (number? v)       {:box/num v}
+        (string? v)       {:box/str v}
+        (symbol? v)       {:box/sym v}
+        :else             v))
 
-(defrew2db :d-list [exp]
+(defshop2db :d-list [exp]
   (let [exp (if (seq? exp) (vec exp) (vector exp))
         cnt (atom 0)]
     (-> (for [e exp]
-          (-> (rew2db e :op-list-elem)
+          (-> (shop2db e :op-list-elem)
               (assoc :sys/pos (swap! cnt inc))))
         vec)))
 
-(defrew2db :a-list [exp]
+(defshop2db :a-list [exp]
   (let [exp (if (seq? exp) (vec exp) (vector exp))
         cnt (atom 0)]
     (-> (for [e exp]
-          (-> (rew2db e :op-list-elem)
+          (-> (shop2db e :op-list-elem)
               (assoc :sys/pos (swap! cnt inc))))
         vec)))
 
-(defrew2db :op-list-elem [exp]
+(defshop2db :op-list-elem [exp]
   (cond (symbol? exp)                 {:box/sym exp}
-        (s/valid? ::atom exp)         (rew2db exp :atom)
-        (s/valid? ::protected exp)    (rew2db exp :protected)
-        (s/valid? ::op-universal exp) (rew2db exp :op-universal)
+        (s/valid? ::atom exp)         (shop2db exp :atom)
+        (s/valid? ::protected exp)    (shop2db exp :protected)
+        (s/valid? ::op-universal exp) (shop2db exp :op-universal)
         :else (throw (ex-info "Invalid item in op list:" {:exp exp}))))
 
-(defrew2db ::protected [exp]
-  {:protected/atom (rew2db (nth exp 1) :atom)})
+(defshop2db ::protected [exp]
+  {:protected/atom (shop2db (nth exp 1) :atom)})
 
-(defrew2db ::op-universal [exp]
+(defshop2db ::op-universal [exp]
   (let [[_ vars cond consq] exp]
     (-> {:sys/typ :op-universal
          :forall/vars (vec vars)}
-        (assoc :forall/conditions   (rew2db cond :logical-exp))
-        (assoc :forall/consequences (mapv #(rew2db % :atom) consq)))))
+        (assoc :forall/conditions   (shop2db cond :logical-exp))
+        (assoc :forall/consequences (mapv #(shop2db % :atom) consq)))))
 
 ;;; ---------------- s-expression -----------------
 (defn seq2sexp [s]
   (cond (seq? s) (cond-> {:s-exp/fn-ref (first s) :sys/typ :s-exp}
                    (-> s rest not-empty) (assoc :s-exp/args (let [cnt (atom 0)]
-                                                              (for [a (rest s)]
-                                                                (->  (rew2db a :s-exp-arg)
-                                                                     (assoc :sys/pos (swap! cnt inc)))))))
+                                                              (-> (for [a (rest s)]
+                                                                    (->  (shop2db a :s-exp-arg)
+                                                                         (assoc :sys/pos (swap! cnt inc))))
+                                                                  vec))))
         (or (number? s) (string? s) (symbol? s)) (box s)))
 
 ;;; This currently does not handle quoted things.
-(defrew2db :s-exp-extended [exp]
+(defshop2db :s-exp-extended [exp]
   (if (symbol? exp)
     {:s-exp/fn-ref exp :sys/typ :s-exp}
     (seq2sexp exp)))
 
-(defrew2db :s-exp-arg [exp]
+(defshop2db :s-exp-arg [exp]
   (if (seq? exp)
     (seq2sexp exp)
     {:s-exp/arg-val (box exp)}))
+
 ;;;-------------------------------- Logical expressions -------------------
-(defrew2db :logical-exp [exp] ; order matters!
-  (cond (s/valid? ::implication exp)    (rew2db exp :implication)
-        (s/valid? ::negation exp)       (rew2db exp :negation)
-        (s/valid? ::disjunct exp)       (rew2db exp :disjunct)
-        (s/valid? ::universal exp)      (rew2db exp :universal)
-        (s/valid? ::assignment exp)     (rew2db exp :assignment)
-        (s/valid? ::eval exp)           (rew2db exp :eval)
-        (s/valid? ::call exp)           (rew2db exp :call)
-        (s/valid? ::enforce exp)        (rew2db exp :enforce)
-        (s/valid? ::setof exp)          (rew2db exp :setof)
-        (s/valid? ::atom exp)           (rew2db exp :atom) ; I think other kinds of atoms are handled by :task-list-elem
-        (s/valid? ::conjunct exp)       (rew2db exp :conjunct)
+(defshop2db :logical-exp [exp] ; order matters!
+  (cond (s/valid? ::implication exp)    (shop2db exp :implication)
+        (s/valid? ::negation exp)       (shop2db exp :negation)
+        (s/valid? ::disjunct exp)       (shop2db exp :disjunct)
+        (s/valid? ::universal exp)      (shop2db exp :universal)
+        (s/valid? ::assignment exp)     (shop2db exp :assignment)
+        (s/valid? ::eval exp)           (shop2db exp :eval)
+        (s/valid? ::call exp)           (shop2db exp :call)
+        (s/valid? ::enforce exp)        (shop2db exp :enforce)
+        (s/valid? ::setof exp)          (shop2db exp :setof)
+        (s/valid? ::atom exp)           (shop2db exp :atom) ; I think other kinds of atoms are handled by :task-list-elem
+        (s/valid? ::conjunct exp)       (shop2db exp :conjunct)
         :else (throw (ex-info "Unknown logical exp:" {:exp exp}))))
 
-(defrew2db :implication [exp]
+(defshop2db :implication [exp]
   (let [[_ l1 l2] exp]
     {:sys/typ :implication
-     :imply/condition (rew2db l1 :logical-exp)
-     :imply/consequence (rew2db l2 :logical-exp)}))
+     :imply/condition (shop2db l1 :logical-exp)
+     :imply/consequence (shop2db l2 :logical-exp)}))
 
-(defrew2db :negation [exp]
-  (-> (rew2db (nth exp 1) :logical-exp)
+(defshop2db :negation [exp]
+  (-> (shop2db (nth exp 1) :logical-exp)
       (assoc :exp/negated? true)))
 
-;;; ToDo: Make the next two ordered
-(defrew2db :conjunct [exp]
-  (let [res (mapv #(rew2db % :logical-exp) exp)]
+#_(defshop2db :conjunct [exp]
+  (let [res (mapv #(shop2db % :logical-exp) exp)]
     (-> (if (empty? res)
-          {:conjunction/shop-empty-list? true}
+          {:conjunction/shop-empty-list? true} ; ToDo: Don't do it this way. In translation from the DB return a '() if that is what is needed. (shop-empty-list? was NYI anyway...)
           {:conjunction/terms res})
         (assoc :sys/typ :conjunction))))
 
-(defrew2db :disjunct [exp]
-  (-> {:sys/typ :disjunction}
-      (assoc :disjunction/terms (mapv #(rew2db % :logical-exp) (rest exp)))))
+;;; ToDo: Make the next two ordered
+(defshop2db :conjunct [exp]
+  (-> {:sys/typ :conjunct}
+      (assoc :conjunct/terms (mapv #(shop2db % :logical-exp) exp))))
+
+(defshop2db :disjunct [exp]
+  (-> {:sys/typ :disjunct}
+      (assoc :disjunct/terms (mapv #(shop2db % :logical-exp) (rest exp)))))
 
 ;;;    (forall (?c) ((dest ?a ?c)) ((same ?c ?c1)))
-(defrew2db :universal [exp]
+(defshop2db :universal [exp]
   (let [[_ vars conds consq] exp]
     (-> {:sys/typ :universal}
         (assoc :forall/vars         (vec vars))
-        (assoc :forall/conditions   (mapv #(rew2db % :atom) conds))
-        (assoc :forall/consequences (mapv #(rew2db % :atom) consq)))))
+        (assoc :forall/conditions   (mapv #(shop2db % :atom) conds))
+        (assoc :forall/consequences (mapv #(shop2db % :atom) consq)))))
 
-(defrew2db :assignment [exp]
+(defshop2db :assignment [exp]
   (let [[_ v e] exp]
     (-> {:sys/typ :assignment}
         (assoc :assign/var v)
-        (assoc :assign/exp (rew2db e :s-exp-extended)))))
+        (assoc :assign/exp (shop2db e :s-exp-extended)))))
 
-(defrew2db :eval [exp]
+(defshop2db :eval [exp]
   {:sys/typ :eval
-   :eval/form (rew2db exp :s-exp-extended)})
+   :eval/form (shop2db exp :s-exp-extended)})
 
-(defrew2db :atom [exp]
+(defshop2db :atom [exp]
   (let [[pred & terms] exp]
     (cond-> {:sys/typ :atom}
       true               (assoc :atom/predicate pred)
       (not-empty terms)  (assoc :atom/roles (-> (let [cnt (atom 0)]
                                                  (for [v terms]
-                                                   {:role/val (box (rew2db v :term))
+                                                   {:role/val (box (shop2db v :term))
                                                     :sys/pos (swap! cnt inc)}))
                                                 vec)))))
 
-(defrew2db :task-atom [exp]
+(defshop2db :task-atom [exp]
   (let [[pred & terms] exp]
     (cond-> {:sys/typ :task-atom}
       true               (assoc :atom/predicate pred)
       (not-empty terms)  (assoc :atom/roles (-> (let [cnt (atom 0)]
-                                                 (for [v terms]
-                                                   {:role/val (box (rew2db v :task-term))
+                                                  (for [v terms]
+                                                   {:role/val (box (shop2db v :task-term))
                                                     :sys/pos (swap! cnt inc)}))
                                                 vec)))))
 
-(defrew2db :term [exp]
+(defshop2db :term [exp]
   (cond (symbol? exp) exp
         (number? exp) exp
-        (seq? exp)    (rew2db exp :list-term)
+        (seq? exp)    (shop2db exp :list-term)
         :else         (throw (ex-info "Not a valid term:" {:exp exp}))))
 
-(defrew2db :task-term [exp]
-  (cond (s/valid? ::term exp)      (rew2db exp :term)
-        (s/valid? ::call-term exp) (rew2db exp :call-term)
-        (s/valid? ::eval-term exp) (rew2db exp :eval-term)
+(defshop2db :task-term [exp]
+  (cond (s/valid? ::term exp)      (shop2db exp :term)
+        (s/valid? ::call-term exp) (shop2db exp :call-term)
+        (s/valid? ::eval-term exp) (shop2db exp :eval-term)
         :else (throw (ex-info "Not a task-term: " {:exp exp}))))
 
-(defrew2db :call-term [exp]
+(defshop2db :call-term [exp]
   (let [[_ fn & args] exp]
     {:sys/typ :call-term
-     :call/fn (-> fn (nth 1) (nth 1)) ; It looks something like this (function (quote +)).
+     :call/fn (if (symbol? fn) fn (-> fn (nth 1) (nth 1))) ; It looks something like this (function (quote +))... or just a symbol
      :call/args (let [cnt (atom 0)]
                   (-> (for [a args]
-                        (-> (rew2db a :s-exp-arg)
+                        (-> (shop2db a :s-exp-arg)
                             (assoc :sys/pos (swap! cnt inc))))
                       vec))}))
 
-(defrew2db :list-term [exp]
+(defshop2db :list-term [exp]
   {:sys/typ :list-term
    :list/terms (let [cnt (atom 0)]
                   (-> (for [a exp]
-                        (-> {:list/val (box (rew2db a :term))}
+                        (-> {:list/val (box (shop2db a :term))}
                             (assoc :sys/pos (swap! cnt inc))))
                       vec))})
 
 ;;;-------------------------------- end of Logical expressions -------------------
-
-;;; (methods-for 'transport-person)
-(defn methods-for
-  "Retrieve all method forms for the given predicate symbol."
-  [pred-sym]
-  (when-let [meth-ents (not-empty
-                        (d/q '[:find [?e ...]
-                               :in $ ?predicate
-                               :where
-                               [?e :atom/predicate ?predicate]
-                               [_ :method/head ?e]]
-                             @(connect-atm :system) pred-sym))]
-    meth-ents))
-
 (def db-schema-shop2+
   "Defines schema elements about shop2 constructs.
    This is combined with the project-oriented schema elements to define the schema for the system (as opposed to schema for a project).
    The schema contains three 'name' attributes that are :db.unique/identity unique and not part of the serialization for shop3.
-   These are :method/name, :operator/name and :axiom/name. (In contrast, :domain/name IS part of the shop3 serialization.)
+   These are :method/ename, :operator/ename and :axiom/ename. (In contrast, :domain/ename IS part of the shop3 serialization.)
    The purpose of these is to allow DB-based management of in plan elements in the context of authoring and refining through the UI.
    A naming convention is used for these three where the name of the domain is prefixed with a dot; thus 'zeno."
   {;; ---------------------- assignment
@@ -702,7 +758,7 @@
    :axiom/head
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the LHS atom of the axiom."}
-   :axiom/name
+   :axiom/ename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity,
         :doc "A DB-unique name for the axiom"}
    :axiom/rhs
@@ -719,6 +775,9 @@
    :box/sym
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol
         :doc "a construct to wrap primitive types when the type cannot be anticipated and therefore a :db.type/ref is used"}
+   :box/empty-list
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a construct to wrap primitive types when the type cannot be anticipated and therefore a :db.type/ref is used"}
 
    ;; ----------------------- call
    :call/fn
@@ -728,18 +787,35 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "The arguments of th the call term"}
 
-   ;; ----------------------- conjunction
-   :conjunction/terms
+   ;; ----------------------- conjunction/disjunction
+   :conjunct/terms
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the terms that are part of a conjunctive expression."} ; ToDo: need a :term/pos or something like that.
+        :doc "the terms that are part of a conjunctive expression."} ; ToDo: need a :sys/pos or something like that.
+
+   :disjunct/terms
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "the terms that are part of a disjunctive expression."} ; ToDo: need a :sys/pos or something like that.
 
    ;; ----------------------- domain
-   :domain/name
+   :domain/ename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
-        :doc "a DB-unique name for the domain."}
+        :doc "a DB-unique name for the domain. The name is appended to everything in :domain/elems, so keep it short.
+              For better description use plan/name or plan/description. 'ename' so that we can still use 'name'!"}
+   :domain/description
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,  :mm/info {:extra? true}
+        :doc "a desciption of domain. This isn't part of SHOP"}
+
    :domain/elems
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "The methods, operators and axioms of the domain."}
+
+   :domain/execute
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+        :doc "A string that reads to a SHOP-style s-expression defining what is typically being executed, e.g. find-plans."}
+
+   :domain/problem
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+        :doc "A string that reads to a SHOP-style s-expression associating a planning goal and states with a domain."}
 
    ;; ---------------------- logical expression
    :exp/negated?
@@ -785,13 +861,13 @@
    :method/case-name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol,
         :doc "a name for the method case; the name is unique only in the context of this method."}
-   :method/name
+   :method/ename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
            :doc "a DB-unique name for the method; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
-   :method/preconditions
+   :method/preconds
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "atoms indicating what must be true in order to apply the method."}
-   :method/rhs-pairs
+   :method/rhs
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "Pairs of conditions and action of a method."}
    :method/task-list
@@ -811,17 +887,12 @@
    :operator/head
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the head atom of an operation."}
-   :operator/name
+   :operator/ename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
         :doc "a DB-unique name for the operation; this isn't part of the SHOP serialization, but rather used for UI manipulation of the object."}
    :operator/preconds
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "preconditions of the operation"}
-
-   ;; ---------------------- preconditions
-   :precond/exp
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "the expression of a precondition (for a method or operator)."}
 
    ;; ---------------------- rhs
    :rhs/case-name
@@ -865,7 +936,7 @@
 
    :sys/typ
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
-        :doc "a keyword indicating the type of the object; it is used to select a serialization method."}
+        :doc "an unqualified keyword indicating the type of the object; it is used to select a serialization method."}
    :sys/pos
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long,
         :doc "the position of the element in the paren't attribute's collection."}
@@ -886,215 +957,378 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
         :doc "when true, indicates that the atoms in task-list can be performed in any order. Ordered is the default."}})
 
-;;;=============================== Serialization (DB structures as SHOP code) ================================================
-(defmacro defrew2shop [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod rew2shop ~tag [~obj & [~@more-args]]
-     (when *debugging?* (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
+;;;=============================== Serialization (DB structures to SHOP common-lisp s-expressions) ================================================
+(defmacro defdb2shop
+  "Macro to wrap methods for translating databse to shop format."
+  {:clj-kondo/lint-as 'clojure.core/fn
+   :arglists '([tag [obj & more-args] & body])} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
+  [tag [obj & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  `(defmethod db2shop ~tag [~obj & [~@more-args]]
+     (when @debugging? (println (cl-format nil "~A==> ~A" (sutil/nspaces (count @tags)) ~tag)))
      (swap! tags #(conj % ~tag))
      (swap! locals #(into [{}] %))
      (let [res# (do ~@body)
            result# (if (seq? res#) (doall res#) res#)]
      (swap! tags   #(-> % rest vec))
      (swap! locals #(-> % rest vec))
-     (do (when *debugging?*
+     (do (when @debugging?
            (println (cl-format nil "~A<-- ~A returns ~S" (sutil/nspaces (count @tags)) ~tag result#)))
          result#))))
 
-(defn rew2shop-dispatch
-  "Allow calls of two forms: (rew2shop exp) (rew2shop exp :some-method-key).
+(defn db2shop-dispatch
+  "Allow calls of two forms: (db2shop exp) (db2shop exp :some-method-key).
    Things with :sys/typ:
-   :assignment :atom :axiom :call-term :conjunction :disjunction :domain :eval :implication :list-term :method
+   :assignment :atom :axiom :call-term :conjunct :disjunct :domain :eval :implication :list-term :method
    :op-call :op-universal :operator :s-exp :sort-by :task-list :universal."
   [exp & [specified]]
   (cond specified                                        specified
         (and (map? exp) (contains? exp :sys/typ))        (:sys/typ exp)
         (or (symbol? exp) (number? exp) (string? exp))   :simple-type
-        (contains? exp :sys/body)                        :body
+        (contains? exp :domain/ename)                    :domain
+        (contains? exp :sys/body)                        :body ; This is used, at least in the shop-round-trip test.
         (contains? exp :box/sym)                         :box
         (contains? exp :box/num)                         :box
         (contains? exp :box/str)                         :box
+        (contains? exp :box/empty-list)                  :box
         (contains? exp :s-exp/arg-val)                   :arg-val
-        :else (throw (ex-info "No dispatch value for exp" {:exp exp}))))
+        (contains? exp :rhs/terms)                       :rhs-terms
+        :else
+        (do (when-not (empty? exp) (reset! diag exp))
+            (throw (ex-info "db2shop-dispatch: No dispatch value for exp" {:exp exp})))))
 
-(defmulti rew2shop #'rew2shop-dispatch)
+(defmulti db2shop #'db2shop-dispatch)
 
-(defrew2shop :domain [{:domain/keys [name elems]}]
-  `(~'defdomain ~(symbol name)
-    ~(for [e (sort-by :sys/pos elems)]
-       (rew2shop e))))
+(defdb2shop :domain [{:domain/keys [ename] :sys/keys [body]}]
+  `(~'defdomain ~(symbol ename)
+    ~(for [e (sort-by :sys/pos (-> body :domain/elems))]
+       (db2shop e))))
 
 ;;; (:method h [n1] C1 T1 [n2] C2 T2 ... [nk] Ck Tk)
-(defrew2shop :method [{:method/keys [head rhs-pairs] :as exp}]
-  (reset! diag exp)
-  `(:method ~(rew2shop head :atom)
-            ~@(mapcat #(rew2shop % :rhs-pair) rhs-pairs))) ; ToDo: Needs :sys/pos.
+(defdb2shop :method [{:method/keys [head rhs]}]
+  `(:method ~(db2shop head :atom)
+            ~@(mapcat #(db2shop % :rhs-pair) (sort-by :sys/pos rhs)))) ; Actually rhs=multiple rh sides.
 
-(defrew2shop :axiom [{:axiom/keys [head rhs] :as exp}]
-  (reset! diag exp)
-  (let [h (rew2shop head :atom)]
+(defdb2shop :axiom [{:axiom/keys [head rhs]}]
+  (let [h (db2shop head :atom)]
     (if rhs
-      `(:- ~h ~@(map #(rew2shop % :rhs) (sort-by :sys/pos rhs)))
+      (let [rew1 (mapcat #(db2shop % :rhs) (sort-by :sys/pos rhs))]
+        (if (-> rew1 first symbol?)
+          `(:- ~h ~@rew1)
+          `(:- ~h ~rew1)))
       `(:- ~h ()))))
 
-
-(defrew2shop :operator [{:operator/keys [head preconds d-list a-list cost] :as exp}]
-  (reset! diag exp)
-  (let [pre (map rew2shop (->> preconds (sort-by :sys/pos) (map :precond/exp)))
-        del (map rew2shop (->> d-list   (sort-by :sys/pos)))
-        add (map rew2shop (->> a-list   (sort-by :sys/pos)))
+(defdb2shop :operator [{:operator/keys [head preconds d-list a-list cost]}]
+  (let [pre (map db2shop (->> preconds (sort-by :sys/pos)))
+        del (map db2shop (->> d-list   (sort-by :sys/pos)))
+        add (map db2shop (->> a-list   (sort-by :sys/pos)))
         res `(:operator
-              ~(rew2shop head)
+              ~(db2shop head)
               ~pre
               ~(if (-> del first symbol?) (first del) del)
               ~(if (-> add first symbol?) (first add) add))]
     (if cost
-      (->> cost rew2shop (conj (vec res)) seq)
+      (->> cost db2shop (conj (vec res)) seq)
       res)))
 
 ;;; --------------- Supporting serialization ------------------------
-(defrew2shop :body [exp] (rew2shop (:sys/body exp)))
+(defdb2shop :body [exp] (-> exp :sys/body db2shop)) ; This is used, at least in the shop-round-trip test.
 
-(defrew2shop :simple-type [exp] exp)
+(defdb2shop :simple-type [exp] exp)
 
-(defrew2shop :rhs [{:rhs/keys [terms case-name]}]
-  (let [res (rew2shop terms)] ; ToDo: terms is a misnomer. Uses :sys/typ :conjunction.
-    (if case-name
-      `(~case-name ~res)
-      res)))
+(defdb2shop :rhs [{:rhs/keys [terms case-name] :box/keys [empty-list]}]
+  (if empty-list
+    '()
+    (let [res (db2shop terms)] ; ToDo: terms is a misnomer. Uses :sys/typ :conjunction.
+      (if case-name
+        `(~case-name ~res)
+        res))))
 
-(defrew2shop :atom [{:atom/keys [predicate roles] :exp/keys [negated?]}]
-  (let [atom `(~predicate ~@(map rew2shop (->> roles (sort-by :sys/pos) (map :role/val))))]
+(defdb2shop :atom [{:atom/keys [predicate roles] :exp/keys [negated?]}]
+  (let [atom `(~predicate ~@(map db2shop (->> roles (sort-by :sys/pos) (map :role/val))))]
     (if negated? `(~'not ~atom) atom)))
 
-(defrew2shop :box [{:box/keys [sym num str]}] (or sym num str))
+(defdb2shop :box [{:box/keys [sym num str empty-list]}]
+  (if empty-list '() (or sym num str)))
 
-(defrew2shop :conjunction [{:conjunction/keys [terms]}]
-  (map rew2shop terms))
+(defdb2shop :conjunct [{:conjunct/keys [terms]}]
+  (map db2shop terms))
 
-(defrew2shop :eval [{:eval/keys [form]}] (rew2shop form)) ; It is just an s-exp, I think.
+(defdb2shop :disjunct [{:disjunct/keys [terms]}]
+  `(or ~@(map db2shop terms)))
 
-(defrew2shop :s-exp [{:s-exp/keys [fn-ref args]}]
-  `(~fn-ref ~@(map rew2shop (->> args (sort-by :sys/pos)))))
+(defdb2shop :rhs-terms [{:rhs/keys [terms]}]
+  (if (and (map? terms) (or (contains? terms :conjunct/terms) (contains? terms :disjunct/terms)))
+    (if (contains? terms :conjunct/terms)
+      (map db2shop (:conjunct/terms terms))
+      `(or ~@(map db2shop (:disjunct/terms terms))))
+  (map db2shop terms)))
 
-(defrew2shop :arg-val [{:s-exp/keys [arg-val]}]
-  (rew2shop arg-val))
+(defdb2shop :eval [{:eval/keys [form]}] (db2shop form)) ; It is just an s-exp, I think.
 
-(defrew2shop :assignment [{:assign/keys [var exp]}]
-  `(~'assign ~var ~(rew2shop exp)))
+(defdb2shop :s-exp [{:s-exp/keys [fn-ref args]}]
+  `(~fn-ref ~@(map db2shop (->> args (sort-by :sys/pos)))))
 
-(defrew2shop :rhs-pair [{:method/keys [case-name preconditions task-list]}]
-  (let [pres (if (-> preconditions vector?)
-               (->> preconditions (sort-by :sys/pos) (map rew2shop))
-               (if (empty? preconditions) '() (rew2shop preconditions)))
-        res `(~pres ~(rew2shop task-list :task-list))]
+(defdb2shop :arg-val [{:s-exp/keys [arg-val]}]
+  (db2shop arg-val))
+
+(defdb2shop :assignment [{:assign/keys [var exp]}]
+  `(~'assign ~var ~(db2shop exp)))
+
+(defdb2shop :rhs-pair [{:method/keys [case-name preconds task-list]}]
+  (let [pres (if (-> preconds vector?)
+               (->> preconds (sort-by :sys/pos) (map db2shop))
+               (if (empty? preconds) '() (db2shop preconds)))
+        pres (if (= :sort-by (-> pres first first)) (first pres) pres) ; :sort-by is different!
+        res `(~pres ~(db2shop task-list :task-list))]
     (if case-name
       (conj res case-name)
       res)))
 
-(defrew2shop :task-list [{:task-list/keys [elems] :as exp}]
-  (->> elems (sort-by :sys/pos) (map rew2shop)))
+(defdb2shop :task-list [{:task-list/keys [elems]}]
+  (->> elems (sort-by :sys/pos) (map db2shop)))
 
-(defrew2shop :task-atom [{:task/keys [immediate?] :atom/keys [predicate roles]}]
-  (let [atom `(~predicate ~@(map rew2shop (->> roles (sort-by :sys/pos) (map :role/val))))]
+(defdb2shop :task-atom [{:task/keys [immediate?] :atom/keys [predicate roles]}]
+  (let [atom `(~predicate ~@(map db2shop (->> roles (sort-by :sys/pos) (map :role/val))))]
     (if immediate? `(:immediate ~@atom) atom)))
 
-(defrew2shop :call-term [{:call/keys [fn args]}]
-  `(~'call (~'function '~fn) ~@(map rew2shop (sort-by :sys/pos args))))
+(defdb2shop :call-term [{:call/keys [fn args]}]
+  `(~'call (~'function '~fn) ~@(map db2shop (sort-by :sys/pos args))))
 
 ;;; ToDo: Some of the following have not been tested.
-(defrew2shop :disjunction [exp] `(~'or ~(map rew2shop exp)))
+(defdb2shop :disjunction [exp] `(~'or ~(map db2shop exp)))
 
-(defrew2shop :implication [{:imply/keys[condition consequence]}]
-  `(~'imply ~(rew2shop condition) ~(rew2shop consequence)))
+(defdb2shop :implication [{:imply/keys[condition consequence]}]
+  `(~'imply ~(db2shop condition) ~(db2shop consequence)))
 
-(defrew2shop :list-term [{:list/keys [terms] :as exp}]
-  (->> terms (sort-by :sys/pos) (map :list/val) (map rew2shop)))
+(defdb2shop :list-term [{:list/keys [terms]}]
+  (->> terms (sort-by :sys/pos) (map :list/val) (map db2shop)))
 
-(defrew2shop :op-call [exp]
-  (rew2shop exp :call-term))
+(defdb2shop :op-call [exp]
+  (db2shop exp :call-term))
 
-(defrew2shop :op-universal [{:op-forall/keys [vars condition consequences]}]
-  `(~'forall (map rew2shop vars)
-    ~(rew2shop condition)
-    ~(map rew2shop consequences)))
+(defdb2shop :op-universal [{:op-forall/keys [condition consequences]}]
+  `(~'forall (map db2shop vars)
+    ~(db2shop condition)
+    ~(map db2shop consequences)))
 
-(defrew2shop :sort-by [{:sort-by/keys [var fn exp]}]
-  `(:sort-by ~(rew2shop var) ~(rew2shop fn) ~(rew2shop exp)))
+(defdb2shop :sort-by [{:sort-by/keys [var fn exp]}]
+  `(:sort-by ~(db2shop var) ~(-> fn db2shop first) ~(db2shop exp)))
 
-(defrew2shop :universal [{:forall/keys [vars conditions consequences]}]
-  `(~'forall ~(map rew2shop vars) ~(map rew2shop conditions) ~(map rew2shop consequences)))
+(defdb2shop :universal [{:forall/keys [vars conditions consequences]}]
+  `(~'forall ~(map db2shop vars) ~(map db2shop conditions) ~(map db2shop consequences)))
 
 ;;; ------------------------ Top-level manipulation -----------------------------------
-(declare code-type)
 (defn canon2db
   "Given a canonical structure, create the corresponding DB structure.
    :canon/pos of each element of :domain/elems is :sys/pos in the DB."
-  [{:domain/keys [name elems]}]
-    {:domain/name name
-     :domain/elems (mapv #(let [name-attr (keyword (code-type %) "name")]
-                            (-> (rew2db  (:canon/code %))
-                                (assoc :sys/pos (:canon/pos %))
-                                (assoc name-attr (get % name-attr))))
-                         (sort-by :canon/pos elems))})
+  [{:domain/keys [ename elems description problem execute]}]
+  (cond-> {:domain/ename ename
+           :sys/body {:sys/typ :domain
+                      :domain/elems (mapv #(let [name-attr (keyword (code-type %) "ename")]
+                                             (-> (shop2db  (:canon/code %) {:domain-name ename})
+                                                 (assoc :sys/pos (:canon/pos %))
+                                                 (assoc name-attr (get % name-attr))))
+                                          (sort-by :canon/pos elems))}}
+    description (assoc :domain/description description)
+    problem     (assoc :domain/problem     (str problem))
+    execute     (assoc :domain/execute     (str execute))))
 
-(defn canon2shop
-  "Rewrite 'canonical' (which is SHOP form embeddded in EDN) as SHOP."
-  [{:domain/keys [name elems]}]
-  `(~'defdomain ~(symbol name)
-    ~(->> elems (sort-by :canon/pos) (map :canon/code))))
-
-(defn name2db
-  "Return the DB entry at the argument name"
-  [name]
+(defn db-entry-for
+  "Return the named DB structure. name is string and db.unique/identity"
+  [name & {:keys [db-atm] :or {db-atm (connect-atm :planning-domains)}}]
   (when-let [eid (d/q '[:find ?e .
                         :in $ ?name
-                        :where (or [?e :method/name ?name]
-                                   [?e :operator/name ?name]
-                                   [?e :axiom/name ?name]
-                                   [?e :domain/name ?name])]
-                      @(connect-atm :system)
+                        :where (or [?e :method/ename ?name]
+                                   [?e :operator/ename ?name]
+                                   [?e :axiom/ename ?name]
+                                   [?e :domain/ename ?name])]
+                      @db-atm
                       name)]
-    (sutil/resolve-db-id {:db/id eid} (connect-atm :system) #{:db/id})))
+    (sutil/resolve-db-id {:db/id eid} db-atm #{:db/id})))
 
-(defn db2canon [name]
-  (when-let [obj (name2db name)]
-    {:domain/name name
-     :domain/elems  (let [cnt (atom 0)]
-                      (for [e (->> obj :domain/elems (sort-by :sys/pos))]
-                        (let [name-attr (keyword (code-type e) "name")]
-                          (-> {:canon/pos (swap! cnt inc)}
-                              (assoc name-attr (get e name-attr))
-                              (assoc :canon/code (rew2shop e))))))}))
+(defn db2canon
+  "Use db2shop to create from db-style maps a map structure where the :domain/elems are individual methods, operators and axioms."
+  [db-obj]
+  (assert (every? #(contains? db-obj %) [:domain/ename :sys/body]))
+  (let [cnt (atom 0)
+        {:domain/keys [description problem execute]} db-obj]
+    (cond-> {:domain/ename (:domain/ename db-obj)
+             :domain/elems (-> (for [e (->> db-obj :sys/body :domain/elems (sort-by :sys/pos))]
+                                 (let [name-attr (keyword (code-type e) "ename")]
+                                   (-> {:canon/pos (swap! cnt inc)}
+                                       (assoc name-attr (get e name-attr))
+                                       (assoc :canon/code (db2shop e)))))
+                               vec)}
+      problem (assoc :domain/problem (edn/read-string problem))
+      execute (assoc :domain/execute (edn/read-string execute))
+      execute (assoc :domain/description description))))
 
-(defn db2shop
-  "Return the DB structure with the given name (a :domain :method, :operator, or :axiom)."
-  [name]
-  (when-let [obj (name2db name)]
-    (rew2shop obj)))
+;;; ------------------------ proj2 to/from canonical ------------------------------
+(def proj-cnt-atm (atom 0))
 
-(defn code-type [exp]
-  (cond (contains? exp :method/name)   "method"
-        (contains? exp :axiom/name)    "axiom"
-        (contains? exp :operator/name) "operator"))
+(defn proj2canon-method
+  "Restructure PROJ into canonical (which is more lisp-like)."
+  [e base-name]
+  (-> {}
+      (assoc :canon/pos (swap! proj-cnt-atm inc))
+      (assoc :method/ename (cond-> (str base-name "." (-> e :method/head method-name))
+                            (-> e :method/rhsides first :method/case-name) (str "." (-> e :method/rhsides first :method/case-name))))
+      (assoc :canon/code
+             `(:method
+               ~(:method/head e)
+               ~@(mapcat (fn [p]
+                           (if-let [cname (:method/case-name p)]
+                             `(~(symbol cname)
+                               ~(if-let [pc (-> p :method/preconds seq)] pc ())
+                               ~(-> p :method/task-list seq))
+                             `(~(if-let [pc (-> p :method/preconds seq)] pc ())
+                               ~(-> p :method/task-list seq))))
+                         (:method/rhsides e))))
+      (dissoc :method/rhsides)))
+
+(defn lisp-seq
+  "Return the collection as a seq."
+  [x]
+  (if (empty? x) '() (seq x)))
+
+(defn proj2canon-operator
+  "Restructure PROJ into canonical (which is more lisp-like)."
+  [e base-name]
+  (-> {}
+      (assoc :canon/pos (swap! proj-cnt-atm inc))
+      (assoc :operator/ename (str base-name "." (-> e :operator/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
+      (assoc :canon/code
+             `(:operator
+               ~(:operator/head e)
+               ~(-> e :operator/preconds lisp-seq)
+               ~(-> e :operator/d-list   lisp-seq)
+               ~(-> e :operator/a-list   lisp-seq)))))
+
+(defn proj2canon-axiom
+  "Restructure PROJ into canonical (which is more lisp-like)."
+  [e base-name]
+    (-> {}
+      (assoc :canon/pos (swap! proj-cnt-atm inc))
+      (assoc :axiom/ename (str base-name "." (-> e :axiom/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
+      (assoc :canon/code
+             `(:-
+               ~(:axiom/head e)
+               ~@(mapcat (fn [rside]
+                           (if-let [cname (:axiom/case-name rside)]
+                             `(~(symbol cname)
+                               ~(if-let [rhs (-> rside :axiom/rhs seq)] rhs ()))
+                             `(~(if-let [rhs (-> rside :axiom/rhs seq)] rhs ()))))
+                         (:axiom/rhsides e))))))
+
+(defn proj2canon
+  "Rewrite the PROJ structure as canonical, which is less lispy."
+  [proj]
+  (reset! proj-cnt-atm 0)
+  (let [{:domain/keys [ename problem execute]} proj
+        base-name ename]
+    (cond-> proj
+      base-name (assoc :domain/ename base-name)
+      problem   (assoc :domain/problem problem)
+      execute   (assoc :domain/execute execute)
+      true      (update :domain/elems
+                        #(for [e %]
+                           (cond (contains? e :method/head)   (proj2canon-method e base-name)
+                                 (contains? e :operator/head) (proj2canon-operator e base-name)
+                                 (contains? e :axiom/head)    (proj2canon-axiom e base-name)))))))
+
+(defn proj2shop
+  "The argument is a planning domain in proj format.
+   Return it translated to SHOP format."
+  [proj]
+  (-> proj
+      proj2canon
+      canon2db
+      db2shop))
+
+(defn db2proj-axiom
+  "Rewrite an axiom to proj form."
+  [obj]
+  (let [{:axiom/keys [head rhs]} (:sys/body obj)]
+    (cond-> {:axiom/head      (db2shop head)}
+      rhs (assoc :axiom/rhsides
+                 (mapv (fn [r]
+                         (cond-> {:axiom/rhs (-> r :rhs/terms db2shop)} ; It is a conjunct.
+                           (:rhs/case-name r) (assoc :axiom/case-name (-> r :rhs/case-name str))))
+                       rhs)))))
+
+(defn db2proj-method
+  "Rewrite an method to proj form."
+  [obj]
+  (-> {:method/head (db2shop (-> obj :sys/body :method/head))}
+      (assoc :method/rhsides
+             (mapv (fn [rhs]
+                     (let [{:method/keys [case-name preconds task-list]} rhs]
+                       (cond-> {}
+                         case-name  (assoc :method/case-name (str case-name))
+                         preconds   (assoc :method/preconds  (mapv db2shop preconds))
+                         true       (assoc :method/task-list (db2shop task-list)))))
+                     (-> obj :sys/body :method/rhs)))))
+
+(defn db2proj-operator
+  "Rewrite an operator to proj form."
+  [obj]
+  (let [{:operator/keys [head preconds d-list a-list]} (:sys/body obj)]
+    (cond-> {:operator/head (db2shop head)}
+      preconds     (assoc :operator/preconds (->> preconds (sort-by :sys/pos) (mapv db2shop)))
+      d-list       (assoc :operator/d-list   (->> d-list   (sort-by :sys/pos) (mapv db2shop)))
+      a-list       (assoc :operator/a-list   (->> a-list   (sort-by :sys/pos) (mapv db2shop))))))
+
+
+(defn db2proj
+  "Rewrite the DB object as a proj object."
+  [{:domain/keys [ename description execute problem] :sys/keys [body]}]
+  (cond-> {}
+    ename        (assoc :domain/ename ename)
+    description  (assoc :domain/description description)
+    problem      (assoc :domain/problem (edn/read-string problem))
+    execute      (assoc :domain/execute (edn/read-string execute))
+    true         (assoc :domain/elems (mapv (fn [elem]
+                                              (let [etyp (-> elem :sys/body :sys/typ)]
+                                                (cond (= :axiom    etyp)    (db2proj-axiom elem),
+                                                      (= :method   etyp)    (db2proj-method elem),
+                                                      (= :operator etyp)    (db2proj-operator elem))))
+                                            (-> body :domain/elems)))))
 
 ;;; ------------------------ DB Stuff -------------------------
-;;; ToDo: This is probably not necessary! I had :db.unique where it should not be.
-(defn collect-lookups
-  [obj]
-  (let [lookups (atom [])
-        id-attr? #{#_:domain/name :method/name :axiom/name :operator/name}]
-    (letfn [(co [x]
-              (cond (map? x)    (doseq [[k v] (seq x)]
-                                  (when (id-attr? k) (swap! lookups conj [:db/add -1 k v]))
-                                  (co v))
-                    (vector? x) (doseq [e x] (co e))))]
-      (co obj)
-      @lookups)))
+;;; Currently this loads zeno, just for testing.
+(defn recreate-planning-domains-db!
+  "Recreate the plans db from .edn data. It uses the connect-atm, which is already established."
+  [cfg]
+  (if (.exists (io/file "data/planning-domains/domains.edn")) ; ToDo: This will need to be better someday soon.
+    (do (log/info "Recreating the planning domains database.")
+        (when (d/database-exists? cfg)
+          (d/delete-database cfg))
+        (d/create-database cfg)
+        (register-db :planning-domains cfg)
+        (let [conn (connect-atm :planning-domains)]
+          (d/transact conn (datahike-schema db-schema-shop2+))
+          (d/transact conn (->> "data/planning-domains/domains.edn"
+                                slurp
+                                edn/read-string
+                                (mapv proj2canon)
+                                (mapv canon2db))))
+        true)
+    (log/error "Not recreating planning domains DB: No backup file.")))
 
-(defn write-obj
-  "Create lookup objects write those, then write the whole thing."
-  [obj]
-  (let [lookup-refs (collect-lookups obj)
-        conn (connect-atm :system)]
-    (doseq [x lookup-refs] (d/transact conn [x]))
-    (d/transact conn [obj])))
+(def recreate-planning-domains-db?
+  "If true it will recreate the Datahike database; it won't add any domains; that's done in the planner."
+  false)
+
+;;; -------------------- Starting and stopping -------------------------
+(defn init-db-cfg
+  "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:base-path).
+   Recreate the system database if sys-db-cfg.recreate-db? = true."
+  []
+  (let [cfg (db-cfg-map :planning-domains)]
+    (register-db :planning-domains cfg)
+    (when recreate-planning-domains-db?  (recreate-planning-domains-db! cfg))
+    {:plan-db-cfg cfg}))
+
+(defstate plans-db-cfg
+  :invalid-state :bogus ; Should warn: "lifecycle functions can only contain `:start` and `:stop`. illegal function found: "
+  :start (init-db-cfg))

@@ -5,7 +5,7 @@
   (:import
    [java.util Date]))
 
-(def diag (atom {}))
+(def ^:diag diag (atom {}))
 
 (defn healthcheck
   [_request]
@@ -13,4 +13,3 @@
   (response/ok
     {:time     (str (Date. (System/currentTimeMillis)))
      :up-since (str (Date. (.getStartTime (java.lang.management.ManagementFactory/getRuntimeMXBean))))}))
-
