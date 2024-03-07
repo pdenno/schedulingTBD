@@ -13,7 +13,11 @@
 
 {:domain/ename "pi"  ; This is appended to every :domain/element, so we keep it short.
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
- :domain/problem "(defproblem process-interview pi () ((characterize-process unknown-proj)))"
+ ;; "(defproblem process-interview pi () ((characterize-process craft-beer)))"
+ :domain/problem {:problem/name "process-interview"
+                  :problem/domain "pi"
+                  :problem/goal-string  "[(characterize-process craft-beer)]"
+                  :problem/state-string ":get-the-real-one-from-the-proj!"}
  :domain/execute "(find-plans 'process-interview :verbose :plans)"
  :domain/elems [;; (characterize-process ?proj)
                 {:method/head (characterize-process ?proj)
@@ -22,10 +26,9 @@
                                    :method/task-list [(!initial-question ?proj)]}
 
                                    {:method/case-name "ongoing-discussion"
-                                    :method/preconds [(ongoing-discussion ?proj)]
-                                    :method/task-list [(!inject-project-name ?proj)      ; "inject" means we'll add this proposition from outside the planner.
-                                                       (!test-well-known-process ?proj)  ; "test" means we MIGHT add a proposition such as (well-know-process beer-brewing).
-                                                       (!test-process-class ?proj)]}]}
+                                    :method/preconds [(ongoing-discussion ?proj)
+                                                      (not (process-defined ?proj))] ; ToDo: process-defined is an axiom RHS. Might need a non-SHOP back-chainer.
+                                    :method/task-list [(get-process-steps ?proj)]}]}
 
                 ;; ====== (not (ongoing-discussion ?proj)) ===============================
                 ;; (!initial-question ?proj)
@@ -42,8 +45,8 @@
                  :method/rhsides [{:method/case-name "well-known"
                                    :method/preconds [(well-known-process ?proj)]
                                    :method/task-list [(!yes-no-process-steps ?proj)]}
-                                  {:method/case-name "unknown"
-                                   :method/preconds [(unknown-process ?proj)]
+                                  {:method/case-name "not well-known"
+                                   :method/preconds [(not (well-known-process ?proj))]
                                    :method/task-list [(!query-process-steps ?proj)]}]}
 
                 ;; (get-wip ?proj)
@@ -71,6 +74,12 @@
                 {:operator/head (!query-for-wip-spreadsheet ?proj)
                  :operator/preconds [(proj-name ?proj) (have-process-steps ?proj)]
                  :operator/a-list [(have-wip ?proj)]}
+
+                ;; (:- (process-defined ?proj)  ; ToDo: This isn't serializing to SHOP correctly!
+                #_{:axiom/head (process-defined ?proj)
+                 :axiom/rhsides [{:axiom/rhs (have-process-steps ?proj)}
+                                 {:axiom/rhs (have-process-ordering ?proj)} ; ToDo: This might be solved by whether or not is it 'job-shop' style.
+                                 {:axiom/rhs (have-process-durs ?proj)}]}
 
                 ;; (:- (same ?x ?x) ())
                 {:axiom/head (same ?x ?x)}

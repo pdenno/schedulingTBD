@@ -814,7 +814,7 @@
         :doc "A string that reads to a SHOP-style s-expression defining what is typically being executed, e.g. find-plans."}
 
    :domain/problem
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref,
         :doc "A string that reads to a SHOP-style s-expression associating a planning goal and states with a domain."}
 
    ;; ---------------------- logical expression
@@ -894,6 +894,16 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "preconditions of the operation"}
 
+   ;; ----------------------- problem
+   :problem/domain #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+                        :doc "A string that refers to the domain; it is a :domain/name."}
+   :problem/name #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
+                      :doc "The name of this domain"}
+   :problem/goal-string #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+                             :doc "A string that can be edn/read-string into a vector propositions that are goals."}
+   :problem/state-string #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+                        :doc "A string that can be edn/read-string into a vector propositions that define current state."}
+
    ;; ---------------------- rhs
    :rhs/case-name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol
@@ -956,6 +966,15 @@
    :task-list/unordered?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
         :doc "when true, indicates that the atoms in task-list can be performed in any order. Ordered is the default."}})
+
+(defn problem2shop
+  "Return the shop serialization of defproblem for the given proj-format object."
+  [{:problem/keys [name domain state-string goal-string]}]
+  (cl-format nil
+             "(defproblem ~A ~A ~%  (~{~A~^ ~}) ~%  (~{~A~^ ~}))"
+             name domain
+             (edn/read-string state-string)
+             (edn/read-string goal-string)))
 
 ;;;=============================== Serialization (DB structures to SHOP common-lisp s-expressions) ================================================
 (defmacro defdb2shop

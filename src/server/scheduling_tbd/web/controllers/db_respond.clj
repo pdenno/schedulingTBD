@@ -5,6 +5,7 @@
    [datahike.api            :as d]
    [ring.util.http-response :as http]
    [scheduling-tbd.db       :as db]
+   [scheduling-tbd.planner  :as plan]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm]]
    [taoensso.timbre         :as log])
   (:import
@@ -59,5 +60,6 @@
       (log/info "db-resp/set-current-project:" project-id)
       (if (db/project-exists? project-id)
         (do (db/set-current-project project-id)
+            (plan/restart-interview project-id)
             (http/ok {:project-id (name project-id)}))
         (http/not-found))))

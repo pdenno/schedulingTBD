@@ -1,13 +1,15 @@
 (ns scheduling-tbd.web.controllers.converse
   "Planning and responding to HTTP user-says."
   (:require
-   [clojure.string          :as str]
-   [datahike.api            :as d]
-   [ring.util.http-response :as http]
-   [scheduling-tbd.db       :as db]
-   [scheduling-tbd.domain   :as dom]
-   [scheduling-tbd.llm      :as llm]
-   [scheduling-tbd.sutil    :as sutil :refer [connect-atm]]
+   [clojure.string           :as str]
+   [datahike.api             :as d]
+   [ring.util.http-response  :as http]
+   [scheduling-tbd.db        :as db]
+   [scheduling-tbd.domain    :as dom]
+   [scheduling-tbd.llm       :as llm]
+   [scheduling-tbd.operators :as ops]
+   [scheduling-tbd.surrogate :as sur]
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm]]
    [taoensso.timbre :as log]))
 
 ;;; ToDo: Need to have some kind of a planning algorithm to kick things off starting with the planned remark about
@@ -46,9 +48,6 @@
       (log/info "op-start-project: Responding with: " response)
       (db/add-msg proj-id response :system))))
 
-;;; [conn (connect-atm (db/current-project-id))]
-;;; (let [{:keys [decision-objective probability]} (llm/find-objective-sentence craft-brewing-desc)] ...) ; <======= First y/n!
-
 (defn wrap-response
   "Wrap text such that it can appear as the text message in the conversation."
   [response-text]
@@ -57,20 +56,15 @@
     (db/inc-msg-id! project-id)
     (db/message-form msg-id :system response-text)))
 
-;;; ToDo: This will be updated to do some sort of planning POMDP, etc.
-(defn plan-response
-  "Top-level function to respond to a user's message."
-  [user-text]
-  (log/info "Got user-text")
-  (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
-    (-> question llm/llm-directly wrap-response) ; These are intentionally Not tracked in the DB.
-    (op-start-project user-text))) ; ToDo: Temporary!  <========================================
-
 (defn reply
   "Handler function for http://api/user-says."
   [request]
   (when-let [user-text (get-in request [:body-params :user-text])]
     (log/info "user-text = " user-text)
-    (let [response (plan-response user-text)]
-      (log/info "response = " response)
-      (http/ok response))))
+    (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
+      (-> question llm/llm-directly wrap-response) ; These are intentionally Not tracked in the DB.
+      (let [response (if-let [[_ surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)]
+                       (sur/start-surrogate surrogate-role)
+                       (ops/dispatch-response user-text))]
+        (log/info "response = " response)
+        (http/ok response)))))

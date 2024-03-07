@@ -36,7 +36,8 @@
         :doc "a keyword matching the one in the same named property of a project database"}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string, same as the :project/name in the project's DB.."}
+        :doc "a string, same as the :project/name in the project's DB."}
+
 ;;; ---------------------- system
    :system/current-project-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
@@ -82,18 +83,27 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "a boolean marking the projected as no longer existing.
               It won't be written to backup. The DB will be moved under the 'deleted' directory."}
-   :project/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a lowercase kebab-case keyword naming a project; unique to the project."}
-   :project/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
+   :project/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "a lowercase kebab-case keyword naming a project; unique to the project."}
    :project/industry
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a short description of the industry in which we are doing scheduling."}
+   :project/messages
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "message objects of the project"}
+   :project/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
+   :project/state-string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string, that can be edn/read-string into a vector of propositions."}
+   :project/surrogate
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "the project's surrogate object, if any."}
 
    ;; ---------------------- summary
    :summary/name
@@ -105,75 +115,6 @@
    :summary/next-msg-id ; ToDo: Remove this. Datalog can do it easy.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc "The ID (a natural number) to be assigned to the next message written (either side of conversation)."}
-
-   ;; ---------------------- surrogate
-   :surrogate/id ; Could this and :surrogate/thread be combined?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A string that uniquely identifies this surrogate, for example, 'craft beer-1'."}
-
-   :surrogate/subject-of-expertise
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The short string identifying what this surrogate is good at minus the verb, which is in the system instruction.
-              For example, this might just be 'craft beer'."}
-
-   :surrogate/thread ; Could this and :surrogate/id be combined?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "An OpenAI assistant thread associated with this project. The surrogate is assistant is "}
-
-   :surrogate/system-instruction
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The complete instruction provided in configuring an OpenAI (or similar) assistant.
-              Typically this substitutes the subject-of-expertise into a template string."}
-
-   :surrogate/openai-obj-str
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "Stringified EDN for what OpenAI returns when an assistant is created."}
-
-   ;; ---------------------- task type (Of course these are not planner tasks!)
-   :task-t/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the task; unique to the project."}
-   :task-t/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this task; unique to the project."}
-   :task-t/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this this task; unique to the project."}
-   :task-t/pre-task
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a task/name identifying a task that must occur before this task "}
-   :task-t/resource-type
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "a keyword naming a resource (type or instance) used in this task"}
-   :task-t/duration-est
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to a duration (dur) object"}
-   :task-t/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
-
-   ;; ---------------------- task instance
-   :task-i/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the task; unique to the project."}
-   :task-i/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this task; unique to the project."}
-   :task-i/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a description of this this task; unique to the project."}
-   :task-i/pre-task
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a task/name identifying a task that must occur before this task "}
-   :task-i/resource-inst
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a keyword naming a :res-t/id or :res-i/id (type or instance) used in this task"}
-   :task-i/duration-est
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to a duration (dur) object"}
-   :task-i/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
 
    ;; ---------------------- resource type
    :res-t/id
@@ -203,6 +144,75 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
 
+      ;; ---------------------- surrogate
+   :surrogate/id ; Could this and :surrogate/thread be combined?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "A string that uniquely identifies this surrogate, for example, 'craft beer-1'."}
+
+   :surrogate/subject-of-expertise
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The short string identifying what this surrogate is good at minus the verb, which is in the system instruction.
+              For example, this might just be 'craft beer'."}
+
+   :surrogate/thread ; Could this and :surrogate/id be combined?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "An OpenAI assistant thread associated with this project. The surrogate is assistant is "}
+
+   :surrogate/system-instruction
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The complete instruction provided in configuring an OpenAI (or similar) assistant.
+              Typically this substitutes the subject-of-expertise into a template string."}
+
+   :surrogate/assistant-obj-str
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Stringified EDN for what OpenAI (or similar) returns when an assistant is created."}
+
+   ;; ---------------------- task instance
+   :task-i/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "a keyword naming the task; unique to the project."}
+   :task-i/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a name for conversation about this task; unique to the project."}
+   :task-i/desc
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "a description of this this task; unique to the project."}
+   :task-i/pre-task
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "a task/name identifying a task that must occur before this task "}
+   :task-i/resource-inst
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "a keyword naming a :res-t/id or :res-i/id (type or instance) used in this task"}
+   :task-i/duration-est
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "a reference to a duration (dur) object"}
+   :task-i/uri
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
+        :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
+
+      ;; ---------------------- task type (Of course these are not planner tasks!)
+   :task-t/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "a keyword naming the task; unique to the project."}
+   :task-t/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a name for conversation about this task; unique to the project."}
+   :task-t/desc
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a description of this this task; unique to the project."}
+   :task-t/pre-task
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "a task/name identifying a task that must occur before this task "}
+   :task-t/resource-type
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "a keyword naming a resource (type or instance) used in this task"}
+   :task-t/duration-est
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "a reference to a duration (dur) object"}
+   :task-t/uri
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
+        :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
+
    ;; ---------------------- work
    :work/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
@@ -211,7 +221,8 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The sentence from user description best describing the scheduling objective."}})
 
-(def db-object-ids
+;;; ToDo: This was used in the old get-project. I'll keep it around for a while to see if it is useful.
+#_(def db-object-ids
   (reduce-kv (fn [res k v] (if (= :db.unique/identity (:db/unique v)) (conj res k) res))
              []
              db-schema-proj+))
@@ -278,19 +289,15 @@
 (defn get-project
   "Return a vector of project content.
    Default content is :summary/name :project/id :message/content."
-  ([pid] (get-project pid db-object-ids))
-  ([pid props]
+  ([pid] (get-project pid #{:db/id}))
+  ([pid filter-set]
    (when-let [conn (connect-atm pid)]
-     (let [eids (mapcat #(d/q '[:find [?e ...]
-                                :in $ ?prop-name
-                                :where [?e ?prop-name]]
-                              @conn
-                              %) props)]
-       (->> eids
-            sort
-            ;;(dp/pull-many @conn '[*])
-            (mapv #(resolve-db-id {:db/id %} conn))
-            vec)))))
+     (let [eid (d/q '[:find ?e .
+                      :in $ ?pid
+                      :where [?e :project/id ?pid]]
+                    @conn
+                    pid)]
+       (resolve-db-id {:db/id eid} conn filter-set)))))
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
@@ -495,7 +502,8 @@
      (d/transact (connect-atm id) {:tx-data [{:summary/name "SUMMARY"
                                               :summary/next-msg-id 2} ; 2 if challenge-intro, no problem if not.
                                              {:project/id id
-                                              :project/name name}
+                                              :project/name name
+                                              :project/state-string "[]"}
                                              (-> intro-prompt
                                                  (assoc :message/time (now))
                                                  (assoc :message/id 1))]})

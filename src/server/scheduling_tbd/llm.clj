@@ -103,3 +103,23 @@
              (throw (ex-info "OpenAI API call failed."
                              {:message (.getMessage e)
                               #_#_:details (-> e .getData :body json/read-str)})))))))
+
+;;;------------------- assistants --------------------------------------------------------
+
+(defn create-assistant
+  "Create an assistant with the given parameters. Provide a map like with following keys:
+     :name - a string, no default.
+     :instructions - a string, the systems instructions; defaults to 'You are a helpful assistant.',
+     :model - a string; defaults to 'gpt-4-1106-preview',
+     :tools - a vector containing maps; defaults to [{:type 'code_interpreter'}]."
+  [{:keys [name instructions model tools]
+    :or {instructions "You are a helpful assistant."
+         model "gpt-4-1106-preview"
+         tools [{:type "code_interpreter"}]}}]
+  (assert (string? name))
+  (let [key (get-api-key :llm)]
+    (openai/create-assistant {:name         name
+                              :model        model
+                              :instructions instructions
+                              :tools        tools} ; Will be good for csv and xslx, at least.
+                             {:api-key key})))

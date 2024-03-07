@@ -13,6 +13,7 @@
    [ezzmq.context            :as zmq-ctx]
    [ezzmq.socket             :as zmq-sock]
    [mount.core               :as mount :refer [defstate]]
+   [scheduling-tbd.db        :as db]
    [scheduling-tbd.operators :as op]
    [scheduling-tbd.shop      :as shop]
    [scheduling-tbd.specs     :as specs]
@@ -192,40 +193,6 @@
       (update :domain/elems #(prune-operators % facts))
       (update :domain/elems #(prune-method-rhsides % facts))))
 
-#_(defn prune-domain ; First try
-  "Return the domain with some operators and methods RHS removed.
-   What is removed are those element for which none of the argument facts unify.
-   The facts argument is a collection of atoms in the logic sense, that is,
-   flat s-expressions representing propositions."
-  [domain facts]
-  (letfn [(pd [obj]
-            (cond (and (map? obj) (contains? obj :domain/ename))     (update obj :domain/elems #(mapv pd %))
-                  (and (map? obj) (contains? obj :operator/head))    (update obj :domain/elems #(prune-operators % facts)) ; WRONG!
-                  (and (map? obj) (contains? obj :axiom/head))       (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
-                  (and (map? obj) (contains? obj :method/head))      (update obj :method/rhsides #(prune-method-rhsides % facts))
-                  (vector? obj)                                      (mapv pd obj)
-                  (seq? obj)                                         (map pd obj)
-                  :else                                              obj))]
-    (pd domain)))
-
-#_(defn prune-domain ; Original
-  "Return the domain with some operators and methods RHS removed.
-   What is removed are those element for which none of the argument facts unify.
-   The facts argument is a collection of atoms in the logic sense, that is,
-   flat s-expressions representing propositions."
-  [domain facts]
-  (letfn [(pd [obj]
-            (cond (and (map? obj) (contains? obj :domain/ename))     (-> (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
-                                                                         ;; This part examines :operator/preconds.
-                                                                         (update obj :domain/elems #(prune-operators % facts)))
-                  (and (map? obj) (contains? obj :axiom/head))       (reduce-kv (fn [m k v] (assoc m k (pd v))) {} obj)
-                  (and (map? obj) (contains? obj :method/head))      (update obj :method/rhsides #(prune-method-rhsides % facts))
-                  (vector? obj)                                      (mapv pd obj)
-                  (seq? obj)                                         (map pd obj)
-                  :else                                              obj))]
-    (pd domain)))
-
-
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
 ;;;       For the time being, I'm just adding uniquely
 (defn update-facts
@@ -277,7 +244,7 @@
             plan)))
 
 ;;; (interview-loop "pi")
-(defn ^:diag interview-loop
+(defn interview-loop
   "Run a conversation with the users. Specifically,
      (1) Create a proj-format planning domain by applying prune-domain against start-facts and the named domain (domain-name).
      (2) Run the :domain/problem & :domain/execute to produce one or more plans. (For now take the first plan computed.)
@@ -297,10 +264,10 @@
    Particularly, the DB content captures a state vector which serves as start-facts in restarting the interview-loop after 'hibernation'.
 
    FWIW, the function returns the state achieved, a collection of :specs/proposition."
-  [domain-name & {:keys [start-facts limit]
+  [domain-name & {:keys [start-facts problem limit]
                   :or {start-facts #{}, limit 3}}]
+  (s/assert ::specs/domain-problem problem)
   (let [canon-proj (-> domain-name (get-domain {:form :proj}))
-        problem (:domain/problem canon-proj)
         execute (:domain/execute canon-proj)]
     (loop [facts start-facts
            domain (-> canon-proj (prune-domain facts) shop/proj2shop)
@@ -320,6 +287,22 @@
           (recur new-facts
                  new-domain
                  (inc cnt)))))))
+
+;;; ToDo: this may be a misnomer; I think I can use it to start a new project too.
+;;; ToDo: This assumes that planning domain is "pi"
+(defn restart-interview
+  "Restart the interview-loop with the given process."
+  [pid & {:keys [domain-name] :or {domain-name "pi"}}]
+  (log/info "Restarting interview for" pid)
+  (let [facts-string (-> pid db/get-project :project/state-string)
+        domain (get-domain domain-name {:form :proj})
+        problem (-> domain
+                    :domain/problem
+                    (assoc :problem/state-string facts-string))]
+    (interview-loop
+     domain-name
+     :start-facts (edn/read-string facts-string)
+     :problem problem)))
 
 ;;; Section 5.6 Debugging Suggestions
 ;;; When you have a problem that does not solve as expected, the following general recipe may help you home in on bugs in your domain definition:
@@ -349,6 +332,7 @@
   "Turn of shop tracing."
   []
   (plan {:execute '(shop-untrace)}))
+
 
 ;;; ========================= Starting, stopping, and testing ===================================
 ;;; ToDo: Currently shop-planner.lisp returns a string of the content wrapped in parenthesis,
