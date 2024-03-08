@@ -40,8 +40,8 @@
 
 (defn ping-diag
   "Create a ping confirmation for use in middle of a round-trip."
-  [{:keys [_client-id _ping-id]}]
-  ;(log/info "Ping" ping-id "from" client-id)
+  [{:keys [client-id ping-id]}]
+  (log/info "Ping" ping-id "from" client-id)
   {:dispatch-key :ping-confirm})
 
 (def dispatch-table

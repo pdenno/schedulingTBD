@@ -27,7 +27,6 @@
 (s/def ::plan-step (s/keys :req [:step/operator :step/args]))
 (s/def ::state-edits (s/keys :req [:edits/add :edits/delete]))
 
-
 (s/def :problem/name string?)
 (s/def :problem/domain string?)
 (s/def :problem/goal-string string?)

@@ -1,5 +1,4 @@
-;;; This is a vector of 'proj' structure. See shop.clj.
-
+;;; This is a proj-format structure. See shop.clj.
 ;;; This example is being used to explore the idea that we can use state information to prune the domain outside of SHOP.
 ;;; Thus instead of (stop-plan) all over the place, we place editing information into the domain that is used to prune off
 ;;; parts of the domain that aren't relevant given state.
@@ -13,14 +12,12 @@
 
 {:domain/ename "pi"  ; This is appended to every :domain/element, so we keep it short.
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
- ;; "(defproblem process-interview pi () ((characterize-process craft-beer)))"
  :domain/problem {:problem/name "process-interview"
                   :problem/domain "pi"
-                  :problem/goal-string  "[(characterize-process craft-beer)]"
+                  :problem/goal-string  "[(characterize-process ?proj)]"
                   :problem/state-string ":get-the-real-one-from-the-proj!"}
- :domain/execute "(find-plans 'process-interview :verbose :plans)"
- :domain/elems [;; (characterize-process ?proj)
-                {:method/head (characterize-process ?proj)
+ :domain/execute "(find-plans 'process-interview :verbose :plans)" ; For example, "(defproblem process-interview pi () ((characterize-process craft-beer)))"
+ :domain/elems [{:method/head (characterize-process ?proj)
                  :method/rhsides [{:method/case-name "from-scratch"
                                    :method/preconds [(not (ongoing-discussion ?proj))]
                                    :method/task-list [(!initial-question ?proj)]}

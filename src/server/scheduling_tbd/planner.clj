@@ -268,7 +268,8 @@
                   :or {start-facts #{}, limit 3}}]
   (s/assert ::specs/domain-problem problem)
   (let [canon-proj (-> domain-name (get-domain {:form :proj}))
-        execute (:domain/execute canon-proj)]
+        execute (:domain/execute canon-proj)
+        problem (shop/problem2shop problem)]
     (loop [facts start-facts
            domain (-> canon-proj (prune-domain facts) shop/proj2shop)
            cnt 1]
@@ -291,7 +292,9 @@
 ;;; ToDo: this may be a misnomer; I think I can use it to start a new project too.
 ;;; ToDo: This assumes that planning domain is "pi"
 (defn restart-interview
-  "Restart the interview-loop with the given process."
+  "Restart the interview-loop with the given project.
+   The project provides :project/state-string which is assigned to :problem/state-string
+   in the call to interview-loop. The rest of problem is defined by the planning domain."
   [pid & {:keys [domain-name] :or {domain-name "pi"}}]
   (log/info "Restarting interview for" pid)
   (let [facts-string (-> pid db/get-project :project/state-string)

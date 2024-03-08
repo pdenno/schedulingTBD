@@ -18,36 +18,6 @@
 
 (def ^:diag diag (atom {}))
 
-(def intro-message
-  "The first message of a conversation."
-  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
-   {:msg-link/uri "http://localhost:3300/learn-more"
-    :msg-link/text "learn more about how this works"}
-   {:msg-text/string "."}])
-
-(defn op-start-project
-  "Summarize user-text as a project name. Execute plan operations to start a project about user-text."
-  [user-text]
-  (let [summary (dom/project-name user-text)
-        id (-> summary str/lower-case (str/replace #"\s+" "-") keyword)
-        proj-info  {:project/id id
-                    :project/name summary
-                    :project/desc user-text ; <==== ToDo: Save this as :msg-id 1 (0 is the "Describe your scheduling problem" message).
-                    #_#_:project/industry _industry}
-        proj-info (db/create-proj-db! proj-info) ; May rename the project-info.
-        proj-id (:project/id proj-info)]
-    (db/add-msg proj-id (d/q '[:find ?prompt . :where [_ :system/initial-prompt ?prompt]] @(connect-atm :system)) :system)
-    (db/add-msg proj-id user-text :user)
-    ;; ToDo:
-    ;; 0) Call the planner and make this code an operator!
-    ;; 1) Set :system/current-project.
-    ;; 2) Store first two messages (prompt and user's first contribution).
-    ;; 3) Check that there isn't a project by that name.
-    ;; 4) Let user change the name of the project.
-    (let [response (str "Great! We'll call your project '" (:project/name proj-info) "'. ")]
-      (log/info "op-start-project: Responding with: " response)
-      (db/add-msg proj-id response :system))))
-
 (defn wrap-response
   "Wrap text such that it can appear as the text message in the conversation."
   [response-text]

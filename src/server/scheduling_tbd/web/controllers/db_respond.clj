@@ -38,15 +38,11 @@
   "Return a map containing :current-project and :others, which is a sorted list of every other project in the DB."
   [_request]
   (letfn [(name&id [obj] (reduce-kv (fn [m k v] (if (#{:project/name :project/id} k) (assoc m k v) m)) {} obj))]
-    (let [current-project (-> (db/current-project-id)
-                              (db/get-project #{:project/id}) ; a vector of DB entity containing :project/id
-                              first
-                              name&id)
+    (let [current-project (-> (db/current-project-id) db/get-project name&id)
           cid    (:project/id current-project)
           others (->> (db/list-projects)
                       (filter #(not= % cid))
-                      (map  #(-> % (db/get-project #{:project/id}) first))
-                      (map #(name&id %)))]
+                      (mapv  #(-> % db/get-project name&id)))]
     (log/info "Call to list-projects")
     (http/ok
      (cond-> {}

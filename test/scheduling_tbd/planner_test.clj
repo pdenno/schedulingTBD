@@ -16,7 +16,12 @@
                   {:problem/name "process-interview"
                    :problem/domain "pi"
                    :problem/goal-string  "[(characterize-process craft-beer)]"
-                   :problem/state-string "[(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)]"}))))
+                   :problem/state-string "[(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)]"}))
+    (is (not (s/valid? ::specs/domain-problem
+                       {:problem/name 1
+                        :problem/domain "pi"
+                        :problem/goal-string  "[(characterize-process craft-beer)]"
+                        :problem/state-string "[(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)]"})))))
 
 (defn tryme []
   (plan/load-domain "data/planning-domains/process-interview.edn")
