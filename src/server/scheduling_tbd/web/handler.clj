@@ -26,8 +26,7 @@
    [reitit.http.interceptors.multipart :as multipart]
    [reitit.http.interceptors.dev :as dev] ; for testing
    [reitit.http.spec :as spec]
-   [scheduling-tbd.web.controllers.converse    :as converse]
-   [scheduling-tbd.web.controllers.db-respond  :as db-resp]
+   [scheduling-tbd.web.controllers.respond :as resp]
    [scheduling-tbd.web.routes.websockets   :as wsock]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
@@ -68,12 +67,12 @@
 ;;; --------- (require '[develop.dutil :as devl]) ; Of course, you'll have to (user/restart) when you update things here.
 ;;; --------- Try it with :reitit.interceptor/transform dev/print-context-diffs. See below.
 ;;; --------- (devl/ajax-test "/api/user-says" {:user-text "LLM: What's the capital of Iowa?"} {:method ajax.core/POST})
-(s/def ::user-says-request  (s/keys :req-un [::user-text]))
+(s/def ::user-says-request  (s/keys :req-un [::user-text] :opt-un [::promise-keys]))
 ;;;(s/def :message/id integer?)  ; ToDo: Should switch to malli. One of the flaws of spec is the naming here.
 ;;;(s/def :message/content (s/coll-of map?))
 ;;;(s/def :message/from string?)
 ;;;(s/def :message/time string?)
-(s/def ::user-says-response map? #_(s/keys :req [:message/id :message/text :message/from :message/time]))
+(s/def ::user-says-response map? #_(s/keys :req [:message/id :message/text :message/from :message/time :promise/clear-keys]))
 (s/def ::user-text   (st/spec {:spec  string?
                                :name "user-text"
                                :description "The text of the user's message."
@@ -139,33 +138,33 @@
             :summary "Respond to the user's most recent message."
             :parameters {:body ::user-says-request}
             :responses {200 {:body ::user-says-response}}
-            :handler converse/reply}}]
+            :handler resp/user-says}}]
 
     ["/get-conversation"
      {:get {;:no-doc true
             :summary "Get the project's conversation from its project DB."
             :parameters {:query ::get-conversation-request}
             :responses {200 {:body ::get-conversation-response}}
-            :handler  db-resp/get-conversation}}]
+            :handler  resp/get-conversation}}]
 
     ["/list-projects"
      {:get {;:no-doc true
             :summary "Get a vector of projects maps and the current project."
             :responses {200 {:body ::list-projects-response}}
-            :handler db-resp/list-projects}}]
+            :handler resp/list-projects}}]
 
     ["/set-current-project"
      {:post {;:no-doc true
              :summary "Get a vector of projects maps and the current project."
              :parameters {:query ::set-current-project-request}
              :responses {200 {:body ::set-current-project-request}} ; {:body {:project-id string?}}}
-             :handler db-resp/set-current-project}}]
+             :handler resp/set-current-project}}]
 
     ["/health"
      {:get {;:no-doc true
             :summary "Check server health"
             :responses {200 {:body {:time string? :up-since string?}}}
-            :handler db-resp/healthcheck}}]]])
+            :handler resp/healthcheck}}]]])
 
 (def options
   {;:reitit.interceptor/transform dev/print-context-diffs ;<======= pretty context diffs of the request (but slows things down quite a bit)!

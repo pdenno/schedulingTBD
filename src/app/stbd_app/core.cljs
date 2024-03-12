@@ -241,6 +241,13 @@
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
 (defonce ping-process (atom nil))
 
+;;; ToDo: This only executes on recompile; I'd like it to run on reload too.
+(defn ^{:before-load true, :dev/before-load true} unmount-root []
+  (log/info "Unmount root.")
+  (when (and chat/connected? chat/client-id)
+    (log/info "Closing channel for client-id = " chat/client-id)
+    (chat/send-message {:dispatch-key :close-channel}))) ; The client-id is appended by send-message!.
+
 (defn ^{:after-load true, :dev/after-load true} mount-root []
   (sutil/config-log :info)
   (log/info "Logging level for the client:"
@@ -251,7 +258,7 @@
   (reset! chat/connected? false)
   (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
   (log/info "Starting a ping process.") ; Start this here so you don't get one every time the chat updates!
-  (reset! ping-process (js/window.setInterval (fn [] (chat/ping!)) 10000)) ; Ping to keep-alive.
+  (reset! ping-process (js/window.setInterval (fn [] (chat/ping!)) 10000)) ; Ping to keep-alive the web-socket.
   ;; Project list and conversation need to be available when .render. Thus promises.
   (.render root ($ app)))
 

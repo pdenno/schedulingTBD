@@ -60,14 +60,16 @@
       (reset! ping-process (js/window.setInterval (fn [] (ping!)) 10000))) ; Ping to keep-alive.
     (throw (ex-info "Websocket Connection Failed:" {:url ws-url}))))
 
-(defn ^:diag send-message!
+
+(defn send-message
   "Send the message to the server. msg can be any Clojure object but if it is a map we add the :client-id.
-   Example usage: (send-message! {:dispatch-key :ping})"
-  [msg]
-  (let [msg (if (map? msg) (assoc msg :client-id client-id) msg)]
-    (if-let [chan @channel]
-      (.send chan (pr-str msg))
-      (throw (ex-info "Couldn't send message; no channel." {:message msg})))))
+   Example usage: (send-message {:dispatch-key :ping})"
+  ([msg] (send-message msg @channel client-id))
+  ([msg chan client-id]
+   (let [msg (if (map? msg) (assoc msg :client-id client-id) msg)]
+     (if chan
+       (.send chan (pr-str msg))
+       (throw (ex-info "Couldn't send message; no channel." {:message msg}))))))
 
 (defn ^:diag reconnect-if-possible [chan receive-handler]
   (if (= 3 (.-readyState chan))

@@ -95,6 +95,13 @@
 (def ws-url (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
 (def channel (atom nil))
 (def connected? (atom false))
+(def pending-promise-keys "These are created by the server to track what is being responded to." (atom #{}))
+
+;;; ToDo: A problem scenario is that the server has put up multiple messages and the user-says just once.
+;;;       I think I'm going to have to have a ws message from the server just about clearing a key.
+;;;       Don't have the client clear it; only have it pick one that it is responding to.
+(defn add-promise-key   [k] (when k (swap! pending-promise-keys conj k)))
+(defn clear-promise-key [k] (when k (swap! pending-promise-keys disj k)))
 
 (def ping-id (atom 0))
 (defn ping!
@@ -107,6 +114,22 @@
                         :ping-id (swap! ping-id inc)})))
     (log/error "Couldn't send ping; channel isn't open.")))
 
+(defn send-message
+  "Send the message to the server. msg can be any Clojure object but if it is a map we add the :client-id.
+   Example usage: (send-message! {:dispatch-key :ping})"
+  [msg]
+  (let [msg (if (map? msg) (assoc msg :client-id client-id) msg)]
+    (if-let [chan @channel]
+      (.send chan (pr-str msg))
+      (throw (ex-info "Couldn't send message; no channel." {:message msg})))))
+
+;;; :tbd-says isn't in this because it sets the set-system-text hook.
+(defn dispatch-msg
+  "Call a function depending on the value of :dispatch-key in the message."
+  [{:keys [dispatch-key promise-key]}]
+  (cond (= dispatch-key :clear-promise-key) (clear-promise-key promise-key)
+        (= dispatch-key :alive?)            (send-message {:alive? true})))
+
 ;;; ========================= Component ===============================
 (defn make-resize-fns
   "These are used by ShareUpDown. The argument is a Hook state variable set- function."
@@ -114,7 +137,7 @@
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
 (defnc Chat [{:keys [chat-height conv-map]}]
-  (let [[msg-list set-msg-list] (hooks/use-state (->> conv-map :conv (mapv msg2rce) clj->js)) ; ToDo: Not clear why this doesn't set msg-list...
+  (let [[msg-list set-msg-list] (hooks/use-state (->> conv-map :conv (mapv msg2rce) clj->js))
         [progress set-progress] (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
         [user-text     set-user-text]   (hooks/use-state "")
@@ -132,7 +155,10 @@
                     (set! (.-onmessage chan)
                           (fn [event]
                             (let [msg (-> event .-data edn/read-string)]
+                              (dispatch-msg msg) ; Just for :clear-promise-key messages currently.
                               (when (= :tbd-says (:dispatch-key msg))
+                                (log/info "promise-key = " (:promise-key msg) "msg =" (:msg msg))
+                                (add-promise-key (:promise-key msg))
                                 (set-system-text (:msg msg)))))) ; ...namely, this function.
                     (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))))
                 (throw (ex-info "Websocket Connection Failed:" {:url ws-url}))))]
@@ -145,7 +171,7 @@
       ;; ------------- Send user-text through REST API; wait on promise for response.
       (hooks/use-effect [user-text]
         (when (not-empty user-text)
-          (-> (dba/user-says user-text)
+          (-> (dba/user-says user-text @pending-promise-keys)
               (p/then #(set-msg-list (->> % msg2rce (add-msg msg-list))))
               (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %))))))
       ;; -------------- progress stuff (currentl not hooked up)
@@ -170,9 +196,11 @@
                        :height box-height ; When set small enough, scroll bars appear.
                        :flexDirection "column"
                        :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
-             ($ rce/MessageList  {:dataSource msg-list
-                                  :style #js {:alignItems "stretch" ; :style is helix for non-MUI things. I think(!)
-                                              :display "flex"}}))   ; "stretch" is just for horizontal??? ToDo: Everything here ignored?
+             ($ rce/MessageList {:dataSource msg-list
+                                 ; :lockable true ; Does nothing.
+                                 :toBottomHeight "100%" ; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist I'd like it to scroll to the bottom.
+                                 :style #js {:alignItems "stretch" ; :style is helix for non-MUI things. I think(!)
+                                             :display "flex"}}))   ; "stretch" is just for horizontal??? ToDo: Everything here ignored?
           :dn
           ($ Stack {:direction "column"}
                  ($ LinearProgress {:variant "determinate" :value progress})

@@ -265,11 +265,13 @@
 
    FWIW, the function returns the state achieved, a collection of :specs/proposition."
   [domain-name & {:keys [start-facts problem limit]
-                  :or {start-facts #{}, limit 3}}]
+                  :or {start-facts [],
+                       problem (-> domain-name (get-domain {:form :proj}) :domain/problem)
+                       limit 3}}]
   (s/assert ::specs/domain-problem problem)
   (let [canon-proj (-> domain-name (get-domain {:form :proj}))
         execute (:domain/execute canon-proj)
-        problem (shop/problem2shop problem)]
+        problem (-> problem (assoc :problem/state-string (str start-facts)) shop/problem2shop)]
     (loop [facts start-facts
            domain (-> canon-proj (prune-domain facts) shop/proj2shop)
            cnt 1]

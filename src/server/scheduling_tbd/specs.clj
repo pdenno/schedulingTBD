@@ -24,8 +24,8 @@
 (s/def :step/operator keyword?)
 (s/def :step/args coll?)
 
-(s/def ::plan-step (s/keys :req [:step/operator :step/args]))
-(s/def ::state-edits (s/keys :req [:edits/add :edits/delete]))
+(s/def ::plan-step (s/keys :req-un [:step/operator :step/args]))
+(s/def ::state-edits (s/keys :req-un [:edits/add :edits/delete]))
 
 (s/def :problem/name string?)
 (s/def :problem/domain string?)

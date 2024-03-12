@@ -3,6 +3,7 @@
   (:require
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
+   [promesa.core         :as p]
    [scheduling-tbd.specs :as specs]
    [scheduling-tbd.sutil :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
    [scheduling-tbd.web.routes.websockets  :as sock]
@@ -57,7 +58,8 @@
      :delete #{}
      :add #{`(~'ongoing-discussion ~@args)}}))
 
-(defn op-start-project
+;;; ToDo: Combine this with :!initial-question above.
+#_(defn op-start-project
   "Summarize user-text as a project name. Execute plan operations to start a project about user-text."
   [user-text]
   (let [summary (dom/project-name user-text)
@@ -80,13 +82,14 @@
       (log/info "op-start-project: Responding with: " response)
       (db/add-msg proj-id response :system))))
 
-
-;;; ToDo: Maybe use promesa here???
 ;;; plan-step: [{:operator :!yes-no-process-steps, :args [aluminium-foil]}]
 (defoperator :!yes-no-process-steps [plan-step facts state-edits]
   (log/info "!yes-no-process-steps: plan-step =" plan-step "facts =" facts "state-edits =" state-edits)
-  (let [{:keys [args]} plan-step]
-    (sock/ws-send-client "In the area to the right, are the process steps listed typically part of your processes? (When done select \"Submit\")")
+  (let [{:keys [args]} plan-step
+        promise-key (sock/ws-send "In the area to the right, are the process steps listed typically part of your processes? (When done select \"Submit\")")]
+    (log/info ":!yes-no-process-steps: promise-key = " promise-key)
+    (-> (sock/lookup-promise promise-key)
+        (p/then #(log/info "Y/N process-steps: promise-key = " promise-key " answer =" %)))
     {:from :!yes-no-process-steps
      :delete #{}
      :add #{`(~'have-process-steps ~(first args))}}))

@@ -46,10 +46,11 @@
 
 (defn user-says
   "Add to the DB the user's text and respond with more dialog."
-  [user-text]
+  [user-text promise-keys]
   (let [prom (p/deferred)]
     (POST "/api/user-says"
-          {:params {:user-text user-text}
+          {:params (cond-> {:user-text user-text}
+                     (not-empty promise-keys) (assoc :promise-keys promise-keys))
            :timeout 30000
            :handler (fn [resp] (p/resolve! prom resp))
            :error-handler (fn [{:keys [status status-text]}]
