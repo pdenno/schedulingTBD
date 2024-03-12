@@ -44,13 +44,13 @@
 
 (defn ping-diag
   "Create a ping confirmation for use in middle of a round-trip."
-  [{:keys [client-id ping-id]}]
-  ;(log/info "Ping" ping-id "from" client-id)
+  [{:keys [_client-id _ping-id]}]
+  ;(log/info "Ping" _ping-id "from" _client-id)
   {:dispatch-key :ping-confirm})
 
 (def dispatch-table
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
-  {:ping ping-diag
+  {:ping          ping-diag
    :close-channel close-channel-by-msg})
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]
@@ -85,7 +85,6 @@
           {:ring.websocket/listener (wsa/websocket-listener in out err)}))
     (log/error "Websocket client did not provide id.")))
 
-
 (defn msg4chat
   ([msg-text] (msg4chat msg-text nil))
   ([msg-text p-key]
@@ -94,18 +93,19 @@
     :promise-key p-key
     :timestamp (now)}))
 
-(def promises
-  "A map of promise names to promises."
-  (atom {}))
+(def promises "A map of promise names to promises." (atom {}))
+(defn clear-promises! [] (reset! promises {}))
 
 (defn new-promise
-  "Return a key to a new promise.
+  "Return a vector of [key, promise] to a new promise.
    We use this key to match returning responses (which may be HTTP/user-says) to know
    what is being responded to." ; ToDo: This is not fool-proof.
   []
-  (let [k (-> (gensym "promise-") keyword)]
-    (swap! promises #(assoc % k (p/deferred)))
-    k))
+  (let [k (-> (gensym "promise-") keyword)
+        p (p/deferred)]
+    (swap! promises #(assoc % k p))
+    (log/info "Adding promise" k)
+    [k p]))
 
 (defn lookup-promise
   "Return the promise associated with the argument key."
@@ -113,23 +113,25 @@
   (or (get @promises k)
       (log/error "Could not find promise with key" k)))
 
-(defn ws-send
+(defn send-with-promise
   "Send the argument message text to the current project (or some other destination if a client-id is provided.
-   Return a promise that is resolved when the user responds to the message."
+   Return a promise that is resolved when the user responds to the message, by whatever means (http or ws)."
   ([msg-text] (if-let [client-id @current-client-id]
-                (ws-send msg-text client-id)
+                (send-with-promise msg-text client-id)
                 (log/error "client-id not set in ws-send.")))
   ([msg-text client-id]
+   (log/info "Sending text:" msg-text)
    (if-let [out (->> client-id (get @socket-channels) :out)]
-     (let [p-key (new-promise)]
+     (let [[p-key p] (new-promise)]
        (log/info "ws-send: p-key =" p-key "msg = " msg-text)
        (go (>! out (-> msg-text (msg4chat p-key) str)))
        (log/info "ws-send: promise-key = " p-key)
-       p-key)
+       p)
      (log/error "Could not find out async channel for client" client-id))))
 
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []
+  (clear-promises!)
   :started!)
 
 (defn wsock-stop []

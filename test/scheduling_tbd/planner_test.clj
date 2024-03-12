@@ -23,6 +23,7 @@
                         :problem/goal-string  "[(characterize-process craft-beer)]"
                         :problem/state-string "[(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)]"})))))
 
+
 (defn ^:diag tryme []
   (plan/load-domain "data/planning-domains/process-interview.edn")
   (let [state-vec (-> :craft-beer-brewery-scheduling
@@ -30,5 +31,7 @@
                       :project/state-string
                       edn/read-string)]
     (log/info "state-vec =" state-vec)
-    (plan/interview-loop "pi"
-                         :start-facts state-vec)))
+    (plan/interview-loop
+     :craft-beer-brewery-scheduling
+     "pi"
+     :start-facts state-vec)))

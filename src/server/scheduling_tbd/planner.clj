@@ -230,18 +230,16 @@
 ;;;       Specifically, there is the need for "restart", in the sense that we can kill
 ;;;       the app and restart it with the same "last question" and unachieved operators
 ;;;       awaiting responses.
-(defn execute-plan
+(defn execute-plan!
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
    Returns a vector ::specs/state-edits object that is the effect of running the plan."
-  [plans facts]
+  [proj-id domain plans]
   (let [plan (translate-plans plans)]
-    (log/info "execute-plan: plan =" plan)
-    (reduce (fn [res plan-step]
-              (s/assert ::specs/plan-step plan-step)
-              (conj res (op/run-op plan-step facts res)))
-            [{:from :start :add #{} :delete #{} }] ; The form of an empty ::specs/state-edits.
-            plan)))
+    (log/info "execute-plan!: plan =" plan)
+    (doseq [plan-step plan]
+      (s/assert ::specs/plan-step plan-step)
+      (op/run-op plan-step proj-id domain))))
 
 ;;; (interview-loop "pi")
 (defn interview-loop
@@ -264,10 +262,10 @@
    Particularly, the DB content captures a state vector which serves as start-facts in restarting the interview-loop after 'hibernation'.
 
    FWIW, the function returns the state achieved, a collection of :specs/proposition."
-  [domain-name & {:keys [start-facts problem limit]
+  [proj-id domain-name & {:keys [start-facts problem limit]
                   :or {start-facts [],
                        problem (-> domain-name (get-domain {:form :proj}) :domain/problem)
-                       limit 3}}]
+                       limit 2}}]
   (s/assert ::specs/domain-problem problem)
   (let [canon-proj (-> domain-name (get-domain {:form :proj}))
         execute (:domain/execute canon-proj)
@@ -278,7 +276,7 @@
       (if (>= cnt limit) ; This is for testing, and maybe safety.
         facts
         (let [plans (plan {:domain domain :problem problem :execute execute})
-              updates (execute-plan plans facts)
+              updates (execute-plan! proj-id domain plans) ; <=============================================== It is in the DB now.
               ;; update the fact set in the order operators were applied.
               new-facts (reduce (fn [res update] (update-facts res update)) facts updates)
               pruned-proj (prune-domain canon-proj new-facts)

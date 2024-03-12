@@ -70,6 +70,7 @@
 (defn wrap-response
   "Wrap text such that it can appear as the text message in the conversation."
   [response-text]
+  (log/info "response-text = " response-text)
   (let [project-id (db/current-project-id)
         msg-id (db/next-msg-id project-id)]
     (db/inc-msg-id! project-id)
@@ -78,14 +79,13 @@
 (defn user-says
   "Handler function for http://api/user-says."
   [request]
-  (when-let [user-text (get-in request [:body-params :user-text])]
-    (reset! diag request)
-    (log/info "user-text = " user-text)
+  (when-let [{:keys [user-text :promise/clear-keys]} (get request :body-params)]
+    (log/info "user-text = " user-text "clear-keys = " clear-keys)
     (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
-      (-> question llm/llm-directly wrap-response) ; These are intentionally Not tracked in the DB.
+      (-> question llm/llm-directly wrap-response http/ok) ; These are intentionally Not tracked in the DB. ToDo: Then whay does wrap-response do db/inc-msg-id?
       (let [response (if-let [[_ surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)]
                        (sur/start-surrogate surrogate-role)
-                       (ops/dispatch-response user-text))]
+                       (ops/dispatch-response user-text clear-keys))]
         (log/info "response = " response)
         (http/ok response)))))
 

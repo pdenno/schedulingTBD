@@ -45,14 +45,19 @@
     prom))
 
 (defn user-says
-  "Add to the DB the user's text and respond with more dialog."
+  "POST to the server some text that was entered from the user's 'Type here:' box.
+   promise-keys is a vector of keywords related to text from server for which some answer is being awaited.
+   Response has form {:message/from :system :message/content [{:msg-text/string 'some text'}]}, or possibly
+   something that just acknowleges receipt."
   [user-text promise-keys]
+  (log/info "user-says: user-text =" user-text)
   (let [prom (p/deferred)]
     (POST "/api/user-says"
           {:params (cond-> {:user-text user-text}
-                     (not-empty promise-keys) (assoc :promise-keys promise-keys))
+                     (not-empty promise-keys) (assoc :promise/clear-keys promise-keys))
            :timeout 30000
            :handler (fn [resp] (p/resolve! prom resp))
            :error-handler (fn [{:keys [status status-text]}]
+                            (log/warn "Error on user-says call:" {:status status :status-text status-text})
                             (p/reject! prom (ex-info "CLJS-AJAX error on /api/user-says" {:status status :status-text status-text})))})
     prom))

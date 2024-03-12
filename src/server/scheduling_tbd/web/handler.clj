@@ -41,6 +41,8 @@
 ;;;   * You can specify keywords and keywords will be conveyed to the web app, but the swagger API will show them as strings.
 ;;;   * If the swagger UI (the page you get when you GET index.html) displays "Failed to load API definition", try :no-doc true
 ;;;     on the most recent definition (or many of them until things start working).
+;;;     ======>  You don't have to restart the server to see changes in the swagger page; just recompile it. <=================
+;;;     A common reason for the Swagger page failing is that you didn't completely specify the spec defs referenced.
 ;;;   * The devl/ajax-tests are Work In Process. Some have uninvestigated bugs.
 ;;;   * You can choose not to define specs for the keys. (Really??? I'm not so sure!)
 ;;;   * The most useful debugging techniques seem to be (in order):
@@ -67,16 +69,20 @@
 ;;; --------- (require '[develop.dutil :as devl]) ; Of course, you'll have to (user/restart) when you update things here.
 ;;; --------- Try it with :reitit.interceptor/transform dev/print-context-diffs. See below.
 ;;; --------- (devl/ajax-test "/api/user-says" {:user-text "LLM: What's the capital of Iowa?"} {:method ajax.core/POST})
-(s/def ::user-says-request  (s/keys :req-un [::user-text] :opt-un [::promise-keys]))
-;;;(s/def :message/id integer?)  ; ToDo: Should switch to malli. One of the flaws of spec is the naming here.
-;;;(s/def :message/content (s/coll-of map?))
-;;;(s/def :message/from string?)
-;;;(s/def :message/time string?)
-(s/def ::user-says-response map? #_(s/keys :req [:message/id :message/text :message/from :message/time :promise/clear-keys]))
+(s/def ::user-says-request  (s/keys :req-un [::user-text] :opt [:promise/keys]))
+(s/def :promise/keys (s/coll-of keyword?))
 (s/def ::user-text   (st/spec {:spec  string?
                                :name "user-text"
                                :description "The text of the user's message."
-                               :json-schema/default "LLM: What's the capital of Iowa?"}))
+                               :json-schema/default "LLM: What is the capital of Iowa?"}))
+
+(s/def :message/content (s/coll-of map?))
+(s/def :message/id integer?)
+(s/def :message/from keyword?)
+(s/def :message/time inst?)
+(s/def :promise/clear-keys (s/coll-of keyword?))
+(s/def ::user-says-response (s/keys :req [:message/content]
+                                    :opt [:message/id :message/from :message/time :promise/clear-keys]))
 
 ;;; -------- (devl/ajax-test "/api/list-projects" [])
 (s/def ::others (s/coll-of map?))

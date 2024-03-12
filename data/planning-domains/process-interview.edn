@@ -29,14 +29,12 @@
 
                 ;; ====== (not (ongoing-discussion ?proj)) ===============================
                 ;; (!initial-question ?proj)
-                {:operator/head (!initial-question ?proj)                    ; ToDo: Need a decision: For the time being, a-list is treated list ':operator/postconds'. It can be used to check
-                 :operator/preconds [(not (ongoing-discussion ?proj))]       ;       that the operator asserted some particular propositions. (I can see there being, for example, an
-                 :operator/a-list [(inject-for! project-name ?proj)          ;       (or (well-known-process ?proj) (unknown-process ?proj)).
-                                   (inject-for ongoing-discussion ?proj)
-                                   (inject-for! well-known-process ?proj)    ; inject-for! is metadata on the proposition (rest of the form) saying we will  have that when we are done with this operation
-                                   (inject-for process-class ?proj)]}        ; inject-for means we might have such a proposition.
-                                                                             ; ToDo: Replace inject-for(!)? with :operator/postconds.
-                                                                             ;       a-list and d-list will be used inside SHOP, if they are needed at all.
+                {:operator/head (!initial-question ?proj)                    ;ToDo: Need a decision: For the time being, a-list is treated list ':operator/postconds'. It can be used to check
+                 :operator/preconds [(not (ongoing-discussion ?proj))]       ;      that the operator asserted some particular propositions. (I can see there being, for example, an
+                 :operator/a-list [(project-name ?proj)                      ;      (or (well-known-process ?proj) (unknown-process ?proj)).
+                                   (ongoing-discussion ?proj)
+                                   (well-known-process ?proj)]}
+
                 ;; ====== (ongoing-discussion ?proj) ===============================
                 {:method/head (get-process-steps ?proj)
                  :method/rhsides [{:method/case-name "well-known"
@@ -73,10 +71,10 @@
                  :operator/a-list [(have-wip ?proj)]}
 
                 ;; (:- (process-defined ?proj)  ; ToDo: This isn't serializing to SHOP correctly!
-                #_{:axiom/head (process-defined ?proj)
-                 :axiom/rhsides [{:axiom/rhs (have-process-steps ?proj)}
-                                 {:axiom/rhs (have-process-ordering ?proj)} ; ToDo: This might be solved by whether or not is it 'job-shop' style.
-                                 {:axiom/rhs (have-process-durs ?proj)}]}
+                {:axiom/head (process-defined ?proj)
+                 :axiom/rhsides [{:axiom/rhs [(have-process-steps ?proj)
+                                              (have-process-ordering ?proj) ; ToDo: This might be solved by whether or not is it 'job-shop' style.
+                                              (have-process-durs ?proj)]}]}
 
                 ;; (:- (same ?x ?x) ())
                 {:axiom/head (same ?x ?x)}

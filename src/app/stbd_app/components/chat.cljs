@@ -172,7 +172,7 @@
       (hooks/use-effect [user-text]
         (when (not-empty user-text)
           (-> (dba/user-says user-text @pending-promise-keys)
-              (p/then #(set-msg-list (->> % msg2rce (add-msg msg-list))))
+              (p/then  #(set-msg-list (->> % msg2rce (add-msg msg-list))))
               (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %))))))
       ;; -------------- progress stuff (currentl not hooked up)
       (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
