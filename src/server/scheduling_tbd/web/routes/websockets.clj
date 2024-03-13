@@ -113,21 +113,20 @@
   (or (get @promises k)
       (log/error "Could not find promise with key" k)))
 
-(defn send-with-promise
+(defn send
   "Send the argument message text to the current project (or some other destination if a client-id is provided.
    Return a promise that is resolved when the user responds to the message, by whatever means (http or ws)."
-  ([msg-text] (if-let [client-id @current-client-id]
-                (send-with-promise msg-text client-id)
-                (log/error "client-id not set in ws-send.")))
-  ([msg-text client-id]
-   (log/info "Sending text:" msg-text)
-   (if-let [out (->> client-id (get @socket-channels) :out)]
-     (let [[p-key p] (new-promise)]
-       (log/info "ws-send: p-key =" p-key "msg = " msg-text)
-       (go (>! out (-> msg-text (msg4chat p-key) str)))
-       (log/info "ws-send: promise-key = " p-key)
-       p)
-     (log/error "Could not find out async channel for client" client-id))))
+  [msg-text & {:keys [promise? client-id]
+               :or {promise? true client-id @current-client-id}}]
+  (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
+  (if-let [out (->> client-id (get @socket-channels) :out)]
+    (if promise?
+      (let [[p-key p] (new-promise)]
+        (go (>! out (-> msg-text (msg4chat p-key) str)))
+        (log/info "ws-send: promise-key = " p-key)
+        p)
+      (go (>! out (-> msg-text msg4chat str))))
+    (log/error "Could not find out async channel for client" client-id)))
 
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []

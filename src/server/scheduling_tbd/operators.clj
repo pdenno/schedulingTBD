@@ -4,6 +4,7 @@
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
    [promesa.core         :as p]
+   [scheduling-tbd.db    :as db]
    [scheduling-tbd.specs :as specs]
    [scheduling-tbd.sutil :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
    [scheduling-tbd.web.routes.websockets  :as ws]
@@ -83,17 +84,6 @@
       (log/info "op-start-project: Responding with: " response)
       (db/add-msg proj-id response :system))))
 
-;;; plan-step: [{:operator :!yes-no-process-steps, :args [aluminium-foil]}]
-#_(defoperator :!yes-no-process-steps [plan-step facts state-edits]
-  (log/info "!yes-no-process-steps: plan-step =" plan-step "facts =" facts "state-edits =" state-edits)
-  (let [{:keys [args]} plan-step
-        promise-key (ws/ws-send "In the area to the right, are the process steps listed typically part of your processes? (When done select \"Submit\")")]
-    (log/info ":!yes-no-process-steps: promise-key = " promise-key)
-    (-> (ws/lookup-promise promise-key)
-        (p/then #(log/info "Y/N process-steps: promise-key = " promise-key " answer =" %)))
-    {:from :!yes-no-process-steps
-     :delete #{}
-     :add #{`(~'have-process-steps ~(first args))}}))
 
 (defn advance-plan
   "Update the project's DB, specifically :project/state-string to show how the plan has advanced.
@@ -101,11 +91,17 @@
       - proj-id is the keyword identifying a project by its :project/id.
       - domain-name is a string identifying a domain by its :domain/ename."
   [plan-step proj-id domain]
-  (log/info "advance-plan: plan-step = " plan-step "proj-id =" proj-id "domain =" domain))
+  (log/info "advance-plan: plan-step = " plan-step "proj-id =" proj-id "domain =" domain)
+  (let [facts (db/get-state proj-id)]
+    facts))
+
+;;; ToDo: This might be a candidate for a method on plan-step.
+(defn db-actions
+  [proj-id plan-steps domain response]
+  (advance-plan proj-id plan-step domain response))
 
 ;;; plan-step: [{:operator :!yes-no-process-steps, :args [aluminium-foil]}]
 (defoperator :!yes-no-process-steps [plan-step proj-id domain]
   (log/info "!yes-no-process-steps: plan-step =" plan-step)
-  (-> (ws/send-with-promise "In the area to the right, are the process steps listed typically part of your processes? \n (When done hit \"Submit\".)")
-      (p/then #(do (log/info "plan-step" plan-step "continuing with data" %) %))
-      (p/then #(advance-plan plan-step %))))
+  (-> (ws/send "Are the process steps listed to the right typically part of your processes? \n (When done hit \"Submit\".)")
+      (p/then (fn [response] (db-actions proj-id plan-step domain response)))))

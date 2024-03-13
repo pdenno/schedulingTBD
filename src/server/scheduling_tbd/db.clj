@@ -285,19 +285,43 @@
             (not [?e :project/deleted? true])]
           @(connect-atm :system)))))
 
+(defn proj-eid
+  "Return the project object's entity id. pid is :project/id."
+  [pid]
+  (when-let [conn (connect-atm pid)]
+    (d/q '[:find ?e .
+           :in $ ?pid
+           :where [?e :project/id ?pid]]
+         @conn
+         pid)))
+
 ;;; ToDo: Add structure to this as the structure develops.
 (defn get-project
   "Return a vector of project content.
    Default content is :summary/name :project/id :message/content."
   ([pid] (get-project pid #{:db/id}))
   ([pid filter-set]
-   (when-let [conn (connect-atm pid)]
-     (let [eid (d/q '[:find ?e .
-                      :in $ ?pid
-                      :where [?e :project/id ?pid]]
-                    @conn
-                    pid)]
-       (resolve-db-id {:db/id eid} conn filter-set)))))
+  (let [conn (connect-atm pid)]
+    (when-let [eid (proj-eid pid)]
+      (resolve-db-id {:db/id eid} conn filter-set)))))
+
+(defn get-state
+  [pid]
+  (let [conn (connect-atm pid)]
+    (when-let [state-str (d/q '[:find ?s .
+                                :in $ ?pid
+                                :where
+                                [?e :project/id ?pid]
+                                [?e :project/state-string ?s]]
+                              @conn)]
+      (edn/read-string state-str))))
+
+(defn put-state
+  "Write an updated state to the project database."
+  [pid state-vec]
+  (let [eid (proj-eid pid)
+        conn (connect-atm pid)]
+    (d/transact conn {:tx-data [[:db/add eid :project/state-string (str state-vec)]]})))
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db

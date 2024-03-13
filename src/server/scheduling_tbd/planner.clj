@@ -239,7 +239,8 @@
     (log/info "execute-plan!: plan =" plan)
     (doseq [plan-step plan]
       (s/assert ::specs/plan-step plan-step)
-      (op/run-op plan-step proj-id domain))))
+      (op/run-op plan-step proj-id domain))
+    (db/get-state proj-id)))
 
 ;;; (interview-loop "pi")
 (defn interview-loop
@@ -276,16 +277,14 @@
       (if (>= cnt limit) ; This is for testing, and maybe safety.
         facts
         (let [plans (plan {:domain domain :problem problem :execute execute})
-              updates (execute-plan! proj-id domain plans) ; <=============================================== It is in the DB now.
+              new-state (execute-plan! proj-id domain plans)
               ;; update the fact set in the order operators were applied.
-              new-facts (reduce (fn [res update] (update-facts res update)) facts updates)
-              pruned-proj (prune-domain canon-proj new-facts)
+              pruned-proj (prune-domain canon-proj new-state)
               new-domain (shop/proj2shop pruned-proj)]
           (log/info "plans =" plans)
-          (log/info "fact-updates =" updates)
-          (log/info "new-facts =" new-facts)
-          (reset! diag {:canon-proj canon-proj :new-facts new-facts :pruned-proj pruned-proj :new-domain new-domain})
-          (recur new-facts
+          (log/info "new-state =" new-state)
+          (reset! diag {:canon-proj canon-proj :new-state new-state :pruned-proj pruned-proj :new-domain new-domain})
+          (recur new-state
                  new-domain
                  (inc cnt)))))))
 
