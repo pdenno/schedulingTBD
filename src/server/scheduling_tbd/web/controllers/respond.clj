@@ -80,13 +80,13 @@
   "Handler function for http://api/user-says."
   [request]
   (when-let [{:keys [user-text :promise/clear-keys]} (get request :body-params)]
-    (log/info "user-text = " user-text "clear-keys = " clear-keys)
-    (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
-      (-> question llm/llm-directly wrap-response http/ok) ; These are intentionally Not tracked in the DB. ToDo: Then whay does wrap-response do db/inc-msg-id?
-      (if-let [[_ surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)]
-        (-> (sur/start-surrogate surrogate-role) http/ok)
-        (-> (ops/dispatch-response user-text clear-keys) http/ok)))
-
+    (let [clear-keys (mapv keyword clear-keys)] ; At least the swagger API can send them as strings.
+      (log/info "user-text = " user-text "clear-keys = " clear-keys)
+      (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
+        (-> question llm/llm-directly wrap-response http/ok) ; These are intentionally Not tracked in the DB. ToDo: Then whay does wrap-response do db/inc-msg-id?
+        (if-let [[_ surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)]
+          (-> (sur/start-surrogate surrogate-role) http/ok)
+          (-> (ops/dispatch-response user-text clear-keys) http/ok))))))
 
 (defn healthcheck
   [_request]

@@ -28,7 +28,12 @@
 (s/def ::state-edits (s/keys :req-un [:edits/add :edits/delete]))
 
 (s/def :problem/name string?)
-(s/def :problem/domain string?)
+(s/def :problem/domain keyword?)
 (s/def :problem/goal-string string?)
 (s/def :problem/state-string string?)
-(s/def ::domain-problem  (s/keys :req [:problem/name :problem/domain :problem/goal-string :problem/state-string]))
+(s/def ::domain-problem  (s/keys :req [:problem/ename :problem/domain :problem/goal-string :problem/state-string]))
+
+;;; ToDo: This can go away with shop.
+(s/def ::shop-obj-plan (s/and vector?
+                              #(every? (fn [step] (s/valid? ::shop-step step)) %)))
+(s/def ::shop-step (s/keys :req-un [::op ::cost]))

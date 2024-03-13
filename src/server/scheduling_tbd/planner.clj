@@ -1,12 +1,12 @@
 (ns scheduling-tbd.planner
   "This provides functions to prune a planning domain and run an interview."
   (:require
-   [clojure.edn          :as edn]
-   [clojure.java.shell   :refer [sh]]
-   [clojure.pprint       :refer [cl-format]]
+   [clojure.core.unify       :as uni]
+   [clojure.edn              :as edn]
+   [clojure.java.shell       :refer [sh]]
+   [clojure.pprint           :refer [cl-format]]
    [clojure.spec.alpha       :as s]
    [clojure.string           :as str]
-   [clojure.core.unify       :as uni]
    [datahike.api             :as d]
    ;;[explainlib.core        :as exp]
    [ezzmq.message            :as zmq]
@@ -79,7 +79,7 @@
       2) :problem - providing a new problem, and
       3) :execute - finding plans for a problem, etc. (See the docs.)
    Return result of execution if (3) is provided, otherwise result from (2) or (1)."
-  [{:keys [domain problem execute verbose?] :or {verbose? true}}]
+  [{:keys [domain problem execute verbose?] :or {verbose? true} :as _diag}]
   (zmq-ctx/with-new-context
     (let [socket (zmq-sock/socket :req {:connect planner-endpoint})]
       (letfn [(wrap-send [data task]
@@ -121,19 +121,19 @@
 
 (defn domain-eid
   "Return the argument domain-name's entity ID."
-  [domain-name]
+  [domain-id]
   (d/q '[:find ?eid .
          :in $ ?dname
-         :where [?eid :domain/ename ?dname]]
+         :where [?eid :domain/id ?dname]]
        @(connect-atm :planning-domains)
-       domain-name))
+       domain-id))
 
 (defn get-domain
   "Return the domain in SHOP format."
-  [domain-name & {:keys [form] :or {form :proj}}]
-  (let [db-obj (if-let [eid (domain-eid domain-name)]
+  [domain-id & {:keys [form] :or {form :proj}}]
+  (let [db-obj (if-let [eid (domain-eid domain-id)]
                  (resolve-db-id {:db/id eid} (connect-atm :planning-domains))
-                 (log/error "Domain" domain-name "not found."))]
+                 (log/error "Domain" domain-id "not found."))]
     (case form
       :db     db-obj
       :proj   (shop/db2proj db-obj)
@@ -193,37 +193,33 @@
       (update :domain/elems #(prune-operators % facts))
       (update :domain/elems #(prune-method-rhsides % facts))))
 
-;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
-;;;       For the time being, I'm just adding uniquely
-(defn update-facts
-  "Update the facts by adding, deleting or resetting to empty.
-     facts - a set of ::specs/positive-proposition.
-     a map - with keys :add and :delete being collections of :specs/positive-proposition.
-             These need not be ground propositions; everything that unifies with a
-             form in delete will be deleted.
-             A variable in the add list will be treated as a skolem.
-             reset? is truthy."
-  [facts {:keys [add delete reset?]}]
-  (assert set? facts)
-  (assert (every? #(s/valid? ::specs/positive-proposition %) facts))
-  (as-> (if reset? #{} facts) ?f
-    (if delete
-      (->> ?f (remove (fn [fact] (some #(uni/unify fact %) delete))) set)
-      ?f)
-    (if add (into ?f add) ?f)))
-
-(defn translate-plans
-  "Translate plans from SHOP format, which is upper-case symbols with cost,
-   to lowercase symbols. Additionally when regarding the operation name,
-   the resulting symbol is ns-qualified in the operators namespace."
-  [plans]
-  (->> plans
-       (map first)
-       (mapv #(let[[op & args] %]
-                (-> {}
-                    (assoc :operator (->> op name str/lower-case keyword))
+;;; ToDo: This can go away with shop.
+(defn translate-plan
+  "Translate plans from SHOP format, which is upper-case symbols with cost, to lowercase symbols.
+  '((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0)) --> [{:cost 1.0, :operator :!drop, :args [banjo]}
+                                                {:cost 1.0, :operator :!pickup, :args [kiwi]}]."
+  [plan]
+  (when-not (seq? plan) (throw (ex-info "Invalid plan" {:plan plan})))
+  (letfn [(plan-obj [plan] ; (((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))) --> [{:operator :!drop, :args [banjo] :cost 1.0},...]."
+            (let [cnt (atom 1)
+                  res (atom '())]
+              (doseq [form plan]
+                (if (odd? @cnt)
+                  (swap! res conj {:op form})
+                  (swap! res #(conj (rest %) (assoc (first %) :cost form))))
+                (swap! cnt inc))
+              (-> res deref reverse vec)))]
+    (let [plan (plan-obj plan)]
+      (s/assert ::specs/shop-obj-plan plan)
+      (mapv (fn [step]
+              (let[{:keys [op]} step
+                   [oper & args] op]
+                (-> step
+                    (dissoc :op)
+                    (assoc :operator (->> oper name str/lower-case keyword))
                     (assoc :args (mapv (fn [arg] (if (symbol? arg) (-> arg name str/lower-case symbol) arg))
-                                       args)))))))
+                                       args)))))
+            plan))))
 
 ;;; ToDo: The operators called from execute-plan are typically long-running.
 ;;;       There is need, therefore, for means to deal with this (IN THE DB, I think).
@@ -234,8 +230,8 @@
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
    Returns a vector ::specs/state-edits object that is the effect of running the plan."
-  [proj-id domain plans]
-  (let [plan (translate-plans plans)]
+  [proj-id domain plan]
+  (let [plan (translate-plan plan)]
     (log/info "execute-plan!: plan =" plan)
     (doseq [plan-step plan]
       (s/assert ::specs/plan-step plan-step)
@@ -263,34 +259,34 @@
    Particularly, the DB content captures a state vector which serves as start-facts in restarting the interview-loop after 'hibernation'.
 
    FWIW, the function returns the state achieved, a collection of :specs/proposition."
-  [proj-id domain-name & {:keys [start-facts problem limit]
+  [proj-id domain-id & {:keys [start-facts problem limit]
                   :or {start-facts [],
-                       problem (-> domain-name (get-domain {:form :proj}) :domain/problem)
-                       limit 2}}]
+                       problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
+                       limit 3}}]
   (s/assert ::specs/domain-problem problem)
-  (let [canon-proj (-> domain-name (get-domain {:form :proj}))
-        execute (:domain/execute canon-proj)
+  (let [proj-domain (-> domain-id (get-domain {:form :proj}))
+        execute (:domain/execute proj-domain)
         problem (-> problem (assoc :problem/state-string (str start-facts)) shop/problem2shop)]
-    (loop [facts start-facts
-           domain (-> canon-proj (prune-domain facts) shop/proj2shop)
+    (loop [state start-facts
+           pruned (prune-domain proj-domain state)
            cnt 1]
       (if (>= cnt limit) ; This is for testing, and maybe safety.
-        facts
-        (let [plans (plan {:domain domain :problem problem :execute execute})
-              new-state (execute-plan! proj-id domain plans)
+        state
+        (let [plans (plan {:domain (shop/proj2shop pruned) :problem problem :execute execute})
+              new-state (execute-plan! proj-id pruned (first plans)) ; ToDo: Deal with multiple plans.
               ;; update the fact set in the order operators were applied.
-              pruned-proj (prune-domain canon-proj new-state)
+              pruned-proj (prune-domain proj-domain new-state)
               new-domain (shop/proj2shop pruned-proj)]
           (log/info "plans =" plans)
           (log/info "new-state =" new-state)
-          (reset! diag {:canon-proj canon-proj :new-state new-state :pruned-proj pruned-proj :new-domain new-domain})
+          ;;(reset! diag {:proj-domain proj-domain :new-state new-state :pruned-proj pruned-proj :new-domain new-domain})
           (recur new-state
                  new-domain
                  (inc cnt)))))))
 
 ;;; ToDo: this may be a misnomer; I think I can use it to start a new project too.
 ;;; ToDo: This assumes that planning domain is "pi"
-(defn restart-interview
+(defn restart-interview ; <=============================================================== ToDo: Currently assumes domain.
   "Restart the interview-loop with the given project.
    The project provides :project/state-string which is assigned to :problem/state-string
    in the call to interview-loop. The rest of problem is defined by the planning domain."
@@ -302,6 +298,7 @@
                     :domain/problem
                     (assoc :problem/state-string facts-string))]
     (interview-loop
+     pid
      domain-name
      :start-facts (edn/read-string facts-string)
      :problem problem)))
@@ -335,7 +332,6 @@
   []
   (plan {:execute '(shop-untrace)}))
 
-
 ;;; ========================= Starting, stopping, and testing ===================================
 ;;; ToDo: Currently shop-planner.lisp returns a string of the content wrapped in parenthesis,
 ;;;       and I haven't looked into why that is. Also BREAK-HERE could be more obscure.
@@ -347,6 +343,7 @@
               ((:operator (!pickup ?a) () () ((have ?a)))
                (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
                (:method (swap ?x ?y)
+                        just-one-way
                         ((have ?x))
                         ((!drop ?x) (!pickup ?y))
                         ((have ?y))

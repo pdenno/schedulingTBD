@@ -2,8 +2,9 @@
 #:summary{:name "SUMMARY", :next-msg-id 4}
 
 #:project{:id :aluminium-foil-production-scheduling,
+          :current-domain :process-interview
           :name "Aluminium foil production scheduling"
-          :state-string "[(proj-name aluminium-foil) (ongoing-discussion aluminium-foil) (well-known-process aluminium-foil)]"
+          :state-string "#{(proj-name aluminium-foil) (ongoing-discussion aluminium-foil) (well-known-process aluminium-foil)}"
           :messages [#:message{:content
                                [#:msg-text{:string
                                            "Describe your scheduling problem in a few sentences or "}

@@ -4,8 +4,9 @@
 #:project{:desc
           "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan.",
           :id :craft-beer-brewery-scheduling,
+          :current-domain :process-interview,
           :name "Craft Beer Brewery Scheduling"
-          :state-string "[(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)]"
+          :state-string "#{(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)}"
           :messages [#:message{:from :system,
                                :id 0,
                                :content [{:msg-text/string "Describe your scheduling problem in a few sentences or "}

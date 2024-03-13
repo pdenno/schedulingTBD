@@ -3,7 +3,8 @@
 
 #:project{:id :snowboards-production-scheduling,
           :name "Snowboards production scheduling"
-          :state-string "[]"
+          :current-domain :process-interview
+          :state-string "#{(proj-name snowboards) (ongoing-discussion snowboards) (well-known-process snowboards)}"
           :messages [#:message{:content
                                [#:msg-text{:string
                                            "Describe your scheduling problem in a few sentences or "}

@@ -1,8 +1,10 @@
 (ns scheduling-tbd.operators
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:require
+   [clojure.core.unify   :as uni]
    [clojure.pprint       :refer [cl-format]]
    [clojure.spec.alpha   :as s]
+   [datahike.api         :as d]
    [promesa.core         :as p]
    [scheduling-tbd.db    :as db]
    [scheduling-tbd.specs :as specs]
@@ -50,6 +52,22 @@
 
 (defmulti run-op #'run-op-dispatch)
 
+;;; -------- Similar for db-actions ----------------------------------------------------------
+(defmacro defaction
+  "Macro to wrap methods for updating the project's database for effects from running an operation."
+  {:clj-kondo/lint-as 'clojure.core/fn
+   :arglists '([plan-step proj-id domain & body])}
+  [tag [plan-step proj-id domain & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  `(defmethod db-action ~tag [~plan-step ~proj-id ~domain & [~@more-args]]
+     (when @debugging? (println (cl-format nil "d=> ~A" ~tag)))
+     (let [res# (do ~@body)]
+       (if (seq? res#) (doall res#) res#)
+       (do (when @debugging?
+             (println (cl-format nil "<-d ~A returns ~S" ~tag res#)))
+           res#))))
+
+(defmulti db-action #'run-op-dispatch)
+
 ;;; N.B.: Typically we won't save an interview query message to the DB until after receiving a response to it from the user.
 ;;;       At that point, we'll also save the :project/state-string. This ensures that when we restart we can use the
 ;;;       planner to put the right question back in play.
@@ -84,24 +102,67 @@
       (log/info "op-start-project: Responding with: " response)
       (db/add-msg proj-id response :system))))
 
+(def ^:diag diag (atom nil))
+
+;;; plan-step =  {:cost 1.0, :operator :!yes-no-process-steps, :args [craft-beer]}
+(defn domain-operator
+  "Return the argument operator from the domain."
+  [domain operator]
+  (->> domain
+       :domain/elems
+       (some #(when (= (-> % :operator/head first) operator) %))))
+
+;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
+;;;       For the time being, I'm just adding uniquely
+(defn add-del-facts
+  "Update the facts by adding, deleting or resetting to empty.
+     facts - a set of ::specs/positive-proposition.
+     a map - with keys :add and :delete being collections of :specs/positive-proposition.
+             These need not be ground propositions; everything that unifies with a
+             form in delete will be deleted.
+             A variable in the add list will be treated as a skolem.
+             reset? is truthy."
+  [facts {:keys [add delete reset?]}]
+  (assert set? facts)
+  (assert (every? #(s/valid? ::specs/positive-proposition %) facts))
+  (as-> (if reset? #{} facts) ?f
+    (if delete
+      (->> ?f (remove (fn [fact] (some #(uni/unify fact %) delete))) set)
+      ?f)
+    (if add (into ?f add) ?f)))
 
 (defn advance-plan
   "Update the project's DB, specifically :project/state-string to show how the plan has advanced.
       - plan-step is a map such as {:operator :!yes-no-process-steps, :args [aluminium-foil]},
       - proj-id is the keyword identifying a project by its :project/id.
-      - domain-name is a string identifying a domain by its :domain/ename."
-  [plan-step proj-id domain]
-  (log/info "advance-plan: plan-step = " plan-step "proj-id =" proj-id "domain =" domain)
-  (let [facts (db/get-state proj-id)]
-    facts))
+      - domain-id is a domain object, typically one that has been pruned.
+   Returns the new state."
+  [plan-step proj-id domain _response]
+  ;;(log/info "advance-plan: plan-step = " plan-step "proj-id =" proj-id "domain =" domain)
+  (let [facts (db/get-state proj-id)
+        {:keys [operator args]} plan-step
+        op-sym (-> operator name symbol)
+        op-obj (domain-operator domain op-sym) ; ToDo: This simplifies when shop is gone.
+        bindings (zipmap (-> op-obj :operator/head rest) args)
+        a-list (mapv #(uni/subst % bindings) (:operator/a-list op-obj))
+        d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))
+        new-state (add-del-facts facts {:add a-list :delete d-list})
+        eid (db/proj-eid proj-id)]
+    (d/transact (connect-atm proj-id) [[:db/add eid :project/state-string (str new-state)]])
+    new-state))
 
-;;; ToDo: This might be a candidate for a method on plan-step.
-(defn db-actions
-  [proj-id plan-steps domain response]
-  (advance-plan proj-id plan-step domain response))
-
-;;; plan-step: [{:operator :!yes-no-process-steps, :args [aluminium-foil]}]
 (defoperator :!yes-no-process-steps [plan-step proj-id domain]
   (log/info "!yes-no-process-steps: plan-step =" plan-step)
-  (-> (ws/send "Are the process steps listed to the right typically part of your processes? \n (When done hit \"Submit\".)")
-      (p/then (fn [response] (db-actions proj-id plan-step domain response)))))
+  (-> (ws/send "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)")
+      (p/then (fn [response] (db-action plan-step proj-id domain response)))))
+
+(defaction :!yes-no-process-steps [plan-step proj-id domain response]
+  (advance-plan plan-step proj-id  domain response))
+
+(defoperator :!yes-no-process-durations [plan-step proj-id domain]
+  (log/info "!yes-no-process-steps: plan-step =" plan-step)
+  (-> (ws/send "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)")
+      (p/then (fn [response] (db-action plan-step proj-id domain response)))))
+
+(defaction :!yes-no-process-durations [plan-step proj-id domain response]
+  (advance-plan plan-step proj-id  domain response))

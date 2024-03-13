@@ -70,7 +70,10 @@
 ;;; --------- Try it with :reitit.interceptor/transform dev/print-context-diffs. See below.
 ;;; --------- (devl/ajax-test "/api/user-says" {:user-text "LLM: What's the capital of Iowa?"} {:method ajax.core/POST})
 (s/def ::user-says-request  (s/keys :req-un [::user-text] :opt [:promise/keys]))
-(s/def :promise/keys (s/coll-of keyword?))
+(s/def :promise/keys (st/spec {:spec (s/coll-of keyword?)
+                               :name :promise-keys
+                               :description "Data sent with a question put to the users, that is used to match to their responses."
+                               :json-schema/default ["promise-42"]}))
 (s/def ::user-text   (st/spec {:spec  string?
                                :name "user-text"
                                :description "The text of the user's message."
@@ -173,7 +176,7 @@
             :handler resp/healthcheck}}]]])
 
 (def options
-  {;:reitit.interceptor/transform dev/print-context-diffs ;<======= pretty context diffs of the request (but slows things down quite a bit)!
+  {:reitit.interceptor/transform dev/print-context-diffs ;<======= pretty context diffs of the request (but slows things down quite a bit)!
    :validate spec/validate ;; enable spec validation for route data
    :reitit.spec/wrap spell/closed ;; strict top-level validation  (error reported if you don't have the last two interceptors)
    :exception pretty/exception

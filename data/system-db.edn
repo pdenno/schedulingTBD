@@ -1,5 +1,5 @@
 [
-#:system{:current-project-id :craft-beer-surrogate-1, :name "SYSTEM"}
+#:system{:current-project-id :craft-beer-surrogate, :name "SYSTEM"}
 
 #:project{:dir
           "/opt/scheduling/projects/craft-beer-brewery-scheduling",

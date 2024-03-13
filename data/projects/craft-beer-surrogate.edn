@@ -3,6 +3,7 @@
 
  #:project{:id :craft-beer-surrogate,
            :name "Craft beer surrogate"
+           :current-domain :process-interview,
            :state-string "[]"
            :messages [#:message{:content
                                 [#:msg-text{:string

@@ -33,5 +33,5 @@
     (log/info "state-vec =" state-vec)
     (plan/interview-loop
      :craft-beer-brewery-scheduling
-     "pi"
+     :process-interview
      :start-facts state-vec)))

@@ -79,6 +79,9 @@
            :doc "A text string as part of :message/content."}
 
    ;; ---------------------- project
+   :project/current-domain
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "a :domain/id (keyword in domains db) indicating where this project is currently working."}
    :project/deleted?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "a boolean marking the projected as no longer existing.
