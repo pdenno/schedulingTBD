@@ -26,6 +26,7 @@
 
 (defn ^:diag tryme []
   (plan/load-domain "data/planning-domains/process-interview.edn")
+  (db/recreate-dbs!)
   (let [state-vec (-> :craft-beer-brewery-scheduling
                       db/get-project
                       :project/state-string

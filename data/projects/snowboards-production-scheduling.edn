@@ -4,7 +4,7 @@
 #:project{:id :snowboards-production-scheduling,
           :name "Snowboards production scheduling"
           :current-domain :process-interview
-          :state-string "#{(proj-name snowboards) (ongoing-discussion snowboards) (well-known-process snowboards)}"
+          :state-string "#{(proj-name snowboards) (system-model snowboards flow) (ongoing-discussion snowboards) (well-known-process snowboards)}"
           :messages [#:message{:content
                                [#:msg-text{:string
                                            "Describe your scheduling problem in a few sentences or "}

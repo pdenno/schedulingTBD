@@ -21,6 +21,9 @@
     :msg-link/text "learn more about how this works"}
    {:msg-text/string "."}])
 
+(def ok-message "This is useful where, for example, the user is typing unanticpated stuff."
+  [{:msg-text/string "ok"}])
+
 (defmacro defoperator
   "Macro to wrap methods for translating shop to database format."
   {:clj-kondo/lint-as 'clojure.core/fn ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
@@ -48,7 +51,8 @@
   [res clear-keys]
   (if-let [p (some #(when-let [prom (ws/lookup-promise %)] prom) clear-keys)]
     (p/resolve! p res)
-    (log/warn "dispatch-response: no match to keys:" clear-keys)))
+    (do (log/warn "dispatch-response: no match to keys:" clear-keys)
+        {:message/content ok-message}))) ; You still need to respond with something!
 
 (defmulti run-op #'run-op-dispatch)
 
@@ -151,18 +155,38 @@
     (d/transact (connect-atm proj-id) [[:db/add eid :project/state-string (str new-state)]])
     new-state))
 
+(def wait-time-for-user-resp "The number of milliseconds to wait for the user to reply to a query." 20000)
+
+;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-steps [plan-step proj-id domain]
   (log/info "!yes-no-process-steps: plan-step =" plan-step)
   (-> (ws/send "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)")
+      (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
 
 (defaction :!yes-no-process-steps [plan-step proj-id domain response]
   (advance-plan plan-step proj-id  domain response))
 
-(defoperator :!yes-no-process-durations [plan-step proj-id domain]
-  (log/info "!yes-no-process-steps: plan-step =" plan-step)
+;;; ----- :!query-process-durs
+(defoperator :!query-process-durs [plan-step proj-id domain]
+  (log/info "!query-process-durs: plan-step =" plan-step)
   (-> (ws/send "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)")
+      (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
 
-(defaction :!yes-no-process-durations [plan-step proj-id domain response]
+(defaction :!query-process-durs [plan-step proj-id domain response]
   (advance-plan plan-step proj-id  domain response))
+
+;;; ----- :!yes-no-process-steps
+(defoperator :!yes-no-process-ordering [plan-step proj-id domain]
+  (log/info "!yes-no-process-ordering: plan-step =" plan-step)
+  (-> (ws/send "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)")
+      (p/await wait-time-for-user-resp)
+      (p/then (fn [response] (db-action plan-step proj-id domain response)))))
+
+(defaction :!yes-no-process-ordering [plan-step proj-id domain response]
+  (advance-plan plan-step proj-id  domain response))
+
+;;; ----- :!stop-discussion
+(defoperator :!stop-discussion [plan-step _proj-id _domain]
+  (log/info "!stop-discussion: plan-step =" plan-step))

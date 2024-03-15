@@ -176,7 +176,7 @@
             :handler resp/healthcheck}}]]])
 
 (def options
-  {:reitit.interceptor/transform dev/print-context-diffs ;<======= pretty context diffs of the request (but slows things down quite a bit)!
+  {;:reitit.interceptor/transform dev/print-context-diffs ;<======= pretty context diffs of the request (but slows things down quite a bit)!
    :validate spec/validate ;; enable spec validation for route data
    :reitit.spec/wrap spell/closed ;; strict top-level validation  (error reported if you don't have the last two interceptors)
    :exception pretty/exception

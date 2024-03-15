@@ -309,7 +309,7 @@
       (resolve-db-id {:db/id eid} conn filter-set)))))
 
 (defn get-state
-  [pid]
+  [pid & {:keys [sort?] :or {sort? true}}]
   (let [conn (connect-atm pid)]
     (when-let [state-str (d/q '[:find ?s .
                                 :in $ ?pid
@@ -317,7 +317,8 @@
                                 [?e :project/id ?pid]
                                 [?e :project/state-string ?s]]
                               @conn)]
-      (edn/read-string state-str))))
+      (cond->> (edn/read-string state-str)
+        sort? (sort-by first)))))
 
 (defn put-state
   "Write an updated state to the project database."

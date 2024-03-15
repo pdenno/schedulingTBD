@@ -32,6 +32,7 @@
  :lint-as {#_#_scheduling-tbd.shop/defdb2shop        clojure.core/defn  ; These aren't needed; I did them in-line. (See shop.clj)
            #_#_scheduling-tbd.shop/defshop2db        clojure.core/defn
            scheduling-tbd.operators/defoperator      clojure.core/defn
+           scheduling-tbd.operators/defaction        clojure.core/defn
            applied-science.js-interop/defn           clojure.core/defn
            mount.core/defstate                       clj-kondo.lint-as/def-catch-all   ; Because the hook is not working!
            ezzmq.core/with-new-context               clojure.core/defmacro             ; I haven't seen defmacro being used; this 'works' as well as def-catch-all.

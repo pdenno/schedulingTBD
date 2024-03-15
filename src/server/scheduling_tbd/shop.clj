@@ -1261,9 +1261,9 @@
       execute   (assoc :domain/execute execute)
       true      (update :domain/elems
                         #(for [e %]
-                           (cond (contains? e :method/head)   (proj2canon-method e base-name)
-                                 (contains? e :operator/head) (proj2canon-operator e base-name)
-                                 (contains? e :axiom/head)    (proj2canon-axiom e base-name)))))))
+                             (cond (contains? e :method/head)   (proj2canon-method e base-name)
+                                   (contains? e :operator/head) (proj2canon-operator e base-name)
+                                   (contains? e :axiom/head)    (proj2canon-axiom e base-name)))))))
 
 (defn proj2shop
   "The argument is a planning domain in proj format.

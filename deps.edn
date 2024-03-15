@@ -7,7 +7,6 @@
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
            funcool/promesa                     {:mvn/version "11.0.678"}
-           org.ring-clojure/ring-websocket-async  {:mvn/version "0.1.0-beta2"} ; depends on ring/ring-core "1.11.0-beta2 ; Mine is "0.1.19 Needs work.
            io.djy/ezzmq                        {:mvn/version "0.8.2"}
            io.replikativ/datahike              {:mvn/version "0.6.1538"}
            metosin/muuntaja                    {:mvn/version "0.6.8"}
@@ -18,9 +17,11 @@
            org.apache.logging.log4j/log4j-api  {:mvn/version "2.23.0"} ; ToDo: Move logging to :dev.
            org.apache.logging.log4j/log4j-core {:mvn/version "2.23.0"} ; ToDo: Move logging to :dev.
            org.clj-commons/hickory             {:mvn/version "0.7.4"}
-           org.slf4j/slf4j-nop                 {:mvn/version "2.0.12"}  ; Stop spurious logging!
+           org.clojure/clojure                 {:mvn/version "1.11.2"}
            org.clojure/data.codec              {:mvn/version "0.2.0"}
            org.clojure/data.json               {:mvn/version "2.5.0"}
+           org.ring-clojure/ring-websocket-async  {:mvn/version "0.1.0-beta2"} ; depends on ring/ring-core "1.11.0-beta2 ; Mine is "0.1.19 Needs work.
+           org.slf4j/slf4j-nop                 {:mvn/version "2.0.12"}  ; Stop spurious logging!
            ring/ring-defaults                  {:mvn/version "0.4.0"}
            ring/ring-jetty-adapter             {:mvn/version "1.11.0-beta2"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
            ring/ring-core                      {:mvn/version "1.11.0-beta2"}  ;; I switched to try org.ring-clojure/ring-websocket-async

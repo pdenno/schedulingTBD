@@ -1,15 +1,10 @@
 [
-#:system{:current-project-id :craft-beer-surrogate, :name "SYSTEM"}
+#:system{:current-project-id :craft-beer-brewery-scheduling, :name "SYSTEM"}
 
 #:project{:dir
           "/opt/scheduling/projects/craft-beer-brewery-scheduling",
           :id :craft-beer-brewery-scheduling,
           :name "craft-beer-brewery-scheduling"}
-
-#:project{:dir
-          "/opt/scheduling/projects/aluminium-foil-production-scheduling",
-          :id :aluminium-foil-production-scheduling,
-          :name "Aluminium foil production scheduling"}
 
 #:project{:dir
           "/opt/scheduling/projects/snowboards-production-scheduling",
@@ -18,6 +13,11 @@
 
 #:project{:dir "/opt/scheduling/projects/craft-beer-surrogate",
           :id :craft-beer-surrogate,
+          :deleted? true
           :name "Craft beer surrogate"}
 
+#:project{:dir
+          "/opt/scheduling/projects/aluminium-foil-production-scheduling",
+          :id :aluminium-foil-production-scheduling,
+          :name "Aluminium foil production scheduling"}
 ]

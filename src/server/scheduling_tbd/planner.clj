@@ -62,10 +62,11 @@
    that has to be cleaned up and interepreted. This takes the string and returns a map with up to three
    values: (1) the form returned (:form), (2) output to std-out (:std-out), and (3) output to err-out (:err-out)."
   [s]
-  (let [[result std err] (str/split s #"BREAK-HERE")
-        [success result] (re-matches #"^\((.*)$" result)
+  (let [[plan std err] (str/split s #"BREAK-HERE")
+        op-list (str/replace plan #"\n" "")
+        [success res] (re-matches #"^\((.*)$" op-list)
         form (if success
-               (try (edn/read-string result) (catch Exception _e :error/unreadable))
+                 (try (edn/read-string res) (catch Exception _e :error/unreadable))
                :error/uninterpretable)
         ;; ToDo: Investigate this bug.
         err (if (= err " )") nil err)]
@@ -272,16 +273,14 @@
            cnt 1]
       (if (>= cnt limit) ; This is for testing, and maybe safety.
         state
-        (let [plans (plan {:domain (shop/proj2shop pruned) :problem problem :execute execute})
+        (let [plans     (plan (reset! diag {:domain (shop/proj2shop pruned) :problem problem :execute execute}))
               new-state (execute-plan! proj-id pruned (first plans)) ; ToDo: Deal with multiple plans.
-              ;; update the fact set in the order operators were applied.
-              pruned-proj (prune-domain proj-domain new-state)
-              new-domain (shop/proj2shop pruned-proj)]
+              pruned    (prune-domain proj-domain new-state)]
           (log/info "plans =" plans)
           (log/info "new-state =" new-state)
           ;;(reset! diag {:proj-domain proj-domain :new-state new-state :pruned-proj pruned-proj :new-domain new-domain})
           (recur new-state
-                 new-domain
+                 pruned
                  (inc cnt)))))))
 
 ;;; ToDo: this may be a misnomer; I think I can use it to start a new project too.
