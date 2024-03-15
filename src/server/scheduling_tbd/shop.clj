@@ -66,7 +66,8 @@
   [exp]
   (cond (contains? exp :method/ename)   "method"
         (contains? exp :axiom/ename)    "axiom"
-        (contains? exp :operator/ename) "operator"))
+        (contains? exp :operator/ename) "operator"
+        :else (throw (ex-info "No code-type for" {:exp exp}))))
 
 ;;; ======================= SHOP2 Grammar ================================================================
 ;;;------ toplevel forms ----
@@ -975,7 +976,8 @@
 
 (defn problem2shop
   "Return the shop object (an s-expression) defproblem for the given proj-format object."
-  [{:problem/keys [ename domain state-string goal-string]}]
+  [{:problem/keys [ename domain state-string goal-string] :as _diag}]
+  (reset! diag _diag)
   (edn/read-string
    (cl-format nil
               "(defproblem ~A ~A ~%  (~{~A~^ ~}) ~%  (~{~A~^ ~}))"
@@ -1222,15 +1224,15 @@
 (defn proj2canon-operator
   "Restructure PROJ into canonical (which is more lisp-like)."
   [e base-name]
-  (-> {}
-      (assoc :canon/pos (swap! proj-cnt-atm inc))
-      (assoc :operator/ename (str base-name "." (-> e :operator/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
-      (assoc :canon/code
-             `(:operator
-               ~(:operator/head e)
-               ~(-> e :operator/preconds lisp-seq)
-               ~(-> e :operator/d-list   lisp-seq)
-               ~(-> e :operator/a-list   lisp-seq)))))
+  (cond-> {}
+    true                  (assoc :canon/pos (swap! proj-cnt-atm inc))
+    true                  (assoc :operator/ename (str base-name "." (-> e :operator/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
+    true                  (assoc :canon/code `(:operator
+                                               ~(:operator/head e)
+                                               ~(-> e :operator/preconds lisp-seq)
+                                               ~(-> e :operator/d-list   lisp-seq)
+                                               ~(-> e :operator/a-list   lisp-seq)))
+    (:operator/cost e)    (update :canon/code #(-> % reverse (conj (:operator/cost e)) reverse))))
 
 (defn proj2canon-axiom
   "Restructure PROJ into canonical (which is more lisp-like)."

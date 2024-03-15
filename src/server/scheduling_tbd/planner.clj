@@ -66,7 +66,9 @@
         op-list (str/replace plan #"\n" "")
         [success res] (re-matches #"^\((.*)$" op-list)
         form (if success
-                 (try (edn/read-string res) (catch Exception _e :error/unreadable))
+               (try (let [res (edn/read-string res)]
+                      (if (= res 'NIL) nil res)) ; UGH!
+                    (catch Exception _e :error/unreadable))
                :error/uninterpretable)
         ;; ToDo: Investigate this bug.
         err (if (= err " )") nil err)]
@@ -89,6 +91,7 @@
                                                    {:task task :msg (.getMessage e)}))))
               (wrap-recv [task]
                 (try (let [res (zmq/receive-msg socket {:stringify true})
+                           ;; This goes away...but really shouldn't call this except for :execute (and a planning problem).
                            {:keys [form std-out err-out]} (-> res first parse-planner-result)]
                        (when verbose?
                          (when std-out (log/info "Planner std-out:" std-out))
@@ -250,6 +253,11 @@
      (4) The state-edits resulting from this plan is then used by prune-domain to produce a NEW planning domain.
          Iteratively such new planning domains are processed through steps 1-3. This continues until no more plans can be generated.
 
+     - proj-id   : a keyword, the :project/id of the project.
+     - domain-id : a keyword, the :domain/id of the domain.
+     - start-facts : a vector of seqs describing grounded propositions.
+     - problem     : a SHOP problem in proj syntax.
+
    The motivation for interatively running steps 1-3 (rather than running to completion in a more comprehensive planning domain)
    is that planning is required to be dynamic and on-line; what is learned through asynchronous discussion (a collection of propositions)
    determines how the planning domain can be pruned. By this means, 'effective planning domains' are produce which are much simpler and
@@ -266,21 +274,21 @@
                        limit 3}}]
   (s/assert ::specs/domain-problem problem)
   (let [proj-domain (-> domain-id (get-domain {:form :proj}))
-        execute (:domain/execute proj-domain)
-        problem (-> problem (assoc :problem/state-string (str start-facts)) shop/problem2shop)]
-    (loop [state start-facts
-           pruned (prune-domain proj-domain state)
+        execute (:domain/execute proj-domain)]
+    (loop [state   start-facts
+           problem (-> problem (assoc :problem/state-string (str start-facts)))
+           pruned  (prune-domain proj-domain start-facts)
+           plans   (plan (reset! diag {:domain (shop/proj2shop pruned) :problem (shop/problem2shop problem) :execute execute}))
            cnt 1]
-      (if (>= cnt limit) ; This is for testing, and maybe safety.
+      (if (or (empty? plans) (>= cnt limit))
         state
-        (let [plans     (plan (reset! diag {:domain (shop/proj2shop pruned) :problem problem :execute execute}))
-              new-state (execute-plan! proj-id pruned (first plans)) ; ToDo: Deal with multiple plans.
-              pruned    (prune-domain proj-domain new-state)]
-          (log/info "plans =" plans)
-          (log/info "new-state =" new-state)
-          ;;(reset! diag {:proj-domain proj-domain :new-state new-state :pruned-proj pruned-proj :new-domain new-domain})
+        (let [new-state (execute-plan! proj-id pruned (first plans)) ; ToDo: Deal with multiple plans.
+              new-problem (-> problem (assoc :problem/state-string (str new-state)) shop/problem2shop)
+              new-pruned (prune-domain proj-domain new-state)]
           (recur new-state
-                 pruned
+                 new-problem
+                 new-pruned
+                 (reset! diag (plan {:domain (shop/proj2shop pruned) :problem (shop/problem2shop problem) :execute execute}))
                  (inc cnt)))))))
 
 ;;; ToDo: this may be a misnomer; I think I can use it to start a new project too.
