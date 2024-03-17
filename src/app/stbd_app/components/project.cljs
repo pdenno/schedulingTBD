@@ -7,7 +7,9 @@
    ["@mui/material/MenuItem$default"    :as MenuItem]
    ["@mui/material/Select$default"      :as Select]
    ;;["@mui/material/styles"              :as styles :refer [createTheme themeOptions ThemeProvider]] ; WIP
-   [helix.core    :as helix :refer [defnc $]]))
+   [helix.core         :as helix :refer [defnc $]]
+   [stbd-app.db-access :as dba]
+   [taoensso.timbre    :as log :refer-macros [info debug log]]))
 
 (defn proj-id2nice
   "For the argument :project/id keyword, return a string with
@@ -37,6 +39,11 @@
           (map :project/id)
           clj->js)))
 
+(defn start-a-new-project
+  "Do a call db_access http method to start a new project."
+  []
+  (log/info "**** Start a new project. ****"))
+
 ;;; current-project and content of the others vector are keywords.
 ;;; As a rule, we keep data as it is maintained in the DB until we need a string for React.
 ;;; Nicolas: Keywords translate to strings with clj->js which is recursive. Or you can use clojure.core/name on keywords or strings.
@@ -59,7 +66,8 @@
                                 (let [proj-str (j/get-in v [:props :value])
                                       proj (some #(when (= proj-str (-> % :project/id name)) %) proj-infos)]
                                   (reset! menu-list (order-projects proj proj-infos))
-                                  (when (not= proj-str "START-A-NEW-PROJECT")
+                                  (if (= proj-str "START-A-NEW-PROJECT")
+                                    (start-a-new-project)
                                     (change-proj-fn proj))))}
             (for [p @menu-list]
               ($ MenuItem {:key p :value p} (proj-id2nice p))))))))

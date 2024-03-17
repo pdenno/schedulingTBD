@@ -115,6 +115,9 @@
                                        (recur (s/valid? ::logical-exp (nth terms 0))
                                               (subvec terms 1))))))))
 
+
+(s/def ::case-name (s/and symbol? #(not (re-find #"\s+" (name %)))))
+
 ;;;---- toplevel support ----------------------------
 ;;;      (:method (upper-move-aircraft-no-style ?a ?c)
 ;;;               Case1 ((at ?a ?c)) ()
@@ -423,7 +426,9 @@
       ;; Uniqueness is not well thought through in SHOP! If there is any case-name whatsoever, add THE FIRST to the name.
       ;; It appears from the zeno example that method signatures might include both formal parameters and sometimes case names.
       ;; I don't think we care, since we are handing the thing to SHOP to deal with, but we need unique for the DB.
-      (update res :method/ename #(str % "." case-name))
+      (if (s/valid? ::case-name case-name)
+        (update res :method/ename #(str % "." case-name))
+        (throw (ex-info "Invalid case-name" {:case-name case-name}))) ; ToDo: Goes away with SHOP.
       res)))
 
 ;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>])
@@ -980,9 +985,9 @@
   (reset! diag _diag)
   (edn/read-string
    (cl-format nil
-              "(defproblem ~A ~A ~%  (~{~A~^ ~}) ~%  (~{~A~^ ~}))"
+              "(defproblem ~A ~A ~%  (~{~%~A~^ ~}) ~%  (~{~A~^ ~}))"
               ename (name domain)
-              (edn/read-string state-string)
+              (->> (edn/read-string state-string) (sort-by first))
               (edn/read-string goal-string))))
 
 ;;;=============================== Serialization (DB structures to SHOP common-lisp s-expressions) ================================================

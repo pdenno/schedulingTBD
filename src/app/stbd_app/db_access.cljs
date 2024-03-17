@@ -54,7 +54,7 @@
   (let [prom (p/deferred)]
     (POST "/api/user-says"
           {:params (cond-> {:user-text user-text}
-                     (not-empty promise-keys) (assoc :promise/clear-keys (vec promise-keys)))
+                     (not-empty promise-keys) (assoc :promise/pending-keys (vec promise-keys)))
            :timeout 30000
            :handler (fn [resp] (p/resolve! prom resp))
            :error-handler (fn [{:keys [status status-text]}]

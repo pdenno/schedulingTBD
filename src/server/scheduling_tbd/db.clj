@@ -401,7 +401,6 @@
 (defn recreate-dbs!
   "Recreate the system DB on storage from backup.
    For each project it lists, recreate it from backup if such backup exists."
-  {:clj-kondo/lint-as 'clojure.core/defn}
   []
   (recreate-system-db!)
   (doseq [pid (list-projects)]

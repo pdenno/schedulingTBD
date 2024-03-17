@@ -69,7 +69,7 @@
 ;;; --------- (require '[develop.dutil :as devl]) ; Of course, you'll have to (user/restart) when you update things here.
 ;;; --------- Try it with :reitit.interceptor/transform dev/print-context-diffs. See below.
 ;;; --------- (devl/ajax-test "/api/user-says" {:user-text "LLM: What's the capital of Iowa?"} {:method ajax.core/POST})
-(s/def ::user-says-request  (s/keys :req-un [::user-text] :opt [:promise/keys]))
+(s/def ::user-says-request  (s/keys :req-un [::user-text] :opt [::user-text :promise/keys]))
 (s/def :promise/keys (st/spec {:spec (s/coll-of keyword?)
                                :name :promise-keys
                                :description "Data sent with a question put to the users, that is used to match to their responses."
@@ -83,9 +83,10 @@
 (s/def :message/id integer?)
 (s/def :message/from keyword?)
 (s/def :message/time inst?)
-(s/def :promise/clear-keys (s/coll-of keyword?))
-(s/def ::user-says-response (s/keys :req [:message/content]
-                                    :opt [:message/id :message/from :message/time :promise/clear-keys]))
+(s/def :message/ack boolean?) ; Typically true; your response does not add to the chat.
+(s/def :promise/pending-keys (s/coll-of keyword?))
+;;; ToDo: Either :msg/ack or :message/content
+(s/def ::user-says-response (s/keys :opt [:message/content :message/id :message/from :message/time :messsage/ack :promise/pending-keys]))
 
 ;;; -------- (devl/ajax-test "/api/list-projects" [])
 (s/def ::others (s/coll-of map?))
@@ -121,6 +122,9 @@
 (s/def ::set-current-project-request (s/keys :req-un [::project-id]))
 (s/def ::set-current-project-response (s/keys :req-un [::project-id]))
 
+(s/def ::new-proj-request map?)
+(s/def ::new-proj-response map?)
+
 (def routes
   [["/app" {:get {:no-doc true
                   :summary "Load the web app for someone."
@@ -142,19 +146,26 @@
     {:swagger {;:no-doc true
                :tags ["SchedulingTBD functions"]}}
 
-   ["/user-says"
-    {:post {;:no-doc true
-            :summary "Respond to the user's most recent message."
-            :parameters {:body ::user-says-request}
-            :responses {200 {:body ::user-says-response}}
-            :handler resp/user-says}}]
+    #_["/user-says"
+     {:post {;:no-doc true
+             :summary "Respond to the user's most recent message."
+             :parameters {:body ::user-says-request}
+             :responses {200 {:body ::user-says-response}}
+             :handler resp/user-says}}]
+
+   ["/new-project"
+    {:get {;:no-doc true
+           :summary "Respond to the user's request to start a new project."
+           :parameters {:query ::new-proj-request}
+           :responses {200 {:body ::new-proj-response}}
+           :handler resp/start-new-project}}]
 
     ["/get-conversation"
-     {:get {;:no-doc true
+     {:get {:no-doc true ; <=====================================================================
             :summary "Get the project's conversation from its project DB."
             :parameters {:query ::get-conversation-request}
             :responses {200 {:body ::get-conversation-response}}
-            :handler  resp/get-conversation}}]
+            :handler resp/get-conversation}}]
 
     ["/list-projects"
      {:get {;:no-doc true

@@ -65,11 +65,12 @@
   (let [[plan std err] (str/split s #"BREAK-HERE")
         op-list (str/replace plan #"\n" "")
         [success res] (re-matches #"^\((.*)$" op-list)
-        form (if success
-               (try (let [res (edn/read-string res)]
-                      (if (= res 'NIL) nil res)) ; UGH!
-                    (catch Exception _e :error/unreadable))
-               :error/uninterpretable)
+        form (cond success                   (try (let [res (edn/read-string res)]
+                                                    (cond (= res 'NIL)            nil ; UGH!
+                                                          :else                   res))
+                                                  (catch Exception _e :error/unreadable))
+                   (= op-list ":BAD-INPUT")   :bad-input
+                   :else                      :error/uninterpretable)
         ;; ToDo: Investigate this bug.
         err (if (= err " )") nil err)]
     {:form form
@@ -236,12 +237,38 @@
    Returns a vector ::specs/state-edits object that is the effect of running the plan."
   [proj-id domain plan]
   (let [plan (translate-plan plan)]
-    (log/info "execute-plan!: plan =" plan)
+    (log/info "execute-plan!: proj-id =" proj-id "plan =" plan)
     (doseq [plan-step plan]
       (s/assert ::specs/plan-step plan-step)
       (op/run-op plan-step proj-id domain))
     (db/get-state proj-id)))
 
+(defn discussion-stopped?
+  "Return true if the state vector contains the discussion-stopped fact."
+  [state]
+  (some #(= 'discussion-stopped (first %)) state))
+
+;;; -------------------------------------- Plan checking --------------------------------------------------------------------
+(defn check-domain-to-goals
+  "Return nil if domain references the problem otherwise :error-domain-not-addressing-goal.
+   This doesn't check whether the problem can be inferred by means of axioms."  ; ToDo: Fix this when SHOP goes away.
+  [domain state-vec goal-vec]
+  (let [method-heads (->> domain :domain/elems (filter #(contains? % :method/head)) (mapv :method/head))]
+    (doseq [g goal-vec]
+      (or (some #(uni/unify g %) method-heads)
+          (some #(uni/unify g %) state-vec)
+          (throw (ex-info "Goal unifies with neither method-heads nor state-vec."
+                          {:goal g :method-heads method-heads :state-vec state-vec}))))))
+
+(defn check-triple
+  "Return a keyword naming an obvious error in the domain/problem/execute structure."
+  [{:keys [domain problem _execute] :as pass-obj}]
+  (let [state-vec (-> problem :problem/state-string edn/read-string vec)
+        goal-vec (-> problem :problem/goal-string edn/read-string vec)]
+    (check-domain-to-goals domain state-vec goal-vec) ; ToDo: Many more tests like this.
+  pass-obj))
+
+;;; -------------------------------------- interview loop --------------------------------------------------------------------
 ;;; (interview-loop "pi")
 (defn interview-loop
   "Run a conversation with the users. Specifically,
@@ -267,34 +294,40 @@
    Implementationally, it can be stopped and restarted from project DB data, which captures the substance of the entire discussion to date.
    Particularly, the DB content captures a state vector which serves as start-facts in restarting the interview-loop after 'hibernation'.
 
-   FWIW, the function returns the state achieved, a collection of :specs/proposition."
+   'triple' below refers to the map containing :domain :problem and :execute in either proj or SHOP form.
+   The function returns the state achieved, a collection of :specs/proposition."
   [proj-id domain-id & {:keys [start-facts problem limit]
                   :or {start-facts [],
                        problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
-                       limit 3}}]
+                       limit 30}}] ; ToDo: Temporary
   (s/assert ::specs/domain-problem problem)
   (let [proj-domain (-> domain-id (get-domain {:form :proj}))
         execute (:domain/execute proj-domain)]
-    (loop [state   start-facts
-           problem (-> problem (assoc :problem/state-string (str start-facts)))
-           pruned  (prune-domain proj-domain start-facts)
-           plans   (plan (reset! diag {:domain (shop/proj2shop pruned) :problem (shop/problem2shop problem) :execute execute}))
-           cnt 1]
-      (if (or (empty? plans) (>= cnt limit))
-        state
-        (let [new-state (execute-plan! proj-id pruned (first plans)) ; ToDo: Deal with multiple plans.
-              new-problem (-> problem (assoc :problem/state-string (str new-state)) shop/problem2shop)
-              new-pruned (prune-domain proj-domain new-state)]
-          (recur new-state
-                 new-problem
-                 new-pruned
-                 (reset! diag (plan {:domain (shop/proj2shop pruned) :problem (shop/problem2shop problem) :execute execute}))
-                 (inc cnt)))))))
+    (letfn [(translate-triple [triple] (-> triple (update :domain shop/proj2shop) (update :problem shop/problem2shop)))]
+      (loop [state   start-facts
+             problem (-> problem (assoc :problem/state-string (str start-facts)))
+             pruned  (prune-domain proj-domain start-facts)
+             plans   (-> {:domain  pruned :problem problem :execute execute} check-triple translate-triple plan)
+             cnt 1]
+        (cond (= plans :bad-input)            :bad-input
+              (>= cnt limit)                  (sort-by first state)
+              (empty? plans)                  (sort-by first state)
+              (discussion-stopped? state)     (sort-by first state)
+              :else  (let [new-state   (execute-plan! proj-id pruned (first plans)) ; ToDo: Deal with multiple plans.
+                           new-problem (assoc problem :problem/state-string (str new-state))
+                           new-pruned  (prune-domain proj-domain new-state)]
+                       (log/info "new-state = " new-state)
+                       (recur new-state
+                              new-problem
+                              new-pruned
+                              (-> {:domain new-pruned :problem new-problem :execute execute} check-triple translate-triple plan)
+                              (inc cnt))))))))
 
 ;;; ToDo: this may be a misnomer; I think I can use it to start a new project too.
 ;;; ToDo: This assumes that planning domain is "pi"
 (defn restart-interview ; <=============================================================== ToDo: Currently assumes domain.
   "Restart the interview-loop with the given project.
+   This would be used when, for example, the user changes projects.
    The project provides :project/state-string which is assigned to :problem/state-string
    in the call to interview-loop. The rest of problem is defined by the planning domain."
   [pid & {:keys [domain-name] :or {domain-name "pi"}}]

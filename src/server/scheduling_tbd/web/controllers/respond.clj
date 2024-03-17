@@ -15,20 +15,6 @@
 
 (def ^:diag diag (atom {}))
 
-#_(defn get-conversation
-  "Return a sorted vector of the messages of the argument project or current project if not specified.
-   Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."
-  [request]
-  (log/info "get-conversation start..")
-  (let [{:keys [project-id]} (-> request :query-params keywordize-keys)]
-    (log/info "get-conversation for" project-id)
-    (if-let [conn-atm (-> project-id keyword connect-atm)]
-      (let [msgs (-> (d/q '[:find [?e ...] :where [?e :message/id]] @conn-atm) sort)]
-        (http/ok
-         {:conv-for project-id
-          :conv (mapv #(resolve-db-id {:db/id %} conn-atm) msgs)}))
-      (http/not-found))))
-
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."
@@ -76,22 +62,31 @@
     (db/inc-msg-id! project-id)
     (db/message-form msg-id :system response-text)))
 
-(def ok-message "This is useful where, for example, the user is typing unanticpated stuff."
-  [{:msg-text/string "respond ok"}])
-
 (defn user-says
   "Handler function for http://api/user-says."
   [request]
   (reset! diag request)
-  (when-let [{:keys [user-text :promise/clear-keys]} (get request :body-params)]
-    (let [clear-keys (mapv keyword clear-keys)] ; At least the swagger API can send them as strings.
-      (log/info "user-text = " user-text "clear-keys = " clear-keys)
+  (when-let [{:keys [user-text :promise/pending-keys]} (get request :body-params)]
+    (let [pending-keys (mapv keyword pending-keys)] ; At least the swagger API can send them as strings.
+      (log/info "user-text = " user-text "pending-keys = " pending-keys)
       (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
         (-> question llm/llm-directly wrap-response http/ok) ; These are intentionally Not tracked in the DB. ToDo: Then whay does wrap-response do db/inc-msg-id?
         (if-let [[_ surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)]
           (-> (sur/start-surrogate surrogate-role) http/ok)
-          (do (ops/dispatch-response user-text clear-keys)
-              (http/ok {:message/content ok-message}))))))) ; ToDo: I want something that doesn't make noise.
+          (do (ops/dispatch-response user-text pending-keys)
+              (http/ok {:message/ack true})))))))
+
+(def intro-message
+  "The first message of a conversation."
+  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
+   {:msg-link/uri "http://localhost:3300/learn-more"
+    :msg-link/text "learn more about how this works"}
+   {:msg-text/string "."}])
+
+(defn start-new-project
+  "User chose to start a new project. Respond with the intro message."
+  [_request]
+  (http/ok {:message/content intro-message}))
 
 (defn healthcheck
   [_request]

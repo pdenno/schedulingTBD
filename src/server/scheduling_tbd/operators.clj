@@ -14,13 +14,6 @@
 
 (def debugging? (atom true))
 
-(def intro-message
-  "The first message of a conversation."
-  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
-   {:msg-link/uri "http://localhost:3300/learn-more"
-    :msg-link/text "learn more about how this works"}
-   {:msg-text/string "."}])
-
 (def ok-message "This is useful where, for example, the user is typing unanticpated stuff."
   [{:msg-text/string "ok"}])
 
@@ -45,14 +38,30 @@
     (keyword? operator) operator
     :else (throw (ex-info "run-op-dispatch: No dispatch value for operator" {:op operator}))))
 
+;;; =============  Promise key management (exploratory code!)  =============================================================
+;;;   * By design, the server waits for a response before sending another question (except for maybe some future where
+;;;     there is a "Are you still there?").
+;;;     - Questions always are transmitted over the websocket; they are the beginning of something new.
+;;;   * The user, however can put out as many things as she likes.
+;;;   * promise-keys are an attempt to match the question to the responses.
+;;;     - When the server asks a question, it adds a promise key to the question; the client manages a set of these keys.
+;;;     - When the user does a user-says, it tells the server what keys it has.
+;;;     - As the system processes a user-says, it decides what keys to tell the client to erase.
+;;;     - The system uses the keys to match a question to a user-says.
+;;;       + It picks the key top-most on its stack that is also in the set sent by the client with user-says.
+;;;     - When the system has decided where to route the question, it can also tell the client to remove that key from its set.
+;;;       + This last step is important because the server needs to get old promise-keys off the stack.
 (defn dispatch-response
-  "Operators wait for responses matching their key. This resolves the promise, allowing continuation
-   of the operator's processing."
-  [res clear-keys]
-  (if-let [p (some #(when-let [prom (ws/lookup-promise %)] prom) clear-keys)]
-    (p/resolve! p res)
-    (do (log/warn "dispatch-response: no match to keys:" clear-keys)
-        {:message/content ok-message}))) ; You still need to respond with something!
+  "Operators wait for responses matching their key.
+   This resolves the promise, allowing continuation  of the operator's processing.
+   It also ws/sends a message to the client to clear the chosen key."
+  [resp client-keys]
+  (let [{:keys [prom prom-key client-id]} (ws/select-promise client-keys)]
+    (if (not prom-key)
+      {:message/ack true} ; You still need to respond with something!
+      (do
+        (ws/clear-keys client-id [prom-key])
+        (p/resolve! prom resp)))))
 
 (defmulti run-op #'run-op-dispatch)
 
@@ -63,12 +72,13 @@
    :arglists '([plan-step proj-id domain & body])}
   [tag [plan-step proj-id domain & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
   `(defmethod db-action ~tag [~plan-step ~proj-id ~domain & [~@more-args]]
-     (when @debugging? (println (cl-format nil "d=> ~A" ~tag)))
+     ;;(when @debugging? (println (cl-format nil "d=> ~A" ~tag)))
      (let [res# (do ~@body)]
        (if (seq? res#) (doall res#) res#)
-       (do (when @debugging?
-             (println (cl-format nil "<-d ~A returns ~S" ~tag res#)))
-           res#))))
+       res#)))
+;;;       (do (when @debugging?
+;;;             (println (cl-format nil "<-d ~A returns ~S" ~tag res#)))
+;;;           res#)
 
 (defmulti db-action #'run-op-dispatch)
 
@@ -188,5 +198,9 @@
   (advance-plan plan-step proj-id  domain response))
 
 ;;; ----- :!stop-discussion
-(defoperator :!stop-discussion [plan-step _proj-id _domain]
-  (log/info "!stop-discussion: plan-step =" plan-step))
+(defoperator :!stop-discussion [plan-step proj-id domain]
+  (log/info "!stop-discussion: plan-step =" plan-step)
+  (db-action plan-step proj-id domain nil))
+
+(defaction :!stop-discussion [plan-step proj-id domain response]
+  (advance-plan plan-step proj-id  domain response))

@@ -85,33 +85,61 @@
           {:ring.websocket/listener (wsa/websocket-listener in out err)}))
     (log/error "Websocket client did not provide id.")))
 
-(defn msg4chat
-  ([msg-text] (msg4chat msg-text nil))
-  ([msg-text p-key]
-   {:dispatch-key :tbd-says
-    :msg msg-text
-    :promise-key p-key
-    :timestamp (now)}))
+;;; ----------------------- Promise management -------------------------------
+(def promise-stack "A stack of promise objects." (atom ()))
+(defn clear-promises! [] (reset! promise-stack '()))
 
-(def promises "A map of promise names to promises." (atom {}))
-(defn clear-promises! [] (reset! promises {}))
+(defn remove-promise!
+  "Remove the promise identified by the argument :prom-key from the promise-stack."
+  [prom-key]
+  (swap! promise-stack (fn [stack] (remove #(= prom-key (:prom-key %)) stack))))
 
 (defn new-promise
   "Return a vector of [key, promise] to a new promise.
    We use this key to match returning responses (which may be HTTP/user-says) to know
    what is being responded to." ; ToDo: This is not fool-proof.
-  []
+  [client-id]
   (let [k (-> (gensym "promise-") keyword)
-        p (p/deferred)]
-    (swap! promises #(assoc % k p))
-    (log/info "Adding promise" k)
-    [k p]))
+        p (p/deferred)
+        obj {:prom p :prom-key k :client-id client-id :timestamp (java.util.Date.)}]
+    (swap! promise-stack #(conj % k obj))
+    ;(log/info "Adding promise" (:prom-key obj))
+    obj))
 
-(defn lookup-promise
+(defn ^:diag lookup-promise
   "Return the promise associated with the argument key."
   [k]
-  (or (get @promises k)
+  (or (some #(when (= k (:prom-key %)) %) @promise-stack)
       (log/error "Could not find promise with key" k)))
+
+(defn select-promise
+  "Return the promise that is top-most on the stack and also in the argument set."
+  [client-keys]
+  (let [in-client-set? (set client-keys)
+        stack @promise-stack]
+    (or (some #(when (in-client-set? (:prom-key %)) %) stack)
+        (log/warn "Couldn't find promise for any of" client-keys))))
+
+(defn clear-keys
+  "Clear the argument promises (their keys are provided) from the stack and
+   send a message to the client to do similar."
+  [client-id client-keys]
+  (doseq [k client-keys] (remove-promise! k))
+  (if-let [out (->> client-id (get @socket-channels) :out)]
+    (let [msg {:dispatch-key :clear-promise-keys
+               :promise-keys client-keys}]
+      (go (>! out (str msg))))
+    (log/error "Could not find out async channel for client" client-id)))
+
+;;;-------------------- Sending questions to client --------------------------
+(defn msg4chat
+  "Format a message, typically a question, for transmission to a client."
+  ([msg-text] (msg4chat msg-text nil))
+  ([msg-text p-key]
+   (cond-> {:dispatch-key :tbd-says
+            :msg msg-text
+            :timestamp (now)}
+     p-key (assoc :promise-key p-key))))
 
 (defn send
   "Send the argument message text to the current project (or some other destination if a client-id is provided.
@@ -121,10 +149,10 @@
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]
     (if promise?
-      (let [[p-key p] (new-promise)]
-        (go (>! out (-> msg-text (msg4chat p-key) str)))
-        (log/info "ws-send: promise-key = " p-key)
-        p)
+      (let [{:keys [prom prom-key]} (new-promise client-id)]
+        (go (>! out (-> msg-text (msg4chat prom-key) str)))
+        ;(log/info "ws-send: promise-key = " prom-key)
+        prom)
       (go (>! out (-> msg-text msg4chat str))))
     (log/error "Could not find out async channel for client" client-id)))
 

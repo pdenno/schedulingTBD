@@ -10,6 +10,10 @@
 ;;; In this design, you don't worry about :method/preconds and :operator/preconds except among sibling choices.
 ;;; I think I'll have :keep/conds and :prune/conds.
 
+;;; What I learned (I think!):
+;;;  - It is an error (:bad-input) to have a fact that unifies with the head of an axiom! Try this with craft beer and (process-defined craft-beer).
+
+
 {:domain/id :process-interview
  :domain/ename "pi"  ; This is appended to every :domain/element, so we keep it short.
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
@@ -23,21 +27,12 @@
                                    :method/preconds [(not (ongoing-discussion ?proj))]
                                    :method/task-list [(!initial-question ?proj)]}
 
-                                   {:method/case-name "ongoing-discussion"
-                                    :method/preconds [(ongoing-discussion ?proj)
-                                                      (not (process-defined ?proj))]     ; ToDo: This (negative constraint) is not effective! (It won't be within an operator set. I need to GET IT from SHOP for second iteration.
-                                    :method/task-list [(get-process-steps ?proj)         ; Need more preconditions here, specifically (system-model flow).
+                                  {:method/case-name "ongoing-discussion"
+                                   :method/preconds [(ongoing-discussion ?proj)
+                                                     (not (process-defined ?proj))]
+                                    :method/task-list [(get-process-steps ?proj)
                                                        (!query-process-durs ?proj)
-                                                       (!yes-no-process-ordering ?proj)]}
-
-                                  {:method/case-name "Stop discussion!"
-                                   :method/preconds [(process-defined? ?proj)]
-                                   :method/task-list [(!stop-discussion ?proj)]}]}         ; Need more preconditions here, specifically (system-model flow).
-
-                {:operator/head (!stop-discussion ?proj)
-                 :operator/cost 0.5
-                 :operator/a-list [(discussion-stopped ?proj)]}
-
+                                                       (!yes-no-process-ordering ?proj)]}]}
 
                 ;; ====== (not (ongoing-discussion ?proj)) ===============================
                 ;; (!initial-question ?proj)
@@ -52,7 +47,7 @@
                  :method/rhsides [{:method/case-name "well-known"
                                    :method/preconds [(well-known-process ?proj)]
                                    :method/task-list [(!yes-no-process-steps ?proj)]}
-                                  {:method/case-name "not well-known"
+                                  {:method/case-name "not-well-known"
                                    :method/preconds [(not (well-known-process ?proj))]
                                    :method/task-list [(!query-process-steps ?proj)]}]}
 

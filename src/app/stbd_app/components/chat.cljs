@@ -100,8 +100,9 @@
 ;;; ToDo: A problem scenario is that the server has put up multiple messages and the user-says just once.
 ;;;       I think I'm going to have to have a ws message from the server just about clearing a key.
 ;;;       Don't have the client clear it; only have it pick one that it is responding to.
-(defn add-promise-key   [k] (when k (swap! pending-promise-keys conj k)))
-(defn clear-promise-key [k] (when k (swap! pending-promise-keys disj k)))
+(defn add-promise-key    [k]  (when k (swap! pending-promise-keys conj k)))
+(defn clear-promise-keys! [ks]
+  (doseq [k ks] (when k (swap! pending-promise-keys disj k))))
 
 (def ping-id (atom 0))
 (defn ping!
@@ -126,9 +127,9 @@
 ;;; :tbd-says isn't in this because it sets the set-system-text hook.
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
-  [{:keys [dispatch-key promise-key]}]
-  (cond (= dispatch-key :clear-promise-key) (clear-promise-key promise-key)
-        (= dispatch-key :alive?)            (send-message {:alive? true})))
+  [{:keys [dispatch-key promise-keys] :as _msg}]
+  (cond (= dispatch-key :clear-promise-keys) (clear-promise-keys! promise-keys)
+        (= dispatch-key :alive?)             (send-message {:alive? true})))
 
 ;;; ========================= Component ===============================
 (defn make-resize-fns
@@ -172,7 +173,8 @@
       (hooks/use-effect [user-text]
         (when (not-empty user-text)
           (-> (dba/user-says user-text @pending-promise-keys)
-              (p/then  #(set-msg-list (->> % msg2rce (add-msg msg-list))))
+              (p/then  #(when-not (:message/ack %)
+                          (set-msg-list (->> % msg2rce (add-msg msg-list)))))
               (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %))))))
       ;; -------------- progress stuff (currentl not hooked up)
       (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.

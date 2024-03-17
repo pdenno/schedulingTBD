@@ -1,6 +1,7 @@
 (ns scheduling-tbd.planner-test
   (:require
    [clojure.edn             :as edn]
+   [clojure.pprint          :refer [cl-format]]
    [clojure.spec.alpha      :as s]
    [clojure.string          :as str]
    [clojure.test            :refer [deftest is testing]]
@@ -24,15 +25,17 @@
                         :problem/state-string "[(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)]"})))))
 
 
-(defn ^:diag tryme []
-  (plan/load-domain "data/planning-domains/process-interview.edn")
-  ;(db/recreate-dbs!)
-  (let [state-vec (-> :craft-beer-brewery-scheduling
-                      db/get-project
-                      :project/state-string
-                      edn/read-string)]
-    (log/info "state-vec =" state-vec)
-    (plan/interview-loop
-     :craft-beer-brewery-scheduling
-     :process-interview
-     :start-facts state-vec)))
+(defn ^:diag tryme
+  ([] (tryme :craft-beer-brewery-scheduling))
+  ([proj-id]
+   (plan/load-domain "data/planning-domains/process-interview.edn")
+   (db/recreate-dbs!)
+   (let [state-vec (-> proj-id
+                       db/get-project
+                       :project/state-string
+                       edn/read-string)]
+     (log/info "state-vec =" (cl-format nil "~{~%~A~^,~}" (sort-by first state-vec)))
+     (plan/interview-loop
+      proj-id
+      :process-interview
+      :start-facts state-vec))))
