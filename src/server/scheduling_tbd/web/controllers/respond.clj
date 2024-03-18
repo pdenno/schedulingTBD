@@ -66,7 +66,8 @@
   "Handler function for http://api/user-says."
   [request]
   (reset! diag request)
-  (when-let [{:keys [user-text :promise/pending-keys]} (get request :body-params)]
+  (when-let [{:keys [user-text client-id :promise/pending-keys]} (get request :body-params)]
+    (assert (uuid? (parse-uuid client-id)))
     (let [pending-keys (mapv keyword pending-keys)] ; At least the swagger API can send them as strings.
       (log/info "user-text = " user-text "pending-keys = " pending-keys)
       (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
@@ -85,8 +86,10 @@
 
 (defn start-new-project
   "User chose to start a new project. Respond with the intro message."
-  [_request]
-  (http/ok {:message/content intro-message}))
+  [request]
+  (when-let [{:keys [client-id]} (-> request :query-params keywordize-keys)]
+    (log/info "Start new project for" client-id)
+    (http/ok {:message/content intro-message})))
 
 (defn healthcheck
   [_request]

@@ -244,8 +244,8 @@
 ;;; ToDo: This only executes on recompile; I'd like it to run on reload too.
 (defn ^{:before-load true, :dev/before-load true} unmount-root []
   (log/info "Unmount root.")
-  (when (and chat/connected? chat/client-id)
-    (log/info "Closing channel for client-id = " chat/client-id)
+  (when (and chat/connected? dba/client-id)
+    (log/info "Closing channel for client-id = " dba/client-id)
     (chat/send-message {:dispatch-key :close-channel}))) ; The client-id is appended by send-message!.
 
 (defn ^{:after-load true, :dev/after-load true} mount-root []

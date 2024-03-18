@@ -41,8 +41,9 @@
 ;;;   * You can specify keywords and keywords will be conveyed to the web app, but the swagger API will show them as strings.
 ;;;   * If the swagger UI (the page you get when you GET index.html) displays "Failed to load API definition", try :no-doc true
 ;;;     on the most recent definition (or many of them until things start working).
-;;;     ======>  You don't have to restart the server to see changes in the swagger page; just recompile it. <=================
-;;;     A common reason for the Swagger page failing is that you didn't completely specify the spec defs referenced.
+;;;   * You don't have to restart the server to see changes in the swagger page; just recompile it.
+;;    * However, to see updates to referenced functions (e.g. the stuff in respond.clj) you need to restart the server: (user/restart).
+;;;   * A common reason for the Swagger page failing is that you didn't completely specify the spec defs referenced.
 ;;;   * The devl/ajax-tests are Work In Process. Some have uninvestigated bugs.
 ;;;   * You can choose not to define specs for the keys. (Really??? I'm not so sure!)
 ;;;   * The most useful debugging techniques seem to be (in order):
@@ -50,6 +51,7 @@
 ;;;       2) Execute with swagger and determine whether problem is with Clojure Spec validation.
 ;;;       3) If it is get diag atoms for the offending request or response and run s/valid? and s/explain by hand.
 ;;;       4) If none of that is the problem, study what the wrappers are doing by uncommenting ev/print-context-diffs and running the code.
+;;;   * I once had what appeared to be non-printing text in a s/def expression mess things up. Really.
 
 ;;; =========== Pages (just homepage, thus far.)  =======
 (def selmer-opts {:custom-resource-path (io/resource "html")})
@@ -66,10 +68,15 @@
   (render request "home.html" {:errors (:errors flash)}))
 ;;;====================================================
 
+(s/def ::client-id (st/spec {:spec string?
+                             :name "client-id"
+                             :description "A UUID string identifying the client."
+                             :json-schema/default "2f30f002-37b7-4dd1-bc01-5484273012f0"}))
+
 ;;; --------- (require '[develop.dutil :as devl]) ; Of course, you'll have to (user/restart) when you update things here.
 ;;; --------- Try it with :reitit.interceptor/transform dev/print-context-diffs. See below.
 ;;; --------- (devl/ajax-test "/api/user-says" {:user-text "LLM: What's the capital of Iowa?"} {:method ajax.core/POST})
-(s/def ::user-says-request  (s/keys :req-un [::user-text] :opt [::user-text :promise/keys]))
+(s/def ::user-says-request  (s/keys :req-un [::client-id ::user-text] :opt-un [::user-text] :opt [:promise/keys]))
 (s/def :promise/keys (st/spec {:spec (s/coll-of keyword?)
                                :name :promise-keys
                                :description "Data sent with a question put to the users, that is used to match to their responses."
@@ -85,8 +92,8 @@
 (s/def :message/time inst?)
 (s/def :message/ack boolean?) ; Typically true; your response does not add to the chat.
 (s/def :promise/pending-keys (s/coll-of keyword?))
-;;; ToDo: Either :msg/ack or :message/content
-(s/def ::user-says-response (s/keys :opt [:message/content :message/id :message/from :message/time :messsage/ack :promise/pending-keys]))
+;;; ToDo: Either :message/ack or :message/content
+(s/def ::user-says-response (s/keys :opt [:message/content :message/id :message/from :message/time :message/ack :promise/pending-keys]))
 
 ;;; -------- (devl/ajax-test "/api/list-projects" [])
 (s/def ::others (s/coll-of map?))
@@ -99,7 +106,7 @@
                             :json-schema/default ["craft-beer-brewery-scheduling" "snowboard-production-scheduling"]}))
 
 ;;; -------- (devl/ajax-test "/api/get-conversation" {:project-id "craft-beer-brewery-scheduling"})
-(s/def ::get-conversation-request (st/spec {:spec (s/keys :req-un [::project-id])
+(s/def ::get-conversation-request (st/spec {:spec (s/keys :req-un [::client-id ::project-id])
                                             :name "project-id"
                                             :description "A string uniquely identifying the project to the system DB."
                                             :json-schema/default "craft-beer-brewery-scheduling"}))
@@ -119,10 +126,10 @@
 (s/def ::ws-connection-request (s/keys :req-un [::client-id]))
 
 ;;; -------- (devl/ajax-test "/api/set-current-project" {:project-id "craft-beer-brewery-scheduling"} {:method ajax.core/POST}) ; ToDo: doesn't work.
-(s/def ::set-current-project-request (s/keys :req-un [::project-id]))
+(s/def ::set-current-project-request (s/keys :req-un [::client-id ::project-id]))
 (s/def ::set-current-project-response (s/keys :req-un [::project-id]))
 
-(s/def ::new-proj-request map?)
+(s/def ::new-proj-request (s/keys :req-un [::client-id]))
 (s/def ::new-proj-response map?)
 
 (def routes
@@ -146,7 +153,7 @@
     {:swagger {;:no-doc true
                :tags ["SchedulingTBD functions"]}}
 
-    #_["/user-says"
+    ["/user-says"
      {:post {;:no-doc true
              :summary "Respond to the user's most recent message."
              :parameters {:body ::user-says-request}
@@ -177,7 +184,7 @@
      {:post {;:no-doc true
              :summary "Get a vector of projects maps and the current project."
              :parameters {:query ::set-current-project-request}
-             :responses {200 {:body ::set-current-project-request}} ; {:body {:project-id string?}}}
+             :responses {200 {:body ::set-current-project-response}}
              :handler resp/set-current-project}}]
 
     ["/health"

@@ -1,5 +1,6 @@
 (ns scheduling-tbd.web.routes.websockets
   "Set up a websockets and message routing for async communication with the client using ring.websocket.async."
+  (:refer-clojure :exclude [send])
   (:require
    [clojure.core.async   :as async :refer [<! >! <!! >!! go]]
    [clojure.edn          :as edn]
@@ -16,7 +17,7 @@
 
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique ID provided by the client." (atom {}))
-(def current-client-id "UUID identifying client. Text above notwithstanding, this is a single-user idea." (atom nil))
+(def current-client-id "UUID identifying client. This is for diagnostics." (atom nil))
 
 (defn make-ws-channels
   "Create channels and store them keyed by the unique ID provided by the client."
@@ -39,12 +40,12 @@
 
 (defn close-channel-by-msg
   "Close the channel. This is typically from a client unmount."
-  [{:keys [client-id]}]
-  (close-ws-channels client-id))
+  [{:keys [id]}]
+  (close-ws-channels id))
 
 (defn ping-diag
   "Create a ping confirmation for use in middle of a round-trip."
-  [{:keys [_client-id _ping-id]}]
+  [{:keys [_id _ping-id]}]
   ;(log/info "Ping" _ping-id "from" _client-id)
   {:dispatch-key :ping-confirm})
 

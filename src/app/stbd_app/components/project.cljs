@@ -39,10 +39,11 @@
           (map :project/id)
           clj->js)))
 
-(defn start-a-new-project
+#_(defn start-a-new-project
   "Do a call db_access http method to start a new project."
   []
-  (log/info "**** Start a new project. ****"))
+  (log/info "**** Start a new project. ****")
+  (dba/start-new-project))
 
 ;;; current-project and content of the others vector are keywords.
 ;;; As a rule, we keep data as it is maintained in the DB until we need a string for React.
@@ -66,9 +67,10 @@
                                 (let [proj-str (j/get-in v [:props :value])
                                       proj (some #(when (= proj-str (-> % :project/id name)) %) proj-infos)]
                                   (reset! menu-list (order-projects proj proj-infos))
-                                  (if (= proj-str "START-A-NEW-PROJECT")
-                                    (start-a-new-project)
-                                    (change-proj-fn proj))))}
+                                  (log/info "SelectProject: proj =" proj)
+                                  ;(if (= proj-str "START-A-NEW-PROJECT")
+                                   ; (start-a-new-project)
+                                    (change-proj-fn proj)))}
             (for [p @menu-list]
               ($ MenuItem {:key p :value p} (proj-id2nice p))))))))
 

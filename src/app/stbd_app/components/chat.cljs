@@ -15,7 +15,7 @@
    ["react-chat-elements/dist/main"    :as rce]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [scheduling-tbd.util :as sutil :refer [timeout-info #_invalidate-timeout-info]]
-   [stbd-app.db-access  :as dba]
+   [stbd-app.db-access  :as dba :refer [client-id]]
    [stbd-app.util       :as util]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
@@ -91,7 +91,6 @@
   (-> msg-list js->clj (conj msg) clj->js))
 
 ;;; ------------------- web-socket ------------------------------
-(def client-id "A random uuid naming this client. It changes on disconnect." (str (random-uuid)))
 (def ws-url (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
 (def channel (atom nil))
 (def connected? (atom false))

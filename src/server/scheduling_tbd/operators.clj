@@ -1,5 +1,6 @@
 (ns scheduling-tbd.operators
   "Implementation of the action of plans. These call the LLM, query the user, etc."
+  (:refer-clojure :exclude [send])
   (:require
    [clojure.core.unify   :as uni]
    [clojure.pprint       :refer [cl-format]]
@@ -55,7 +56,7 @@
   "Operators wait for responses matching their key.
    This resolves the promise, allowing continuation  of the operator's processing.
    It also ws/sends a message to the client to clear the chosen key."
-  [resp client-keys]
+  [resp client-keys] ; ToDo: Should I pass the client-id in here (from user-says) or just rely on select-promise?
   (let [{:keys [prom prom-key client-id]} (ws/select-promise client-keys)]
     (if (not prom-key)
       {:message/ack true} ; You still need to respond with something!
