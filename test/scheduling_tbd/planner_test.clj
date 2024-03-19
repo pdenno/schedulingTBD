@@ -9,6 +9,7 @@
    [scheduling-tbd.planner  :as plan]
    [scheduling-tbd.shop     :as shop]
    [scheduling-tbd.specs    :as specs]
+   [scheduling-tbd.web.routes.websockets :as ws]
    [taoensso.timbre          :as log]))
 
 (deftest valid-problem
@@ -24,7 +25,8 @@
                         :problem/goal-string  "[(characterize-process craft-beer)]"
                         :problem/state-string "[(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)]"})))))
 
-
+;;; (tryme :snowboards-production-scheduling)
+;;; (tryme :aluminium-foil-production-scheduling)
 (defn ^:diag tryme
   ([] (tryme :craft-beer-brewery-scheduling))
   ([proj-id]
@@ -38,4 +40,5 @@
      (plan/interview-loop
       proj-id
       :process-interview
-      :start-facts state-vec))))
+      (ws/any-client!)
+      {:start-facts state-vec}))))

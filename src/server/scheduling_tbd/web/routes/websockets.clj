@@ -19,6 +19,13 @@
 (def socket-channels "Indexed by a unique ID provided by the client." (atom {}))
 (def current-client-id "UUID identifying client. This is for diagnostics." (atom nil))
 
+;;; ToDo: move to devl?
+(defn ^:diag any-client!
+  "Return the client-id of a any client, hoping there is just one.
+   This is only used in development, I think."
+  []
+  (-> @socket-channels keys first))
+
 (defn make-ws-channels
   "Create channels and store them keyed by the unique ID provided by the client."
   [id]
@@ -134,27 +141,29 @@
 
 ;;;-------------------- Sending questions to client --------------------------
 (defn msg4chat
-  "Format a message, typically a question, for transmission to a client."
-  ([msg-text] (msg4chat msg-text nil))
-  ([msg-text p-key]
-   (cond-> {:dispatch-key :tbd-says
-            :msg msg-text
-            :timestamp (now)}
-     p-key (assoc :promise-key p-key))))
+  "Format a message, typically a question, for transmission to a client.
+     msg-text                - Either simple text or something that can be used by edn/read-string.
+     recipient-read-string?  - true if recipient should be edn/read-string the msg-text
+     p-key                   - a key to a promise; so sender can link this to corresponding responses."
+  [msg-text & {:keys [p-key recipient-read-string?]}]
+  (cond-> {:dispatch-key :tbd-says :msg msg-text :timestamp (now)}
+    recipient-read-string?       (assoc :recipient-read-string? true)
+    p-key                        (assoc :promise-key p-key)))
 
 (defn send
   "Send the argument message text to the current project (or some other destination if a client-id is provided.
    Return a promise that is resolved when the user responds to the message, by whatever means (http or ws)."
-  [msg-text & {:keys [promise? client-id]
-               :or {promise? true client-id @current-client-id}}]
+  [msg-text & {:keys [promise? client-id recipient-read-string?]
+               :or {promise? true
+                    client-id @current-client-id}}]
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]
-    (if promise?
-      (let [{:keys [prom prom-key]} (new-promise client-id)]
-        (go (>! out (-> msg-text (msg4chat prom-key) str)))
-        ;(log/info "ws-send: promise-key = " prom-key)
-        prom)
-      (go (>! out (-> msg-text msg4chat str))))
+    (let [{:keys [prom prom-key]} (when promise? (new-promise client-id))]
+      (go (>! out (str (msg4chat
+                        msg-text
+                        :p-key prom-key
+                        :recipient-read-string? recipient-read-string?))))
+      prom)
     (log/error "Could not find out async channel for client" client-id)))
 
 ;;;------------------- Starting and stopping ---------------

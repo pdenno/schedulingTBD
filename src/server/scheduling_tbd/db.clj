@@ -320,6 +320,20 @@
       (cond->> (edn/read-string state-str)
         sort? (sort-by first)))))
 
+(def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
+  #{:project/messages :message/id :message/from :message/content :message/time :msg-text/string :msg-link/uri})
+
+(defn get-messages
+  "For the argument project (pid) return messages sorted by their :message/id."
+  [pid]
+  (when-let [eid (project-exists? pid)]
+    (->> (resolve-db-id {:db/id eid}
+                       (connect-atm pid)
+                       :keep-set message-keep-set)
+        :project/messages
+        (sort-by :message/id)
+        vec)))
+
 (defn put-state
   "Write an updated state to the project database."
   [pid state-vec]

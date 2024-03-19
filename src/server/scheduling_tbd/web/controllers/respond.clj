@@ -1,57 +1,80 @@
 (ns scheduling-tbd.web.controllers.respond
   (:require
    [clojure.walk             :as walk :refer [keywordize-keys]]
-   [datahike.api             :as d]
+   [mount.core :as mount :refer [defstate]]
+   [promesa.core             :as p]
    [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.llm       :as llm]
    [scheduling-tbd.operators :as ops]
    [scheduling-tbd.planner   :as plan]
-   [scheduling-tbd.surrogate :as sur]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
+   [scheduling-tbd.surrogate :as sur]
    [taoensso.timbre          :as log])
   (:import
    [java.util Date]))
 
 (def ^:diag diag (atom {}))
 
+(def client-current-proj "Current project (keyword) indexed by client-id (string)."  (atom {}))
+(defn clear-client-current-proj [] (reset! client-current-proj {}))
+
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."
   [request]
-  (let [{:keys [project-id]} (-> request :query-params keywordize-keys)]
+  (let [{:keys [project-id]} (-> request :query-params keywordize-keys)
+        project-id (keyword project-id)
+        eid (db/project-exists? project-id)
+        msgs (when eid (db/get-messages project-id))]
     (log/info "get-conversation for" project-id)
-    (if-let [proj (-> project-id keyword db/get-project)]
-      (http/ok
-       {:conv-for project-id
-        :conv (->> proj :project/messages (sort-by :message/id) vec)})
-      (http/not-found))))
+    (cond (project-id :START-A-NEW-PROJECT)       (http/ok {:conv-for project-id :conv []})
+          msgs                                    (http/ok {:conv-for project-id :conv msgs})
+          :else                                   (http/not-found))))
+
+(def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
 
 (defn list-projects
   "Return a map containing :current-project and :others, which is a sorted list of every other project in the DB."
-  [_request]
-  (letfn [(name&id [obj] (reduce-kv (fn [m k v] (if (#{:project/name :project/id} k) (assoc m k v) m)) {} obj))]
-    (let [current-project (-> (db/current-project-id) db/get-project name&id)
-          cid    (:project/id current-project)
-          others (->> (db/list-projects)
-                      (filter #(not= % cid))
-                      (mapv  #(-> % db/get-project name&id)))]
-    (log/info "Call to list-projects")
-    (http/ok
-     (cond-> {}
-       current-project    (assoc :current-project current-project)
-       (not-empty others) (assoc :others others))))))
+  [request]
+  (letfn [(resolve-proj-info [pid]
+            (resolve-db-id {:db/id (db/project-exists? pid)}
+                           (connect-atm pid)
+                           :keep-set #{:project/name :project/id}))]
+    (let [proj-infos (mapv resolve-proj-info (db/list-projects))
+          client-id (-> request :query-params :client-id)
+          current (or (when-let [proj (get @client-current-proj client-id)] (resolve-proj-info proj))
+                      (first proj-infos)
+                      new-proj-entry)
+          others (filterv #(not= % current) proj-infos)]
+      (log/info "Call to list-projects")
+      (http/ok
+       (cond-> {:current-project current}
+         (not-empty others) (assoc :others others))))))
+
+(defmacro report-long-running
+  "Return the string from writing to *out* after this runs in a future."
+  [[timeout] & body]
+  `(-> (p/future (with-out-str ~@body))
+       (p/await ~timeout)
+       (p/then #(log/info "Long-running:" %))
+       (p/catch #(log/warn "Long-running (exception):" %))))
 
 (defn set-current-project
   [request]
-  (let [{:keys [project-id]} (-> request :query-params keywordize-keys)
+  (let [{:keys [project-id client-id]} (:body-params request)
         project-id (keyword project-id)]
-      (log/info "db-resp/set-current-project:" project-id)
-      (if (db/project-exists? project-id)
-        (do (db/set-current-project project-id)
-            (plan/restart-interview project-id)
-            (http/ok {:project-id (name project-id)}))
-        (http/not-found))))
+    (log/info "db-resp/set-current-project: project-id =" project-id "client-id =" client-id)
+      (cond (db/project-exists? project-id)          (do (db/set-current-project project-id)
+                                                         (swap! client-current-proj #(assoc % client-id project-id))
+                                                         (report-long-running (plan/restart-interview project-id))
+                                                         (http/ok {:project/id project-id
+                                                                   :project/name (-> (db/get-project project-id) :project/name)}))
+
+            (= project-id :start-a-new-project)      (do (report-long-running (plan/interview-loop project-id :process-interview))
+                                                         (http/ok {:message/ack true}))
+
+            :else                                    (http/not-found))))
 
 (defn wrap-response
   "Wrap text such that it can appear as the text message in the conversation."
@@ -65,8 +88,7 @@
 (defn user-says
   "Handler function for http://api/user-says."
   [request]
-  (reset! diag request)
-  (when-let [{:keys [user-text client-id :promise/pending-keys]} (get request :body-params)]
+  (when-let [{:keys [user-text client-id :promise/pending-keys]} (:body-params request)]
     (assert (uuid? (parse-uuid client-id)))
     (let [pending-keys (mapv keyword pending-keys)] ; At least the swagger API can send them as strings.
       (log/info "user-text = " user-text "pending-keys = " pending-keys)
@@ -77,23 +99,13 @@
           (do (ops/dispatch-response user-text pending-keys)
               (http/ok {:message/ack true})))))))
 
-(def intro-message
-  "The first message of a conversation."
-  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
-   {:msg-link/uri "http://localhost:3300/learn-more"
-    :msg-link/text "learn more about how this works"}
-   {:msg-text/string "."}])
-
-(defn start-new-project
-  "User chose to start a new project. Respond with the intro message."
-  [request]
-  (when-let [{:keys [client-id]} (-> request :query-params keywordize-keys)]
-    (log/info "Start new project for" client-id)
-    (http/ok {:message/content intro-message})))
-
 (defn healthcheck
   [_request]
   (log/info "Doing a health check.")
   (http/ok
     {:time     (str (Date. (System/currentTimeMillis)))
      :up-since (str (Date. (.getStartTime (java.lang.management.ManagementFactory/getRuntimeMXBean))))}))
+
+(defstate respond-state
+  "Clean up client-current-project"
+  :start (clear-client-current-proj))

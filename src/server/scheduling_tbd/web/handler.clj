@@ -98,12 +98,7 @@
 ;;; -------- (devl/ajax-test "/api/list-projects" [])
 (s/def ::others (s/coll-of map?))
 (s/def ::current-project map?)
-
 (s/def ::list-projects-response (s/keys :req-un [::others ::current-project]))
-(s/def ::projects (st/spec {:spec (s/coll-of string?)
-                            :name "projects"
-                            :description "The :project/name of all projects."
-                            :json-schema/default ["craft-beer-brewery-scheduling" "snowboard-production-scheduling"]}))
 
 ;;; -------- (devl/ajax-test "/api/get-conversation" {:project-id "craft-beer-brewery-scheduling"})
 (s/def ::get-conversation-request (st/spec {:spec (s/keys :req-un [::client-id ::project-id])
@@ -127,10 +122,9 @@
 
 ;;; -------- (devl/ajax-test "/api/set-current-project" {:project-id "craft-beer-brewery-scheduling"} {:method ajax.core/POST}) ; ToDo: doesn't work.
 (s/def ::set-current-project-request (s/keys :req-un [::client-id ::project-id]))
-(s/def ::set-current-project-response (s/keys :req-un [::project-id]))
-
-(s/def ::new-proj-request (s/keys :req-un [::client-id]))
-(s/def ::new-proj-response map?)
+(s/def :project/id keyword?)
+(s/def :project/name string?)
+(s/def ::set-current-project-response (s/keys :req [:project/id :project/name]))
 
 (def routes
   [["/app" {:get {:no-doc true
@@ -160,15 +154,8 @@
              :responses {200 {:body ::user-says-response}}
              :handler resp/user-says}}]
 
-   ["/new-project"
-    {:get {;:no-doc true
-           :summary "Respond to the user's request to start a new project."
-           :parameters {:query ::new-proj-request}
-           :responses {200 {:body ::new-proj-response}}
-           :handler resp/start-new-project}}]
-
     ["/get-conversation"
-     {:get {:no-doc true ; <=====================================================================
+     {:get {;:no-doc true ; <=====================================================================
             :summary "Get the project's conversation from its project DB."
             :parameters {:query ::get-conversation-request}
             :responses {200 {:body ::get-conversation-response}}
@@ -183,7 +170,7 @@
     ["/set-current-project"
      {:post {;:no-doc true
              :summary "Get a vector of projects maps and the current project."
-             :parameters {:query ::set-current-project-request}
+             :parameters {:body ::set-current-project-request}
              :responses {200 {:body ::set-current-project-response}}
              :handler resp/set-current-project}}]
 

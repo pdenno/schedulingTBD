@@ -154,12 +154,14 @@
                     (reset! connected? true)
                     (set! (.-onmessage chan)
                           (fn [event]
-                            (let [msg (-> event .-data edn/read-string)]
-                              (dispatch-msg msg) ; Just for :clear-promise-key messages currently.
-                              (when (= :tbd-says (:dispatch-key msg))
-                                (log/info "promise-key = " (:promise-key msg) "msg =" (:msg msg))
-                                (add-promise-key (:promise-key msg))
-                                (set-system-text (:msg msg)))))) ; ...namely, this function.
+                            (try (let [{:keys [msg promise-key recipient-read-string?] :as _diag} (-> event .-data edn/read-string)]
+                                   (reset! diag _diag)
+                                   (dispatch-msg msg) ; Just for :clear-promise-key messages currently.
+                                   (when (= :tbd-says (:dispatch-key msg))
+                                     (when promise-key (log/info "promise-key = " promise-key "msg =" msg)
+                                           (add-promise-key promise-key))
+                                     (set-system-text (if recipient-read-string? (edn/read-string msg) msg))))
+                                 (catch :default e (log/warn "Error in :tbd-days socket reading.")))))
                     (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))))
                 (throw (ex-info "Websocket Connection Failed:" {:url ws-url}))))]
       ;; ------------- talk through web socket; server-initiated.

@@ -14,16 +14,14 @@
    [taoensso.timbre      :as log]))
 
 (def debugging? (atom true))
-
-(def ok-message "This is useful where, for example, the user is typing unanticpated stuff."
-  [{:msg-text/string "ok"}])
+(def ^:diag diag (atom nil))
 
 (defmacro defoperator
   "Macro to wrap methods for translating shop to database format."
-  {:clj-kondo/lint-as 'clojure.core/fn ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
-   :arglists '([plan-step proj-id domain & body])} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
-  [tag [plan-step proj-id domain & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod run-op ~tag [~plan-step ~proj-id ~domain & [~@more-args]]
+  {:clj-kondo/lint-as 'clojure.core/defmacro ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
+   :arglists '(tag [arg-map] & body)} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
+  [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  `(defmethod run-op ~tag [~'_tag ~arg-map]
      (when @debugging? (println (cl-format nil "==> ~A" ~tag)))
      (let [res# (do ~@body)]
        (if (seq? res#) (doall res#) res#)
@@ -34,7 +32,7 @@
 (defn run-op-dispatch
   "Parameters to run-op have form [plan-step proj-id domain & other-args]
    This dispatch function choose a method by return (:operator plan-step)."
-  [{:keys [operator]} & _]
+  [operator & _]
   (cond ;; Optional 2nd argument specifies method to call. Order matters!
     (keyword? operator) operator
     :else (throw (ex-info "run-op-dispatch: No dispatch value for operator" {:op operator}))))
@@ -69,10 +67,10 @@
 ;;; -------- Similar for db-actions ----------------------------------------------------------
 (defmacro defaction
   "Macro to wrap methods for updating the project's database for effects from running an operation."
-  {:clj-kondo/lint-as 'clojure.core/fn
-   :arglists '([plan-step proj-id domain & body])}
-  [tag [plan-step proj-id domain & more-args] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod db-action ~tag [~plan-step ~proj-id ~domain & [~@more-args]]
+  {:clj-kondo/lint-as 'clojure.core/defmacro
+   :arglists '(tag [arg-map] & body)}
+  [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  `(defmethod db-action ~tag [~'_tag ~arg-map]
      ;;(when @debugging? (println (cl-format nil "d=> ~A" ~tag)))
      (let [res# (do ~@body)]
        (if (seq? res#) (doall res#) res#)
@@ -82,42 +80,6 @@
 ;;;           res#)
 
 (defmulti db-action #'run-op-dispatch)
-
-;;; N.B.: Typically we won't save an interview query message to the DB until after receiving a response to it from the user.
-;;;       At that point, we'll also save the :project/state-string. This ensures that when we restart we can use the
-;;;       planner to put the right question back in play.
-(defoperator :!initial-question [plan-step proj-id domain]
-  (log/info "!initial-question: plan-step =" plan-step "proj-id =" proj-id "domain =" domain)
-  (let [{:keys [args]} plan-step]
-    {:from :!initial-question
-     :delete #{}
-     :add #{`(~'ongoing-discussion ~@args)}}))
-
-;;; ToDo: Combine this with :!initial-question above.
-#_(defn op-start-project
-  "Summarize user-text as a project name. Execute plan operations to start a project about user-text."
-  [user-text]
-  (let [summary (dom/project-name user-text)
-        id (-> summary str/lower-case (str/replace #"\s+" "-") keyword)
-        proj-info  {:project/id id
-                    :project/name summary
-                    :project/desc user-text ; <==== ToDo: Save this as :msg-id 1 (0 is the "Describe your scheduling problem" message).
-                    #_#_:project/industry _industry}
-        proj-info (db/create-proj-db! proj-info) ; May rename the project-info.
-        proj-id (:project/id proj-info)]
-    (db/add-msg proj-id (d/q '[:find ?prompt . :where [_ :system/initial-prompt ?prompt]] @(connect-atm :system)) :system)
-    (db/add-msg proj-id user-text :user)
-    ;; ToDo:
-    ;; 0) Call the planner and make this code an operator!
-    ;; 1) Set :system/current-project.
-    ;; 2) Store first two messages (prompt and user's first contribution).
-    ;; 3) Check that there isn't a project by that name.
-    ;; 4) Let user change the name of the project.
-    (let [response (str "Great! We'll call your project '" (:project/name proj-info) "'. ")]
-      (log/info "op-start-project: Responding with: " response)
-      (db/add-msg proj-id response :system))))
-
-(def ^:diag diag (atom nil))
 
 ;;; plan-step =  {:cost 1.0, :operator :!yes-no-process-steps, :args [craft-beer]}
 (defn domain-operator
@@ -150,7 +112,7 @@
   "Update the project's DB, specifically :project/state-string to show how the plan has advanced.
       - plan-step is a map such as {:operator :!yes-no-process-steps, :args [aluminium-foil]},
       - proj-id is the keyword identifying a project by its :project/id.
-      - domain-id is a domain object, typically one that has been pruned.
+      - domain is a domain object, typically one that has been pruned. (So it IS small!)
    Returns the new state."
   [plan-step proj-id domain _response]
   ;;(log/info "advance-plan: plan-step = " plan-step "proj-id =" proj-id "domain =" domain)
@@ -168,40 +130,62 @@
 
 (def wait-time-for-user-resp "The number of milliseconds to wait for the user to reply to a query." 20000)
 
-;;; ----- :!yes-no-process-steps
-(defoperator :!yes-no-process-steps [plan-step proj-id domain]
-  (log/info "!yes-no-process-steps: plan-step =" plan-step)
-  (-> (ws/send "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)")
+(def intro-message
+  "The first message of a conversation."
+  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
+   {:msg-link/uri "http://localhost:3300/learn-more"
+    :msg-link/text "learn more about how this works"}
+   {:msg-text/string "."}])
+
+;;; Typically we won't save an interview query message to the DB until after receiving a response to it from the user.
+;;; At that point, we'll also save the :project/state-string. This ensures that when we restart we can use the
+;;; planner to put the right question back in play.
+(defoperator :!initial-question [{:keys [plan-step proj-id client-id domain]}]
+  (log/info "!initial-question: plan-step =" plan-step)
+  (-> (ws/send (str intro-message) :recipient-read-string? true :client-id client-id)
       (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
 
-(defaction :!yes-no-process-steps [plan-step proj-id domain response]
+(defaction :!yes-no-process-steps [{:keys [plan-step proj-id _client-id domain response]}]
+  (advance-plan plan-step proj-id domain response))
+
+;;; ----- :!yes-no-process-steps
+(defoperator :!yes-no-process-steps [{:keys [plan-step proj-id client-id domain]}]
+  (log/info "!yes-no-process-steps: plan-step =" plan-step)
+  (-> (ws/send "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
+               :client-id client-id)
+      (p/await wait-time-for-user-resp)
+      (p/then (fn [response] (db-action plan-step proj-id domain response)))))
+
+(defaction :!yes-no-process-steps [{:keys [plan-step proj-id domain response]}]
   (advance-plan plan-step proj-id  domain response))
 
 ;;; ----- :!query-process-durs
-(defoperator :!query-process-durs [plan-step proj-id domain]
+(defoperator :!query-process-durs [{:keys [plan-step proj-id client-id domain]}]
   (log/info "!query-process-durs: plan-step =" plan-step)
-  (-> (ws/send "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)")
+  (-> (ws/send "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"
+               :client-id client-id)
       (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
 
-(defaction :!query-process-durs [plan-step proj-id domain response]
+(defaction :!query-process-durs [{:keys [plan-step proj-id domain response]}]
   (advance-plan plan-step proj-id  domain response))
 
 ;;; ----- :!yes-no-process-steps
-(defoperator :!yes-no-process-ordering [plan-step proj-id domain]
+(defoperator :!yes-no-process-ordering [{:keys [plan-step proj-id client-id domain]}]
   (log/info "!yes-no-process-ordering: plan-step =" plan-step)
-  (-> (ws/send "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)")
+  (-> (ws/send "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
+               :client-id client-id)
       (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
 
-(defaction :!yes-no-process-ordering [plan-step proj-id domain response]
+(defaction :!yes-no-process-ordering [{:keys [plan-step proj-id domain response]}]
   (advance-plan plan-step proj-id  domain response))
 
 ;;; ----- :!stop-discussion
-(defoperator :!stop-discussion [plan-step proj-id domain]
+#_(defoperator :!stop-discussion [{:keys [plan-step proj-id _client-id domain]}]
   (log/info "!stop-discussion: plan-step =" plan-step)
   (db-action plan-step proj-id domain nil))
 
-(defaction :!stop-discussion [plan-step proj-id domain response]
+#_(defaction :!stop-discussion [{:keys [plan-step proj-id _client-id domain response]}]
   (advance-plan plan-step proj-id  domain response))

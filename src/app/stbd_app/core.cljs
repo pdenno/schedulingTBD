@@ -165,13 +165,12 @@
         useful-height (int (- height banner-height))
         chat-side-height useful-height
         code-side-height useful-height]
-    (hooks/use-effect :once ; Need to set :max-height of resizable editors after everything is created.
-                      (editor/resize-finish "code-editor" nil code-side-height))
     (hooks/use-effect :once
-       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
-           (p/then #(do
-                      (set-proj-infos (conj (:others %) (:current-project %)))
-                      (set-proj (:current-project %))))))
+      (log/info "ONCE")
+      (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
+      (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
+          (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
+                       (set-proj (:current-project %))))))
     (hooks/use-effect [proj]
       (when proj
         (-> (dba/get-conversation proj)

@@ -235,12 +235,17 @@
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
    Returns a vector ::specs/state-edits object that is the effect of running the plan."
-  [proj-id domain plan]
+  [proj-id client-id domain plan]
   (let [plan (translate-plan plan)]
     (log/info "execute-plan!: proj-id =" proj-id "plan =" plan)
-    (doseq [plan-step plan]
+    (doseq [plan-step plan] ; after translate-plan plan-steps have :operator :args and :cost.
       (s/assert ::specs/plan-step plan-step)
-      (op/run-op plan-step proj-id domain))
+      (op/run-op
+       (:operator plan-step)
+       {:plan-step plan-step
+        :proj-id proj-id
+        :client-id client-id
+        :domain domain}))
     (db/get-state proj-id)))
 
 (defn discussion-stopped?
@@ -296,14 +301,14 @@
 
    'triple' below refers to the map containing :domain :problem and :execute in either proj or SHOP form.
    The function returns the state achieved, a collection of :specs/proposition."
-  [proj-id domain-id & {:keys [start-facts problem limit]
-                  :or {start-facts [],
-                       problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
-                       limit 30}}] ; ToDo: Temporary
+  [proj-id domain-id client-id & {:keys [start-facts problem limit]
+                                  :or {start-facts [],
+                                       problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
+                                       limit 30}}] ; ToDo: Temporary
   (s/assert ::specs/domain-problem problem)
   (let [proj-domain (-> domain-id (get-domain {:form :proj}))
         execute (:domain/execute proj-domain)]
-    (letfn [(translate-triple [triple] (-> triple (update :domain shop/proj2shop) (update :problem shop/problem2shop)))]
+    (letfn [(translate-triple [triple] (-> triple (update :domain shop/proj2shop) (update :problem shop/problem2shop)))] ; N.B.: A good place to wrap with (reset! diag)
       (loop [state   start-facts
              problem (-> problem (assoc :problem/state-string (str start-facts)))
              pruned  (prune-domain proj-domain start-facts)
@@ -313,7 +318,7 @@
               (>= cnt limit)                  (sort-by first state)
               (empty? plans)                  (sort-by first state)
               (discussion-stopped? state)     (sort-by first state)
-              :else  (let [new-state   (execute-plan! proj-id pruned (first plans)) ; ToDo: Deal with multiple plans.
+              :else  (let [new-state   (execute-plan! proj-id client-id pruned (first plans)) ; ToDo: Deal with multiple plans.
                            new-problem (assoc problem :problem/state-string (str new-state))
                            new-pruned  (prune-domain proj-domain new-state)]
                        (log/info "new-state = " new-state)
@@ -331,17 +336,18 @@
    The project provides :project/state-string which is assigned to :problem/state-string
    in the call to interview-loop. The rest of problem is defined by the planning domain."
   [pid & {:keys [domain-name] :or {domain-name "pi"}}]
-  (log/info "Restarting interview for" pid)
-  (let [facts-string (-> pid db/get-project :project/state-string)
+  (log/info "restart-interview: NYI."))
+  #_(let [facts-string (-> pid db/get-project :project/state-string)
         domain (get-domain domain-name {:form :proj})
-        problem (-> domain
+        _problem (-> domain
                     :domain/problem
                     (assoc :problem/state-string facts-string))]
-    (interview-loop
+    (log/info "restart-interview: NYI.")
+    #_(interview-loop
      pid
      domain-name
      :start-facts (edn/read-string facts-string)
-     :problem problem)))
+     :problem problem))
 
 ;;; Section 5.6 Debugging Suggestions
 ;;; When you have a problem that does not solve as expected, the following general recipe may help you home in on bugs in your domain definition:
@@ -415,6 +421,7 @@
   "Start the planner. This relies on environment variable PLANNER_SBCL, which is just
    the name of the SBCL core file. That file is expected to be in the project directory."
   []
+  (load-domain "data/planning-domains/process-interview.edn")
   (try
     (let [cmd-arg (cl-format nil "'(setf shop3-zmq::*endpoint* ~S)'" planner-endpoint)]
       ;; --eval does not work!
