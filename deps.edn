@@ -1,6 +1,7 @@
 {:paths   ["src/lib"]
  :deps    {camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
+           cider/cider-nrepl                   {:mvn/version "0.47.0"}  ; <===== added for frustrating mismatch problem.
            com.cemerick/url                    {:mvn/version "0.1.1"}
            com.github.pdenno/explainlib        {:mvn/version "1.0.33"} ; was 1.0.12
            com.taoensso/timbre                 {:mvn/version "6.5.0"}

@@ -2,14 +2,17 @@
   "Set up a websockets and message routing for async communication with the client using ring.websocket.async."
   (:refer-clojure :exclude [send])
   (:require
-   [clojure.core.async   :as async :refer [<! >! <!! >!! go]]
-   [clojure.edn          :as edn]
-   [clojure.walk         :as walk  :refer [keywordize-keys]]
-   [mount.core           :as mount :refer [defstate]]
-   [promesa.core         :as p]
-   [ring.websocket.async :as wsa]
-   [scheduling-tbd.util  :refer [now]]
-   [taoensso.timbre      :as log]))
+   [clojure.core.async       :as async :refer [<! >! <!! >!! go]]
+   [clojure.edn              :as edn]
+   [clojure.spec.alpha       :as s]
+   [clojure.walk             :as walk  :refer [keywordize-keys]]
+   [mount.core               :as mount :refer [defstate]]
+   [promesa.core             :as p]
+   [ring.websocket.async     :as wsa]
+   [scheduling-tbd.llm       :as llm]
+   [scheduling-tbd.surrogate :as sur]
+   [scheduling-tbd.util      :refer [now]]
+   [taoensso.timbre          :as log]))
 
 ;;; Though this system is only exploratory code that will probably run single-user in a Docker instance,
 ;;; I'm writing this mostly as though the server handles multiple clients.
@@ -18,6 +21,7 @@
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique ID provided by the client." (atom {}))
 (def current-client-id "UUID identifying client. This is for diagnostics." (atom nil))
+(declare user-says send-to-chat)
 
 ;;; ToDo: move to devl?
 (defn ^:diag any-client!
@@ -56,12 +60,31 @@
   ;(log/info "Ping" _ping-id "from" _client-id)
   {:dispatch-key :ping-confirm})
 
+(declare clear-keys select-promise)
+;;;--------------------- Receiving a response from a client -----------------------
+(defn user-says
+  "Handle web-socket message with dispatch key :user-says.
+   This will typically clear a promise-key."
+  [{:keys [msg-text client-id promise-keys] :as msg}]
+  (log/info "User-says:" msg)
+  (let [
+        [ask-llm? question] (re-matches #"\s*LLM:(.*)" msg-text)
+        [surrogate? surrogate-role] (re-matches #"\s*SUR:(.*)" msg-text)]
+    (cond ask-llm?           (-> question llm/llm-directly (send-to-chat {:promise? false}))
+          surrogate?         (sur/start-surrogate surrogate-role))
+    (when-let [prom-obj (select-promise promise-keys)]
+      (when (and (not ask-llm?) (not surrogate?))
+        (clear-keys client-id [(:prom-key prom-obj)])
+        (p/resolve! (:prom prom-obj) msg-text)))))
+
 (def dispatch-table
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
   {:ping          ping-diag
+   :user-says     user-says
    :close-channel close-channel-by-msg})
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]
+  (log/info "dispatch: msg =" msg)
   (when-not (= :ping dispatch-key) (log/info "Received msg:" msg))
   (if (contains? dispatch-table dispatch-key)
     ((get dispatch-table dispatch-key) msg)
@@ -102,16 +125,24 @@
   [prom-key]
   (swap! promise-stack (fn [stack] (remove #(= prom-key (:prom-key %)) stack))))
 
+(s/def ::promise (s/keys :req-un [::prom ::prom-key ::client-id ::timestamp]))
+(s/def ::prom p/promise?)
+(s/def ::prom-key keyword?)
+(s/def ::client-id string?)
+(s/def ::timestamp #(instance? java.util.Date %))
+
 (defn new-promise
   "Return a vector of [key, promise] to a new promise.
-   We use this key to match returning responses (which may be HTTP/user-says) to know
+   We use this key to match returning responses from ws-send :user-says, to know
    what is being responded to." ; ToDo: This is not fool-proof.
   [client-id]
   (let [k (-> (gensym "promise-") keyword)
         p (p/deferred)
         obj {:prom p :prom-key k :client-id client-id :timestamp (java.util.Date.)}]
-    (swap! promise-stack #(conj % k obj))
-    ;(log/info "Adding promise" (:prom-key obj))
+    (swap! promise-stack #(conj % obj))
+    ;; Because I saw it messed up once...
+    (when-not (every? #(s/valid? ::promise %) @promise-stack)
+      (throw (ex-info "Promise stack is messed up" {:stack @promise-stack})))
     obj))
 
 (defn ^:diag lookup-promise
@@ -146,11 +177,12 @@
      recipient-read-string?  - true if recipient should be edn/read-string the msg-text
      p-key                   - a key to a promise; so sender can link this to corresponding responses."
   [msg-text & {:keys [p-key recipient-read-string?]}]
-  (cond-> {:dispatch-key :tbd-says :msg msg-text :timestamp (now)}
+  (cond-> {:dispatch-key :tbd-says :msg-text msg-text :timestamp (now)}
     recipient-read-string?       (assoc :recipient-read-string? true)
     p-key                        (assoc :promise-key p-key)))
 
-(defn send
+;;; (ws/send-to-chat "Hey are you alive?" :promise? false :client-id (ws/any-client!)
+(defn send-to-chat
   "Send the argument message text to the current project (or some other destination if a client-id is provided.
    Return a promise that is resolved when the user responds to the message, by whatever means (http or ws)."
   [msg-text & {:keys [promise? client-id recipient-read-string?]

@@ -114,21 +114,24 @@
                         :ping-id (swap! ping-id inc)})))
     (log/error "Couldn't send ping; channel isn't open.")))
 
-(defn send-message
+(defn ws-send-msg
   "Send the message to the server. msg can be any Clojure object but if it is a map we add the :client-id.
-   Example usage: (send-message! {:dispatch-key :ping})"
-  [msg]
-  (let [msg (if (map? msg) (assoc msg :client-id client-id) msg)]
+   Example usage: (ws-send-msg! {:dispatch-key :ping})"
+  [msg-obj]
+  (let [msg-obj (assoc msg-obj :client-id client-id)]
     (if-let [chan @channel]
-      (.send chan (pr-str msg))
-      (throw (ex-info "Couldn't send message; no channel." {:message msg})))))
+      ;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
+      (if (= 1 (.-readyState chan))
+        (.send chan (pr-str msg-obj))
+        (log/warn "Channel not ready to send."))
+      (throw (ex-info "Couldn't send message; no channel." {:msg-text msg-obj})))))
 
 ;;; :tbd-says isn't in this because it sets the set-system-text hook.
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
   [{:keys [dispatch-key promise-keys] :as _msg}]
   (cond (= dispatch-key :clear-promise-keys) (clear-promise-keys! promise-keys)
-        (= dispatch-key :alive?)             (send-message {:alive? true})))
+        (= dispatch-key :alive?)             (ws-send-msg {:alive? true})))
 
 ;;; ========================= Component ===============================
 (defn make-resize-fns
@@ -145,49 +148,50 @@
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         input-ref (hooks/use-ref nil)
         resize-fns (make-resize-fns set-box-height)]
-    (hooks/use-effect [conv-map] ;... and this is necessary.
-      (set-msg-list (->> conv-map :conv (mapv msg2rce) clj->js)))
-    (letfn [(connect! []  ; I think this has to be here owing to scoping restrictions on hooks functions,... ToDo: Can't I pass it in?
+    ;; ------------- talk through web socket; server-initiated.
+    (letfn [(connect! [] ; 2024-03-19: This really does seem to need to be inside the component!
               (if-let [chan (js/WebSocket. ws-url)]
                 (do (log/info "Websocket Connected!")
                     (reset! channel chan)
                     (reset! connected? true)
                     (set! (.-onmessage chan)
                           (fn [event]
-                            (try (let [{:keys [msg promise-key recipient-read-string?] :as _diag} (-> event .-data edn/read-string)]
-                                   (reset! diag _diag)
-                                   (dispatch-msg msg) ; Just for :clear-promise-key messages currently.
-                                   (when (= :tbd-says (:dispatch-key msg))
-                                     (when promise-key (log/info "promise-key = " promise-key "msg =" msg)
+                            (try (let [{:keys [msg-text promise-key dispatch-key recipient-read-string?] :as msg-obj} (-> event .-data edn/read-string)]
+                                   (dispatch-msg msg-obj) ; Just for :clear-promise-key messages currently.
+                                   (when (= :tbd-says dispatch-key)
+                                     (when promise-key (log/info "promise-key = " promise-key "msg =" msg-obj)
                                            (add-promise-key promise-key))
-                                     (set-system-text (if recipient-read-string? (edn/read-string msg) msg))))
-                                 (catch :default e (log/warn "Error in :tbd-days socket reading.")))))
+                                     ;; ToDo: Consider transit rather then edn/read-string.
+                                     (set-system-text (if recipient-read-string? (edn/read-string msg-text) msg-text))))
+                                 (catch :default e (log/warn "Error in :tbd-says socket reading:" e)))))
                     (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))))
                 (throw (ex-info "Websocket Connection Failed:" {:url ws-url}))))]
-      ;; ------------- talk through web socket; server-initiated.
-      (when-not @connected? (connect!)) ; Start the web socket.
-      (hooks/use-effect [system-text]
-        (when (not-empty system-text)
-          (let [new-msg (rce-msg :system system-text)]
-            (set-msg-list (add-msg msg-list new-msg)))))
+    (hooks/use-effect :once ; Start the web socket.
+      (when-not @connected? (connect!)))
+    (hooks/use-effect [conv-map] ;... and this is necessary.
+      (set-msg-list (->> conv-map :conv (mapv msg2rce) clj->js)))
+    (hooks/use-effect [system-text]
+      (when (not-empty system-text)
+        (let [new-msg (rce-msg :system system-text)]
+          (set-msg-list (add-msg msg-list new-msg)))))
       ;; ------------- Send user-text through REST API; wait on promise for response.
-      (hooks/use-effect [user-text]
-        (when (not-empty user-text)
-          (-> (dba/user-says user-text @pending-promise-keys)
-              (p/then  #(when-not (:message/ack %)
-                          (set-msg-list (->> % msg2rce (add-msg msg-list)))))
-              (p/catch #(log/info (str "CLJS-AJAX user-says error: status = " %))))))
+    (hooks/use-effect [user-text]
+     (when (not-empty user-text)
+       (ws-send-msg {:dispatch-key :user-says
+                     :msg-text user-text
+                     :client-id client-id
+                     :promise-keys @pending-promise-keys})))
       ;; -------------- progress stuff (currentl not hooked up)
-      (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
-        (reset! progress-atm 0)
-        (reset! progress-handle
-                (js/window.setInterval
-                 (fn []
-                   (let [percent (compute-progress)]
-                     (if (or (>= progress 100) (not progressing?))
-                       (do (set-progress 0) (js/window.clearInterval @progress-handle))
-                       (set-progress (reset! progress-atm percent)))))
-                 200)))
+    (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
+       (reset! progress-atm 0)
+       (reset! progress-handle
+               (js/window.setInterval
+                (fn []
+                  (let [percent (compute-progress)]
+                    (if (or (>= progress 100) (not progressing?))
+                      (do (set-progress 0) (js/window.clearInterval @progress-handle))
+                      (set-progress (reset! progress-atm percent)))))
+                200)))
       ;; ----------------- component UI structure.
       ($ ShareUpDown
          {:init-height chat-height

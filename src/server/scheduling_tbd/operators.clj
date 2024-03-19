@@ -142,7 +142,7 @@
 ;;; planner to put the right question back in play.
 (defoperator :!initial-question [{:keys [plan-step proj-id client-id domain]}]
   (log/info "!initial-question: plan-step =" plan-step)
-  (-> (ws/send (str intro-message) :recipient-read-string? true :client-id client-id)
+  (-> (ws/send-to-chat (str intro-message) :recipient-read-string? true :client-id client-id)
       (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
 
@@ -152,7 +152,7 @@
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-steps [{:keys [plan-step proj-id client-id domain]}]
   (log/info "!yes-no-process-steps: plan-step =" plan-step)
-  (-> (ws/send "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
+  (-> (ws/send-to-chat "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
                :client-id client-id)
       (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
@@ -163,7 +163,7 @@
 ;;; ----- :!query-process-durs
 (defoperator :!query-process-durs [{:keys [plan-step proj-id client-id domain]}]
   (log/info "!query-process-durs: plan-step =" plan-step)
-  (-> (ws/send "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"
+  (-> (ws/send-to-chat "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"
                :client-id client-id)
       (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
@@ -174,7 +174,7 @@
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-ordering [{:keys [plan-step proj-id client-id domain]}]
   (log/info "!yes-no-process-ordering: plan-step =" plan-step)
-  (-> (ws/send "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
+  (-> (ws/send-to-chat "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
                :client-id client-id)
       (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
