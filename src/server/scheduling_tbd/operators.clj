@@ -32,54 +32,34 @@
 (defn run-op-dispatch
   "Parameters to run-op have form [plan-step proj-id domain & other-args]
    This dispatch function choose a method by return (:operator plan-step)."
-  [operator & _]
-  (cond ;; Optional 2nd argument specifies method to call. Order matters!
-    (keyword? operator) operator
-    :else (throw (ex-info "run-op-dispatch: No dispatch value for operator" {:op operator}))))
-
-;;; =============  Promise key management (exploratory code!)  =============================================================
-;;;   * By design, the server waits for a response before sending another question (except for maybe some future where
-;;;     there is a "Are you still there?").
-;;;     - Questions always are transmitted over the websocket; they are the beginning of something new.
-;;;   * The user, however can put out as many things as she likes.
-;;;   * promise-keys are an attempt to match the question to the responses.
-;;;     - When the server asks a question, it adds a promise key to the question; the client manages a set of these keys.
-;;;     - When the user does a user-says, it tells the server what keys it has.
-;;;     - As the system processes a user-says, it decides what keys to tell the client to erase.
-;;;     - The system uses the keys to match a question to a user-says.
-;;;       + It picks the key top-most on its stack that is also in the set sent by the client with user-says.
-;;;     - When the system has decided where to route the question, it can also tell the client to remove that key from its set.
-;;;       + This last step is important because the server needs to get old promise-keys off the stack.
-(defn dispatch-response
-  "Operators wait for responses matching their key.
-   This resolves the promise, allowing continuation  of the operator's processing.
-   It also ws/sends a message to the client to clear the chosen key."
-  [resp client-keys] ; ToDo: Should I pass the client-id in here (from user-says) or just rely on select-promise?
-  (let [{:keys [prom prom-key client-id]} (ws/select-promise client-keys)]
-    (if (not prom-key)
-      {:message/ack true} ; You still need to respond with something!
-      (do
-        (ws/clear-keys client-id [prom-key])
-        (p/resolve! prom resp)))))
+  [tag & _]
+  (log/info "run-op-dispatch: tag =" tag)
+  (cond
+    (keyword? tag) tag
+    :else (throw (ex-info "run-op-dispatch: No dispatch value for tag" {:tag tag}))))
 
 (defmulti run-op #'run-op-dispatch)
 
-;;; -------- Similar for db-actions ----------------------------------------------------------
+;;; --------  db-actions is similar but adds a second object, the response from the operator -----------------------------------
 (defmacro defaction
   "Macro to wrap methods for updating the project's database for effects from running an operation."
   {:clj-kondo/lint-as 'clojure.core/defmacro
-   :arglists '(tag [arg-map] & body)}
-  [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod db-action ~tag [~'_tag ~arg-map]
-     ;;(when @debugging? (println (cl-format nil "d=> ~A" ~tag)))
+   :arglists '(tag [arg-map response] & body)}
+  [tag [arg-map response] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  `(defmethod db-action ~tag [~arg-map ~response]
      (let [res# (do ~@body)]
        (if (seq? res#) (doall res#) res#)
        res#)))
-;;;       (do (when @debugging?
-;;;             (println (cl-format nil "<-d ~A returns ~S" ~tag res#)))
-;;;           res#)
 
-(defmulti db-action #'run-op-dispatch)
+(defn db-action-dispatch
+  "Parameters to db-action is a object with at least a :plan-step in it and a response from run-op (user response)."
+  [obj & _]
+  (log/info "db-action-dispatch: obj =" obj)
+  (if-let [tag (-> obj :plan-step :operator)]
+    tag
+    (throw (ex-info "db-action-dispatch: No dispatch value for plan-step" {:obj obj}))))
+
+(defmulti db-action #'db-action-dispatch)
 
 ;;; plan-step =  {:cost 1.0, :operator :!yes-no-process-steps, :args [craft-beer]}
 (defn domain-operator
@@ -114,8 +94,8 @@
       - proj-id is the keyword identifying a project by its :project/id.
       - domain is a domain object, typically one that has been pruned. (So it IS small!)
    Returns the new state."
-  [plan-step proj-id domain _response]
-  ;;(log/info "advance-plan: plan-step = " plan-step "proj-id =" proj-id "domain =" domain)
+  [{:keys [plan-step proj-id domain]} _response]
+  (log/info "advance-plan: plan-step = " plan-step "proj-id =" proj-id "domain =" domain)
   (let [facts (db/get-state proj-id)
         {:keys [operator args]} plan-step
         op-sym (-> operator name symbol)
@@ -146,46 +126,42 @@
       (p/await wait-time-for-user-resp)
       (p/then (fn [response] (db-action plan-step proj-id domain response)))))
 
-(defaction :!yes-no-process-steps [{:keys [plan-step proj-id _client-id domain response]}]
-  (advance-plan plan-step proj-id domain response))
-
 ;;; ----- :!yes-no-process-steps
-(defoperator :!yes-no-process-steps [{:keys [plan-step proj-id client-id domain]}]
+(defoperator :!yes-no-process-steps [{:keys [plan-step proj-id client-id domain] :as obj}]
   (log/info "!yes-no-process-steps: plan-step =" plan-step)
   (-> (ws/send-to-chat "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
                :client-id client-id)
       (p/await wait-time-for-user-resp)
-      (p/then (fn [response] (db-action plan-step proj-id domain response)))))
+      (p/then #(do (log/info "After the p/await:" %) %))
+      (p/then (fn [response] (db-action obj response)))
+      (p/catch #(log/error "!yes-no-process-steps: error =" %))))
 
-(defaction :!yes-no-process-steps [{:keys [plan-step proj-id domain response]}]
-  (advance-plan plan-step proj-id  domain response))
+(defaction :!yes-no-process-steps [obj response]
+  (log/info "Now the db action...")
+  (advance-plan obj response))
 
 ;;; ----- :!query-process-durs
-(defoperator :!query-process-durs [{:keys [plan-step proj-id client-id domain]}]
+(defoperator :!query-process-durs [{:keys [plan-step client-id] :as obj}]
   (log/info "!query-process-durs: plan-step =" plan-step)
   (-> (ws/send-to-chat "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"
                :client-id client-id)
       (p/await wait-time-for-user-resp)
-      (p/then (fn [response] (db-action plan-step proj-id domain response)))))
+      (p/then (fn [response] (db-action obj response)))
+      (p/catch #(log/error "!query-process-durs: error =" %))))
 
-(defaction :!query-process-durs [{:keys [plan-step proj-id domain response]}]
-  (advance-plan plan-step proj-id  domain response))
+(defaction :!query-process-durs [obj response]
+  (log/info "Now the db action...")
+  (advance-plan obj response))
 
 ;;; ----- :!yes-no-process-steps
-(defoperator :!yes-no-process-ordering [{:keys [plan-step proj-id client-id domain]}]
+(defoperator :!yes-no-process-ordering [{:keys [plan-step client-id] :as obj}]
   (log/info "!yes-no-process-ordering: plan-step =" plan-step)
   (-> (ws/send-to-chat "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
                :client-id client-id)
       (p/await wait-time-for-user-resp)
-      (p/then (fn [response] (db-action plan-step proj-id domain response)))))
+      (p/then (fn [response] (db-action obj response)))
+      (p/catch #(log/error "!yes-no-process-ordering: error =" %))))
 
-(defaction :!yes-no-process-ordering [{:keys [plan-step proj-id domain response]}]
-  (advance-plan plan-step proj-id  domain response))
-
-;;; ----- :!stop-discussion
-#_(defoperator :!stop-discussion [{:keys [plan-step proj-id _client-id domain]}]
-  (log/info "!stop-discussion: plan-step =" plan-step)
-  (db-action plan-step proj-id domain nil))
-
-#_(defaction :!stop-discussion [{:keys [plan-step proj-id _client-id domain response]}]
-  (advance-plan plan-step proj-id  domain response))
+(defaction :!yes-no-process-ordering [obj response]
+  (log/info "Now the db action...")
+  (advance-plan obj response))

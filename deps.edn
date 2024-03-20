@@ -3,6 +3,7 @@
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
            cider/cider-nrepl                   {:mvn/version "0.47.0"}  ; <===== added for frustrating mismatch problem.
            com.cemerick/url                    {:mvn/version "0.1.1"}
+           ;;com.cognitect/transit-clj           {:mvn/version "1.0.333"}
            com.github.pdenno/explainlib        {:mvn/version "1.0.33"} ; was 1.0.12
            com.taoensso/timbre                 {:mvn/version "6.5.0"}
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}

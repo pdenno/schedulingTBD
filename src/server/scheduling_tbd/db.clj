@@ -432,7 +432,7 @@
   "If necessary to ensure uniqueness, update the project name and id."
   [proj-info]
   (let [names (d/q '[:find [?name ...]
-                      :where [_ :project/name ?name]] @(connect-atm :system))
+                     :where [_ :project/name ?name]] @(connect-atm :system))
         name (:project/name proj-info)]
     (if (not-any? #(= name %) names)
       proj-info

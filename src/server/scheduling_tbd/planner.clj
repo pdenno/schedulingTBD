@@ -1,24 +1,25 @@
 (ns scheduling-tbd.planner
   "This provides functions to prune a planning domain and run an interview."
   (:require
-   [clojure.core.unify       :as uni]
-   [clojure.edn              :as edn]
-   [clojure.java.shell       :refer [sh]]
-   [clojure.pprint           :refer [cl-format]]
-   [clojure.spec.alpha       :as s]
-   [clojure.string           :as str]
-   [datahike.api             :as d]
-   ;;[explainlib.core        :as exp]
-   [ezzmq.message            :as zmq]
-   [ezzmq.context            :as zmq-ctx]
-   [ezzmq.socket             :as zmq-sock]
-   [mount.core               :as mount :refer [defstate]]
-   [scheduling-tbd.db        :as db]
-   [scheduling-tbd.operators :as op]
-   [scheduling-tbd.shop      :as shop]
-   [scheduling-tbd.specs     :as specs]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
-   [taoensso.timbre          :as log]))
+   [clojure.core.unify        :as uni]
+   [clojure.edn               :as edn]
+   [clojure.java.shell        :refer [sh]]
+   [clojure.pprint            :refer [cl-format]]
+   [clojure.spec.alpha        :as s]
+   [clojure.string            :as str]
+   [datahike.api              :as d]
+   ;;[explainlib.core         :as exp]
+   [ezzmq.message             :as zmq]
+   [ezzmq.context             :as zmq-ctx]
+   [ezzmq.socket              :as zmq-sock]
+   [mount.core                :as mount :refer [defstate]]
+   [scheduling-tbd.db         :as db]
+   [scheduling-tbd.operators  :as op]
+   [scheduling-tbd.shop       :as shop]
+   [scheduling-tbd.specs      :as specs]
+   [scheduling-tbd.sutil      :as sutil :refer [connect-atm resolve-db-id]]
+   [scheduling-tbd.web.routes.websockets :as ws]
+   [taoensso.timbre           :as log]))
 
 (def planner-endpoint-port 31888)
 (def planner-endpoint (format "tcp://*:%s" planner-endpoint-port))
@@ -226,11 +227,6 @@
                                        args)))))
             plan))))
 
-;;; ToDo: The operators called from execute-plan are typically long-running.
-;;;       There is need, therefore, for means to deal with this (IN THE DB, I think).
-;;;       Specifically, there is the need for "restart", in the sense that we can kill
-;;;       the app and restart it with the same "last question" and unachieved operators
-;;;       awaiting responses.
 (defn execute-plan!
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
@@ -240,6 +236,7 @@
     (log/info "execute-plan!: proj-id =" proj-id "plan =" plan)
     (doseq [plan-step plan] ; after translate-plan plan-steps have :operator :args and :cost.
       (s/assert ::specs/plan-step plan-step)
+      (log/info "run plan-step" plan-step)
       (op/run-op
        (:operator plan-step)
        {:plan-step plan-step
@@ -314,6 +311,7 @@
              pruned  (prune-domain proj-domain start-facts)
              plans   (-> {:domain  pruned :problem problem :execute execute} check-triple translate-triple plan)
              cnt 1]
+        (log/info "state = " state)
         (cond (= plans :bad-input)            :bad-input
               (>= cnt limit)                  (sort-by first state)
               (empty? plans)                  (sort-by first state)
@@ -413,8 +411,9 @@
           :else                                (log/error "Planner fails test:" result))
     result))
 
-;;; ToDo: Check for free port.
-(def endpoint "The port at which the SHOP2 planner can be reached." 31777)
+(defn interview-for-new-project!
+  []
+  (log/info "Starting a new project!!!"))
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!
@@ -422,6 +421,7 @@
    the name of the SBCL core file. That file is expected to be in the project directory."
   []
   (load-domain "data/planning-domains/process-interview.edn")
+  (ws/register-ws-dispatch :start-a-new-project interview-for-new-project!)
   (try
     (let [cmd-arg (cl-format nil "'(setf shop3-zmq::*endpoint* ~S)'" planner-endpoint)]
       ;; --eval does not work!

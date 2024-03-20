@@ -3,11 +3,9 @@
    [clojure.edn             :as edn]
    [clojure.pprint          :refer [cl-format]]
    [clojure.spec.alpha      :as s]
-   [clojure.string          :as str]
    [clojure.test            :refer [deftest is testing]]
    [scheduling-tbd.db       :as db]
    [scheduling-tbd.planner  :as plan]
-   [scheduling-tbd.shop     :as shop]
    [scheduling-tbd.specs    :as specs]
    [scheduling-tbd.web.routes.websockets :as ws]
    [taoensso.timbre          :as log]))

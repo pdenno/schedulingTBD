@@ -18,7 +18,8 @@
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.db-access :as dba]
-   [stbd-app.util :as util]
+   [stbd-app.util   :as util]
+   [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom {}))
@@ -177,7 +178,7 @@
             (p/then #(set-conversation %)))))
     (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
               (log/info "--------- Calling change-project: p =" p)
-              (when (not= proj p)
+              (when-not  (or (= p proj) (= (:project/id p) :START-A-NEW-PROJECT))
                 (dba/set-current-project p)
                 (set-proj p)))]
       ($ Stack {:direction "column" :height useful-height}
@@ -243,9 +244,9 @@
 ;;; ToDo: This only executes on recompile; I'd like it to run on reload too.
 (defn ^{:before-load true, :dev/before-load true} unmount-root []
   (log/info "Unmount root.")
-  (when (and chat/connected? dba/client-id)
-    (log/info "Closing channel for client-id = " dba/client-id)
-    (chat/ws-send-msg {:dispatch-key :close-channel}))) ; The client-id is appended by send-message!.
+  (when (and ws/connected? util/client-id)
+    (log/info "Closing channel for client-id = " util/client-id)
+    (ws/send-msg {:dispatch-key :close-channel}))) ; The client-id is appended by send-message!.
 
 (defn ^{:after-load true, :dev/after-load true} mount-root []
   (sutil/config-log :info)
@@ -254,10 +255,10 @@
                  :min-level
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
-  (reset! chat/connected? false)
+  (reset! ws/connected? false)
   (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
   (log/info "Starting a ping process.") ; Start this here so you don't get one every time the chat updates!
-  (reset! ping-process (js/window.setInterval (fn [] (chat/ping!)) 10000)) ; Ping to keep-alive the web-socket.
+  (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 10000)) ; Ping to keep-alive the web-socket.
   ;; Project list and conversation need to be available when .render. Thus promises.
   (.render root ($ app)))
 

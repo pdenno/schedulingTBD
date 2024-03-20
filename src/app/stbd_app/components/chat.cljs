@@ -5,7 +5,6 @@
    [clojure.edn                :as edn]
    [helix.core                 :refer [defnc $]]
    [helix.hooks                :as hooks]
-   [promesa.core               :as p]
    ["@mui/icons-material/Send$default" :as Send]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/IconButton$default" :as IconButton]
@@ -14,9 +13,8 @@
    ["@mui/material/Stack$default" :as Stack]
    ["react-chat-elements/dist/main"    :as rce]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
+   [stbd-app.ws         :as ws]
    [scheduling-tbd.util :as sutil :refer [timeout-info #_invalidate-timeout-info]]
-   [stbd-app.db-access  :as dba :refer [client-id]]
-   [stbd-app.util       :as util]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
@@ -90,49 +88,6 @@
 (defn add-msg [msg-list msg]
   (-> msg-list js->clj (conj msg) clj->js))
 
-;;; ------------------- web-socket ------------------------------
-(def ws-url (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
-(def channel (atom nil))
-(def connected? (atom false))
-(def pending-promise-keys "These are created by the server to track what is being responded to." (atom #{}))
-
-;;; ToDo: A problem scenario is that the server has put up multiple messages and the user-says just once.
-;;;       I think I'm going to have to have a ws message from the server just about clearing a key.
-;;;       Don't have the client clear it; only have it pick one that it is responding to.
-(defn add-promise-key    [k]  (when k (swap! pending-promise-keys conj k)))
-(defn clear-promise-keys! [ks]
-  (doseq [k ks] (when k (swap! pending-promise-keys disj k))))
-
-(def ping-id (atom 0))
-(defn ping!
-  "Ping the server to keep the socket alive."
-  []
-  (if-let [chan @channel]
-    (when (= 1 (.-readyState chan)) ; 0=connecting, 1=open, 2=closing, 3=closed.
-      (.send chan (str {:dispatch-key :ping,
-                        :client-id client-id
-                        :ping-id (swap! ping-id inc)})))
-    (log/error "Couldn't send ping; channel isn't open.")))
-
-(defn ws-send-msg
-  "Send the message to the server. msg can be any Clojure object but if it is a map we add the :client-id.
-   Example usage: (ws-send-msg! {:dispatch-key :ping})"
-  [msg-obj]
-  (let [msg-obj (assoc msg-obj :client-id client-id)]
-    (if-let [chan @channel]
-      ;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
-      (if (= 1 (.-readyState chan))
-        (.send chan (pr-str msg-obj))
-        (log/warn "Channel not ready to send."))
-      (throw (ex-info "Couldn't send message; no channel." {:msg-text msg-obj})))))
-
-;;; :tbd-says isn't in this because it sets the set-system-text hook.
-(defn dispatch-msg
-  "Call a function depending on the value of :dispatch-key in the message."
-  [{:keys [dispatch-key promise-keys] :as _msg}]
-  (cond (= dispatch-key :clear-promise-keys) (clear-promise-keys! promise-keys)
-        (= dispatch-key :alive?)             (ws-send-msg {:alive? true})))
-
 ;;; ========================= Component ===============================
 (defn make-resize-fns
   "These are used by ShareUpDown. The argument is a Hook state variable set- function."
@@ -150,24 +105,24 @@
         resize-fns (make-resize-fns set-box-height)]
     ;; ------------- talk through web socket; server-initiated.
     (letfn [(connect! [] ; 2024-03-19: This really does seem to need to be inside the component!
-              (if-let [chan (js/WebSocket. ws-url)]
+              (if-let [chan (js/WebSocket. ws/ws-url)]
                 (do (log/info "Websocket Connected!")
-                    (reset! channel chan)
-                    (reset! connected? true)
+                    (reset! ws/channel chan)
+                    (reset! ws/connected? true)
                     (set! (.-onmessage chan)
                           (fn [event]
                             (try (let [{:keys [msg-text promise-key dispatch-key recipient-read-string?] :as msg-obj} (-> event .-data edn/read-string)]
-                                   (dispatch-msg msg-obj) ; Just for :clear-promise-key messages currently.
+                                   (ws/dispatch-msg msg-obj) ; Just for :clear-promise-key messages currently.
                                    (when (= :tbd-says dispatch-key)
                                      (when promise-key (log/info "promise-key = " promise-key "msg =" msg-obj)
-                                           (add-promise-key promise-key))
+                                           (ws/add-promise-key promise-key))
                                      ;; ToDo: Consider transit rather then edn/read-string.
                                      (set-system-text (if recipient-read-string? (edn/read-string msg-text) msg-text))))
                                  (catch :default e (log/warn "Error in :tbd-says socket reading:" e)))))
                     (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))))
-                (throw (ex-info "Websocket Connection Failed:" {:url ws-url}))))]
+                (throw (ex-info "Websocket Connection Failed:" {:url ws/ws-url}))))]
     (hooks/use-effect :once ; Start the web socket.
-      (when-not @connected? (connect!)))
+      (when-not @ws/connected? (connect!)))
     (hooks/use-effect [conv-map] ;... and this is necessary.
       (set-msg-list (->> conv-map :conv (mapv msg2rce) clj->js)))
     (hooks/use-effect [system-text]
@@ -177,10 +132,7 @@
       ;; ------------- Send user-text through REST API; wait on promise for response.
     (hooks/use-effect [user-text]
      (when (not-empty user-text)
-       (ws-send-msg {:dispatch-key :user-says
-                     :msg-text user-text
-                     :client-id client-id
-                     :promise-keys @pending-promise-keys})))
+       (ws/send-msg {:dispatch-key :user-says :msg-text user-text})))
       ;; -------------- progress stuff (currentl not hooked up)
     (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
        (reset! progress-atm 0)

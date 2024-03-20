@@ -105,7 +105,7 @@
                                             :name "project-id"
                                             :description "A string uniquely identifying the project to the system DB."
                                             :json-schema/default "craft-beer-brewery-scheduling"}))
-(s/def ::conv-for (st/spec {:spec #(or (string? %) (keyword? %))
+(s/def ::conv-for (st/spec {:spec #(or (string? %) (keyword? %)) ; ToDo: Investigate. I think keyword? is sufficient.
                             :name "conv-for" ; The description for responses is not shown in Swagger UI.
                             :description "The project-id for which the conversation is provided."
                             :json-schema/default "craft-beer-brewery-scheduling"}))
@@ -146,13 +146,6 @@
    ["/api"
     {:swagger {;:no-doc true
                :tags ["SchedulingTBD functions"]}}
-
-    ["/user-says"
-     {:post {;:no-doc true
-             :summary "Respond to the user's most recent message."
-             :parameters {:body ::user-says-request}
-             :responses {200 {:body ::user-says-response}}
-             :handler resp/user-says}}]
 
     ["/get-conversation"
      {:get {;:no-doc true ; <=====================================================================

@@ -85,20 +85,6 @@
     (db/inc-msg-id! project-id)
     (db/message-form msg-id :system response-text)))
 
-(defn user-says
-  "Handler function for http://api/user-says."
-  [request]
-  (when-let [{:keys [user-text client-id :promise/pending-keys]} (:body-params request)]
-    (assert (uuid? (parse-uuid client-id)))
-    (let [pending-keys (mapv keyword pending-keys)] ; At least the swagger API can send them as strings.
-      (log/info "user-text = " user-text "pending-keys = " pending-keys)
-      (if-let [[_ question] (re-matches #"\s*LLM:(.*)" user-text)]
-        (-> question llm/llm-directly wrap-response http/ok) ; These are intentionally Not tracked in the DB. ToDo: Then whay does wrap-response do db/inc-msg-id?
-        (if-let [[_ surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)]
-          (-> (sur/start-surrogate surrogate-role) http/ok)
-          (do (ops/dispatch-response user-text pending-keys)
-              (http/ok {:message/ack true})))))))
-
 (defn healthcheck
   [_request]
   (log/info "Doing a health check.")

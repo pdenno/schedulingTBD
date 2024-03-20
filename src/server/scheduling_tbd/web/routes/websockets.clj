@@ -6,6 +6,7 @@
    [clojure.edn              :as edn]
    [clojure.spec.alpha       :as s]
    [clojure.walk             :as walk  :refer [keywordize-keys]]
+   ;;[cognitect.transit        :as transit]
    [mount.core               :as mount :refer [defstate]]
    [promesa.core             :as p]
    [ring.websocket.async     :as wsa]
@@ -14,14 +15,10 @@
    [scheduling-tbd.util      :refer [now]]
    [taoensso.timbre          :as log]))
 
-;;; Though this system is only exploratory code that will probably run single-user in a Docker instance,
-;;; I'm writing this mostly as though the server handles multiple clients.
-;;; I think it is just a little less error-prone this way while doing development.
-
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique ID provided by the client." (atom {}))
 (def current-client-id "UUID identifying client. This is for diagnostics." (atom nil))
-(declare user-says send-to-chat)
+(declare user-says send-to-chat dispatch)
 
 ;;; ToDo: move to devl?
 (defn ^:diag any-client!
@@ -43,7 +40,7 @@
 (defn close-ws-channels [id]
   (when (contains? @socket-channels id)
     (let [{:keys [in out err]} (get @socket-channels id)]
-      (log/info "Closing websocket channels for " id (now))
+      ;;(log/info "Closing websocket channels for " id (now))
       (async/close! in)
       (async/close! out)
       (async/close! err)
@@ -56,39 +53,11 @@
 
 (defn ping-diag
   "Create a ping confirmation for use in middle of a round-trip."
-  [{:keys [_id _ping-id]}]
-  ;(log/info "Ping" _ping-id "from" _client-id)
+  [{:keys [id ping-id]}]
+  (log/info "Ping" ping-id "from" id)
   {:dispatch-key :ping-confirm})
 
 (declare clear-keys select-promise)
-;;;--------------------- Receiving a response from a client -----------------------
-(defn user-says
-  "Handle web-socket message with dispatch key :user-says.
-   This will typically clear a promise-key."
-  [{:keys [msg-text client-id promise-keys] :as msg}]
-  (log/info "User-says:" msg)
-  (let [
-        [ask-llm? question] (re-matches #"\s*LLM:(.*)" msg-text)
-        [surrogate? surrogate-role] (re-matches #"\s*SUR:(.*)" msg-text)]
-    (cond ask-llm?           (-> question llm/llm-directly (send-to-chat {:promise? false}))
-          surrogate?         (sur/start-surrogate surrogate-role))
-    (when-let [prom-obj (select-promise promise-keys)]
-      (when (and (not ask-llm?) (not surrogate?))
-        (clear-keys client-id [(:prom-key prom-obj)])
-        (p/resolve! (:prom prom-obj) msg-text)))))
-
-(def dispatch-table
-  "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
-  {:ping          ping-diag
-   :user-says     user-says
-   :close-channel close-channel-by-msg})
-
-(defn dispatch [{:keys [dispatch-key] :as msg}]
-  (log/info "dispatch: msg =" msg)
-  (when-not (= :ping dispatch-key) (log/info "Received msg:" msg))
-  (if (contains? dispatch-table dispatch-key)
-    ((get dispatch-table dispatch-key) msg)
-    (log/error "No dispatch function for " msg)))
 
 ;;; ToDo: I'm using blocking versions (>!!, <!!) so you'd think I'd be checking for timeout.
 ;;;       But some are closed and return nil. I suppose I should put the the test in a future just in case???
@@ -99,7 +68,7 @@
     (let [{:keys [in out _err]} (get @socket-channels id)
           res (do (>!! out (str {:dispatch-key :alive?})) (<!! in))]
       (when-not res
-        (log/info "Closing non-alive channel" id)
+        ;;(log/info "Closing non-alive channel" id)
         (close-ws-channels id)))))
 
 (defn establish-websocket-handler [request]
@@ -107,7 +76,7 @@
   (if-let [id (-> request :query-params keywordize-keys :client-id)]
     (do (close-ws-channels id)
         (let [{:keys [in out err]} (make-ws-channels id)]
-          (log/info "Starting websocket handler for " id (now))
+          ;;(log/info "Starting websocket handler for " id (now))
           (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
             (loop []
               (when-let [msg (<! in)]
@@ -117,6 +86,20 @@
     (log/error "Websocket client did not provide id.")))
 
 ;;; ----------------------- Promise management -------------------------------
+;;;   * By design, the server waits for a response before sending another question (except for maybe some future where there is a "Are you still there?").
+;;;     - Questions always are transmitted over the websocket; they are the beginning of something new.
+;;;   * The user, however might be able to send multiple chat responses before the next question.
+;;;   * promise-keys are an attempt to match the question to the responses.
+;;;     - When the server asks a question, it adds a promise key to the question; the client manages a set of these keys.
+;;;     - When the user does a user-says, it tells the server what keys it has.
+;;;     - As the system processes a user-says, it decides what keys to tell the client to erase.
+;;;     - The system uses the keys to match a question to a user-says.
+;;;       + It picks the key top-most on its stack that is also in the set sent by the client with user-says.
+;;;     - When the system has decided where to route the question, it can also tell the client to remove that key from its set.
+;;;       + This last step is important because the server needs to get old promise-keys off the stack.
+;;;
+;;; Note that the whole process is run in websockets. REST is only used for less interactive UI activities (e.g. changing projects).
+
 (def promise-stack "A stack of promise objects." (atom ()))
 (defn clear-promises! [] (reset! promise-stack '()))
 
@@ -170,6 +153,22 @@
       (go (>! out (str msg))))
     (log/error "Could not find out async channel for client" client-id)))
 
+;;;--------------------- Receiving a response from a client -----------------------
+(defn user-says
+  "Handle web-socket message with dispatch key :user-says. This will typically clear a promise-key."
+  [{:keys [msg-text client-id promise-keys] :as msg}]
+  (log/info "User-says:" msg)
+  (let [
+        [ask-llm? question] (re-matches #"\s*LLM:(.*)" msg-text)
+        [surrogate? surrogate-role] (re-matches #"\s*SUR:(.*)" msg-text)]
+    (cond ask-llm?           (-> question llm/llm-directly (send-to-chat {:promise? false}))
+          surrogate?         (sur/start-surrogate surrogate-role))
+    (when-let [prom-obj (select-promise promise-keys)]
+      (when (and (not ask-llm?) (not surrogate?))
+        (clear-keys client-id [(:prom-key prom-obj)])
+        (log/info "Before resolve!: msg-text =" msg-text)
+        (p/resolve! (:prom prom-obj) msg-text)))))
+
 ;;;-------------------- Sending questions to client --------------------------
 (defn msg4chat
   "Format a message, typically a question, for transmission to a client.
@@ -198,10 +197,35 @@
       prom)
     (log/error "Could not find out async channel for client" client-id)))
 
+(def dispatch-table
+  "A map from keys to functions used to call responses from clients."
+  (atom nil))
+
+(defn register-ws-dispatch
+  "Add a function to the websocket dispatch table."
+  [k func]
+  (swap! dispatch-table #(assoc % k func))
+  (log/info "Registered function for websocket:" k))
+
+;;; ToDo: How is it that vars resolve to the current referent with defmulti, but not here (var-get notwithstanding).
+(defn init-dispatch-table!
+  "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
+  []
+  (reset! dispatch-table {:ping                 ping-diag
+                          :user-says            user-says
+                          :close-channel        close-channel-by-msg}))
+
+(defn dispatch [{:keys [dispatch-key] :as msg}]
+  (when-not (= :ping dispatch-key) (log/info "Received msg:" msg))
+  (if (contains? @dispatch-table dispatch-key)
+    ((get @dispatch-table dispatch-key) msg)
+    (log/error "No dispatch function for " msg)))
+
+
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []
   (clear-promises!)
-  :started!)
+  (init-dispatch-table!))
 
 (defn wsock-stop []
   (doseq [id (keys @socket-channels)]
@@ -211,4 +235,4 @@
 (defstate wsock
   "Reitit Ring handler (a self-sufficient 'app' sans listening on port)."
   :start (wsock-start)
-  :stop (wsock-stop))
+  :stop  (wsock-stop))
