@@ -52,6 +52,7 @@
        (cond-> {:current-project current}
          (not-empty others) (assoc :others others))))))
 
+;;; ToDo: This belongs in utils.clj when you get a chance
 (defmacro report-long-running
   "Return the string from writing to *out* after this runs in a future."
   [[timeout] & body]
@@ -67,11 +68,11 @@
     (log/info "db-resp/set-current-project: project-id =" project-id "client-id =" client-id)
       (cond (db/project-exists? project-id)          (do (db/set-current-project project-id)
                                                          (swap! client-current-proj #(assoc % client-id project-id))
-                                                         (report-long-running (plan/restart-interview project-id))
+                                                         (report-long-running (plan/restart-interview project-id)) ; <========================= replace
                                                          (http/ok {:project/id project-id
                                                                    :project/name (-> (db/get-project project-id) :project/name)}))
 
-            (= project-id :start-a-new-project)      (do (report-long-running (plan/interview-loop project-id :process-interview))
+            (= project-id :start-a-new-project)      (do (report-long-running (plan/interview-loop project-id :process-interview)) ; <=============== replace
                                                          (http/ok {:message/ack true}))
 
             :else                                    (http/not-found))))

@@ -11,6 +11,7 @@
    [promesa.core             :as p]
    [ring.websocket.async     :as wsa]
    [scheduling-tbd.llm       :as llm]
+   [scheduling-tbd.specs     :as spec]
    [scheduling-tbd.surrogate :as sur]
    [scheduling-tbd.util      :refer [now]]
    [taoensso.timbre          :as log]))
@@ -53,8 +54,8 @@
 
 (defn ping-diag
   "Create a ping confirmation for use in middle of a round-trip."
-  [{:keys [id ping-id]}]
-  (log/info "Ping" ping-id "from" id)
+  [{:keys [client-id ping-id]}]
+  ;(log/info "Ping" ping-id "from" client-id)
   {:dispatch-key :ping-confirm})
 
 (declare clear-keys select-promise)
@@ -158,42 +159,29 @@
   "Handle web-socket message with dispatch key :user-says. This will typically clear a promise-key."
   [{:keys [msg-text client-id promise-keys] :as msg}]
   (log/info "User-says:" msg)
-  (let [
-        [ask-llm? question] (re-matches #"\s*LLM:(.*)" msg-text)
-        [surrogate? surrogate-role] (re-matches #"\s*SUR:(.*)" msg-text)]
-    (cond ask-llm?           (-> question llm/llm-directly (send-to-chat {:promise? false}))
-          surrogate?         (sur/start-surrogate surrogate-role))
-    (when-let [prom-obj (select-promise promise-keys)]
-      (when (and (not ask-llm?) (not surrogate?))
-        (clear-keys client-id [(:prom-key prom-obj)])
+  (if-let [prom-obj (select-promise promise-keys)]
+    (do (clear-keys client-id [(:prom-key prom-obj)])
         (log/info "Before resolve!: msg-text =" msg-text)
-        (p/resolve! (:prom prom-obj) msg-text)))))
+        (p/resolve! (:prom prom-obj) msg-text))
+    (log/error "user-says: no prom-key")))
 
 ;;;-------------------- Sending questions to client --------------------------
-(defn msg4chat
-  "Format a message, typically a question, for transmission to a client.
-     msg-text                - Either simple text or something that can be used by edn/read-string.
-     recipient-read-string?  - true if recipient should be edn/read-string the msg-text
-     p-key                   - a key to a promise; so sender can link this to corresponding responses."
-  [msg-text & {:keys [p-key recipient-read-string?]}]
-  (cond-> {:dispatch-key :tbd-says :msg-text msg-text :timestamp (now)}
-    recipient-read-string?       (assoc :recipient-read-string? true)
-    p-key                        (assoc :promise-key p-key)))
-
 ;;; (ws/send-to-chat "Hey are you alive?" :promise? false :client-id (ws/any-client!)
 (defn send-to-chat
   "Send the argument message text to the current project (or some other destination if a client-id is provided.
-   Return a promise that is resolved when the user responds to the message, by whatever means (http or ws)."
-  [msg-text & {:keys [promise? client-id recipient-read-string?]
-               :or {promise? true
-                    client-id @current-client-id}}]
+   Return a promise that is resolved when the user responds to the message, by whatever means (http or ws).
+     msg-obj is is a vector of ::spec/msg-text-elem and :spec/msg-link-elem. See specs.cljs."
+  [msg-obj & {:keys [promise? client-id] :or {promise? true}}]
+  (s/assert ::spec/chat-msg msg-obj)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]
-    (let [{:keys [prom prom-key]} (when promise? (new-promise client-id))]
-      (go (>! out (str (msg4chat
-                        msg-text
-                        :p-key prom-key
-                        :recipient-read-string? recipient-read-string?))))
+    (let [{:keys [prom prom-key]} (when promise? (new-promise client-id))
+          msg-obj (cond-> {:dispatch-key :tbd-says
+                           :msg-obj msg-obj
+                           :client-id client-id
+                           :timestamp (now)}
+                    prom-key (assoc :p-key prom-key))]
+      (go (>! out (str msg-obj)))
       prom)
     (log/error "Could not find out async channel for client" client-id)))
 
@@ -207,16 +195,19 @@
   (swap! dispatch-table #(assoc % k func))
   (log/info "Registered function for websocket:" k))
 
-;;; ToDo: How is it that vars resolve to the current referent with defmulti, but not here (var-get notwithstanding).
 (defn init-dispatch-table!
-  "A map from keyword keys (typically values of :dispatch-key) to functions for websockets."
+  "A map from keyword keys (typically values of :dispatch-key) to functions for websockets.
+   Other entries in this table include (they are added by register-ws-dispatch):
+       :start-a-new-project plan/interview-for-new-proj
+       :surrogate-call      sur/start-surrogate
+       :ask-llm             llm/directly."
   []
   (reset! dispatch-table {:ping                 ping-diag
                           :user-says            user-says
                           :close-channel        close-channel-by-msg}))
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]
-  (when-not (= :ping dispatch-key) (log/info "Received msg:" msg))
+  (when-not (= :ping dispatch-key)  (log/info "Received msg:" msg))
   (if (contains? @dispatch-table dispatch-key)
     ((get @dispatch-table dispatch-key) msg)
     (log/error "No dispatch function for " msg)))

@@ -412,8 +412,8 @@
     result))
 
 (defn interview-for-new-project!
-  []
-  (log/info "Starting a new project!!!"))
+  [{:keys [client-id]}]
+  (log/info "Starting a new project for client" client-id))
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!

@@ -37,3 +37,14 @@
 (s/def ::shop-obj-plan (s/and vector?
                               #(every? (fn [step] (s/valid? ::shop-step step)) %)))
 (s/def ::shop-step (s/keys :req-un [::op ::cost]))
+
+(s/def :msg-text/string string?)
+(s/def :msg-link/uri string?)
+(s/def :msg-link/text string?)
+(s/def ::msg-text-elem (s/keys :req [:msg-text/string]))
+(s/def ::msg-link-elem (s/keys :req [:msg-link/uri :msg-link/text]))
+(s/def ::chat-msg (s/and vector?
+                         #(every? (fn [elem]
+                                    (or (s/valid? ::msg-text-elem elem)
+                                        (s/valid? ::msg-link-elem elem)))
+                                  %)))

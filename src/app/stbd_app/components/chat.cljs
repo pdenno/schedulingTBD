@@ -39,6 +39,26 @@
               (+ @progress-atm 2))]
     res))
 
+;;; --------------------------promise-key management ---------------------------------------
+(def pending-promise-keys "These are created by the server to track what is being responded to." (atom #{}))
+
+(defn add-promise-key
+  "When the server sends a message that is part of a conversation and requires a response, it adds a keyword
+   that associates to a promise on the server side and allows the server to continue the conversation,
+   interpreting the :user-says response which repeat this promise-key as answer to the :tbd-says ws message.
+   This function just adds to the list, which in most cases will be empty when the argument key is added here."
+  [k]  (when k (swap! pending-promise-keys conj k)))
+
+(defn clear-promise-keys! [ks]
+  (doseq [k ks] (when k (swap! pending-promise-keys disj k))))
+
+;;; :tbd-says isn't in this because it sets the set-system-text hook.
+(defn dispatch-msg
+  "Call a function depending on the value of :dispatch-key in the message."
+  [{:keys [dispatch-key promise-keys] :as _msg}]
+  (cond (= dispatch-key :clear-promise-keys) (clear-promise-keys! promise-keys)
+        (= dispatch-key :alive?)             (ws/send-msg {:dispatch-key :alive? :alive? true})))
+
 ;;; ------------------------- active stuff ------------------------------------
 (def item-keys "Atom for a unique :key of some UI object." (atom 0))
 
@@ -99,7 +119,7 @@
         [progress set-progress] (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
         [user-text     set-user-text]   (hooks/use-state "")
-        [system-text set-system-text]   (hooks/use-state "")
+        [tbd-obj set-tbd-obj]   (hooks/use-state "")
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         input-ref (hooks/use-ref nil)
         resize-fns (make-resize-fns set-box-height)]
@@ -112,12 +132,12 @@
                     (set! (.-onmessage chan)
                           (fn [event]
                             (try (let [{:keys [msg-text promise-key dispatch-key recipient-read-string?] :as msg-obj} (-> event .-data edn/read-string)]
-                                   (ws/dispatch-msg msg-obj) ; Just for :clear-promise-key messages currently.
+                                   (dispatch-msg msg-obj) ; Just for :clear-promise-key messages currently.
                                    (when (= :tbd-says dispatch-key)
                                      (when promise-key (log/info "promise-key = " promise-key "msg =" msg-obj)
-                                           (ws/add-promise-key promise-key))
+                                           (add-promise-key promise-key))
                                      ;; ToDo: Consider transit rather then edn/read-string.
-                                     (set-system-text (if recipient-read-string? (edn/read-string msg-text) msg-text))))
+                                     (set-tbd-obj (if recipient-read-string? (edn/read-string msg-text) msg-text))))
                                  (catch :default e (log/warn "Error in :tbd-says socket reading:" e)))))
                     (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))))
                 (throw (ex-info "Websocket Connection Failed:" {:url ws/ws-url}))))]
@@ -125,14 +145,19 @@
       (when-not @ws/connected? (connect!)))
     (hooks/use-effect [conv-map] ;... and this is necessary.
       (set-msg-list (->> conv-map :conv (mapv msg2rce) clj->js)))
-    (hooks/use-effect [system-text]
-      (when (not-empty system-text)
-        (let [new-msg (rce-msg :system system-text)]
+    (hooks/use-effect [tbd-obj]
+      (when (not-empty tbd-obj)
+        (let [new-msg (rce-msg :system (edn/read-string tbd-obj))] ; <============================================== I'm confused!
           (set-msg-list (add-msg msg-list new-msg)))))
       ;; ------------- Send user-text through REST API; wait on promise for response.
     (hooks/use-effect [user-text]
-     (when (not-empty user-text)
-       (ws/send-msg {:dispatch-key :user-says :msg-text user-text})))
+       (when (not-empty user-text)
+         (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" user-text)
+               [surrogate? surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)
+               msg (cond  ask-llm?      {:dispatch-key :ask-llm :question question}
+                          surrogate?    {:dispatch-key :surrogate-call :role surrogate-role}
+                          :else         {:dispatch-key :user-says :msg-text user-text :promise-keys @pending-promise-keys})]
+           (ws/send-msg msg))))
       ;; -------------- progress stuff (currentl not hooked up)
     (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
        (reset! progress-atm 0)

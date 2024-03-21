@@ -179,8 +179,8 @@
     (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
               (log/info "--------- Calling change-project: p =" p)
               (when-not  (or (= p proj) (= (:project/id p) :START-A-NEW-PROJECT))
-                (dba/set-current-project p)
-                (set-proj p)))]
+                (dba/set-current-project p))
+              (set-proj p))]
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
             {:variant "h4"

@@ -10,6 +10,7 @@
    [clojure.edn                  :as edn]
    [wkok.openai-clojure.api      :as openai]
    [scheduling-tbd.sutil         :refer [get-api-key]]
+   [scheduling-tbd.web.routes.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
    [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
@@ -57,10 +58,20 @@
 
 (defn llm-directly
   "User can ask anything outside of session by starting the text with 'LLM:."
-  [question]
-  (query-llm [{:role "system"    :content "You are a helpful assistant."}
-              {:role "user"      :content question}]
-             {:raw-text? true}))
+  [{:keys [client-id question]}]
+  (-> (p/future (query-llm [{:role "system"    :content "You are a helpful assistant."}
+                            {:role "user"      :content question}]
+                           {:raw-text? true}))
+      (p/await 20000)
+      (p/then #(ws/send-to-chat {:dispatch-key :tbd-says
+                                 :client
+
+
+
+(defn llm-init
+  "Mount initialization function for this file."
+  []
+  (ws/register-ws-dispatch  :ask-llm llm-directly))
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-var-partial

@@ -1,10 +1,10 @@
 {:paths   ["src/lib"]
  :deps    {camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
-           cider/cider-nrepl                   {:mvn/version "0.47.0"}  ; <===== added for frustrating mismatch problem.
+           cider/cider-nrepl                   {:mvn/version "0.47.0"}  ; <===== added for frustrating mismatch problem. No help.
            com.cemerick/url                    {:mvn/version "0.1.1"}
            ;;com.cognitect/transit-clj           {:mvn/version "1.0.333"}
-           com.github.pdenno/explainlib        {:mvn/version "1.0.33"} ; was 1.0.12
+           ;;com.github.pdenno/explainlib        {:mvn/version "1.0.33"} ; was 1.0.12
            com.taoensso/timbre                 {:mvn/version "6.5.0"}
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
@@ -20,9 +20,10 @@
            org.apache.logging.log4j/log4j-core {:mvn/version "2.23.1"} ; ToDo: Move logging to :dev.
            org.clj-commons/hickory             {:mvn/version "0.7.4"}
            org.clojure/clojure                 {:mvn/version "1.11.2"}
+           org.clojure/core.unify              {:mvn/version "0.6.0"}
            org.clojure/data.codec              {:mvn/version "0.2.0"}
            org.clojure/data.json               {:mvn/version "2.5.0"}
-           org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"} ; depends on ring/ring-core "1.11.0-beta2 ; Mine is "0.1.19 Needs work.
+           org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"} ;  "0.1.19" Does not exist.
            org.slf4j/slf4j-nop                 {:mvn/version "2.0.12"}    ; Stop spurious logging!
            ring/ring-defaults                  {:mvn/version "0.4.0"}
            ring/ring-jetty-adapter             {:mvn/version "1.12.0"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
@@ -83,12 +84,9 @@
 ;;;  |          |                           mount/mount |       0.1.17 |       0.1.18 |
 ;;;  |          |    org.apache.logging.log4j/log4j-api |       2.23.0 |       2.23.1 |
 ;;;  |          |   org.apache.logging.log4j/log4j-core |       2.23.0 |       2.23.1 |
-;;;  |          | org.ring-clojure/ring-websocket-async |  0.1.0-beta2 |       0.1.19 |  ; It will say 0.1.19 is new, but it is 5 months old and incompatible with newer ring.
-;;;  |          |                        ring/ring-core | 1.11.0-beta2 | 2.0.0-alpha1 |  ; Not doing these.
+;;;  |          | org.ring-clojure/ring-websocket-async |  0.1.0-beta2 |       0.1.19 |  ; search/outdated will say 0.1.19 is new, but it cannot be found.
+;;;  |          |                        ring/ring-core | 1.11.0-beta2 | 2.0.0-alpha1 |  ; Not doing these. 2.0.0 is not happening any time soon.
 ;;;  |          |                       ring/ring-devel | 1.11.0-beta2 | 2.0.0-alpha1 |  ; org.ring-clojure/ring-websocket-async
 ;;;  |          |               ring/ring-jetty-adapter | 1.11.0-beta2 | 2.0.0-alpha1 |  ; is a problem. Conversation with James Reeves; 1.11.1 is up to date (not .0-beta2)
 ;;;  |          |                  thheller/shadow-cljs |       2.27.4 |       2.27.5 |
 ;;;  |          |                  thheller/shadow-cljs |       2.27.4 |       2.27.5 |
-
-;;; I tried to build local ring-websocket-async/0.1.19 to use the 2.0.0-alpha1 ring stuff; not successful.
-;;; Of course, 2.0 means breaking changes anyway!
