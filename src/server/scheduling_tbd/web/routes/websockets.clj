@@ -10,9 +10,7 @@
    [mount.core               :as mount :refer [defstate]]
    [promesa.core             :as p]
    [ring.websocket.async     :as wsa]
-   [scheduling-tbd.llm       :as llm]
    [scheduling-tbd.specs     :as spec]
-   [scheduling-tbd.surrogate :as sur]
    [scheduling-tbd.util      :refer [now]]
    [taoensso.timbre          :as log]))
 
@@ -168,16 +166,16 @@
 ;;;-------------------- Sending questions to client --------------------------
 ;;; (ws/send-to-chat "Hey are you alive?" :promise? false :client-id (ws/any-client!)
 (defn send-to-chat
-  "Send the argument message text to the current project (or some other destination if a client-id is provided.
+  "Send the argument message-vec to the current project (or some other destination if a client-id is provided.
    Return a promise that is resolved when the user responds to the message, by whatever means (http or ws).
-     msg-obj is is a vector of ::spec/msg-text-elem and :spec/msg-link-elem. See specs.cljs."
-  [msg-obj & {:keys [promise? client-id] :or {promise? true}}]
-  (s/assert ::spec/chat-msg msg-obj)
+     msg-vec is is a vector of ::spec/msg-text-elem and :spec/msg-link-elem. See specs.cljs."
+  [msg-vec & {:keys [promise? client-id] :or {promise? true}}]
+  (s/assert ::spec/chat-msg-vec msg-vec)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]
     (let [{:keys [prom prom-key]} (when promise? (new-promise client-id))
           msg-obj (cond-> {:dispatch-key :tbd-says
-                           :msg-obj msg-obj
+                           :msg-vec msg-vec
                            :client-id client-id
                            :timestamp (now)}
                     prom-key (assoc :p-key prom-key))]

@@ -42,7 +42,7 @@
 ;;; --------------------------promise-key management ---------------------------------------
 (def pending-promise-keys "These are created by the server to track what is being responded to." (atom #{}))
 
-(defn add-promise-key
+(defn remember-promise ; Silly name?
   "When the server sends a message that is part of a conversation and requires a response, it adds a keyword
    that associates to a promise on the server side and allows the server to continue the conversation,
    interpreting the :user-says response which repeat this promise-key as answer to the :tbd-says ws message.
@@ -76,23 +76,12 @@
 ;;; ToDo: Remove this and it usages?
 (def msg-index "This might be a waste of time. WS won't' print the same message twice in a row."  (atom 0))
 
-(defn rce-msg
-  "Return a React Chat Elements (RCE) message for simple text content.
-   Example usage: (rce-msg :system :text 'Hello, World!')."
-  [speaker text]
-  (let [{:keys [name color position]} (get msg-style speaker)]
-    (clj->js {:id (swap! msg-index inc)
-              :type "text"
-              :title name
-              :titleColor color
-              :position position
-              :text (vector text)})))
 
-(defn msg2rce
+(defn msg-vec2rce
   "Rewrite the conversation DB-style messages to objects acceptable to the RCE component.
    Does not do clj->js on it, however."
-  [msg]
-  (let [{:keys [name color position]} (get msg-style (:message/from msg))]
+  [msg-vec msg-owner]
+  (let [{:keys [name color position]} (get msg-style msg-owner)]
     (-> {:type "text"}
         (assoc :id (swap! msg-index inc))
         (assoc :title name)
@@ -103,7 +92,7 @@
                                  (conj res (make-link (:msg-link/uri elem) (:msg-link/text elem)))
                                  (conj res (:msg-text/string elem))))
                              []
-                             (:message/content msg))))))
+                             msg-vec)))))
 
 (defn add-msg [msg-list msg]
   (-> msg-list js->clj (conj msg) clj->js))
@@ -115,13 +104,13 @@
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
 (defnc Chat [{:keys [chat-height conv-map]}]
-  (let [[msg-list set-msg-list] (hooks/use-state (->> conv-map :conv (mapv msg2rce) clj->js))
-        [progress set-progress] (hooks/use-state 0)
+  (let [[msg-list set-msg-list]         (hooks/use-state (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js))
+        [progress set-progress]         (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
-        [user-text     set-user-text]   (hooks/use-state "")
-        [tbd-obj set-tbd-obj]   (hooks/use-state "")
+        [user-text     set-user-text]   (hooks/use-state "")                         ; Something the user said, plain text.
+        [tbd-obj set-tbd-obj]           (hooks/use-state "")                         ; Something the system said, a dispatch-obj with :msg-vec.
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
-        input-ref (hooks/use-ref nil)
+        input-ref                       (hooks/use-ref nil)
         resize-fns (make-resize-fns set-box-height)]
     ;; ------------- talk through web socket; server-initiated.
     (letfn [(connect! [] ; 2024-03-19: This really does seem to need to be inside the component!
@@ -130,27 +119,27 @@
                     (reset! ws/channel chan)
                     (reset! ws/connected? true)
                     (set! (.-onmessage chan)
-                          (fn [event]
-                            (try (let [{:keys [msg-text promise-key dispatch-key recipient-read-string?] :as msg-obj} (-> event .-data edn/read-string)]
+                          (fn [event]       ;; ToDo: Consider transit rather then edn/read-string.
+                            (try (let [{:keys [promise-key dispatch-key] :as msg-obj} (-> event .-data edn/read-string)]
                                    (dispatch-msg msg-obj) ; Just for :clear-promise-key messages currently.
                                    (when (= :tbd-says dispatch-key)
                                      (when promise-key (log/info "promise-key = " promise-key "msg =" msg-obj)
-                                           (add-promise-key promise-key))
-                                     ;; ToDo: Consider transit rather then edn/read-string.
-                                     (set-tbd-obj (if recipient-read-string? (edn/read-string msg-text) msg-text))))
+                                           (remember-promise promise-key))
+                                     (log/info "msg-obj =" msg-obj)
+                                     (set-tbd-obj msg-obj)))
                                  (catch :default e (log/warn "Error in :tbd-says socket reading:" e)))))
                     (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))))
                 (throw (ex-info "Websocket Connection Failed:" {:url ws/ws-url}))))]
     (hooks/use-effect :once ; Start the web socket.
       (when-not @ws/connected? (connect!)))
-    (hooks/use-effect [conv-map] ;... and this is necessary.
-      (set-msg-list (->> conv-map :conv (mapv msg2rce) clj->js)))
-    (hooks/use-effect [tbd-obj]
+    (hooks/use-effect [conv-map] ; Put the entire conversation into the chat.
+      (set-msg-list (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js)))
+    (hooks/use-effect [tbd-obj]  ; Put TBD's (server's) message into the chat.
       (when (not-empty tbd-obj)
-        (let [new-msg (rce-msg :system (edn/read-string tbd-obj))] ; <============================================== I'm confused!
+        (log/info "*******************In effect, tbd-obj =" tbd-obj)
+        (let [new-msg (-> tbd-obj :msg-vec (msg-vec2rce :system) clj->js)]
           (set-msg-list (add-msg msg-list new-msg)))))
-      ;; ------------- Send user-text through REST API; wait on promise for response.
-    (hooks/use-effect [user-text]
+    (hooks/use-effect [user-text] ; Entered by user with arrow button. Send user-text to the server, and put it in the chat.
        (when (not-empty user-text)
          (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" user-text)
                [surrogate? surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)
@@ -196,7 +185,7 @@
                                   :multiline true})
                     ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
                                                (when-let [text (not-empty (j/get iref :value))]
-                                                 (set-msg-list (add-msg msg-list (rce-msg :user text)))
+                                                 (set-msg-list (add-msg msg-list (msg-vec2rce [{:msg-text/string text}] :user)))
                                          (j/assoc! iref :value "")
                                          (set-user-text text)))}
                        ($ Send))))}))))

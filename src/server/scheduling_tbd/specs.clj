@@ -43,8 +43,8 @@
 (s/def :msg-link/text string?)
 (s/def ::msg-text-elem (s/keys :req [:msg-text/string]))
 (s/def ::msg-link-elem (s/keys :req [:msg-link/uri :msg-link/text]))
-(s/def ::chat-msg (s/and vector?
-                         #(every? (fn [elem]
-                                    (or (s/valid? ::msg-text-elem elem)
-                                        (s/valid? ::msg-link-elem elem)))
-                                  %)))
+(s/def ::chat-msg-vec (s/and vector?
+                             #(every? (fn [elem]
+                                        (or (s/valid? ::msg-text-elem elem)
+                                            (s/valid? ::msg-link-elem elem)))
+                                      %)))

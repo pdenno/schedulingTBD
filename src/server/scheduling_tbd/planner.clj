@@ -299,13 +299,13 @@
    'triple' below refers to the map containing :domain :problem and :execute in either proj or SHOP form.
    The function returns the state achieved, a collection of :specs/proposition."
   [proj-id domain-id client-id & {:keys [start-facts problem limit]
-                                  :or {start-facts [],
+                                  :or {start-facts '#{},
                                        problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
                                        limit 30}}] ; ToDo: Temporary
   (s/assert ::specs/domain-problem problem)
   (let [proj-domain (-> domain-id (get-domain {:form :proj}))
         execute (:domain/execute proj-domain)]
-    (letfn [(translate-triple [triple] (-> triple (update :domain shop/proj2shop) (update :problem shop/problem2shop)))] ; N.B.: A good place to wrap with (reset! diag)
+    (letfn [(translate-triple [triple] (reset! diag (-> triple (update :domain shop/proj2shop) (update :problem shop/problem2shop))))] ; N.B.: A good place to wrap with (reset! diag)
       (loop [state   start-facts
              problem (-> problem (assoc :problem/state-string (str start-facts)))
              pruned  (prune-domain proj-domain start-facts)
@@ -383,20 +383,22 @@
 ;;;(plan kiwi-example) ==> ["(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))"]
 (def kiwi-example
   "This is an example from usage from the SHOP2 documentation. It is used to test communication with the planner."
-  {:domain '(defdomain kiwi-example
-              ((:operator (!pickup ?a) () () ((have ?a)))
-               (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())
-               (:method (swap ?x ?y)
+  '{:domain (defdomain kiwi-example
+              ((:method (swap ?x ?y)
                         just-one-way
                         ((have ?x))
                         ((!drop ?x) (!pickup ?y))
                         ((have ?y))
-                        ((!drop ?y) (!pickup ?x)))))
-   :problem '(defproblem problem1 kiwi-example
+                        ((!drop ?y) (!pickup ?x)))
+               (:operator (!pickup ?a) () () ((have ?a)))
+               (:operator (!drop ?a) ((have ?a)) ((have ?a)) ())))
+    :problem (defproblem problem1 kiwi-example
                ((have banjo))         ; This is state data.
                ((swap banjo kiwi)))   ; This is a method.
-   :execute '(find-plans 'problem1 :verbose :plans)
-   :answer '(((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))})
+   :execute (find-plans 'problem1 :verbose :plans)
+    :answer (((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))})
+
+
 
 (defn test-the-planner
   "Define a planning domain. Define a problem. Find plans for the problem.
@@ -411,9 +413,13 @@
           :else                                (log/error "Planner fails test:" result))
     result))
 
+;;; Run the following when you update interview-for-new-project!:
+;;;  (ws/register-ws-dispatch :start-a-new-project plan/interview-for-new-project!)
 (defn interview-for-new-project!
   [{:keys [client-id]}]
-  (log/info "Starting a new project for client" client-id))
+  (log/info "Calling inteview-loop for new project: client-id =" client-id)
+  (interview-loop :new-project :process-interview client-id))
+
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!

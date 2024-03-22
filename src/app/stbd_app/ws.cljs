@@ -24,7 +24,7 @@
   "Send the message to the server. msg can be any Clojure object but if it is a map we add the :client-id.
    Example usage: (ws-send-msg! {:dispatch-key :ping})"
   [{:keys [dispatch-key] :as msg-obj}]
-  (assert (#{:users-says :alive? :ping :start-a-new-project} dispatch-key))
+  (assert (#{:users-says :alive? :ping :start-a-new-project :ask-llm :surrogate-call} dispatch-key))
   (let [msg-obj (assoc msg-obj :client-id client-id)]
     (if-let [chan @channel]
       ;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.

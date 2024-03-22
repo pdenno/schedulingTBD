@@ -25,12 +25,21 @@
 
 ;;; (tryme :snowboards-production-scheduling)
 ;;; (tryme :aluminium-foil-production-scheduling)
-(defn ^:diag tryme
+(defn ^:diag tryme []
+  (plan/load-domain "data/planning-domains/process-interview.edn")
+  (db/recreate-dbs!)
+  (plan/interview-loop
+   :new-project
+   :process-interview
+   (ws/any-client!)))
+
+
+(defn ^:diag tryme-old
   ([] (tryme :craft-beer-brewery-scheduling))
   ([proj-id]
    (plan/load-domain "data/planning-domains/process-interview.edn")
    (db/recreate-dbs!)
-   (let [state-vec (-> proj-id
+   (let [state-set (-> proj-id
                        db/get-project
                        :project/state-string
                        edn/read-string)]
@@ -39,4 +48,4 @@
       proj-id
       :process-interview
       (ws/any-client!)
-      {:start-facts state-vec}))))
+      {:start-facts state-set}))))

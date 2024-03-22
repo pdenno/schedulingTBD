@@ -14,6 +14,8 @@
    [camel-snake-kebab.core       :as csk]
    [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
+   [mount.core                   :as mount :refer [defstate]]
+   [promesa.core                 :as p]
    [taoensso.timbre              :as log]))
 
 (def ^:diag diag (atom nil))
@@ -56,6 +58,7 @@
            (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
     (throw (ex-info "No key for use of LLM API found." {}))))
 
+;;; (llm/llm-start)
 (defn llm-directly
   "User can ask anything outside of session by starting the text with 'LLM:."
   [{:keys [client-id question]}]
@@ -63,15 +66,8 @@
                             {:role "user"      :content question}]
                            {:raw-text? true}))
       (p/await 20000)
-      (p/then #(ws/send-to-chat {:dispatch-key :tbd-says
-                                 :client
-
-
-
-(defn llm-init
-  "Mount initialization function for this file."
-  []
-  (ws/register-ws-dispatch  :ask-llm llm-directly))
+      (p/then #(ws/send-to-chat [{:msg-text/string %}] {:client-id client-id :promise? false}))
+      (p/catch #(log/error "Failure in llm-directly:" %))))
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-var-partial
@@ -134,3 +130,15 @@
                               :instructions instructions
                               :tools        tools} ; Will be good for csv and xslx, at least.
                              {:api-key key})))
+
+;;;------------------- Starting and stopping ---------------
+(defn llm-start []
+  (ws/register-ws-dispatch  :ask-llm llm-directly)
+  :ask-directly-registered)
+
+(defn llm-stop [] :llm-stopped)
+
+(defstate llm-tools
+  "Initialize llm-tools, so far just registering for llm-directly."
+  :start (llm-start)
+  :stop  (llm-stop))
