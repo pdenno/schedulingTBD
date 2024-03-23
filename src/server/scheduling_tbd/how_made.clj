@@ -212,7 +212,7 @@
   (if (segment-exists? seg-name)
     (if-let [challenge (-> (str "a company that makes " seg-name)
                              dom/pretend-you-manage-prompt
-                             (llm/query-llm {:model "gpt-4" :raw-text? true}))]
+                             (llm/query-llm {:model-class :gpt-4 :raw-text? true}))]
       (do (log/info "Intro Response: " challenge)
           (d/transact (connect-atm :him) {:tx-data [{:segment/name seg-name
                                                      :segment/challenge-intro challenge}]}))

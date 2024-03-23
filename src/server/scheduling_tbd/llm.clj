@@ -20,31 +20,31 @@
 
 (def ^:diag diag (atom nil))
 
-(def factors-enumeration nil)
+(def openai-models
+  "A map keyed by 'simple' keywords associating a model name recognized by openai. Example {:gpt4 'gpt-4-turbo-preview'...}"
+  (atom {}))
 
-;;; GPT-3.5 Turbo Instruct is a large language model that builds upon the capabilities of GPT-3.5 Turbo.
-;;; It is specifically optimized for understanding and executing instructions in a wide range of tasks and scenarios.
-;;; Unlike chat-focused models, GPT-3.5-turbo-instruct excels in providing direct and precise responses to instructions.
-#_[{:id "gpt-3.5-turbo",               :created 1677610602, :owned_by "openai"}
-   {:id "gpt-3.5-turbo-0301",          :created 1677649963, :owned_by "openai"}
-   {:id "gpt-3.5-turbo-16k",           :created 1683758102, :owned_by "openai-internal"}
-   {:id "gpt-3.5-turbo-16k-0613",      :created 1685474247, :owned_by "openai"}
-   {:id "gpt-3.5-turbo-0613",          :created 1686587434, :owned_by "openai"}
-   {:id "gpt-4-0613",                  :created 1686588896, :owned_by "openai"}
-   {:id "gpt-4-0314",                  :created 1687882410, :owned_by "openai"}
-   {:id "gpt-4",                       :created 1687882411, :owned_by "openai"}
-   {:id "gpt-3.5-turbo-instruct",      :created 1692901427, :owned_by "system"} ; "This is not a chat model and thus not supported in the v1/chat/completions endpoint. Did you mean to use v1/completions?
-   {:id "gpt-3.5-turbo-instruct-0914", :created 1694122472, :owned_by "system"}]
+(def openai-models-preferred
+  "These names (keywords) are the models we use, and the models we've been using lately."
+  {:gpt-3.5     "gpt-3.5-turbo-0125"
+   :gpt-4       "gpt-4-0125-preview"
+   :davinci     "davinci-002"})
 
-(def chat-model? #{"gpt-3.5-turbo", "gpt-3.5-turbo-0301", "gpt-3.5-turbo-16k", "gpt-3.5-turbo-16k-0613", "gpt-3.5-turbo-0613", "gpt-4-0613", "gpt-4-0314", "gpt-4"})
+(defn pick-llm
+  "Return a string recognizable by OpenAI naming a model of the class provide.
+   For example (pick-llm :gpt-4) --> 'gpt-4-0125-preview'."
+  [k]
+  (assert (contains? @openai-models k))
+  (get @openai-models k))
 
 (defn query-llm
   "Return a Clojure map that is read from the string created by the LLM given the vector of messages that is the argument."
-  [messages & {:keys [model raw-text?] :or {model "gpt-3.5-turbo"} :as other}]
+  [messages & {:keys [model-class raw-text?] :or {model :gpt-4} :as other}]
   (reset! diag {:msg messages :other other})
-  (assert (chat-model? model)) ; Otherwise you get an http 404; you might not connect the dots!
   (if-let [key (get-api-key :llm)]
-    (try (let [res (-> (openai/create-chat-completion {:model model :messages messages} {:api-key key})
+    (try (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class)
+                                                       :messages messages}
+                                                      {:api-key key})
                        :choices
                        first
                        :message
@@ -99,7 +99,7 @@
     (let [prompt (conj good-var-partial
                        {:role "user"
                         :content (cl-format nil "[~A]" purpose)})]
-      (try (let [res (query-llm prompt {:model "gpt-4"})]
+      (try (let [res (query-llm prompt {:model-class :gpt-4})]
              (if-let [var-name (:name res)]
                (cond-> var-name
                  (= :kebab-case string-type) (csk/->kebab-case-string)
@@ -131,12 +131,36 @@
                               :tools        tools} ; Will be good for csv and xslx, at least.
                              {:api-key key})))
 
+(defn select-openai-models!
+  "Set the open-ai-models atom to models in each class"
+  []
+  (if-let [api-key (get-api-key :llm)]
+    (let [models (->> (openai/list-models {:api-key api-key}) :data  (sort-by :created) reverse)]
+      (reset! openai-models
+              (reduce (fn [res k]
+                        (let [preferred (get openai-models-preferred k)
+                              chosen (or (some #(when (= preferred (:id %)) (:id %)) models)
+                                         (let [pattern (re-pattern (str "^" (name k) ".*"))]
+                                           (some #(when (re-matches pattern (:id %)) (:id %)) models)))]
+                          (assoc res k chosen)))
+                      {}
+                      (keys openai-models-preferred))))
+    (throw (ex-info "Could not find LLM api key." {})))
+  (when-not (every? #(get @openai-models %) (keys openai-models-preferred))
+    (throw (ex-info "No openai-model found for a required model type." {:models @openai-models})))
+  (doseq [[k mod] @openai-models]
+    (when (not= mod (get openai-models-preferred k))
+      (log/warn "Preferred model for" k "was not available. Chose" mod))))
+
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []
   (ws/register-ws-dispatch  :ask-llm llm-directly)
-  :ask-directly-registered)
+  (select-openai-models!)
+  [:ask-directly-registered :opena-models-selected])
 
-(defn llm-stop [] :llm-stopped)
+(defn llm-stop []
+  (reset! openai-models {})
+  :llm-stopped)
 
 (defstate llm-tools
   "Initialize llm-tools, so far just registering for llm-directly."

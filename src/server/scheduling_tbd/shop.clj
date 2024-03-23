@@ -2,6 +2,7 @@
   "Rewrite SHOP planning domain structures to db structures.
    Rewrite db structures to SHOP planning domain (defdomain) structures."
   (:require
+   [clojure.core.unify   :as uni]
    [clojure.edn          :as edn]
    [clojure.java.io      :as io]
    [clojure.pprint       :refer [cl-format]]
@@ -981,14 +982,18 @@
 
 (defn problem2shop
   "Return the shop object (an s-expression) defproblem for the given proj-format object."
-  [{:problem/keys [ename domain state-string goal-string] :as _diag}]
-  (reset! diag _diag)
-  (edn/read-string
-   (cl-format nil
-              "(defproblem ~A ~A ~%  (~{~%~A~^ ~}) ~%  (~{~A~^ ~}))"
-              ename (name domain)
-              (->> (edn/read-string state-string) (sort-by first))
-              (edn/read-string goal-string))))
+  [{:problem/keys [ename domain state-string goal-string] :as _prob} state-vec]
+  (reset! diag {:prob _prob :state-vec state-vec})
+  (let [goals (edn/read-string goal-string)
+        goal-pred (first goals ) ; ToDo: I'm assuming here that goal-string is a single predicate
+        bindings (reduce (fn [res g] (merge res (uni/unify goal-pred g))) {} state-vec)
+        goals (mapv #(uni/subst % bindings) goals)]
+    (edn/read-string
+     (cl-format nil
+                "(defproblem ~A ~A ~%  (~{~%~A~^ ~}) ~%  (~{~A~^ ~}))"
+                ename (name domain)
+                (->> (edn/read-string state-string) (sort-by first))
+                goals))))
 
 ;;;=============================== Serialization (DB structures to SHOP common-lisp s-expressions) ================================================
 (defmacro defdb2shop

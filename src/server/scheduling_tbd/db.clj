@@ -288,16 +288,6 @@
             (not [?e :project/deleted? true])]
           @(connect-atm :system)))))
 
-(defn proj-eid
-  "Return the project object's entity id. pid is :project/id."
-  [pid]
-  (when-let [conn (connect-atm pid)]
-    (d/q '[:find ?e .
-           :in $ ?pid
-           :where [?e :project/id ?pid]]
-         @conn
-         pid)))
-
 ;;; ToDo: Add structure to this as the structure develops.
 (defn get-project
   "Return a vector of project content.
@@ -305,20 +295,22 @@
   ([pid] (get-project pid #{:db/id}))
   ([pid filter-set]
   (let [conn (connect-atm pid)]
-    (when-let [eid (proj-eid pid)]
+    (when-let [eid (project-exists? pid)]
       (resolve-db-id {:db/id eid} conn filter-set)))))
 
 (defn get-state
   [pid & {:keys [sort?] :or {sort? true}}]
-  (let [conn (connect-atm pid)]
-    (when-let [state-str (d/q '[:find ?s .
-                                :in $ ?pid
-                                :where
-                                [?e :project/id ?pid]
-                                [?e :project/state-string ?s]]
-                              @conn)]
-      (cond->> (edn/read-string state-str)
-        sort? (sort-by first)))))
+  (if (= pid :new-project)
+    []
+    (let [conn (connect-atm pid)]
+      (when-let [state-str (d/q '[:find ?s .
+                                  :in $ ?pid
+                                  :where
+                                  [?e :project/id ?pid]
+                                  [?e :project/state-string ?s]]
+                                @conn)]
+        (cond->> (edn/read-string state-str)
+          sort? (sort-by first))))))
 
 (def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
   #{:project/messages :message/id :message/from :message/content :message/time :msg-text/string :msg-link/uri})
@@ -337,7 +329,7 @@
 (defn put-state
   "Write an updated state to the project database."
   [pid state-vec]
-  (let [eid (proj-eid pid)
+  (let [eid (project-exists? pid)
         conn (connect-atm pid)]
     (d/transact conn {:tx-data [[:db/add eid :project/state-string (str state-vec)]]})))
 

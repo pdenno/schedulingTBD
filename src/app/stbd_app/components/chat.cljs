@@ -120,15 +120,14 @@
                     (reset! ws/connected? true)
                     (set! (.-onmessage chan)
                           (fn [event]       ;; ToDo: Consider transit rather then edn/read-string.
-                            (try (let [{:keys [promise-key dispatch-key] :as msg-obj} (-> event .-data edn/read-string)]
-                                   (dispatch-msg msg-obj) ; Just for :clear-promise-key messages currently.
+                            (try (let [{:keys [p-key dispatch-key] :as msg-obj} (-> event .-data edn/read-string)]
+                                   (dispatch-msg msg-obj) ; Just for :clear-promise-keys messages currently.
                                    (when (= :tbd-says dispatch-key)
-                                     (when promise-key (log/info "promise-key = " promise-key "msg =" msg-obj)
-                                           (remember-promise promise-key))
+                                     (when p-key (remember-promise p-key))
                                      (log/info "msg-obj =" msg-obj)
                                      (set-tbd-obj msg-obj)))
                                  (catch :default e (log/warn "Error in :tbd-says socket reading:" e)))))
-                    (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))))
+                    (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg)))) ; ToDo: investigate why it gets these.
                 (throw (ex-info "Websocket Connection Failed:" {:url ws/ws-url}))))]
     (hooks/use-effect :once ; Start the web socket.
       (when-not @ws/connected? (connect!)))
@@ -136,16 +135,17 @@
       (set-msg-list (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js)))
     (hooks/use-effect [tbd-obj]  ; Put TBD's (server's) message into the chat.
       (when (not-empty tbd-obj)
-        (log/info "*******************In effect, tbd-obj =" tbd-obj)
         (let [new-msg (-> tbd-obj :msg-vec (msg-vec2rce :system) clj->js)]
           (set-msg-list (add-msg msg-list new-msg)))))
     (hooks/use-effect [user-text] ; Entered by user with arrow button. Send user-text to the server, and put it in the chat.
        (when (not-empty user-text)
+         (log/info "In user-text hook: user-text =" user-text)
          (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" user-text)
                [surrogate? surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)
                msg (cond  ask-llm?      {:dispatch-key :ask-llm :question question}
                           surrogate?    {:dispatch-key :surrogate-call :role surrogate-role}
                           :else         {:dispatch-key :user-says :msg-text user-text :promise-keys @pending-promise-keys})]
+           (log/info "Before ws/send-msg: msg =" msg)
            (ws/send-msg msg))))
       ;; -------------- progress stuff (currentl not hooked up)
     (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.

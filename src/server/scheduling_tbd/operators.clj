@@ -2,16 +2,18 @@
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:refer-clojure :exclude [send])
   (:require
-   [clojure.core.unify   :as uni]
-   [clojure.pprint       :refer [cl-format]]
-   [clojure.spec.alpha   :as s]
-   [datahike.api         :as d]
-   [promesa.core         :as p]
-   [scheduling-tbd.db    :as db]
-   [scheduling-tbd.specs :as specs]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
+   [clojure.core.unify    :as uni]
+   [clojure.pprint        :refer [cl-format]]
+   [clojure.spec.alpha    :as s]
+   [clojure.string        :as str]
+   [datahike.api          :as d]
+   [promesa.core          :as p]
+   [scheduling-tbd.db     :as db]
+   [scheduling-tbd.domain :as dom]
+   [scheduling-tbd.specs  :as spec]
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
    [scheduling-tbd.web.routes.websockets  :as ws]
-   [taoensso.timbre      :as log]))
+   [taoensso.timbre       :as log]))
 
 (def debugging? (atom true))
 (def ^:diag diag (atom nil))
@@ -53,8 +55,8 @@
 
 (defn db-action-dispatch
   "Parameters to db-action is a object with at least a :plan-step in it and a response from run-op (user response)."
-  [obj & _]
-  (log/info "db-action-dispatch: obj =" obj)
+  [obj _response]
+  ;(log/info "db-action-dispatch: obj =" obj "response =" _response)
   (if-let [tag (-> obj :plan-step :operator)]
     tag
     (throw (ex-info "db-action-dispatch: No dispatch value for plan-step" {:obj obj}))))
@@ -73,7 +75,7 @@
 ;;;       For the time being, I'm just adding uniquely
 (defn add-del-facts
   "Update the facts by adding, deleting or resetting to empty.
-     facts - a set of ::specs/positive-proposition.
+     facts - a set of ::spec/positive-proposition.
      a map - with keys :add and :delete being collections of :specs/positive-proposition.
              These need not be ground propositions; everything that unifies with a
              form in delete will be deleted.
@@ -81,12 +83,26 @@
              reset? is truthy."
   [facts {:keys [add delete reset?]}]
   (assert set? facts)
-  (assert (every? #(s/valid? ::specs/positive-proposition %) facts))
+  (assert (every? #(s/valid? ::spec/positive-proposition %) facts))
   (as-> (if reset? #{} facts) ?f
     (if delete
       (->> ?f (remove (fn [fact] (some #(uni/unify fact %) delete))) set)
       ?f)
     (if add (into ?f add) ?f)))
+
+(defn find-fact
+  "Unify the fact (which need not be ground) to the fact-list"
+  [fact fact-list]
+  (some #(when (uni/unify fact %) %) fact-list))
+
+(defn new-project-advance
+  "Stuff done to create a new project through project-advance."
+  [{:keys [more-a-list]}]
+  (if-let [pname-fact (find-fact '(project-name ?x) more-a-list)]
+    (let [pid   (-> pname-fact second str/lower-case (str/replace #"\s+" "-") keyword)
+          pname (-> pname-fact second (str/replace #"\-" " "))] ; ToDo: Fix this (in caller).
+      (db/create-proj-db! {:project/id pid :project/name  pname}))
+    (throw (ex-info "Couldn't find a project-name fact while advancing plan." {:more-a-list more-a-list}))))
 
 (defn advance-plan
   "Update the project's DB, specifically :project/state-string to show how the plan has advanced.
@@ -94,74 +110,90 @@
       - proj-id is the keyword identifying a project by its :project/id.
       - domain is a domain object, typically one that has been pruned. (So it IS small!)
    Returns the new state."
-  [{:keys [plan-step proj-id domain]} _response]
-  (log/info "advance-plan: plan-step = " plan-step "proj-id =" proj-id "domain =" domain)
+  [{:keys [plan-step proj-id domain more-d-list more-a-list] :as obj}]
+  (log/info "advance-plan: proj-id =" proj-id "more-d-list = " more-d-list "more-a-list =" more-a-list)
   (let [facts (db/get-state proj-id)
         {:keys [operator args]} plan-step
         op-sym (-> operator name symbol)
         op-obj (domain-operator domain op-sym) ; ToDo: This simplifies when shop is gone.
         bindings (zipmap (-> op-obj :operator/head rest) args)
-        a-list (mapv #(uni/subst % bindings) (:operator/a-list op-obj))
-        d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))
+        a-list (into (mapv #(uni/subst % bindings) (:operator/a-list op-obj)) more-a-list)
+        d-list (into (mapv #(uni/subst % bindings) (:operator/d-list op-obj)) more-d-list)
         new-state (add-del-facts facts {:add a-list :delete d-list})
-        eid (db/proj-eid proj-id)]
-    (d/transact (connect-atm proj-id) [[:db/add eid :project/state-string (str new-state)]])
+        eid (db/project-exists? proj-id)]
+    (cond eid                        (d/transact (connect-atm proj-id) [[:db/add eid :project/state-string (str new-state)]])
+          (= proj-id :new-project)   (new-project-advance obj)
+          :else                      (throw (ex-info "Couldn't find proj-id while advancing plan." {:proj-id proj-id})))
     new-state))
 
 (def wait-time-for-user-resp "The number of milliseconds to wait for the user to reply to a query." 20000)
 
-(def intro-message
-  "The first message of a conversation."
-  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
-   {:msg-link/uri "http://localhost:3300/learn-more"
-    :msg-link/text "learn more about how this works"}
-   {:msg-text/string "."}])
+(defn str2msg-vec [s] [{:msg-text/string s}])
 
 ;;; Typically we won't save an interview query message to the DB until after receiving a response to it from the user.
 ;;; At that point, we'll also save the :project/state-string. This ensures that when we restart we can use the
 ;;; planner to put the right question back in play.
-(defoperator :!initial-question [{:keys [plan-step proj-id client-id domain]}]
-  (log/info "!initial-question: plan-step =" plan-step)
-  (-> (ws/send-to-chat (str intro-message) :recipient-read-string? true :client-id client-id)
-      (p/await wait-time-for-user-resp)
-      (p/then (fn [response] (db-action plan-step proj-id domain response)))))
+
+;;; The 'obj' parameter is a map containing client-id, plan-step, proj-id, and domain, typically.
+
+;;; ----- :!initial-question
+(defoperator :!initial-question [{:keys [client-id] :as obj}]
+  (-> (ws/send-to-chat (:message/content db/intro-prompt) :client-id client-id)
+      (p/then (fn [response] (db-action obj response)))
+      (p/catch (fn [err] (log/error "Error in !initial-question:" err)))))
+
+;;; ToDo: Need a comprehensive solution to exceptions. (In the macro, I think.)
+;;; It might involve trying the defaction again.
+(defaction :!initial-question [obj response]
+  (if-let [proj-name (dom/project-name response)]
+    (let [proj-name-sym (-> proj-name (str/replace  #"\s+" "-") symbol)]
+      (log/info "!initial-question: proj-name-sym =" proj-name-sym)
+      (-> obj
+          (update :more-d-list #(into '[(project-name new-project)] %))
+          (update :more-a-list #(into `[(~'project-name ~proj-name-sym)
+                                        (~'ongoing-discussion ~proj-name-sym)] %))
+          advance-plan))
+    (log/warn "Could not compute project-name")))
 
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-steps [{:keys [plan-step proj-id client-id domain] :as obj}]
-  (log/info "!yes-no-process-steps: plan-step =" plan-step)
-  (-> (ws/send-to-chat "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
-               :client-id client-id)
+  (log/info "!yes-no-process-steps: obj =" obj)
+  (-> "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
+      str2msg-vec
+      (ws/send-to-chat :client-id client-id)
       (p/await wait-time-for-user-resp)
       (p/then #(do (log/info "After the p/await:" %) %))
-      (p/then (fn [response] (db-action obj response)))
-      (p/catch #(log/error "!yes-no-process-steps: error =" %))))
+      (p/then  (fn [response] (db-action obj response)))
+      (p/catch (fn [err] (log/error "Error in !yes-no-process-steps:" err)))))
 
 (defaction :!yes-no-process-steps [obj response]
-  (log/info "Now the db action...")
-  (advance-plan obj response))
+  (log/info "!yes-no-process-steps (action): response =" response "obj =" obj)
+  (advance-plan obj))
 
 ;;; ----- :!query-process-durs
 (defoperator :!query-process-durs [{:keys [plan-step client-id] :as obj}]
-  (log/info "!query-process-durs: plan-step =" plan-step)
-  (-> (ws/send-to-chat "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"
-               :client-id client-id)
+  (log/info "!query-process-durs: obj =" obj)
+  (-> "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"
+      str2msg-vec
+      (ws/send-to-chat :client-id client-id)
       (p/await wait-time-for-user-resp)
-      (p/then (fn [response] (db-action obj response)))
-      (p/catch #(log/error "!query-process-durs: error =" %))))
+      (p/then  (fn [response] (db-action obj response)))
+      (p/catch (fn [err] (log/error "Error in !query-process-durs:" err)))))
 
 (defaction :!query-process-durs [obj response]
-  (log/info "Now the db action...")
-  (advance-plan obj response))
+  (log/info "!query-process-durs (action): response =" response "obj =" obj)
+  (advance-plan obj))
 
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-ordering [{:keys [plan-step client-id] :as obj}]
   (log/info "!yes-no-process-ordering: plan-step =" plan-step)
-  (-> (ws/send-to-chat "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
-               :client-id client-id)
+  (-> "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
+      str2msg-vec
+      (ws/send-to-chat :client-id client-id)
       (p/await wait-time-for-user-resp)
-      (p/then (fn [response] (db-action obj response)))
-      (p/catch #(log/error "!yes-no-process-ordering: error =" %))))
+      (p/then  (fn [response] (db-action obj response)))
+      (p/catch (fn [err] (log/error "Error in !yes-no-process-ordering:" err)))))
 
 (defaction :!yes-no-process-ordering [obj response]
-  (log/info "Now the db action...")
-  (advance-plan obj response))
+  (log/info "!yes-no-process-ordering (action): response =" response "obj =" obj)
+  (advance-plan obj))

@@ -1,8 +1,9 @@
 (ns scheduling-tbd.domain
   "Scheduling domain prompts."
   (:require
-   [scheduling-tbd.llm           :as llm :refer [query-llm]]
-   [clojure.string               :as str]))
+   [clojure.string           :as str]
+   [scheduling-tbd.llm       :as llm :refer [query-llm]]
+   [taoensso.timbre          :as log]))
 
 (def ^:diag diag (atom nil))
 
@@ -12,17 +13,22 @@
 (def project-name-partial
   "This is used to name the project.  Wrap the user's paragraph in square brackets."
   [{:role "system"    :content "You are a helpful assistant."}
-   {:role "user"      :content "Produce a Clojure map containing 1 key, :summary, the value of which is a string of 3 words or less describing the scheduling task being discussed in the text in square brackets."}
+   {:role "user"      :content "Produce a Clojure map containing 1 key, :project-name, the value of which is a string of 3 words or less describing the scheduling project being discussed in the text in square brackets.
+                                If the text says something like 'We make <x>', <x> ought to be part of your answer."}
 
-   {:role "user"      :content "[We produce clothes for firefighting. Our most significant scheduling problem is about deciding how many workers to assign to each product.]"}
-   {:role "assistant" :content "{:summary \"PPE production scheduling\"}"}
+   {:role "user"      :content "[We produce clothes for firefighting (PPE). Our most significant scheduling problem is about deciding how many workers to assign to each product.]"}
+   {:role "assistant" :content "{:project-name \"PPE production scheduling\"}"}
 
    {:role "user"      :content "[We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.]"}
-   {:role "assistant" :content "{:summary \"road construction and repaving scheduling\"}"}
+   {:role "assistant" :content "{:project-name \"road construction and repaving scheduling\"}"}
    {:role "user"      :content "WRONG. That is more than 3 words."} ; This doesn't help, except with GPT-4!
 
+   {:role "user"      :content "[We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.]"}
+   {:role "assistant" :content "{:project-name \"supply chain scheduling\"}"}
+   {:role "user"      :content "WRONG. Be more specific!"} ; This doesn't help, except with GPT-4!
+
    {:role "user"      :content "[Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.]"}
-   {:role "assistant" :content "{:summary \"job shop scheduling\"}"}])
+   {:role "assistant" :content "{:project-name \"job shop scheduling\"}"}])
 
 (def project-objective-partial
   "This is used to scan text for an objective. Wrap the user's paragraph in square brackets."
@@ -84,32 +90,37 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   [{:role "system"    :content (format "Pretend you manage %s. You have good knowledge of the business's processes and supply chain." manage-what)}
    {:role "user"      :content "In no more than 5 sentences, describe your principal scheduling problem."}])
 
-;;; ToDo: This is temporary for the web app.
-(defn project-name [user-text]
-  (when-let [project-name (-> (conj project-name-partial
-                                    {:role "user" :content user-text})
-                              (query-llm {:model "gpt-3.5-turbo"})
-                              :summary)]
-    (str/replace project-name #"\s+" "-")))
+(defn project-name
+  "Wrap the user-text in square brackets and send it to an LLM to suggest a project name.
+   Returns a string consisting of just a few words."
+  [user-text]
+  (reset! diag user-text)
+  (if-let [res (-> (conj project-name-partial
+                      {:role "user" :content (str "[ " user-text " ]")})
+                (query-llm {:model-class :gpt-4}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
+                :project-name)]
+    res
+    (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text}))))
+
 
 (defn pretend-you-manage-interview [what-you-manage & desc]
   (let [high-level-desc (or (first desc)
                             (-> what-you-manage
                                 pretend-you-manage-prompt
-                                (query-llm {:model "gpt-4" :raw-text? true})))
+                                (query-llm {:model-class :gpt-4 :raw-text? true})))
         user-text {:role "user" :content (format "[%s]" high-level-desc)}
         project-name (-> (conj project-name-partial user-text)
-                         (query-llm {:model "gpt-3.5-turbo"})
+                         (query-llm {:model-class :gpt-3.5})
                          :summary
                          (str/replace #"\s+" "-"))]
     {:high-level    high-level-desc
      :activity-name (-> (re-matches #"(.*)\s+scheduling" project-name) (nth 1))
      :project-name  project-name
      :objective     (-> (conj project-objective-partial user-text)
-                        (query-llm {:model "gpt-4"})
+                        (query-llm {:model-class :gpt-4})
                         :objective)
      :service?      (-> (conj service-vs-artifact-partial user-text)
-                        (query-llm {:model "gpt-4"}))}))
+                        (query-llm {:model-class :gpt-4}))}))
 
 (def user-problems
   {:snack-food "The primary challenge in our scheduling process involves effectively coordinating all the steps in our supply chain, starting from raw material procurement to the final delivery of our snack foods to grocery chains.
@@ -142,7 +153,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   (reduce-kv (fn [m k v]
                (try
                  (let [user-text {:role "user" :content (format "[%s]" v)}]
-                   (assoc m k (-> (conj service-vs-artifact-partial user-text) (query-llm {:model "gpt-4"}))))
+                   (assoc m k (-> (conj service-vs-artifact-partial user-text) (query-llm {:model-class :gpt-4}))))
                  (catch Throwable e
                    (assoc m k (format "Failed: %s" e)))))
              {}
@@ -277,7 +288,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   [text]
   (try (let [yes-or-no (-> (conj raw-material-challenge-partial
                                  {:role "user" :content (format "[%s]" text)})
-                           (query-llm {:raw-text? true :model "gpt-3.5-turbo"}))
+                           (query-llm {:raw-text? true :model-class :gpt-3.5}))
              yes-pos (re-matches #"\s*yes\s*" yes-or-no)
              no-pos  (when-not yes-pos (re-matches #"\s*no\s*" yes-or-no))
              answer  (cond yes-pos :yes

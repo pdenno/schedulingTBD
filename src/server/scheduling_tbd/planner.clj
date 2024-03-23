@@ -16,7 +16,7 @@
    [scheduling-tbd.db         :as db]
    [scheduling-tbd.operators  :as op]
    [scheduling-tbd.shop       :as shop]
-   [scheduling-tbd.specs      :as specs]
+   [scheduling-tbd.specs      :as spec]
    [scheduling-tbd.sutil      :as sutil :refer [connect-atm resolve-db-id]]
    [scheduling-tbd.web.routes.websockets :as ws]
    [taoensso.timbre           :as log]))
@@ -115,6 +115,7 @@
 (defn ^:diag load-domain
   "Load a planning domain into the database."
   [path & {:keys [_force?] :or {_force? true}}] ; ToDo: check if exists.
+  (log/info "start load domain")
   (if-let [conn (connect-atm :planning-domains)]
     (->> path
          slurp
@@ -151,8 +152,8 @@
    OR if the negative condition argument unifies with no fact.
    Facts are always positive literals."
   [condition facts]
-  (s/assert ::specs/proposition condition)
-  (if (s/valid? ::specs/negated-proposition condition)
+  (s/assert ::spec/proposition condition)
+  (if (s/valid? ::spec/negated-proposition condition)
     (let [ncond (second condition)]
       (not-any? #(uni/unify ncond %) facts))
     (some #(uni/unify condition %) facts)))
@@ -216,7 +217,7 @@
                 (swap! cnt inc))
               (-> res deref reverse vec)))]
     (let [plan (plan-obj plan)]
-      (s/assert ::specs/shop-obj-plan plan)
+      (s/assert ::spec/shop-obj-plan plan)
       (mapv (fn [step]
               (let[{:keys [op]} step
                    [oper & args] op]
@@ -230,12 +231,12 @@
 (defn execute-plan!
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
-   Returns a vector ::specs/state-edits object that is the effect of running the plan."
+   Returns a vector ::spec/state-edits object that is the effect of running the plan."
   [proj-id client-id domain plan]
   (let [plan (translate-plan plan)]
     (log/info "execute-plan!: proj-id =" proj-id "plan =" plan)
     (doseq [plan-step plan] ; after translate-plan plan-steps have :operator :args and :cost.
-      (s/assert ::specs/plan-step plan-step)
+      (s/assert ::spec/plan-step plan-step)
       (log/info "run plan-step" plan-step)
       (op/run-op
        (:operator plan-step)
@@ -268,7 +269,15 @@
   (let [state-vec (-> problem :problem/state-string edn/read-string vec)
         goal-vec (-> problem :problem/goal-string edn/read-string vec)]
     (check-domain-to-goals domain state-vec goal-vec) ; ToDo: Many more tests like this.
-  pass-obj))
+    pass-obj))
+
+(defn translate-triple
+  "Translate the domain, problem, and execute (not really) statements from proj format to SHOP format."
+  [triple state-vec]
+  (reset! diag
+          (-> triple
+              (update :domain shop/proj2shop)
+              (update :problem #(shop/problem2shop % state-vec)))))
 
 ;;; -------------------------------------- interview loop --------------------------------------------------------------------
 ;;; (interview-loop "pi")
@@ -299,53 +308,31 @@
    'triple' below refers to the map containing :domain :problem and :execute in either proj or SHOP form.
    The function returns the state achieved, a collection of :specs/proposition."
   [proj-id domain-id client-id & {:keys [start-facts problem limit]
-                                  :or {start-facts '#{},
+                                  :or {start-facts '#{(characterize-process new-proj)},
                                        problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
                                        limit 30}}] ; ToDo: Temporary
-  (s/assert ::specs/domain-problem problem)
+  (s/assert ::spec/domain-problem problem)
   (let [proj-domain (-> domain-id (get-domain {:form :proj}))
-        execute (:domain/execute proj-domain)]
-    (letfn [(translate-triple [triple] (reset! diag (-> triple (update :domain shop/proj2shop) (update :problem shop/problem2shop))))] ; N.B.: A good place to wrap with (reset! diag)
-      (loop [state   start-facts
-             problem (-> problem (assoc :problem/state-string (str start-facts)))
-             pruned  (prune-domain proj-domain start-facts)
-             plans   (-> {:domain  pruned :problem problem :execute execute} check-triple translate-triple plan)
-             cnt 1]
-        (log/info "state = " state)
-        (cond (= plans :bad-input)            :bad-input
-              (>= cnt limit)                  (sort-by first state)
-              (empty? plans)                  (sort-by first state)
-              (discussion-stopped? state)     (sort-by first state)
-              :else  (let [new-state   (execute-plan! proj-id client-id pruned (first plans)) ; ToDo: Deal with multiple plans.
-                           new-problem (assoc problem :problem/state-string (str new-state))
-                           new-pruned  (prune-domain proj-domain new-state)]
-                       (log/info "new-state = " new-state)
-                       (recur new-state
-                              new-problem
-                              new-pruned
-                              (-> {:domain new-pruned :problem new-problem :execute execute} check-triple translate-triple plan)
-                              (inc cnt))))))))
-
-;;; ToDo: this may be a misnomer; I think I can use it to start a new project too.
-;;; ToDo: This assumes that planning domain is "pi"
-(defn restart-interview ; <=============================================================== ToDo: Currently assumes domain.
-  "Restart the interview-loop with the given project.
-   This would be used when, for example, the user changes projects.
-   The project provides :project/state-string which is assigned to :problem/state-string
-   in the call to interview-loop. The rest of problem is defined by the planning domain."
-  [pid & {:keys [domain-name] :or {domain-name "pi"}}]
-  (log/info "restart-interview: NYI."))
-  #_(let [facts-string (-> pid db/get-project :project/state-string)
-        domain (get-domain domain-name {:form :proj})
-        _problem (-> domain
-                    :domain/problem
-                    (assoc :problem/state-string facts-string))]
-    (log/info "restart-interview: NYI.")
-    #_(interview-loop
-     pid
-     domain-name
-     :start-facts (edn/read-string facts-string)
-     :problem problem))
+        execute (:domain/execute proj-domain)] ; The execute statement is invariant to state changes.
+    (loop [state   start-facts
+           problem (-> problem (assoc :problem/state-string (str start-facts)))
+           pruned  (prune-domain proj-domain start-facts)
+           plans   (-> {:domain  pruned :problem problem :execute execute} check-triple (translate-triple state) plan)
+           cnt 1]
+      (log/info "state = " state)
+      (cond (= plans :bad-input)            :bad-input
+            (>= cnt limit)                  (sort-by first state)
+            (empty? plans)                  (sort-by first state)
+            (discussion-stopped? state)     (sort-by first state)
+            :else  (let [new-state   (execute-plan! proj-id client-id pruned (first plans)) ; ToDo: Deal with multiple plans.
+                         new-problem (assoc problem :problem/state-string (str new-state))
+                         new-pruned  (prune-domain proj-domain new-state)]
+                     (log/info "new-state = " new-state)
+                     (recur new-state
+                            new-problem
+                            new-pruned
+                            (-> {:domain new-pruned :problem new-problem :execute execute} check-triple (translate-triple new-state) plan)
+                            (inc cnt)))))))
 
 ;;; Section 5.6 Debugging Suggestions
 ;;; When you have a problem that does not solve as expected, the following general recipe may help you home in on bugs in your domain definition:

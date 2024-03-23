@@ -16,11 +16,11 @@
 ;;; ToDo: This works when I run it by hand, but not when I run it through Kaocha.
 (deftest query-llm-tests
   (testing "Testing a simple query with different LLMs."
-    (is (let [res (query-llm proj-summary-msgs {:model "gpt-4"})]
+    (is (let [res (query-llm proj-summary-msgs {:model-class :gpt-4})]
           (and (map? res)
                (= (keys res) '(:summary))
                (-> res :summary (str/split #"\s+") count (<= 3)))))
-    (is (let [res (query-llm proj-summary-msgs {:model "gpt-3.5-turbo"})]
+    (is (let [res (query-llm proj-summary-msgs {:model-class :gpt-3.5})]
             (and (map? res)
                  (= (keys res) '(:summary))
                  (-> res :summary (str/split #"\s+") count (<= 4)))))))

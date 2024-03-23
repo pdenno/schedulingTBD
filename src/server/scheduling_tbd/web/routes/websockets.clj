@@ -15,7 +15,7 @@
    [taoensso.timbre          :as log]))
 
 (def ^:diag diag (atom {}))
-(def socket-channels "Indexed by a unique ID provided by the client." (atom {}))
+(def socket-channels "Indexed by a unique client-id provided by the client." (atom {}))
 (def current-client-id "UUID identifying client. This is for diagnostics." (atom nil))
 (declare user-says send-to-chat dispatch)
 
@@ -32,23 +32,35 @@
   (reset! current-client-id id)
   (let [chans {:in  (async/chan)
                :out (async/chan)
-               :err (async/chan)}]
+               :err (async/chan)
+               :exit-atm (atom nil)}]
     (swap! socket-channels  #(assoc % id chans))
     chans))
 
+;;; ToDo: I think, before closing, I want to send something to the client so that it check it's exit-atm
 (defn close-ws-channels [id]
   (when (contains? @socket-channels id)
-    (let [{:keys [in out err]} (get @socket-channels id)]
-      ;;(log/info "Closing websocket channels for " id (now))
-      (async/close! in)
-      (async/close! out)
-      (async/close! err)
-      (swap! socket-channels #(dissoc % id)))))
+    (let [{:keys [in out err exit-atm]} (get @socket-channels id)]
+      (log/info "Closing websocket channels for " id (now))
+      ;; Set exit-atm and send something so go loop will be jogged and see it.
+      (reset! exit-atm true)
+      (>!! in (str {:dispatch-key :stop}))
+      ;; (>!! err "STOP") ; ToDo: Why do things stall when I do this?
+      (-> (p/delay 500)
+          (p/then (fn [_]
+                    (async/close! in)
+                    (async/close! out)
+                    (async/close! err)
+                    (swap! socket-channels #(dissoc % id))))))))
 
-(defn close-channel-by-msg
-  "Close the channel. This is typically from a client unmount."
-  [{:keys [id]}]
-  (close-ws-channels id))
+(declare clear-promises!)
+(defn forget-client
+  "Close the channel and forget the promises associated with the client.
+   This is typically from a client unmount."
+  [{:keys [client-id]}]
+  (log/info client-id "closes its websocket.")
+  (close-ws-channels client-id)
+  (clear-promises! client-id))
 
 (defn ping-diag
   "Create a ping confirmation for use in middle of a round-trip."
@@ -70,17 +82,35 @@
         ;;(log/info "Closing non-alive channel" id)
         (close-ws-channels id)))))
 
-(defn establish-websocket-handler [request]
+(defn error-listener
+  "Start a go loop for listening for errors from the client."
+  [client-id]
+  (if-let [{:keys [err exit-atm]} (get @socket-channels client-id)]
+    (go
+      (loop []
+        (when-let [msg (<! err)]
+          (log/error "Error channel reports:" msg "client-id =" client-id)
+          (when-not @exit-atm (recur)))))
+    (log/error "error-listener: Cannot find client-id" client-id)))
+
+(defn establish-websocket-handler
+  "Handler for http:/ws request.
+   Set up web socket in, out, and err channels."
+  [request]
   (close-inactive-channels)
-  (if-let [id (-> request :query-params keywordize-keys :client-id)]
-    (do (close-ws-channels id)
-        (let [{:keys [in out err]} (make-ws-channels id)]
+  (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
+    (do (close-ws-channels client-id)
+        (let [{:keys [in out err exit-atm]} (make-ws-channels client-id)]
           ;;(log/info "Starting websocket handler for " id (now))
           (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
             (loop []
-              (when-let [msg (<! in)]
-                (>! out (-> msg edn/read-string dispatch str)) ; For round-trip messages from client.
-                (recur))))
+              (when-let [msg (<! in)] ; Listen fo messages
+                (reset! diag msg)
+                (>! out (-> msg edn/read-string dispatch str)))
+              (when-not @exit-atm (recur))))
+          (log/warn "Exiting go loop.")
+          (reset! diag :exiting!)      ; ToDo: I expected to see this, but instead I get "{:dispatch-key :stop}"...
+          (error-listener client-id)   ; ...from from close-ws-channels above.
           {:ring.websocket/listener (wsa/websocket-listener in out err)}))
     (log/error "Websocket client did not provide id.")))
 
@@ -98,20 +128,22 @@
 ;;;       + This last step is important because the server needs to get old promise-keys off the stack.
 ;;;
 ;;; Note that the whole process is run in websockets. REST is only used for less interactive UI activities (e.g. changing projects).
-
-(def promise-stack "A stack of promise objects." (atom ()))
-(defn clear-promises! [] (reset! promise-stack '()))
-
-(defn remove-promise!
-  "Remove the promise identified by the argument :prom-key from the promise-stack."
-  [prom-key]
-  (swap! promise-stack (fn [stack] (remove #(= prom-key (:prom-key %)) stack))))
-
-(s/def ::promise (s/keys :req-un [::prom ::prom-key ::client-id ::timestamp]))
+(s/def ::promise (s/keys :req-un [::prom ::p-key ::client-id ::timestamp]))
 (s/def ::prom p/promise?)
-(s/def ::prom-key keyword?)
+(s/def ::p-key keyword?)
 (s/def ::client-id string?)
 (s/def ::timestamp #(instance? java.util.Date %))
+
+(def promise-stack "A stack of promise objects." (atom ()))
+
+(defn clear-promises!
+  ([] (reset! promise-stack '()))
+  ([client-id] (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %))))
+
+(defn remove-promise!
+  "Remove the promise identified by the argument :p-key from the promise-stack."
+  [p-key]
+  (swap! promise-stack (fn [stack] (remove #(= p-key (:p-key %)) stack))))
 
 (defn new-promise
   "Return a vector of [key, promise] to a new promise.
@@ -120,25 +152,19 @@
   [client-id]
   (let [k (-> (gensym "promise-") keyword)
         p (p/deferred)
-        obj {:prom p :prom-key k :client-id client-id :timestamp (java.util.Date.)}]
+        obj {:prom p :p-key k :client-id client-id :timestamp (java.util.Date.)}]
     (swap! promise-stack #(conj % obj))
     ;; Because I saw it messed up once...
     (when-not (every? #(s/valid? ::promise %) @promise-stack)
       (throw (ex-info "Promise stack is messed up" {:stack @promise-stack})))
     obj))
 
-(defn ^:diag lookup-promise
-  "Return the promise associated with the argument key."
-  [k]
-  (or (some #(when (= k (:prom-key %)) %) @promise-stack)
-      (log/error "Could not find promise with key" k)))
-
 (defn select-promise
   "Return the promise that is top-most on the stack and also in the argument set."
   [client-keys]
   (let [in-client-set? (set client-keys)
         stack @promise-stack]
-    (or (some #(when (in-client-set? (:prom-key %)) %) stack)
+    (or (some #(when (in-client-set? (:p-key %)) %) stack)
         (log/warn "Couldn't find promise for any of" client-keys))))
 
 (defn clear-keys
@@ -158,10 +184,10 @@
   [{:keys [msg-text client-id promise-keys] :as msg}]
   (log/info "User-says:" msg)
   (if-let [prom-obj (select-promise promise-keys)]
-    (do (clear-keys client-id [(:prom-key prom-obj)])
+    (do (clear-keys client-id [(:p-key prom-obj)])
         (log/info "Before resolve!: msg-text =" msg-text)
         (p/resolve! (:prom prom-obj) msg-text))
-    (log/error "user-says: no prom-key")))
+    (log/error "user-says: no p-key (e.g. no question in play)")))
 
 ;;;-------------------- Sending questions to client --------------------------
 ;;; (ws/send-to-chat "Hey are you alive?" :promise? false :client-id (ws/any-client!)
@@ -173,12 +199,12 @@
   (s/assert ::spec/chat-msg-vec msg-vec)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]
-    (let [{:keys [prom prom-key]} (when promise? (new-promise client-id))
+    (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
           msg-obj (cond-> {:dispatch-key :tbd-says
                            :msg-vec msg-vec
                            :client-id client-id
                            :timestamp (now)}
-                    prom-key (assoc :p-key prom-key))]
+                    p-key (assoc :p-key p-key))]
       (go (>! out (str msg-obj)))
       prom)
     (log/error "Could not find out async channel for client" client-id)))
@@ -202,14 +228,14 @@
   []
   (reset! dispatch-table {:ping                 ping-diag
                           :user-says            user-says
-                          :close-channel        close-channel-by-msg}))
+                          :close-channel        forget-client}))
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]
-  (when-not (= :ping dispatch-key)  (log/info "Received msg:" msg))
-  (if (contains? @dispatch-table dispatch-key)
-    ((get @dispatch-table dispatch-key) msg)
-    (log/error "No dispatch function for " msg)))
-
+  ;(when-not (= :ping dispatch-key)  (log/info "Received msg:" msg))
+  ;(log/info "Received msg:" msg)
+  (cond (= dispatch-key :stop)                        nil ; What needs to be done has already been done.
+        (contains? @dispatch-table dispatch-key)      ((get @dispatch-table dispatch-key) msg)
+        :else                                         (log/error "No dispatch function for " msg)))
 
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []
