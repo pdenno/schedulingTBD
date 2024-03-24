@@ -26,3 +26,25 @@
 
 (s/def ::plan-step (s/keys :req-un [:step/operator :step/args]))
 (s/def ::state-edits (s/keys :req-un [:edits/add :edits/delete]))
+
+(s/def :problem/name string?)
+(s/def :problem/domain keyword?)
+(s/def :problem/goal-string string?)
+(s/def :problem/state-string string?)
+(s/def ::domain-problem  (s/keys :req [:problem/ename :problem/domain :problem/goal-string :problem/state-string]))
+
+;;; ToDo: This can go away with shop.
+(s/def ::shop-obj-plan (s/and vector?
+                              #(every? (fn [step] (s/valid? ::shop-step step)) %)))
+(s/def ::shop-step (s/keys :req-un [::op ::cost]))
+
+(s/def :msg-text/string string?)
+(s/def :msg-link/uri string?)
+(s/def :msg-link/text string?)
+(s/def ::msg-text-elem (s/keys :req [:msg-text/string]))
+(s/def ::msg-link-elem (s/keys :req [:msg-link/uri :msg-link/text]))
+(s/def ::chat-msg-vec (s/and vector?
+                             #(every? (fn [elem]
+                                        (or (s/valid? ::msg-text-elem elem)
+                                            (s/valid? ::msg-link-elem elem)))
+                                      %)))

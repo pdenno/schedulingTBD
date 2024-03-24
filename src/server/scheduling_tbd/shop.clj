@@ -2,6 +2,7 @@
   "Rewrite SHOP planning domain structures to db structures.
    Rewrite db structures to SHOP planning domain (defdomain) structures."
   (:require
+   [clojure.core.unify   :as uni]
    [clojure.edn          :as edn]
    [clojure.java.io      :as io]
    [clojure.pprint       :refer [cl-format]]
@@ -66,7 +67,8 @@
   [exp]
   (cond (contains? exp :method/ename)   "method"
         (contains? exp :axiom/ename)    "axiom"
-        (contains? exp :operator/ename) "operator"))
+        (contains? exp :operator/ename) "operator"
+        :else (throw (ex-info "No code-type for" {:exp exp}))))
 
 ;;; ======================= SHOP2 Grammar ================================================================
 ;;;------ toplevel forms ----
@@ -113,6 +115,9 @@
                                               (subvec terms 2))
                                        (recur (s/valid? ::logical-exp (nth terms 0))
                                               (subvec terms 1))))))))
+
+
+(s/def ::case-name (s/and symbol? #(not (re-find #"\s+" (name %)))))
 
 ;;;---- toplevel support ----------------------------
 ;;;      (:method (upper-move-aircraft-no-style ?a ?c)
@@ -422,7 +427,9 @@
       ;; Uniqueness is not well thought through in SHOP! If there is any case-name whatsoever, add THE FIRST to the name.
       ;; It appears from the zeno example that method signatures might include both formal parameters and sometimes case names.
       ;; I don't think we care, since we are handing the thing to SHOP to deal with, but we need unique for the DB.
-      (update res :method/ename #(str % "." case-name))
+      (if (s/valid? ::case-name case-name)
+        (update res :method/ename #(str % "." case-name))
+        (throw (ex-info "Invalid case-name" {:case-name case-name}))) ; ToDo: Goes away with SHOP.
       res)))
 
 ;;; Operator: (:operator <head> <pre-conds> <d-list> <a-list> [<cost>])
@@ -797,10 +804,6 @@
         :doc "the terms that are part of a disjunctive expression."} ; ToDo: need a :sys/pos or something like that.
 
    ;; ----------------------- domain
-   :domain/ename
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
-        :doc "a DB-unique name for the domain. The name is appended to everything in :domain/elems, so keep it short.
-              For better description use plan/name or plan/description. 'ename' so that we can still use 'name'!"}
    :domain/description
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,  :mm/info {:extra? true}
         :doc "a desciption of domain. This isn't part of SHOP"}
@@ -809,13 +812,23 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "The methods, operators and axioms of the domain."}
 
+   :domain/ename
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, ; ToDo: The idea that it is appended can go away with SHOP, or with better object structure.
+        :doc "A string that is appended to everything in :domain/elems, so keep it short.
+              For better description use plan/name or plan/description. 'ename' so that we can still use 'name'!"}
+
    :domain/execute
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
         :doc "A string that reads to a SHOP-style s-expression defining what is typically being executed, e.g. find-plans."}
 
+   :domain/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity,
+        :doc "a DB-unique id (keyword). The name is appended to everything in :domain/elems, so keep it short.
+              For better description use plan/name or plan/description. 'ename' so that we can still use 'name'!"}
+
    :domain/problem
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
-        :doc "A string that reads to a SHOP-style s-expression associating a planning goal and states with a domain."}
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref,
+        :doc "An object with attributes  :problem/{name, domain, goal-string, state-string} expressing a top-level planning goal."}
 
    ;; ---------------------- logical expression
    :exp/negated?
@@ -894,6 +907,16 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "preconditions of the operation"}
 
+   ;; ----------------------- problem
+   :problem/domain #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+                        :doc "A keyword that refers to the domain; it is a :domain/id."}
+   :problem/ename #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity,
+                       :doc "The name of this domain, used as a prefix in axiom, method and operator definitions."}
+   :problem/goal-string #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+                             :doc "A string that can be edn/read-string into a vector propositions that are goals."}
+   :problem/state-string #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+                        :doc "A string that can be edn/read-string into a vector propositions that define current state."}
+
    ;; ---------------------- rhs
    :rhs/case-name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/symbol
@@ -957,6 +980,21 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean,
         :doc "when true, indicates that the atoms in task-list can be performed in any order. Ordered is the default."}})
 
+(defn problem2shop
+  "Return the shop object (an s-expression) defproblem for the given proj-format object."
+  [{:problem/keys [ename domain state-string goal-string] :as _prob} state-vec]
+  (reset! diag {:prob _prob :state-vec state-vec})
+  (let [goals (edn/read-string goal-string)
+        goal-pred (first goals ) ; ToDo: I'm assuming here that goal-string is a single predicate
+        bindings (reduce (fn [res g] (merge res (uni/unify goal-pred g))) {} state-vec)
+        goals (mapv #(uni/subst % bindings) goals)]
+    (edn/read-string
+     (cl-format nil
+                "(defproblem ~A ~A ~%  (~{~%~A~^ ~}) ~%  (~{~A~^ ~}))"
+                ename (name domain)
+                (->> (edn/read-string state-string) (sort-by first))
+                goals))))
+
 ;;;=============================== Serialization (DB structures to SHOP common-lisp s-expressions) ================================================
 (defmacro defdb2shop
   "Macro to wrap methods for translating databse to shop format."
@@ -998,8 +1036,8 @@
 
 (defmulti db2shop #'db2shop-dispatch)
 
-(defdb2shop :domain [{:domain/keys [ename] :sys/keys [body]}]
-  `(~'defdomain ~(symbol ename)
+(defdb2shop :domain [{:domain/keys [id] :sys/keys [body]}]
+  `(~'defdomain ~(symbol id)
     ~(for [e (sort-by :sys/pos (-> body :domain/elems))]
        (db2shop e))))
 
@@ -1121,8 +1159,9 @@
 (defn canon2db
   "Given a canonical structure, create the corresponding DB structure.
    :canon/pos of each element of :domain/elems is :sys/pos in the DB."
-  [{:domain/keys [ename elems description problem execute]}]
-  (cond-> {:domain/ename ename
+  [{:domain/keys [id ename elems description problem execute]}]
+  (cond-> {:domain/id id
+           :domain/ename ename
            :sys/body {:sys/typ :domain
                       :domain/elems (mapv #(let [name-attr (keyword (code-type %) "ename")]
                                              (-> (shop2db  (:canon/code %) {:domain-name ename})
@@ -1130,8 +1169,8 @@
                                                  (assoc name-attr (get % name-attr))))
                                           (sort-by :canon/pos elems))}}
     description (assoc :domain/description description)
-    problem     (assoc :domain/problem     (str problem))
-    execute     (assoc :domain/execute     (str execute))))
+    problem     (assoc :domain/problem     problem) ; an object with :problem namespace keys.
+    execute     (assoc :domain/execute     execute))) ; a string
 
 (defn db-entry-for
   "Return the named DB structure. name is string and db.unique/identity"
@@ -1151,15 +1190,16 @@
   [db-obj]
   (assert (every? #(contains? db-obj %) [:domain/ename :sys/body]))
   (let [cnt (atom 0)
-        {:domain/keys [description problem execute]} db-obj]
-    (cond-> {:domain/ename (:domain/ename db-obj)
+        {:domain/keys [id description problem execute]} db-obj]
+    (cond-> {:domain/id id
+             :domain/ename (:domain/ename db-obj)
              :domain/elems (-> (for [e (->> db-obj :sys/body :domain/elems (sort-by :sys/pos))]
                                  (let [name-attr (keyword (code-type e) "ename")]
                                    (-> {:canon/pos (swap! cnt inc)}
                                        (assoc name-attr (get e name-attr))
                                        (assoc :canon/code (db2shop e)))))
                                vec)}
-      problem (assoc :domain/problem (edn/read-string problem))
+      problem (assoc :domain/problem problem)
       execute (assoc :domain/execute (edn/read-string execute))
       execute (assoc :domain/description description))))
 
@@ -1194,15 +1234,15 @@
 (defn proj2canon-operator
   "Restructure PROJ into canonical (which is more lisp-like)."
   [e base-name]
-  (-> {}
-      (assoc :canon/pos (swap! proj-cnt-atm inc))
-      (assoc :operator/ename (str base-name "." (-> e :operator/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
-      (assoc :canon/code
-             `(:operator
-               ~(:operator/head e)
-               ~(-> e :operator/preconds lisp-seq)
-               ~(-> e :operator/d-list   lisp-seq)
-               ~(-> e :operator/a-list   lisp-seq)))))
+  (cond-> {}
+    true                  (assoc :canon/pos (swap! proj-cnt-atm inc))
+    true                  (assoc :operator/ename (str base-name "." (-> e :operator/head method-name))) ; Unlike the shop example, we plan to have not naming collisions!
+    true                  (assoc :canon/code `(:operator
+                                               ~(:operator/head e)
+                                               ~(-> e :operator/preconds lisp-seq)
+                                               ~(-> e :operator/d-list   lisp-seq)
+                                               ~(-> e :operator/a-list   lisp-seq)))
+    (:operator/cost e)    (update :canon/code #(-> % reverse (conj (:operator/cost e)) reverse))))
 
 (defn proj2canon-axiom
   "Restructure PROJ into canonical (which is more lisp-like)."
@@ -1224,17 +1264,18 @@
   "Rewrite the PROJ structure as canonical, which is less lispy."
   [proj]
   (reset! proj-cnt-atm 0)
-  (let [{:domain/keys [ename problem execute]} proj
+  (let [{:domain/keys [id ename problem execute]} proj
         base-name ename]
     (cond-> proj
+      id        (assoc :domain/id id)
       base-name (assoc :domain/ename base-name)
       problem   (assoc :domain/problem problem)
       execute   (assoc :domain/execute execute)
       true      (update :domain/elems
                         #(for [e %]
-                           (cond (contains? e :method/head)   (proj2canon-method e base-name)
-                                 (contains? e :operator/head) (proj2canon-operator e base-name)
-                                 (contains? e :axiom/head)    (proj2canon-axiom e base-name)))))))
+                             (cond (contains? e :method/head)   (proj2canon-method e base-name)
+                                   (contains? e :operator/head) (proj2canon-operator e base-name)
+                                   (contains? e :axiom/head)    (proj2canon-axiom e base-name)))))))
 
 (defn proj2shop
   "The argument is a planning domain in proj format.
@@ -1281,11 +1322,12 @@
 
 (defn db2proj
   "Rewrite the DB object as a proj object."
-  [{:domain/keys [ename description execute problem] :sys/keys [body]}]
+  [{:domain/keys [id ename description execute problem] :sys/keys [body]}]
   (cond-> {}
+    id           (assoc :domain/id id)
     ename        (assoc :domain/ename ename)
     description  (assoc :domain/description description)
-    problem      (assoc :domain/problem (edn/read-string problem))
+    problem      (assoc :domain/problem problem)
     execute      (assoc :domain/execute (edn/read-string execute))
     true         (assoc :domain/elems (mapv (fn [elem]
                                               (let [etyp (-> elem :sys/body :sys/typ)]
@@ -1298,22 +1340,23 @@
 ;;; Currently this loads zeno, just for testing.
 (defn recreate-planning-domains-db!
   "Recreate the plans db from .edn data. It uses the connect-atm, which is already established."
-  [cfg]
-  (if (.exists (io/file "data/planning-domains/domains.edn")) ; ToDo: This will need to be better someday soon.
-    (do (log/info "Recreating the planning domains database.")
-        (when (d/database-exists? cfg)
-          (d/delete-database cfg))
-        (d/create-database cfg)
-        (register-db :planning-domains cfg)
-        (let [conn (connect-atm :planning-domains)]
-          (d/transact conn (datahike-schema db-schema-shop2+))
-          (d/transact conn (->> "data/planning-domains/domains.edn"
-                                slurp
-                                edn/read-string
-                                (mapv proj2canon)
-                                (mapv canon2db))))
-        true)
-    (log/error "Not recreating planning domains DB: No backup file.")))
+  []
+  (let [cfg (db-cfg-map :planning-domains)]
+    (if (.exists (io/file "data/planning-domains/domains.edn")) ; ToDo: This will need to be better someday soon.
+      (do (log/info "Recreating the planning domains database.")
+          (when (d/database-exists? cfg)
+            (d/delete-database cfg))
+          (d/create-database cfg)
+          (register-db :planning-domains cfg)
+          (let [conn (connect-atm :planning-domains)]
+            (d/transact conn (datahike-schema db-schema-shop2+))
+            (d/transact conn (->> "data/planning-domains/domains.edn"
+                                  slurp
+                                  edn/read-string
+                                  (mapv proj2canon)
+                                  (mapv canon2db))))
+          true)
+      (log/error "Not recreating planning domains DB: No backup file."))))
 
 (def recreate-planning-domains-db?
   "If true it will recreate the Datahike database; it won't add any domains; that's done in the planner."
@@ -1326,7 +1369,7 @@
   []
   (let [cfg (db-cfg-map :planning-domains)]
     (register-db :planning-domains cfg)
-    (when recreate-planning-domains-db?  (recreate-planning-domains-db! cfg))
+    (when recreate-planning-domains-db?  (recreate-planning-domains-db!))
     {:plan-db-cfg cfg}))
 
 (defstate plans-db-cfg

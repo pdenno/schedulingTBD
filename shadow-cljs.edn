@@ -2,15 +2,16 @@
  :nrepl {:port 7002}
  :http  {:port 9631}
  :builds ; Only :frontend :kaochaRM have been used much.
- {:frontend ;-------------- Running the exerciser -------------------
+ {:frontend ;-------------- Running the stbd-client -------------------
   {:target           :browser
    :nrepl           {:middleware [cider.nrepl/cider-middleware]}
    :output-dir       "resources/public/js"
    :asset-path       "/js"
    :compiler-options {:externs ["datascript/externs.js"]}
    :modules          {:app {:entries [stbd-app.core] ; creates app.js owing to key :app.
-                            :init-fn stbd-app.core/mount-root}}
-   :devtools         {:after-load stbd-app.core/mount-root}}
+                            :init-fn stbd-app.core/start}}
+   :devtools         {:after-load stbd-app.core/start
+                      :before-load stbd-app.core/stop}}
 
   :kaochaSTBD ;-------------- Testing cljs ------------------------------
   {:target           :browser-test

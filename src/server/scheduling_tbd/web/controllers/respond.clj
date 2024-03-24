@@ -1,16 +1,90 @@
 (ns scheduling-tbd.web.controllers.respond
   (:require
-   [clojure.string          :as str]
-   [datahike.api            :as d]
-   [ring.util.http-response :as http]
-   [scheduling-tbd.db       :as db]
-   [scheduling-tbd.domain   :as domain]
-   [scheduling-tbd.sutil    :refer [connect-atm]]
-   [taoensso.timbre :as log])
+   [clojure.walk             :as walk :refer [keywordize-keys]]
+   [mount.core :as mount :refer [defstate]]
+   [promesa.core             :as p]
+   [ring.util.http-response  :as http]
+   [scheduling-tbd.db        :as db]
+   [scheduling-tbd.llm       :as llm]
+   [scheduling-tbd.operators :as ops]
+   [scheduling-tbd.planner   :as plan]
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
+   [scheduling-tbd.surrogate :as sur]
+   [taoensso.timbre          :as log])
   (:import
    [java.util Date]))
 
 (def ^:diag diag (atom {}))
+
+(def client-current-proj "Current project (keyword) indexed by client-id (string)."  (atom {}))
+(defn clear-client-current-proj [] (reset! client-current-proj {}))
+
+(defn get-conversation
+  "Return a sorted vector of the messages of the argument project or current project if not specified.
+   Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."
+  [request]
+  (let [{:keys [project-id]} (-> request :query-params keywordize-keys)
+        project-id (keyword project-id)
+        eid (db/project-exists? project-id)
+        msgs (when eid (db/get-messages project-id))]
+    (log/info "get-conversation for" project-id)
+    (cond (project-id :START-A-NEW-PROJECT)       (http/ok {:conv-for project-id :conv []})
+          msgs                                    (http/ok {:conv-for project-id :conv msgs})
+          :else                                   (http/not-found))))
+
+(def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
+
+(defn list-projects
+  "Return a map containing :current-project and :others, which is a sorted list of every other project in the DB."
+  [request]
+  (letfn [(resolve-proj-info [pid]
+            (resolve-db-id {:db/id (db/project-exists? pid)}
+                           (connect-atm pid)
+                           :keep-set #{:project/name :project/id}))]
+    (let [proj-infos (mapv resolve-proj-info (db/list-projects))
+          client-id (-> request :query-params :client-id)
+          current (or (when-let [proj (get @client-current-proj client-id)] (resolve-proj-info proj))
+                      (first proj-infos)
+                      new-proj-entry)
+          others (filterv #(not= % current) proj-infos)]
+      (log/info "Call to list-projects")
+      (http/ok
+       (cond-> {:current-project current}
+         (not-empty others) (assoc :others others))))))
+
+;;; ToDo: This belongs in utils.clj when you get a chance
+(defmacro report-long-running
+  "Return the string from writing to *out* after this runs in a future."
+  [[timeout] & body]
+  `(-> (p/future (with-out-str ~@body))
+       (p/await ~timeout)
+       (p/then #(log/info "Long-running:" %))
+       (p/catch #(log/warn "Long-running (exception):" %))))
+
+(defn set-current-project
+  [request]
+  (let [{:keys [project-id client-id]} (:body-params request)
+        project-id (keyword project-id)]
+    (log/info "db-resp/set-current-project: project-id =" project-id "client-id =" client-id)
+      (cond (db/project-exists? project-id)          (do (db/set-current-project project-id)
+                                                         (swap! client-current-proj #(assoc % client-id project-id))
+                                                         (report-long-running (plan/restart-interview project-id)) ; <========================= replace
+                                                         (http/ok {:project/id project-id
+                                                                   :project/name (-> (db/get-project project-id) :project/name)}))
+
+            (= project-id :start-a-new-project)      (do (report-long-running (plan/interview-loop project-id :process-interview)) ; <=============== replace
+                                                         (http/ok {:message/ack true}))
+
+            :else                                    (http/not-found))))
+
+(defn wrap-response
+  "Wrap text such that it can appear as the text message in the conversation."
+  [response-text]
+  (log/info "response-text = " response-text)
+  (let [project-id (db/current-project-id)
+        msg-id (db/next-msg-id project-id)]
+    (db/inc-msg-id! project-id)
+    (db/message-form msg-id :system response-text)))
 
 (defn healthcheck
   [_request]
@@ -19,57 +93,6 @@
     {:time     (str (Date. (System/currentTimeMillis)))
      :up-since (str (Date. (.getStartTime (java.lang.management.ManagementFactory/getRuntimeMXBean))))}))
 
-(defn initial-projects
-  "List all the projects in the DB. :initial-prompt comes along for the ride."
-  [_request]
-  (let [project-list (d/q '[:find [?name ...] :where [_ :project/name ?name]] @(connect-atm :system))
-        current-project-name (when-let [proj (db/current-project-id)]
-                               (-> proj name (str/replace #"-" " ")))]
-    (http/ok
-     (cond-> {}
-       (not-empty project-list) (assoc :projects project-list)
-       (not-empty project-list) (assoc :current-project-name current-project-name)
-       true (assoc :initial-prompt (d/q '[:find ?prompt .
-                                          :where [_ :system/initial-prompt ?prompt]]
-                                        @(connect-atm :system)))))))
-
-(defn op-start-project
-  "Summarize user-text as a project name. Execute plan operations to start a project about user-text."
-  [user-text]
-  (let [summary (domain/project-name user-text)
-        id (-> summary str/lower-case (str/replace #"\s+" "-") keyword)
-        proj-info  {:project/id id
-                    :project/name summary
-                    :project/desc user-text ; <==== ToDo: Save this as :msg-id 1 (0 is the "Describe your scheduling problem" message).
-                    #_#_:project/industry _industry}
-        proj-info (db/create-proj-db! proj-info) ; May rename the project-info.
-        id (:project/id proj-info)]
-    (db/add-msg id (d/q '[:find ?prompt . :where [_ :system/initial-prompt ?prompt]] @(connect-atm :system)) :system)
-    (db/add-msg id user-text :user)
-    ;; ToDo:
-    ;; 0) Call the planner and make this code an operator!
-    ;; 1) Set :system/current-project.
-    ;; 2) Store first two messages (prompt and user's first contribution).
-    ;; 3) Check that there isn't a project by that name.
-    ;; 4) Let user change the name of the project.
-    (let [response (str "Great! We'll call your project '" (:project/name proj-info) "'. ")]
-      (log/info "op-start-project: Responding with: " response)
-      (db/add-msg id response :system))))
-
-;;; [conn (connect-atm (db/current-project-id))]
-;;; (let [{:keys [decision-objective probability]} (llm/find-objective-sentence craft-brewing-desc)] ...) ; <======= First y/n!
-
-(defn plan-response
-  "Top-level function to respond to a user's message."
-  [user-text]
-  (log/info "Got user-text")
-  (op-start-project user-text))
-
-(defn respond
-  "Handler function for http://api/user-says."
-  [request]
-  (when-let [user-text (get-in request [:body-params :user-text])]
-    (log/info "user-text = " user-text)
-    (let [response (plan-response user-text)]
-      (log/info "response = " response)
-      (http/ok response))))
+(defstate respond-state
+  "Clean up client-current-project"
+  :start (clear-client-current-proj))

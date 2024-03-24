@@ -60,7 +60,8 @@
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
       (log/error "DB is registered but does not exist:" k))
-    (log/error "No such DB:" k)))
+    (throw (ex-info "No such DB" {:key k}))
+    #_(log/error "No such DB:" k)))
 
 (defn datahike-schema
   "Create a Datahike-compatible schema from the above."
@@ -95,20 +96,24 @@
 (defn resolve-db-id
   "Return the form resolved, removing properties in filter-set,
    a set of db attribute keys, for example, #{:db/id}."
-  ([form conn-atm] (resolve-db-id form conn-atm #{:db/id}))
-  ([form conn-atm filter-set]
-   (letfn [(resolve-aux [obj]
-             (cond
-               (db-ref? obj) (let [res (dp/pull @conn-atm '[*] (:db/id obj))]
-                               (if (= res obj) nil (resolve-aux res)))
-               (map? obj) (reduce-kv (fn [m k v] (if (filter-set k) m (assoc m k (resolve-aux v))))
-                                     {}
-                                     obj)
-               (vector? obj)      (mapv resolve-aux obj)
-               (set? obj)    (set (mapv resolve-aux obj))
-               (coll? obj)        (map  resolve-aux obj)
-               :else  obj))]
-     (resolve-aux form))))
+  [form conn-atm & {:keys [keep-set drop-set]
+                    :or {drop-set #{:db/id}
+                         keep-set #{}}}]
+  (letfn [(resolve-aux [obj]
+            (cond
+              (db-ref? obj) (let [res (dp/pull @conn-atm '[*] (:db/id obj))]
+                              (if (= res obj) nil (resolve-aux res)))
+              (map? obj) (reduce-kv (fn [m k v]
+                                      (cond (drop-set k)                                    m
+                                            (and (not-empty keep-set) (not (keep-set k)))   m
+                                            :else                                           (assoc m k (resolve-aux v))))
+                                    {}
+                                    obj)
+              (vector? obj)      (mapv resolve-aux obj)
+              (set? obj)    (set (mapv resolve-aux obj))
+              (coll? obj)        (map  resolve-aux obj)
+              :else  obj))]
+    (resolve-aux form)))
 
 (defn root-entities
   "Return a sorted vector of root entities (natural numbers) for all root entities of the DB."

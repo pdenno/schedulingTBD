@@ -6,6 +6,7 @@
 (def ^:diag diag (atom nil))
 
 (def server-port 3300) ; ToDo: Get this from config.
+(def client-id "A random uuid naming this client. It changes on disconnect." (str (random-uuid)))
 
 ;;; ToDo: Is there a react way? It looks like react doesn't have this notion.
 (def ^:diag root "The application's root 'Symbol(react.element)' element" (atom nil))

@@ -18,7 +18,8 @@
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.db-access :as dba]
-   [stbd-app.util :as util]
+   [stbd-app.util   :as util]
+   [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom {}))
@@ -157,6 +158,14 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
+(def test-string
+  "We make acrylic bathtubs.
+The main scheduling problem in our business involves timely acquiring and managing parts and supplies from various global vendors.
+Coordinating these deliveries to align with our production schedule is challenging, especially given fluctuating lead times and possible delays.
+Additionally, synchronizing manufacturing processes to ensure a seamless assembly line operation while minimizing idle time is vital.
+It is also crucial to handle unexpected changes or disruptions in the schedule.
+Finally, ensuring maintenance and quality inspections are timely done to keep the production on schedule is equally critical.")
+
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
         [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
@@ -165,22 +174,21 @@
         useful-height (int (- height banner-height))
         chat-side-height useful-height
         code-side-height useful-height]
-    (hooks/use-effect :once ; Need to set :max-height of resizable editors after everything is created.
-                      (editor/resize-finish "code-editor" nil code-side-height))
     (hooks/use-effect :once
-       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
-           (p/then #(do
-                      (set-proj-infos (conj (:others %) (:current-project %)))
-                      (set-proj (:current-project %))))))
+      (log/info "ONCE")
+      (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
+      (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
+          (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
+                       (set-proj (:current-project %))))))
     (hooks/use-effect [proj]
       (when proj
         (-> (dba/get-conversation proj)
             (p/then #(set-conversation %)))))
     (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
               (log/info "--------- Calling change-project: p =" p)
-              (when (not= proj p)
-                (dba/set-current-project p)
-                (set-proj p)))]
+              (when-not  (or (= p proj) (= (:project/id p) :START-A-NEW-PROJECT))
+                (dba/set-current-project p))
+              (set-proj p))]
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
             {:variant "h4"
@@ -198,7 +206,8 @@
                        ($ chat/Chat {:chat-height chat-side-height :conv-map conversation}))
              :right ($ ShareUpDown
                        {:init-height code-side-height
-                        :up ($ Editor {:name "code-editor"
+                        :up ($ Editor {:text test-string
+                                       :name "code-editor"
                                        :height code-side-height})
                         :dn ($ Box)
                         :share-fns (:right-share top-share-fns)})
@@ -241,19 +250,33 @@
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
 (defonce ping-process (atom nil))
 
-(defn ^{:after-load true, :dev/after-load true} mount-root []
+;;; --------------- https://code.thheller.com/blog/shadow-cljs/2019/08/25/hot-reload-in-clojurescript.html ----------------------
+(defn ^{:after-load true, :dev/after-load true} start []
   (sutil/config-log :info)
   (log/info "Logging level for the client:"
             (->> log/*config*
                  :min-level
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
-  (reset! chat/connected? false)
+  (reset! ws/connected? false)
   (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
-  (log/info "Starting a ping process.") ; Start this here so you don't get one every time the chat updates!
-  (reset! ping-process (js/window.setInterval (fn [] (chat/ping!)) 10000)) ; Ping to keep-alive.
+  (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 10000)) ; Ping to keep-alive the web-socket.
+  #_(-> (p/delay 2000) ; This was intended to solve a not-ready problem, but screws things up.
+      (p/then (fn [_x] (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 10000)))) ; Ping to keep-alive the web-socket.
+      (p/then (fn [_x] (log/info "Starting a ping process.")))) ; Start this here so you don't get one every time the chat updates!
   ;; Project list and conversation need to be available when .render. Thus promises.
   (.render root ($ app)))
 
 (defn ^:export init []
-  (mount-root))
+  (start))
+
+;;; ToDo: This only executes on recompile; I'd like it to run on reload too.
+;;; Note that start/stop above are shadow-cljs things and reload isn't.
+;;; For a possible solution See "performance.getEntriesByType("navigation")" at
+;;; https://stackoverflow.com/questions/5004978/check-if-page-gets-reloaded-or-refreshed-in-javascript
+(defn ^{:before-load true, :dev/before-load true #_#_:dev/before-load-async true} stop []
+  (log/info "STOP")
+  (when (and ws/connected? util/client-id)
+    (log/info "Telling server to close channel for client-id = " util/client-id)
+    (ws/send-msg {:dispatch-key :close-channel}) ; The client-id is appended by send-message!.
+    (log/info "Message sent for client-id = " util/client-id)))
