@@ -1,6 +1,4 @@
 [
-#:summary{:name "SUMMARY", :next-msg-id 4}
-
 #:project{:id :aluminium-foil-production-scheduling,
           :current-domain :process-interview
           :name "Aluminium foil production scheduling"

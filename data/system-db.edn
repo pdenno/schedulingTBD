@@ -1,5 +1,5 @@
 [
-#:system{:current-project-id :aluminium-foil-production-scheduling, :name "SYSTEM"} ; ToDo: Make this go away; it is client-specific.
+#:system{:default-project-id :aluminium-foil-production-scheduling, :name "SYSTEM"}
 
 #:project{:dir
           "/opt/scheduling/projects/craft-beer-brewery-scheduling",
@@ -10,11 +10,6 @@
           "/opt/scheduling/projects/snowboards-production-scheduling",
           :id :snowboards-production-scheduling,
           :name "Snowboards production scheduling"}
-
-#:project{:dir "/opt/scheduling/projects/craft-beer-surrogate",
-          :id :craft-beer-surrogate,
-          :deleted? true
-          :name "Craft beer surrogate"}
 
 #:project{:dir
           "/opt/scheduling/projects/aluminium-foil-production-scheduling",

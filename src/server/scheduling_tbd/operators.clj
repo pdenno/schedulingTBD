@@ -95,13 +95,37 @@
   [fact fact-list]
   (some #(when (uni/unify fact %) %) fact-list))
 
+#_(ws/send-to-chat {:promise? nil
+                    :client-id (ws/any-client!)
+                    :dispatch-key
+                    :update-proj-name
+                    :new-proj-map {:project/name "whatever" :project/id  :craft-beer-brewery-scheduling}})
+
+(def intro-prompt
+  "This is the DB form of the first message of a conversation."
+  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
+   {:msg-link/uri "http://localhost:3300/learn-more"
+    :msg-link/text "learn more about how this works"}
+   {:msg-text/string "."}])
+
 (defn new-project-advance
   "Stuff done to create a new project through project-advance."
-  [{:keys [more-a-list]}]
+  [{:keys [more-a-list project-name response state-string client-id] :as obj}]
+  ;(log/info "npa: obj =" obj)
+  ;(reset! diag obj)
   (if-let [pname-fact (find-fact '(project-name ?x) more-a-list)]
     (let [pid   (-> pname-fact second str/lower-case (str/replace #"\s+" "-") keyword)
-          pname (-> pname-fact second (str/replace #"\-" " "))] ; ToDo: Fix this (in caller).
-      (db/create-proj-db! {:project/id pid :project/name  pname}))
+          pname (->>  (str/split project-name #"\s+") (mapv str/capitalize) (interpose " ") (apply str))
+          pid   (db/create-proj-db! {:project/id pid :project/name  pname}) ; pid might not have been unique, thus this returns a new one.
+          eid   (db/project-exists? pid)]
+      (d/transact (connect-atm pid) [[:db/add eid :project/state-string state-string]])
+      (db/add-msg pid :system intro-prompt)
+      (db/add-msg pid :user   [{:msg-text/string response}])
+      (db/add-msg pid :system [{:msg-text/string (format "Great! We'll call your project '%s'." pname)}])
+      ;; Now tell the client to 'look again' because we've added the "Great..." msg to what he sees, and
+      ;; we also use this :update-proj-name to change the project selected.
+      (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :update-proj-name
+                        :new-proj-map {:project/name pname :project/id pid}}))
     (throw (ex-info "Couldn't find a project-name fact while advancing plan." {:more-a-list more-a-list}))))
 
 (defn advance-plan
@@ -111,7 +135,7 @@
       - domain is a domain object, typically one that has been pruned. (So it IS small!)
    Returns the new state."
   [{:keys [plan-step proj-id domain more-d-list more-a-list] :as obj}]
-  (log/info "advance-plan: proj-id =" proj-id "more-d-list = " more-d-list "more-a-list =" more-a-list)
+  (log/info "ap: obj =" obj)
   (let [facts (db/get-state proj-id)
         {:keys [operator args]} plan-step
         op-sym (-> operator name symbol)
@@ -122,13 +146,16 @@
         new-state (add-del-facts facts {:add a-list :delete d-list})
         eid (db/project-exists? proj-id)]
     (cond eid                        (d/transact (connect-atm proj-id) [[:db/add eid :project/state-string (str new-state)]])
-          (= proj-id :new-project)   (new-project-advance obj)
+          (= proj-id :new-project)   (new-project-advance (assoc obj :state-string (str new-state)))
           :else                      (throw (ex-info "Couldn't find proj-id while advancing plan." {:proj-id proj-id})))
     new-state))
 
 (def wait-time-for-user-resp "The number of milliseconds to wait for the user to reply to a query." 20000)
 
-(defn str2msg-vec [s] [{:msg-text/string s}])
+(defn msg-vec
+  [s]
+  (assert (string? s))
+  [{:msg-text/string s}])
 
 ;;; Typically we won't save an interview query message to the DB until after receiving a response to it from the user.
 ;;; At that point, we'll also save the :project/state-string. This ensures that when we restart we can use the
@@ -138,7 +165,7 @@
 
 ;;; ----- :!initial-question
 (defoperator :!initial-question [{:keys [client-id] :as obj}]
-  (-> (ws/send-to-chat (:message/content db/intro-prompt) :client-id client-id)
+  (-> (ws/send-to-chat {:msg-vec intro-prompt :client-id client-id})
       (p/then (fn [response] (db-action obj response)))
       (p/catch (fn [err] (log/error "Error in !initial-question:" err)))))
 
@@ -147,8 +174,10 @@
 (defaction :!initial-question [obj response]
   (if-let [proj-name (dom/project-name response)]
     (let [proj-name-sym (-> proj-name (str/replace  #"\s+" "-") symbol)]
-      (log/info "!initial-question: proj-name-sym =" proj-name-sym)
+      (log/info "!initial-question: proj-name =" proj-name)
       (-> obj
+          (assoc :response response)
+          (assoc  :project-name proj-name)
           (update :more-d-list #(into '[(project-name new-project)] %))
           (update :more-a-list #(into `[(~'project-name ~proj-name-sym)
                                         (~'ongoing-discussion ~proj-name-sym)] %))
@@ -158,9 +187,9 @@
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-steps [{:keys [plan-step proj-id client-id domain] :as obj}]
   (log/info "!yes-no-process-steps: obj =" obj)
-  (-> "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
-      str2msg-vec
-      (ws/send-to-chat :client-id client-id)
+  (-> {:client-id client-id}
+      (assoc :msg-vec (msg-vec "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"))
+      ws/send-to-chat
       (p/await wait-time-for-user-resp)
       (p/then #(do (log/info "After the p/await:" %) %))
       (p/then  (fn [response] (db-action obj response)))
@@ -173,9 +202,9 @@
 ;;; ----- :!query-process-durs
 (defoperator :!query-process-durs [{:keys [plan-step client-id] :as obj}]
   (log/info "!query-process-durs: obj =" obj)
-  (-> "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"
-      str2msg-vec
-      (ws/send-to-chat :client-id client-id)
+  (-> {:client-id client-id}
+      (assoc :msg-vec (msg-vec "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"))
+      ws/send-to-chat
       (p/await wait-time-for-user-resp)
       (p/then  (fn [response] (db-action obj response)))
       (p/catch (fn [err] (log/error "Error in !query-process-durs:" err)))))
@@ -187,9 +216,9 @@
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-ordering [{:keys [plan-step client-id] :as obj}]
   (log/info "!yes-no-process-ordering: plan-step =" plan-step)
-  (-> "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
-      str2msg-vec
-      (ws/send-to-chat :client-id client-id)
+  (-> {:client-id client-id}
+      (assoc :msg-vec (msg-vec "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"))
+      ws/send-to-chat
       (p/await wait-time-for-user-resp)
       (p/then  (fn [response] (db-action obj response)))
       (p/catch (fn [err] (log/error "Error in !yes-no-process-ordering:" err)))))

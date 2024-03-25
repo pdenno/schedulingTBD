@@ -14,6 +14,7 @@
    ;[datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.util  :as util :refer [now]]
+   [scheduling-tbd.specs :as spec]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id]]
    [taoensso.timbre :as log :refer [debug]])
   (:import
@@ -39,9 +40,9 @@
         :doc "a string, same as the :project/name in the project's DB."}
 
 ;;; ---------------------- system
-   :system/current-project-id
+   :system/default-project-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
-        :doc "a keyword naming the current project; set by user using UI, it is one of the :project/id values in this DB."}
+        :doc "a keyword providing a project-id clients get when starting up."}
    :system/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
         :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}})
@@ -115,10 +116,6 @@
    :summary/interview-state
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "a keyword (enum val from some set; ns=interview-state) indicating the current disposition of the interview."}
-   :summary/next-msg-id ; ToDo: Remove this. Datalog can do it easy.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc "The ID (a natural number) to be assigned to the next message written (either side of conversation)."}
-
    ;; ---------------------- resource type
    :res-t/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
@@ -237,15 +234,6 @@
 ;;; Atom for the configuration map used for connecting to the project db.
 (defonce proj-base-cfg (atom nil))
 
-(defn current-project-id
-  "Get the current project from the system database."
-  []
-  (d/q '[:find ?proj .
-         :where
-         [?entity :system/name "SYSTEM"]
-         [?entity :system/current-project-id ?proj]]
-       @(connect-atm :system)))
-
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
    (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
@@ -261,16 +249,30 @@
            :in $ ?proj-id
            :where
            [?e :project/id ?proj-id]]
-;           (not [?e :project/deleted? true])]
          @(connect-atm proj-id) proj-id)))
 
-(defn set-current-project
-  "Get the current project from the system database."
-  [proj-id & {:keys [check-exists?] :or {check-exists? true}}]
-  (when check-exists? (project-exists? proj-id))
-  (d/transact (connect-atm :system)
-              [{:system/name "SYSTEM" ; Singleton
-                :system/current-project-id proj-id}]))
+(defn get-project
+  "Return the project structure."
+  ([pid] (get-project pid #{:db/id}))
+  ([pid filter-set]
+   (let [conn (connect-atm pid)]
+     (when-let [eid (project-exists? pid)]
+       (resolve-db-id {:db/id eid} conn filter-set)))))
+
+(defn default-project
+  "Return a map of the  default :project/id and :project/name.
+   :project/id is from the system database, and
+   providing :project/name was a mistake in several situations." ; ToDo: Fix this.
+  []
+  (let [pid (d/q '[:find ?proj .
+                   :where
+                   [?entity :system/name "SYSTEM"]
+                   [?entity :system/default-project-id ?proj]]
+                 @(connect-atm :system))]
+    (get-project pid #{:project/name})
+    (when-let [eid (project-exists? pid)]
+      (resolve-db-id {:db/id eid} (connect-atm pid)
+                     :keep-set #{:project/name :project/id}))))
 
 (defn list-projects
   "Return a vector of keywords maps describing each project known by the system DB."
@@ -287,16 +289,6 @@
             [?e :project/id  ?proj-id]
             (not [?e :project/deleted? true])]
           @(connect-atm :system)))))
-
-;;; ToDo: Add structure to this as the structure develops.
-(defn get-project
-  "Return a vector of project content.
-   Default content is :summary/name :project/id :message/content."
-  ([pid] (get-project pid #{:db/id}))
-  ([pid filter-set]
-  (let [conn (connect-atm pid)]
-    (when-let [eid (project-exists? pid)]
-      (resolve-db-id {:db/id eid} conn filter-set)))))
 
 (defn get-state
   [pid & {:keys [sort?] :or {sort? true}}]
@@ -404,10 +396,16 @@
         cfg)
     (log/error "Not recreating DB because backup file does not exist:" backup-file))))
 
+(def keep-db? #{:him :planning-domains})
 (defn recreate-dbs!
   "Recreate the system DB on storage from backup.
    For each project it lists, recreate it from backup if such backup exists."
   []
+  (swap! sutil/databases-atm
+         #(reduce-kv (fn [res k v] (if (keep-db? k) (assoc res k v) res)) {} %))
+  (if-let [him (get @sutil/databases-atm :him)]
+    (reset! sutil/databases-atm {:him him})
+    (reset! sutil/databases-atm {}))
   (recreate-system-db!)
   (doseq [pid (list-projects)]
     (recreate-project-db! pid)))
@@ -440,71 +438,40 @@
             (assoc :project/name new-name)
             (assoc :project/id new-id))))))
 
-(defn next-msg-id
-  "Return the next message ID in the project's DB."
-  [project-id]
-  (if-let [conn (connect-atm project-id)]
-    (d/q '[:find ?next-id .
-           :where
-           [?e :summary/name "SUMMARY"]
-           [?e :summary/next-msg-id ?next-id]]
-         @conn)
-    (log/info "Project does not exist" {:id project-id})))
+(defn max-msg-id
+  "Return the current highest message ID used in the project."
+  [pid]
+  (when-let [eid (project-exists? pid)]
+    (as-> (resolve-db-id {:db/id eid}
+                        (connect-atm pid)
+                        :keep-set #{:project/messages :message/id}) ?o
+      (:project/messages ?o)
+      (map :message/id ?o)
+      (if (empty? ?o) 0 (apply max ?o)))))
 
-(defn inc-msg-id!
-  "Increment the next message ID in the project's DB."
-  [project-id]
-  (let [id (next-msg-id project-id)
-        conn (connect-atm project-id)]
-    (d/transact conn [{:summary/name "SUMMARY"
-                       :summary/next-msg-id (inc id)}])))
-
-(defn message-form
-  "Create a map that looks like the messages that are stored in the DB and communicated to the web app.
-   Assumes just one msg-text."
-  [msg-id from msg-text]
-  {:message/id msg-id
-   :message/from from
-   :message/content [{:msg-text/string msg-text}]
-   :message/time (-> (LocalDateTime/now)
-                     str
-                     clojure.instant/read-instant-date)})
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
-  [project-id msg-text from]
-  (if-let [conn (connect-atm project-id)] ; ToDo the then part (and thus the if) should not be necessary.
-    (let [msg-id (d/q '[:find ?next-id .
-                        :where
-                        [?e :summary/name "SUMMARY"]
-                        [?e :summary/next-msg-id ?next-id]]
-                      @conn)
-          msg (message-form msg-id from msg-text)]
-      (d/transact conn
-                  [msg
-                   {:summary/name "SUMMARY"
-                    :summary/next-msg-id (inc msg-id)}])
-      msg)
-    (log/info "Project does not exist" {:id project-id})))
+  [pid from msg-vec]
+  (s/assert ::spec/chat-msg-vec msg-vec)
+  (if-let [conn (connect-atm pid)]
+    ;; See "Map forms" at https://docs.datomic.com/pro/transactions/transactions.html
+    ;; ToDo: Look for other ways to do this. I'm
+    ;; (1) Installing a new :message/id,
+    ;; (2) getting its eid, and,
+    ;; (3) adding to that.
+    (let [msg-id (inc (max-msg-id pid))]
+      (d/transact conn {:tx-data [{:db/id (project-exists? pid)
+                                  :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
+    (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn add-project
   "Add the argument project (a db-cfg map) to the system database."
-  ([id proj-name dir] (add-project id proj-name dir {:make-current? true}))
-  ([id proj-name dir opts]
+  ([id proj-name dir]
    (d/transact (connect-atm :system)
-               {:tx-data [(cond-> {:system/name "SYSTEM"}
-                            (:make-current? opts) (assoc :system/current-project-id id))
-                          {:project/id id
+               {:tx-data [{:project/id id
                            :project/name proj-name
                            :project/dir dir}]})))
 
-(def intro-prompt
-  "This is the DB form of the first message of a conversation."
-  #:message{:from :system,
-            :id 0,
-            :content [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
-                      {:msg-link/uri "http://localhost:3300/learn-more"
-                       :msg-link/text "learn more about how this works"}
-                      {:msg-text/string "."}]})
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
@@ -517,36 +484,31 @@
    The project-info map must include :project/id and :project/name.
      proj-info  - map containing at least :project/id and :project/name.
      additional - a vector of maps to add to the database.
-     opts -  {:force? - overwrite project with same name.
-              :make-current? - focus of work in UI.}"
+     opts -  {:force? - overwrite project with same name}
+   Return the "
   ([proj-info] (create-proj-db! proj-info {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {:intro? true}))
   ([proj-info additional-info opts]
    (s/assert ::project-info proj-info)
    (let [{:project/keys [id name]} (if (:force? opts) proj-info (unique-proj proj-info))
-         cfg (db-cfg-map :project id)]
-     (when-not (-> cfg :store :path java.io.File. .isDirectory)
+         cfg (db-cfg-map :project id)
+         dir (-> cfg :store :path)]
+     (when-not (-> dir java.io.File. .isDirectory)
        (-> cfg :store :path java.io.File. .mkdir))
+     (add-project id name dir)
      (when (d/database-exists? cfg) (d/delete-database cfg))
      (d/create-database cfg)
      (register-db id cfg)
      ;; Add to project db
      (d/transact (connect-atm id) db-schema-proj)
-     (d/transact (connect-atm id) {:tx-data [{:summary/name "SUMMARY"
-                                              :summary/next-msg-id 2} ; 2 if challenge-intro, no problem if not.
-                                             {:project/id id
+     (d/transact (connect-atm id) {:tx-data [{:project/id id
                                               :project/name name
-                                              :project/state-string "[]"}
-                                             (-> intro-prompt
-                                                 (assoc :message/time (now))
-                                                 (assoc :message/id 1))]})
+                                              :project/state-string "[]"}]})
      (when (not-empty additional-info)
        (d/transact (connect-atm id) additional-info))
-     (when (:intro? opts) (add-msg id (format "Great! We'll call your project '%s'." name) :system))
      ;; Add knowledge of this project to the system db.
-     (add-project id name (-> cfg :store :path) opts)
      (log/info "Created project database for" id)
-     (assoc cfg :project/id id))))
+     id)))
 
 (defn delete-project
   "Remove project from the system DB and move its project directory to the the deleted directory.

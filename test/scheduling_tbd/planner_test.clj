@@ -15,10 +15,13 @@
   []
   (alias 'uni 'clojure.core.unify)
   (alias 'str 'clojure.string)
+  (alias 'd   'datahike.api)
+  (alias 'dp  'datahike.pull-api)
   (alias 'dom 'scheduling-tbd.domain)
   (alias 'how 'scheduling-tbd.how-made)
   (alias 'llm 'scheduling-tbd.llm)
   (alias 'op 'scheduling-tbd.operators)
+  (alias 'resp 'scheduling-tbd.web.controllers.respond)
   (alias 'shop 'scheduling-tbd.shop)
   (alias 'spec 'scheduling-tbd.specs)
   (alias 'sutil 'scheduling-tbd.sutil)

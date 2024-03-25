@@ -16,7 +16,16 @@
 
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique client-id provided by the client." (atom {}))
-(def current-client-id "UUID identifying client. This is for diagnostics." (atom nil))
+
+(def client-current-proj "Current project (keyword) indexed by client-id (string)."  (atom {}))
+(defn clear-client-current-proj [] (reset! client-current-proj {}))
+(defn set-current-project
+  "We track client's current project, but since clients are ephemeral, it isn't a DB thing."
+  [client-id pid]
+  (when-not (some #(= client-id %) (keys @socket-channels))
+    (log/warn "Nothing know about client when setting current project. client-id =" client-id))
+  (swap! client-current-proj #(assoc % client-id pid)))
+
 (declare user-says send-to-chat dispatch)
 
 ;;; ToDo: move to devl?
@@ -29,7 +38,6 @@
 (defn make-ws-channels
   "Create channels and store them keyed by the unique ID provided by the client."
   [id]
-  (reset! current-client-id id)
   (let [chans {:in  (async/chan)
                :out (async/chan)
                :err (async/chan)
@@ -195,16 +203,17 @@
   "Send the argument message-vec to the current project (or some other destination if a client-id is provided.
    Return a promise that is resolved when the user responds to the message, by whatever means (http or ws).
      msg-vec is is a vector of ::spec/msg-text-elem and :spec/msg-link-elem. See specs.cljs."
-  [msg-vec & {:keys [promise? client-id] :or {promise? true}}]
+  [{:keys [msg-vec promise? client-id dispatch-key]
+    :or {msg-vec [] promise? true dispatch-key :tbd-says} :as content}]
   (s/assert ::spec/chat-msg-vec msg-vec)
+  (log/info "send-to-chat: content =" content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]
     (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
-          msg-obj (cond-> {:dispatch-key :tbd-says
-                           :msg-vec msg-vec
-                           :client-id client-id
-                           :timestamp (now)}
-                    p-key (assoc :p-key p-key))]
+          msg-obj (cond-> content
+                    true                (assoc :dispatch-key (or dispatch-key :tbd-says))
+                    p-key               (assoc :p-key p-key)
+                    true                (assoc :timestamp (now)))]
       (go (>! out (str msg-obj)))
       prom)
     (log/error "Could not find out async channel for client" client-id)))
@@ -240,6 +249,7 @@
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []
   (clear-promises!)
+  (clear-client-current-proj) ; ToDo: Restarting the server means we lose knowledge of their current project. Ok?
   (init-dispatch-table!))
 
 (defn wsock-stop []

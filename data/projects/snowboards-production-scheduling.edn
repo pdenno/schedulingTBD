@@ -1,6 +1,4 @@
 [
-#:summary{:name "SUMMARY", :next-msg-id 4}
-
 #:project{:id :snowboards-production-scheduling,
           :name "Snowboards production scheduling"
           :current-domain :process-interview

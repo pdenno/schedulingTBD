@@ -1,6 +1,4 @@
 [
-#:summary{:name "SUMMARY", :next-msg-id 2}
-
  #:project{:id :craft-beer-surrogate,
            :deleted? true
            :name "Craft beer surrogate"

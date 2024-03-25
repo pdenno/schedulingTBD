@@ -66,8 +66,13 @@
                             {:role "user"      :content question}]
                            {:raw-text? true}))
       (p/await 20000)
-      (p/then #(ws/send-to-chat [{:msg-text/string %}] {:client-id client-id :promise? false}))
-      (p/catch #(log/error "Failure in llm-directly:" %))))
+      (p/then #(ws/send-to-chat {:client-id client-id :promise? false :msg-vec [{:msg-text/string %}]}))
+      (p/catch (fn [e]
+                 (log/error "Failure in llm-directly:")
+                 (ws/send-to-chat {:client-id client-id
+                                   :promise? false
+                                   :msg-vec [{:msg-text/string "There was a problem answering that."}]})))))
+
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-var-partial

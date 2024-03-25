@@ -120,11 +120,9 @@
 ;;; -------- (devl/ajax-test "/api/ws" {:client-id "my-fake-uuid"}) ; ToDo: ajax-test not working here. Not investigated
 (s/def ::ws-connection-request (s/keys :req-un [::client-id]))
 
-;;; -------- (devl/ajax-test "/api/set-current-project" {:project-id "craft-beer-brewery-scheduling"} {:method ajax.core/POST}) ; ToDo: doesn't work.
-(s/def ::set-current-project-request (s/keys :req-un [::client-id ::project-id]))
 (s/def :project/id keyword?)
 (s/def :project/name string?)
-(s/def ::set-current-project-response (s/keys :req [:project/id :project/name]))
+
 
 (def routes
   [["/app" {:get {:no-doc true
@@ -159,13 +157,6 @@
             :summary "Get a vector of projects maps and the current project."
             :responses {200 {:body ::list-projects-response}}
             :handler resp/list-projects}}]
-
-    ["/set-current-project"
-     {:post {;:no-doc true
-             :summary "Get a vector of projects maps and the current project."
-             :parameters {:body ::set-current-project-request}
-             :responses {200 {:body ::set-current-project-response}}
-             :handler resp/set-current-project}}]
 
     ["/health"
      {:get {;:no-doc true
