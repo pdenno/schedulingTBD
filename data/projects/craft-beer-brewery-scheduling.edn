@@ -1,6 +1,4 @@
 [
-#:summary{:name "SUMMARY", :next-msg-id 3}
-
 #:project{:desc
           "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan.",
           :id :craft-beer-brewery-scheduling,

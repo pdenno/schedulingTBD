@@ -55,9 +55,13 @@
 ;;; :tbd-says isn't in this because it sets the set-system-text hook.
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
-  [{:keys [dispatch-key promise-keys] :as _msg}]
-  (cond (= dispatch-key :clear-promise-keys) (clear-promise-keys! promise-keys)
-        (= dispatch-key :alive?)             (ws/send-msg {:dispatch-key :alive? :alive? true})))
+  [{:keys [dispatch-key promise-keys new-proj-map] :as _msg} change-proj-fn]
+  (case dispatch-key
+    :clear-promise-keys (clear-promise-keys! promise-keys)
+    :alive?             (ws/send-msg {:dispatch-key :alive? :alive? true})
+    :update-proj-name   (change-proj-fn new-proj-map)
+    :ping-confirm       :ok
+    "default"))
 
 ;;; ------------------------- active stuff ------------------------------------
 (def item-keys "Atom for a unique :key of some UI object." (atom 0))
@@ -103,7 +107,7 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(defnc Chat [{:keys [chat-height conv-map]}]
+(defnc Chat [{:keys [chat-height conv-map change-proj-fn]}]
   (let [[msg-list set-msg-list]         (hooks/use-state (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js))
         [progress set-progress]         (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
@@ -121,7 +125,7 @@
                     (set! (.-onmessage chan)
                           (fn [event]       ;; ToDo: Consider transit rather then edn/read-string.
                             (try (let [{:keys [p-key dispatch-key] :as msg-obj} (-> event .-data edn/read-string)]
-                                   (dispatch-msg msg-obj) ; Just for :clear-promise-keys messages currently.
+                                   (dispatch-msg msg-obj change-proj-fn)
                                    (when (= :tbd-says dispatch-key)
                                      (when p-key (remember-promise p-key))
                                      (log/info "msg-obj =" msg-obj)

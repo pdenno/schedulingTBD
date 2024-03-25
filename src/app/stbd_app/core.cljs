@@ -177,18 +177,18 @@ Finally, ensuring maintenance and quality inspections are timely done to keep th
     (hooks/use-effect :once
       (log/info "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
-      (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with :current-project and :others.
+      (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
           (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
-                       (set-proj (:current-project %))))))
-    (hooks/use-effect [proj]
-      (when proj
-        (-> (dba/get-conversation proj)
-            (p/then #(set-conversation %)))))
+                       (set-proj (:current-project %))
+                       (-> (dba/get-conversation (:current-project %))
+                           (p/then (fn [pid] (set-conversation pid))))))))
     (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
-              (log/info "--------- Calling change-project: p =" p)
-              (when-not  (or (= p proj) (= (:project/id p) :START-A-NEW-PROJECT))
-                (dba/set-current-project p))
-              (set-proj p))]
+              (log/info "--------- Calling change-project: p =" p) ; If p = :START-A-NEW-PROJECT, this will run again after server finds a name.
+              (when-not (= p proj)                                 ; In that case, it will have updated the conversation, with the "Great,...".
+                (set-proj p)
+                (set-conversation {:conv [] :conf-for proj})
+                (-> (dba/get-conversation p)
+                    (p/then #(set-conversation %)))))]
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
             {:variant "h4"
@@ -203,7 +203,7 @@ Finally, ensuring maintenance and quality inspections are timely done to keep th
                   ($ SelectProject {:current-proj proj :proj-infos proj-infos :change-proj-fn change-project}))))
          ($ ShareLeftRight
             {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
-                       ($ chat/Chat {:chat-height chat-side-height :conv-map conversation}))
+                       ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :change-proj-fn change-project}))
              :right ($ ShareUpDown
                        {:init-height code-side-height
                         :up ($ Editor {:text test-string
@@ -261,10 +261,6 @@ Finally, ensuring maintenance and quality inspections are timely done to keep th
   (reset! ws/connected? false)
   (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
   (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 10000)) ; Ping to keep-alive the web-socket.
-  #_(-> (p/delay 2000) ; This was intended to solve a not-ready problem, but screws things up.
-      (p/then (fn [_x] (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 10000)))) ; Ping to keep-alive the web-socket.
-      (p/then (fn [_x] (log/info "Starting a ping process.")))) ; Start this here so you don't get one every time the chat updates!
-  ;; Project list and conversation need to be available when .render. Thus promises.
   (.render root ($ app)))
 
 (defn ^:export init []

@@ -22,22 +22,6 @@
                                                     {:status status :status-text status-text})))})
     prom))
 
-(defn set-current-project
-  [{:project/keys [id]}]
-  (log/info "Call to db-set-current-project: project-id =" id)
-  (let [prom (p/deferred)]
-    (if (= id :START-A-NEW-PROJECT)
-      (POST "/api/set-current-project" ; (str "/api/set-current-project?project-id=" (name id) "&client-id=" client-id)
-            {:params {:project-id (name id) :client-id client-id} ; ToDo: Really not sure about this!
-             :timeout 2000
-             :handler (fn [resp] (p/resolve! prom resp))
-             :error-handler (fn [{:keys [status status-text]}]
-                            (p/reject! prom (ex-info "CLJS-AJAX error on /api/set-current-project"
-                                                     {:status status :status-text status-text})))})
-      (do (ws/send-msg {:dispatch-key :start-a-new-project})
-          (p/resolve! prom :START-A-NEW-PROJECT)))
-    prom))
-
 ;;; {:conv-for id :conv [{:message/from :system :message/content [{:msg-text/string "You want to start a new project?"}]}]})
 (defn get-conversation
   "Return a promise that will resolve to the vector of a maps describing the complete conversation so far.
@@ -46,13 +30,11 @@
   [{:project/keys [id]}]
   (log/info "Call to get-conversation for" id)
   (let [prom (p/deferred)]
-    (if (= id :START-A-NEW-PROJECT)
-      (do (ws/send-msg {:dispatch-key :start-a-new-project})
-          (p/resolve! prom {:conv-for id :conv []}))
-      (GET (str "/api/get-conversation?project-id=" (name id) "&client-id=" client-id)
-           {:timeout 3000
-            :handler (fn [resp] (p/resolve! prom resp))
-            :error-handler (fn [{:keys [status status-text]}]
-                             (p/reject! prom (ex-info "CLJS-AJAX error on /api/get-conversation"
-                                                      {:status status :status-text status-text})))}))
-      prom))
+    (GET (str "/api/get-conversation?project-id=" (name id) "&client-id=" client-id)
+         {:timeout 3000
+          :handler (fn [resp] (p/resolve! prom resp))
+          :error-handler (fn [{:keys [status status-text]}]
+                           (p/reject! prom (ex-info "CLJS-AJAX error on /api/get-conversation"
+                                                    {:status status :status-text status-text})))})
+    (ws/send-msg {:dispatch-key :resume-conversation :project-id id})
+    prom))

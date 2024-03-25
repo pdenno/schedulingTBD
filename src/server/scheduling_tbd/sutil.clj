@@ -148,3 +148,12 @@
                               (into-array java.nio.file.CopyOption
                                           [(java.nio.file.StandardCopyOption/ATOMIC_MOVE)
                                            (java.nio.file.StandardCopyOption/REPLACE_EXISTING)]))))
+
+;;; Keep this around; it might get used eventually!
+#_(defmacro report-long-running
+  "Return the string from writing to *out* after this runs in a future."
+  [[timeout] & body]
+  `(-> (p/future (with-out-str ~@body))
+       (p/await ~timeout)
+       (p/then #(log/info "Long-running:" %))
+       (p/catch #(log/warn "Long-running (exception):" %))))

@@ -385,8 +385,6 @@
    :execute (find-plans 'problem1 :verbose :plans)
     :answer (((!DROP BANJO) 1.0 (!PICKUP KIWI) 1.0))})
 
-
-
 (defn test-the-planner
   "Define a planning domain. Define a problem. Find plans for the problem.
    Check that the plan matches what is expected."
@@ -402,11 +400,15 @@
 
 ;;; Run the following when you update interview-for-new-project!:
 ;;;  (ws/register-ws-dispatch :start-a-new-project plan/interview-for-new-project!)
-(defn interview-for-new-project!
-  [{:keys [client-id]}]
-  (log/info "Calling inteview-loop for new project: client-id =" client-id)
-  (interview-loop :new-project :process-interview client-id))
+(defn resume-conversation
+  [{:keys [project-id client-id]}]
+  (log/info "Calling interview-loop for new project: client-id =" client-id)
+  (if (= project-id :START-A-NEW-PROJECT)
+    (interview-loop :new-project :process-interview client-id)
+    (log/info "Not yet resuming for existing projects.")))
 
+;;; This makes recompilation smoother.
+(def test-the-planner? true)
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!
@@ -414,16 +416,17 @@
    the name of the SBCL core file. That file is expected to be in the project directory."
   []
   (load-domain "data/planning-domains/process-interview.edn")
-  (ws/register-ws-dispatch :start-a-new-project interview-for-new-project!)
-  (try
-    (let [cmd-arg (cl-format nil "'(setf shop3-zmq::*endpoint* ~S)'" planner-endpoint)]
-      ;; --eval does not work!
-      (future (sh planner-executable "--non-interactive" "--disable-debugger" "--eval"  cmd-arg)))
-    (catch Exception e
-      (log/error (:message e))
-      (throw (ex-info "Running planner didn't work." {:error e}))))
-  (Thread/sleep 2000)
-  (test-the-planner))
+  (ws/register-ws-dispatch :resume-conversation resume-conversation)
+  (when test-the-planner?
+    (try
+      (let [cmd-arg (cl-format nil "'(setf shop3-zmq::*endpoint* ~S)'" planner-endpoint)]
+        ;; --eval does not work!
+        (future (sh planner-executable "--non-interactive" "--disable-debugger" "--eval"  cmd-arg)))
+      (catch Exception e
+        (log/error (:message e))
+        (throw (ex-info "Running planner didn't work." {:error e}))))
+    (Thread/sleep 2000)
+    (test-the-planner)))
 
 (defn quit-planner!
   "Quit the planner. It can be restarted with a shell command through mount."
