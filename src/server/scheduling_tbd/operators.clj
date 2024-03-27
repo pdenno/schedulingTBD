@@ -10,6 +10,7 @@
    [promesa.core          :as p]
    [scheduling-tbd.db     :as db]
    [scheduling-tbd.domain :as dom]
+   [scheduling-tbd.llm    :as llm]
    [scheduling-tbd.specs  :as spec]
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm resolve-db-id db-cfg-map]]
    [scheduling-tbd.web.routes.websockets  :as ws]
@@ -95,15 +96,10 @@
   [fact fact-list]
   (some #(when (uni/unify fact %) %) fact-list))
 
-#_(ws/send-to-chat {:promise? nil
-                    :client-id (ws/any-client!)
-                    :dispatch-key
-                    :update-proj-name
-                    :new-proj-map {:project/name "whatever" :project/id  :craft-beer-brewery-scheduling}})
-
 (def intro-prompt
   "This is the DB form of the first message of a conversation."
-  [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
+  [{:msg-text/string "Describe your most significant scheduling problem in a few sentences"}
+   {:msg-text/string " or"}
    {:msg-link/uri "http://localhost:3300/learn-more"
     :msg-link/text "learn more about how this works"}
    {:msg-text/string "."}])
@@ -123,8 +119,8 @@
       (db/add-msg pid :user   [{:msg-text/string response}])
       (db/add-msg pid :system [{:msg-text/string (format "Great! We'll call your project '%s'." pname)}])
       ;; Now tell the client to 'look again' because we've added the "Great..." msg to what he sees, and
-      ;; we also use this :update-proj-name to change the project selected.
-      (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :update-proj-name
+      ;; we also use this :reload-proj to change the project selected.
+      (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :reload-proj
                         :new-proj-map {:project/name pname :project/id pid}}))
     (throw (ex-info "Couldn't find a project-name fact while advancing plan." {:more-a-list more-a-list}))))
 
@@ -134,9 +130,9 @@
       - proj-id is the keyword identifying a project by its :project/id.
       - domain is a domain object, typically one that has been pruned. (So it IS small!)
    Returns the new state."
-  [{:keys [plan-step proj-id domain more-d-list more-a-list] :as obj}]
+  [{:keys [plan-step pid domain more-d-list more-a-list] :as obj}]
   (log/info "ap: obj =" obj)
-  (let [facts (db/get-state proj-id)
+  (let [facts (db/get-state pid)
         {:keys [operator args]} plan-step
         op-sym (-> operator name symbol)
         op-obj (domain-operator domain op-sym) ; ToDo: This simplifies when shop is gone.
@@ -144,10 +140,10 @@
         a-list (into (mapv #(uni/subst % bindings) (:operator/a-list op-obj)) more-a-list)
         d-list (into (mapv #(uni/subst % bindings) (:operator/d-list op-obj)) more-d-list)
         new-state (add-del-facts facts {:add a-list :delete d-list})
-        eid (db/project-exists? proj-id)]
-    (cond eid                        (d/transact (connect-atm proj-id) [[:db/add eid :project/state-string (str new-state)]])
-          (= proj-id :new-project)   (new-project-advance (assoc obj :state-string (str new-state)))
-          :else                      (throw (ex-info "Couldn't find proj-id while advancing plan." {:proj-id proj-id})))
+        eid (db/project-exists? pid)]
+    (cond eid                        (d/transact (connect-atm pid) [[:db/add eid :project/state-string (str new-state)]])
+          (= pid :new-project)       (new-project-advance (assoc obj :state-string (str new-state)))
+          :else                      (throw (ex-info "Couldn't find proj-id while advancing plan." {:pid pid})))
     new-state))
 
 (def wait-time-for-user-resp "The number of milliseconds to wait for the user to reply to a query." 20000)
@@ -157,15 +153,51 @@
   (assert (string? s))
   [{:msg-text/string s}])
 
-;;; Typically we won't save an interview query message to the DB until after receiving a response to it from the user.
+(defn abstract-chat
+  "Chat with a human or a surrogate.
+     PID     - a keyword identifying a project (i.e. :project/id).
+     TARGET  - #{:human :surrogate}
+     MSG-OBJ - an object suitable for ws/send-to-chat, it has ::spec/chat-msg-vec and a :client-id
+   If target is :human then the message is sent to ws/send-to-chat, a promise is returned.
+   If target is :surrogate, the message is sent to ws/send-to-chat and then a response is ws/send-to-chat.
+   In the :surrogate case, what is returned is content useful to db-actions (the discussion)."
+  [pid target msg-obj]
+  (s/assert ::spec/chat-msg-obj msg-obj)
+  (case target
+    :human      (ws/send-to-chat msg-obj)
+    :surrogate  (let [text (msg-obj :msg-vec first :msg-text/string)]
+                  (ws/send-to-chat msg-obj)
+                  {:query text
+                   :response (llm/query-on-thread pid "user" text)})))
+
+
+;;; Typically we won't save interview query messages to the DB until after receiving a response to it from the user.
 ;;; At that point, we'll also save the :project/state-string. This ensures that when we restart we can use the
 ;;; planner to put the right question back in play.
 
 ;;; The 'obj' parameter is a map containing client-id, plan-step, proj-id, and domain, typically.
+;;; We carry it forward adding to it and destructuring it in function calls.
+
+;;; ----- :!initial-question-surrogate
+(defoperator :!initial-question-surrogate [{:keys [pid client-id] :as obj}]
+  (log/info "!initial-question-surrogate: obj =" obj)
+  (let [res (abstract-chat pid :surrogate
+                           {:msg-vec (-> intro-prompt first (update :msg-text/string #(str % ".")) vector)
+                            :client-id client-id})]
+    (db-action obj res)))
+
+(defaction :!initial-question-surrogate [{:keys [pid client-id] :as obj} reply]
+  (log/info "db-action !initial-question-surrogate: response =" reply "pid =" pid)
+  (ws/send-to-chat {:dispatch-key :tbd-says       :client-id client-id :msg-vec [{:msg-text/string (:query    reply)}]})
+  (ws/send-to-chat {:dispatch-key :surrogate-says :client-id client-id :msg-vec [{:msg-text/string (:response reply)}]})
+  (-> obj
+      (assoc  :pid pid)
+      (update :more-a-list #(into `[(~'ongoing-discussion ~(name pid))] %))
+      advance-plan))
 
 ;;; ----- :!initial-question
-(defoperator :!initial-question [{:keys [client-id] :as obj}]
-  (-> (ws/send-to-chat {:msg-vec intro-prompt :client-id client-id})
+(defoperator :!initial-question [{:keys [pid client-id] :as obj}]
+  (-> (abstract-chat pid :human {:msg-vec intro-prompt :client-id client-id})
       (p/then (fn [response] (db-action obj response)))
       (p/catch (fn [err] (log/error "Error in !initial-question:" err)))))
 

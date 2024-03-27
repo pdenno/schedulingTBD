@@ -1,0 +1,15 @@
+[
+#:project{:id :sur-plate-glass,
+          :name "SUR Plate Glass",
+          :state-string
+          "#{(proj-name sur-plate-glass) (surrogate sur-plate-glass)}",
+          :surrogate
+          #:surrogate{:assistant-obj-str
+                      "{:description nil, :file_ids [], :name \"plate glass surrogate\", :tools [{:type \"code_interpreter\"}], :instructions \"You manage a company that makes plate glass.\\n   You are an expert in production of the company's products and management of its supply chains.\\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\\n   Your answers typically are short, just a few sentences each.\", :id \"asst_2C9Ub7YTCAhWg0nLnJZhEXxL\", :metadata {:usage \"surrogate\"}, :object \"assistant\", :created_at 1711484553, :model \"gpt-4-0125-preview\"}",
+                      :id :sur-plate-glass,
+                      :subject-of-expertise "plate glass",
+                      :system-instruction
+                      "You manage a company that makes plate glass.\n   You are an expert in production of the company's products and management of its supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.",
+                      :thread-str
+                      "{:id \"thread_kFfU7ubf5456RWt5ObXA5GCp\", :object \"thread\", :created_at 1711484553, :metadata {:usage \"surrogate\"}}"}}
+]

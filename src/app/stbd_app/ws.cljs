@@ -29,7 +29,7 @@
     :close-channel          ; Close the ws. (Typically, client is ending.)
     :ping                   ; Ping server.
     :resume-conversation    ; Restart the planner (works for :START-A-NEW-PROJECT too).
-    :surrogate-call         ; User wrote "SUR: <some product type> at the chat prompt.
+    :start-surrogate         ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation.
     :user-says})            ; User wrote at the chat prompt (typically answering a question).
 
 (def send-tries (atom 0))

@@ -232,19 +232,19 @@
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
    Returns a vector ::spec/state-edits object that is the effect of running the plan."
-  [proj-id client-id domain plan]
+  [pid client-id domain plan]
   (let [plan (translate-plan plan)]
-    (log/info "execute-plan!: proj-id =" proj-id "plan =" plan)
+    (log/info "execute-plan!: pid =" pid "plan =" plan)
     (doseq [plan-step plan] ; after translate-plan plan-steps have :operator :args and :cost.
       (s/assert ::spec/plan-step plan-step)
       (log/info "run plan-step" plan-step)
       (op/run-op
        (:operator plan-step)
        {:plan-step plan-step
-        :proj-id proj-id
+        :pid pid
         :client-id client-id
         :domain domain}))
-    (db/get-state proj-id)))
+    (db/get-state pid)))
 
 (defn discussion-stopped?
   "Return true if the state vector contains the discussion-stopped fact."
@@ -291,8 +291,8 @@
      (4) The state-edits resulting from this plan is then used by prune-domain to produce a NEW planning domain.
          Iteratively such new planning domains are processed through steps 1-3. This continues until no more plans can be generated.
 
-     - proj-id   : a keyword, the :project/id of the project.
-     - domain-id : a keyword, the :domain/id of the domain.
+     - pid         : a keyword, the :project/id of the project.
+     - domain-id   : a keyword, the :domain/id of the domain.
      - start-facts : a vector of seqs describing grounded propositions.
      - problem     : a SHOP problem in proj syntax.
 
@@ -307,10 +307,10 @@
 
    'triple' below refers to the map containing :domain :problem and :execute in either proj or SHOP form.
    The function returns the state achieved, a collection of :specs/proposition."
-  [proj-id domain-id client-id & {:keys [start-facts problem limit]
-                                  :or {start-facts '#{(characterize-process new-proj)},
-                                       problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
-                                       limit 30}}] ; ToDo: Temporary
+  [pid domain-id client-id & {:keys [start-facts problem limit]
+                              :or {start-facts '#{(characterize-process new-proj)},
+                                   problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
+                                   limit 30}}] ; ToDo: Temporary
   (s/assert ::spec/domain-problem problem)
   (let [proj-domain (-> domain-id (get-domain {:form :proj}))
         execute (:domain/execute proj-domain)] ; The execute statement is invariant to state changes.
@@ -324,7 +324,7 @@
             (>= cnt limit)                  (sort-by first state)
             (empty? plans)                  (sort-by first state)
             (discussion-stopped? state)     (sort-by first state)
-            :else  (let [new-state   (execute-plan! proj-id client-id pruned (first plans)) ; ToDo: Deal with multiple plans.
+            :else  (let [new-state   (execute-plan! pid client-id pruned (first plans)) ; ToDo: Deal with multiple plans.
                          new-problem (assoc problem :problem/state-string (str new-state))
                          new-pruned  (prune-domain proj-domain new-state)]
                      (log/info "new-state = " new-state)
@@ -408,7 +408,7 @@
     (log/info "Not yet resuming for existing projects.")))
 
 ;;; This makes recompilation smoother.
-(def test-the-planner? true)
+(def test-the-planner? false)
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!
@@ -436,10 +436,11 @@
                 (let [socket (zmq-sock/socket :req {:connect planner-endpoint})]
                   (zmq/send-msg socket "(sb-ext:exit)")
                   (zmq/receive-msg socket {:stringify true}))))]
-    (if (= [":bye!"] (deref fut 3000 :timeout))
-      (do (log/info "Planner terminated as requested.") :stopped)
-      (do (log/warn "Planner state unknown. (It may not have been running.)") :unknown))))
+    (when test-the-planner?
+      (if (= [":bye!"] (deref fut 3000 :timeout))
+        (do (log/info "Planner terminated as requested.") :stopped)
+        (do (log/warn "Planner state unknown. (It may not have been running.)") :unknown)))))
 
 (defstate plan-server
   :start (init-planner!)
-  :stop (quit-planner!))
+  :stop  (quit-planner!))

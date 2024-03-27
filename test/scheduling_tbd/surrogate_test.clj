@@ -101,17 +101,6 @@
 
 
 ;;; ===================== Possibly useful functions ============================================
-(defn list-assistants
-  []
-  (if-let [key (get-api-key :llm)]
-    (openai/list-assistants {:limit 30} {:api-key key})
-    (log/warn "Couldn't get OpenAI API key.")))
-
-(defn delete-assistant
-  [id]
-  (if-let [key (get-api-key :llm)]
-    (openai/delete-assistant {:assistant_id id} {:api-key key})
-    (log/warn "Couldn't get OpenAI API key.")))
 
 ;;; I probably don't need this.
 (defn get-assistant [_name]

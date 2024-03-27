@@ -59,7 +59,7 @@
   (case dispatch-key
     :clear-promise-keys (clear-promise-keys! promise-keys)
     :alive?             (ws/send-msg {:dispatch-key :alive? :alive? true})
-    :update-proj-name   (change-proj-fn new-proj-map)
+    :reload-proj        (change-proj-fn new-proj-map)
     :ping-confirm       :ok
     "default"))
 
@@ -145,9 +145,9 @@
        (when (not-empty user-text)
          (log/info "In user-text hook: user-text =" user-text)
          (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" user-text)
-               [surrogate? surrogate-role] (re-matches #"\s*SUR:(.*)" user-text)
+               [surrogate? product] (re-matches #"\s*SUR:(.*)" user-text)
                msg (cond  ask-llm?      {:dispatch-key :ask-llm :question question}
-                          surrogate?    {:dispatch-key :surrogate-call :role surrogate-role}
+                          surrogate?    {:dispatch-key :start-surrogate :product product}
                           :else         {:dispatch-key :user-says :msg-text user-text :promise-keys @pending-promise-keys})]
            (log/info "Before ws/send-msg: msg =" msg)
            (ws/send-msg msg))))

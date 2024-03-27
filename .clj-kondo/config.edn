@@ -29,7 +29,10 @@
  :hooks   {:analyze-call {mount.core/defstate hooks.defstate/defstate}}
 
  ;; https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#lint-a-custom-macro-like-a-built-in-macro --- Use defn, not defmacro.
- :lint-as {#_#_scheduling-tbd.shop/defdb2shop        clojure.core/defn  ; These aren't needed; I did them in-line. (See shop.clj)
+ :lint-as {;https://andersmurphy.com/2024/01/03/clojure-clj-kondo-datalog-linting.html
+           datahike.api/q                           datascript.core/q
+
+           #_#_scheduling-tbd.shop/defdb2shop        clojure.core/defn  ; These aren't needed; I did them in-line. (See shop.clj)
            #_#_scheduling-tbd.shop/defshop2db        clojure.core/defn
            scheduling-tbd.web.controllers.respond/report-long/running clojure.core/defmacro
            scheduling-tbd.operators/defoperator      clojure.core/defn

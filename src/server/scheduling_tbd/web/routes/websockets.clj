@@ -205,7 +205,7 @@
      msg-vec is is a vector of ::spec/msg-text-elem and :spec/msg-link-elem. See specs.cljs."
   [{:keys [msg-vec promise? client-id dispatch-key]
     :or {msg-vec [] promise? true dispatch-key :tbd-says} :as content}]
-  (s/assert ::spec/chat-msg-vec msg-vec)
+  (s/assert ::spec/chat-msg-obj content)
   (log/info "send-to-chat: content =" content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]

@@ -1360,7 +1360,7 @@
 
 (def recreate-planning-domains-db?
   "If true it will recreate the Datahike database; it won't add any domains; that's done in the planner."
-  false)
+  true)
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-db-cfg
