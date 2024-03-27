@@ -154,9 +154,9 @@
         :doc "The short string identifying what this surrogate is good at minus the verb, which is in the system instruction.
               For example, this might just be 'craft beer'."}
 
-   :surrogate/thread ; Could this and :surrogate/id be combined?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "An OpenAI assistant thread associated with this project. The surrogate is assistant is "}
+   :surrogate/thread-str ; Could this and :surrogate/id be combined?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant thread associated with this project. This is a string which can be read-string'ed to the "}
 
    :surrogate/system-instruction
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
@@ -403,9 +403,6 @@
   []
   (swap! sutil/databases-atm
          #(reduce-kv (fn [res k v] (if (keep-db? k) (assoc res k v) res)) {} %))
-  (if-let [him (get @sutil/databases-atm :him)]
-    (reset! sutil/databases-atm {:him him})
-    (reset! sutil/databases-atm {}))
   (recreate-system-db!)
   (doseq [pid (list-projects)]
     (recreate-project-db! pid)))
@@ -449,16 +446,15 @@
       (map :message/id ?o)
       (if (empty? ?o) 0 (apply max ?o)))))
 
+;;; See "Map forms" at https://docs.datomic.com/pro/transactions/transactions.html
+;;; This is typical: You get the eid of the thing you want to add properties to.
+;;; You specify that as the :db/id and then just add whatever you want for the properties.
+;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
   [pid from msg-vec]
   (s/assert ::spec/chat-msg-vec msg-vec)
   (if-let [conn (connect-atm pid)]
-    ;; See "Map forms" at https://docs.datomic.com/pro/transactions/transactions.html
-    ;; ToDo: Look for other ways to do this. I'm
-    ;; (1) Installing a new :message/id,
-    ;; (2) getting its eid, and,
-    ;; (3) adding to that.
     (let [msg-id (inc (max-msg-id pid))]
       (d/transact conn {:tx-data [{:db/id (project-exists? pid)
                                   :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
@@ -487,7 +483,7 @@
      opts -  {:force? - overwrite project with same name}
    Return the "
   ([proj-info] (create-proj-db! proj-info {}))
-  ([proj-info additional-info] (create-proj-db! proj-info additional-info {:intro? true}))
+  ([proj-info additional-info] (create-proj-db! proj-info additional-info))
   ([proj-info additional-info opts]
    (s/assert ::project-info proj-info)
    (let [{:project/keys [id name]} (if (:force? opts) proj-info (unique-proj proj-info))

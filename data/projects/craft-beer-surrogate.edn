@@ -1,7 +1,7 @@
 [
  #:project{:id :craft-beer-surrogate,
            :deleted? true
-           :name "Craft beer surrogate"
+           :name "Craft beer"
            :current-domain :process-interview,
            :state-string "[]"
            :messages [#:message{:content
@@ -12,12 +12,6 @@
                                  #:msg-text{:string "."}],
                                 :from :system,
                                 :id 1,
-                                :time #inst "2024-02-21T23:21:34.301-00:00"}]
-           :surrogate #:surrogate{:id :craft-beer-surrogate,
-                                  :assistant-obj-str
-                                  "{:description nil, :file_ids [], :name \"Example Assistant from Clojure: Beer\", :tools [{:type \"code_interpreter\"}], :instructions \"You manage a company that makes craft beer.\\n   You are an expert in production of the company's products and management of its supply chains.\\n   You help me by answering questions that will allow us together to build a scheduling systems for your company.\\n   Your answers typically are short, just a few sentences each.\", :id \"asst_igV9Z8M5zI1Y2Xc954YEKvSi\", :metadata {}, :object \"assistant\", :created_at 1708557007, :model \"gpt-4-1106-preview\"}",
-                                  :subject-of-expertise "craft beer",
-                                  :system-instruction
-                                  "You manage a company that makes craft beer.\n   You are an expert in production of the company's products and management of its supply chains.\n   You help me by answering questions that will allow us together to build a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each."}}
+                                :time #inst "2024-02-21T23:21:34.301-00:00"}]}
 
 ]

@@ -15,4 +15,9 @@
           "/opt/scheduling/projects/aluminium-foil-production-scheduling",
           :id :aluminium-foil-production-scheduling,
           :name "Aluminium foil production scheduling"}
+
+ #:project{:dir
+          "/opt/scheduling/projects/sur-plate-glass",
+          :id :sur-plate-glass
+          :name "SUR Plate Glass"}
 ]

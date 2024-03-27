@@ -17,14 +17,18 @@
   (alias 'str 'clojure.string)
   (alias 'd   'datahike.api)
   (alias 'dp  'datahike.pull-api)
+  (alias 'p    'promesa.core)
+  (alias 'openai 'wkok.openai-clojure.api)
   (alias 'dom 'scheduling-tbd.domain)
   (alias 'how 'scheduling-tbd.how-made)
   (alias 'llm 'scheduling-tbd.llm)
+  (alias 'mount 'mount.core)
   (alias 'op 'scheduling-tbd.operators)
   (alias 'resp 'scheduling-tbd.web.controllers.respond)
   (alias 'shop 'scheduling-tbd.shop)
   (alias 'spec 'scheduling-tbd.specs)
   (alias 'sutil 'scheduling-tbd.sutil)
+  (alias 'sur 'scheduling-tbd.surrogate)
   (alias 'ws 'scheduling-tbd.web.routes.websockets))
 
 (deftest valid-problem

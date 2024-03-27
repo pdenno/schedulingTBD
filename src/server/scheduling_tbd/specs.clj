@@ -48,3 +48,8 @@
                                         (or (s/valid? ::msg-text-elem elem)
                                             (s/valid? ::msg-link-elem elem)))
                                       %)))
+
+(s/def ::client-id string?)
+(s/def ::msg-vec ::chat-msg-vec)
+(s/def ::dispatch-key keyword?)
+(s/def ::chat-msg-obj (s/keys :req-un [::msg-vec ::client-id ::dispatch-key]))
