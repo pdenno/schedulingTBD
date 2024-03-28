@@ -49,8 +49,8 @@
                                      :project/surrogate {:surrogate/id pid
                                                          :surrogate/subject-of-expertise expertise
                                                          :surrogate/system-instruction instructions
-                                                         :surrogate/assistant-obj-str (str assist)
-                                                         :surrogate/thread-str (str thread)}}]})
+                                                         :surrogate/assistant-id aid
+                                                         :surrogate/thread-id (:id thread)}}]})
         (llm/get-assistant pid))))
 
 ;;; (sur/start-surrogate {:product "plate glass" :client-id (ws/any-client!)})

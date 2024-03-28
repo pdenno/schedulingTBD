@@ -5,7 +5,7 @@
           :state-string "#{(proj-name foil) (system-model foil flow) (ongoing-discussion foil) (well-known-process foil)}"
           :messages [#:message{:content
                                [#:msg-text{:string
-                                           "Describe your scheduling problem in a few sentences or "}
+                                           "Describe your most significant scheduling problem in a few sentences or "}
                                 #:msg-link{:text "learn more about how this works",
                                            :uri "http://localhost:3300/learn-more"}
                                 #:msg-text{:string "."}],

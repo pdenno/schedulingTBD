@@ -1,5 +1,5 @@
 [
-#:system{:default-project-id :aluminium-foil-production-scheduling, :name "SYSTEM"}
+#:system{:default-project-id :craft-beer-brewery-scheduling, :name "SYSTEM"}
 
 #:project{:dir
           "/opt/scheduling/projects/craft-beer-brewery-scheduling",

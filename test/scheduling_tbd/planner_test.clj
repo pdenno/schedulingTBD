@@ -48,10 +48,10 @@
 ;;; (tryme :aluminium-foil-production-scheduling)
 (defn ^:diag tryme []
   (plan/load-domain "data/planning-domains/process-interview.edn")
-  (db/recreate-dbs!)
   (plan/interview-loop
-   :new-project
+   :craft-beer-brewery-scheduling
    :process-interview
+   {:start-facts (db/get-state :craft-beer-brewery-scheduling)}
    (ws/any-client!)))
 
 (defn ^:diag tryme-old

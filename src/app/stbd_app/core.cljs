@@ -158,13 +158,51 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
-(def test-string
+#_(def test-string
   "We make acrylic bathtubs.
 The main scheduling problem in our business involves timely acquiring and managing parts and supplies from various global vendors.
 Coordinating these deliveries to align with our production schedule is challenging, especially given fluctuating lead times and possible delays.
 Additionally, synchronizing manufacturing processes to ensure a seamless assembly line operation while minimizing idle time is vital.
 It is also crucial to handle unexpected changes or disruptions in the schedule.
 Finally, ensuring maintenance and quality inspections are timely done to keep the production on schedule is equally critical.")
+(def test-string
+  " int : nProducts = 5;
+ set of int: Product = 1..nProducts;
+ set of int: Day = -36..365;
+ enum Task = {mill, ferment, bright};
+ array [Product, Task] of int: taskDuration = [|1, 20, 20 |   % processing times for
+                                                1, 20, 20 |   % various beers, perhaps
+                                                1, 30, 11 |   % from a screenshot of a
+                                                1, 21, 11 |   % of spreadsheet the
+                                                1, 18, 19 |]; % user provided.
+
+ array [Product] of Day: neededDate = [50, 80, 130, 140, 150];
+
+ % We assume a task uses one major resource; resources are synonymous with tasks.
+ array [Product, Task] of var Day: taskStarts; % 'var' means it is a decision variable.
+ array [Product, Task] of var Day: taskEnds;
+
+ % We'll use this below to ensure a resource can only be used by one product at a time.
+ array [Task, Day] of var Product: busyWith;
+
+ % The first two Product are already in the fermentation tank and bright tank respectively.
+ constraint taskStarts[1,mill] = -35;   % Product 1 is therefore in the bright tank...
+ constraint taskStarts[2,mill] = -5;    % ...and out before this one moves there.
+
+ % Next task must start right after previous task ends. No place to put WIP.
+ constraint forall (p in Product) (taskEnds[p, mill   ] + 1 == taskStarts[p, ferment]);
+ constraint forall (p in Product) (taskEnds[p, ferment] + 1 == taskStarts[p, bright]);
+
+ % A task ends taskDuration days after it starts.
+ constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);
+
+ % A resource(task) can only be used with one product at a time.
+ constraint forall (t in Task, p in Product, d in Day where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])
+                    (busyWith[t,d] == p);
+
+ % Aim to have it done when it is needed.
+ solve minimize sum (p in Product) (abs(neededDate[p] - taskEnds[p,bright]));")
+
 
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
