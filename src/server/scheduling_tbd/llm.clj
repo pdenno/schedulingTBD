@@ -169,19 +169,6 @@
                            :metadata metadata}
                           {:api-key key})))
 
-
-;;; This is entirely because the OpenAI objects have stuff I find distracting!
-(def keep-prop? #{:role :content :created_at})
-(defn message-salient
-  "Return interesting parts of messages from the structure returned from openai/list-messages."
-  [msgs]
-  (let [_has-more? (:has_more msgs)] ; ToDo: later.
-    (->> msgs
-         :data
-         (mapv (fn [msg] (reduce-kv (fn [m k v] (if (keep-prop? k) (assoc m k v) m)) {} msg)))
-         (sort-by :created)
-         vec)))
-
 (defn query-on-thread
   "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
     aid      - assistant ID (the OpenAI notion)
@@ -210,7 +197,8 @@
         (cond (> secs timeout-secs)                  (throw (ex-info "query-on-thread: Timeout:" {:msg-text msg-text})),
 
               (= "completed" (:status r))            (let [[m1 m2] (-> (openai/list-messages {:thread_id tid :limit 2} {:api-key key})
-                                                                       message-salient)]
+                                                                       :data
+                                                                       (sort-by :created))]
                                                        (if (= msg-text (-> m2 :content first :text :value))
                                                          (-> m1 :content first :text :value)
                                                          (throw (ex-info "query-on-thread: Response not synced to query:" {:m1 m1 :m2 m2})))),

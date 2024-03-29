@@ -32,10 +32,10 @@
 (defn ensure-surrogate
   "If a surrogate with given expertise exists (if its project exists), return it (the project object resolved from the DB).
    Otherwise create and store a project with the given expertise and the OpenAI assistant object.
-   In either case, it returns the Openai assistant object associated with the pid.
+   In either case, it returns the Openai assistant object ID associated with the pid.
      pid - the project ID (keyword) of a project with an established DB."
   [pid]
-  (or (llm/get-assistant pid)
+  (or (db/get-assistant-id pid)
       (let [conn (connect-atm pid)
             eid (db/project-exists? pid)
             proj-info (resolve-db-id {:db/id eid} conn :keep-set #{:project/name})
@@ -51,7 +51,7 @@
                                                          :surrogate/system-instruction instructions
                                                          :surrogate/assistant-id aid
                                                          :surrogate/thread-id (:id thread)}}]})
-        (llm/get-assistant pid))))
+        (db/get-assistant-id pid))))
 
 ;;; (sur/start-surrogate {:product "plate glass" :client-id (ws/any-client!)})
 (defn start-surrogate

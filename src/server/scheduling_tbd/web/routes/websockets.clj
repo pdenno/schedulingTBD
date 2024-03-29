@@ -28,13 +28,6 @@
 
 (declare user-says send-to-chat dispatch)
 
-;;; ToDo: move to devl?
-(defn ^:diag any-client!
-  "Return the client-id of a any client, hoping there is just one.
-   This is only used in development, I think."
-  []
-  (-> @socket-channels keys first))
-
 (defn make-ws-channels
   "Create channels and store them keyed by the unique ID provided by the client."
   [id]
@@ -61,7 +54,8 @@
                     (async/close! err)
                     (swap! socket-channels #(dissoc % client-id))))))))
 
-(declare clear-promises!)
+(declare clear-promises! clear-keys select-promise)
+
 (defn forget-client
   "Close the channel and forget the promises associated with the client.
    This is typically from a client unmount."
@@ -70,26 +64,39 @@
   (close-ws-channels client-id)
   (clear-promises! client-id))
 
+(def ping-dates  "Indexed by client-id, value is last time it pinged."  (atom {}))
 (defn ping-diag
   "Create a ping confirmation for use in middle of a round-trip."
-  [{:keys [client-id ping-id]}]
-  ;(log/info "Ping" ping-id "from" client-id)
+  [{:keys [client-id]}] ; also ping-id
+  (swap! ping-dates #(assoc % client-id (now)))
   {:dispatch-key :ping-confirm})
 
-(declare clear-keys select-promise)
+(defn alive?
+  "Return true if client had recent ping activity.
+   option :recent defaults to 30 seconds."
+  [client-id & {:keys[recent] :or {recent 30}}]
+  (if-let [last-date (get @ping-dates client-id)]
+    (< (- (-> (now)     .toInstant .toEpochMilli)
+          (-> last-date .toInstant .toEpochMilli))
+       (* recent 1000))
+    (do (swap! ping-dates #(dissoc % client-id)) false)))
+
+(defn ^:diag recent-client!
+  "Return the client-id of the client that pinged most recently.
+   This should only used in development, I think!"
+  []
+  (->> @ping-dates seq (sort-by second) reverse first first))
 
 ;;; ToDo: I'm using blocking versions (>!!, <!!) so you'd think I'd be checking for timeout.
 ;;;       But some are closed and return nil. I suppose I should put the the test in a future just in case???
+;;;       Really, start by making a function alive? that takes a client-id and waits a sec.
 (defn close-inactive-channels
   "Close channels that don't respond to :alive?."
   []
-  (doseq [id (keys @socket-channels)]
-    (swap! socket-channels #(assoc-in % [id :exit?] true))
-    (let [{:keys [in out]} (get @socket-channels id)
-          res (do (>!! out (str {:dispatch-key :alive?})) (<!! in))]
-      (when-not res
-        ;;(log/info "Closing non-alive channel" id)
-        (close-ws-channels id)))))
+  (doseq [client-id (keys @socket-channels)]
+    (when-not (alive? client-id)
+      (swap! socket-channels #(assoc-in % [client-id :exit?] true))
+      (close-ws-channels client-id))))
 
 (defn error-listener
   "Start a go loop for listening for errors from the client."
@@ -104,6 +111,7 @@
           (when-not exit? (recur)))))
     (log/error "error-listener: Cannot find client-id" client-id)))
 
+;;; This is the only thing that listens on in.
 (defn establish-websocket-handler
   "Handler for http:/ws request.
    Set up web socket in, out, and err channels."
@@ -116,8 +124,8 @@
           (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
             (loop []
               (when-let [msg (<! in)] ; Listen fo messages
-                (when-let [res (-> msg edn/read-string dispatch)] ; ToDo: Maybe meta :ws-response? on things intended to be returned?
-                  (>! out (str res))))                            ;       Or just look for :client-id, etc.
+                (when-let [res (-> msg edn/read-string dispatch)]
+                  (when (contains? res :dispatch-key) (>! out (str res)))))
               (when-not (-> @socket-channels (get client-id) :exit?) (recur))))
           (log/warn "Exiting go loop.")
           (error-listener client-id)   ; ...from from close-ws-channels above.
@@ -247,12 +255,15 @@
   (let [res (cond (= dispatch-key :stop)                        nil ; What needs to be done has already been done.
                   (contains? @dispatch-table dispatch-key)      ((get @dispatch-table dispatch-key) msg)
                   :else                                         (log/error "No dispatch function for " msg))]
-    (log/info "dispatch: Sending response:" res)
-    res))
+    (when (map? res)
+      (when-not (= (:dispatch-key res) :ping-confirm)
+        (log/info "dispatch: Sending response:" res))
+      res)))
 
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []
   (clear-promises!)
+  (reset! ping-dates {})
   (clear-client-current-proj) ; ToDo: Restarting the server means we lose knowledge of their current project. Ok?
   (init-dispatch-table!))
 
