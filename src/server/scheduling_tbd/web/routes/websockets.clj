@@ -118,7 +118,7 @@
   [request]
   (close-inactive-channels)
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
-    (do (close-ws-channels client-id)
+    (try (close-ws-channels client-id)
         (let [{:keys [in out err]} (make-ws-channels client-id)]
           ;;(log/info "Starting websocket handler for " id (now))
           (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
@@ -129,7 +129,10 @@
               (when-not (-> @socket-channels (get client-id) :exit?) (recur))))
           (log/warn "Exiting go loop.")
           (error-listener client-id)   ; ...from from close-ws-channels above.
-          {:ring.websocket/listener (wsa/websocket-listener in out err)}))
+          {:ring.websocket/listener (wsa/websocket-listener in out err)})
+        (catch Exception e
+          (log/error "Error in ws loop:" (type e))
+          (close-ws-channels client-id)))
     (log/error "Websocket client did not provide id.")))
 
 ;;; ----------------------- Promise management -------------------------------
