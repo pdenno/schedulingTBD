@@ -152,7 +152,8 @@ Ideally, we would want to set an order that maximizes throughput and minimizes d
 *For instance, if we know that certain product types require more time at certain workstations, we can intersperse them with other product types that take less time at those stations.*
 This way, the workstations are kept busy but not overwhelmed, managing a continuous flow of the production line.
 
-However, this order needs to be set carefully, considering not just the assembly time but *also other factors like demand for different product types and available inventory for parts,*
+However, this order needs to be set carefully, considering not just the assembly time but
+*also other factors like demand for different product types and available inventory for parts,*
 to ensure we are meeting our business goals while managing efficiency.
 
  /Here I highlighted some text that suggests it really 'gets' what cyclical scheduling is about./
@@ -166,8 +167,7 @@ Please list the typical processing time at each workstation for the four product
 *** Agent 8
 Sure, based on our standard operations, the typical processing times (in minutes) at each of the ten workstations are as follows:
 
-For Type 1 Tractors:
-
+**** For Type 1 Tractors:
 Station 1: 20 minutes
 Station 2: 15 minutes
 Station 3: 25 minutes
@@ -178,8 +178,8 @@ Station 7: 15 minutes
 Station 8: 30 minutes
 Station 9: 20 minutes
 Station 10: 15 minutes
-For Type 2 Tractors:
 
+**** For Type 2 Tractors:
 Station 1: 25 minutes
 Station 2: 20 minutes
 Station 3: 20 minutes
@@ -190,8 +190,8 @@ Station 7: 30 minutes
 Station 8: 20 minutes
 Station 9: 15 minutes
 Station 10: 25 minutes
-For Type 3 Tractors:
 
+**** For Type 3 Tractors:
 Station 1: 30 minutes
 Station 2: 25 minutes
 Station 3: 15 minutes
@@ -202,8 +202,8 @@ Station 7: 20 minutes
 Station 8: 15 minutes
 Station 9: 30 minutes
 Station 10: 20 minutes
-For Type 4 Tractors:
 
+**** For Type 4 Tractors:
 Station 1: 15 minutes
 Station 2: 30 minutes
 Station 3: 30 minutes
@@ -214,6 +214,8 @@ Station 7: 30 minutes
 Station 8: 25 minutes
 Station 9: 25 minutes
 Station 10: 30 minutes
+
+
 These are average times and can vary slightly depending on various factors, but they provide a good starting point for our analysis.
 
 /This is good. 15 to 30 minutes seems like a manageable span./
@@ -247,9 +249,13 @@ Yes! Can you provide an example demand rate for the four types that we can try?
 Absolutely, here's an example of a weekly demand rate for each of the four tractor types:
 
 Type 1 Tractor: 100 units
+
 Type 2 Tractor: 80 units
+
 Type 3 Tractor: 120 units
+
 Type 4 Tractor: 90 units
+
 These figures are illustrative and actually fluctuate based on customer orders, seasonal trends, and market factors. But they should provide a decent starting point for your analysis.
 
  /Okay, I think. Seasonal trends would be more a lawn tractor thing, I'd think. Certainly market factors is an issue./
