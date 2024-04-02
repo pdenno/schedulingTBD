@@ -111,7 +111,8 @@
                             :json-schema/default "craft-beer-brewery-scheduling"}))
 
 (s/def ::conv (s/coll-of map?))
-(s/def ::get-conversation-response (s/keys :req-un [::conv-for ::conv]))
+(s/def ::code string?)
+(s/def ::get-conversation-response (s/keys :req-un [::conv-for ::conv] :opt-un [::code]))
 (s/def ::project-id (st/spec {:spec string?
                               :name "project-id"
                               :description "A kebab-case string (will be keywordized) unique to the system DB identifying a project."

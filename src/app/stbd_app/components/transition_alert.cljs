@@ -25,8 +25,8 @@
                   :variant "outlined"
                   :onClick (fn [& _] (set-open true))}
           "Re-open"))))
-                                 
-  
+
+
 ;;; import * as React from 'react';
 ;;; import Box from '@mui/material/Box';
 ;;; import Alert from '@mui/material/Alert';
