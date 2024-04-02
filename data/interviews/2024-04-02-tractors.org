@@ -29,7 +29,7 @@ If you don't have information to answer my questions, you provide a plausible an
 *** TLDR; I have some summary thought at the bottom of this document.
 
 * The Dialog
-** User - Initial question
+** Interviewer - Initial question
 What is the principal production scheduling problem you face?
 
 *** Agent 8
@@ -39,25 +39,25 @@ This results in delays in the overall assembly process, reducing the efficiency 
 
 /Okay, that expands on the system instruction in nice ways./
 
-** User - What do you make?
+** Interviewer - What do you make?
 What kind of products do you make?
 
 *** Agent 8
 We assemble different types of tractors. They can vary in size, power capacity, and additional features based on customer requirements and the specific model being produced.
 
-** User - How many lines?
+** Interviewer - How many lines?
 How many assembly lines do you use?
 
 *** Agent 8
 We use a single synchronous production line for assembling all the tractor models. This line combines the major sub-assemblies into the finished product.
 
-** User - How many product types?
+** Interviewer - How many product types?
 How many product types do you make on the line?
 
 *** Agent 8
 We manufacture four distinct types of tractors on our assembly line. Each product type requires different assembly operations due to variations in design specifications, size, and components used.
 
-** User - How many workstations?
+** Interviewer - How many workstations?
 How many workstations are involved, typically?
 
 *** Agent 8
@@ -67,7 +67,7 @@ Each workstation handles a specific assembly task, such as installing the engine
 /Unlike the interviews where I uploaded the paper, here it drops right into the role as though it were human./
 /I wonder whether the easy questions above helped it towards finding the role we sought (by means of in-context learning)./
 
-** User - Movement between workstations?
+** Interviewer - Movement between workstations?
 How is the work-in-process (the tractor assemblies) moved from one work station to the next?
 
  /This question was problematic in earlier attempts. It have a certain mechanism in mind: an in-floor conveyor I've seen used with tractors. It entails that every job visits every workstation in fixed order./
@@ -82,7 +82,7 @@ It is a continuous process that facilitates efficient workflow.
  /My ears perked up on "continuous process." What does it mean by that?/
 
 
-** User - Clarification on "continuous"
+** Interviewer - Clarification on "continuous"
 By "continuous process" do you mean that the work moves through the workstation at a constant rate?
 
 *** Agent 8
@@ -91,7 +91,7 @@ However, due to the complexity of certain tasks or the different requirements fo
 
  /Okay, that's a fine way to describe certain synchronous lines, I think. I wish it said "synchronous", however./
 
-** User - "longer" workstations?
+** Interviewer - "longer" workstations?
 Do you make these complex workstations longer so as to allows the work-in-process to spend more time at them?
 
   /Probably a mistake on my part to say "longer" here. But the paper (that we aren't using) talks about the "window" in which work can be done./
@@ -107,7 +107,7 @@ We also utilize a floating crew of workers trained in different operations, so t
   /Moving tasks to the next workstation is common in automotive. Might work here too./
   /With automotive you might have several workstations all doing robotic spot welding. In that case it might be easy to do./
 
-** User - Red herring
+** Interviewer - Red herring
 Have you heard of loopy scheduling? Do you practice it?
 
   /I made up "loopy scheduling" just to see whether it would chase a red herring. Turns out (I googled for it) there is something called "loop scheduling" but it seems to concern CPUs./
@@ -120,7 +120,7 @@ However, implementing this method would require significant changes to our curre
 
   /That's good, it didn't take the bait./
 
-** User - Cyclical scheduling?
+** Interviewer - Cyclical scheduling?
 How about cyclical scheduling? Do you practice that?
 
 *** Agent 8
@@ -131,7 +131,7 @@ This system helps to even out the workloads across all workstations and maximize
 
 /Impressive answer. Not sure what it means by "each cycle" though. Does it know what it is talking about? Let's see./
 
-** User - What should we optimize?
+** Interviewer - What should we optimize?
 If we were to work together to try to improve your scheduling, what do you suppose we should try to optimize?
 
 *** Agent 8
@@ -142,7 +142,7 @@ Reviewing the duration of each cycle may also enhance efficiency.
 
  /"Enhancing the efficiency of the floating crew" (but maybe not "distribution") is what Bautista et al. were doing. So this is pretty good./
 
-** User - Ask for elaboration; defines cyclical scheduling
+** Interviewer - Ask for elaboration; defines cyclical scheduling
 Let's focus on the optimal mix of product-types as you suggest. Could you describe a little more what you have in mind here?
 
 *** Agent 8
@@ -153,6 +153,7 @@ Ideally, we would want to set an order that maximizes throughput and minimizes d
 This way, the workstations are kept busy but not overwhelmed, managing a continuous flow of the production line.
 
 However, this order needs to be set carefully, considering not just the assembly time but
+
 *also other factors like demand for different product types and available inventory for parts,*
 to ensure we are meeting our business goals while managing efficiency.
 
@@ -160,7 +161,7 @@ to ensure we are meeting our business goals while managing efficiency.
 
  /And also an oft-cited issue of inventory./
 
-** User - Ask for a table.
+** Interviewer - Ask for a table.
 Okay. Let's put the question of availability of inventory aside for the moment and focus on how long the work-in-process spends at each workstation.
 Please list the typical processing time at each workstation for the four product types.
 
@@ -220,7 +221,7 @@ These are average times and can vary slightly depending on various factors, but 
 
 /This is good. 15 to 30 minutes seems like a manageable span./
 
-** User - floating crew speed up?
+** Interviewer - floating crew speed up?
 Very good. Regarding the floating crew, what sort of speed-up (percent) can we expect them to produce at a workstation? And is it pretty much the same at each workstation?
 
 *** Agent 8
@@ -233,7 +234,7 @@ But on average, we saw a consistent speed-up of around 25% across all workstatio
  /This is good but I was hoping it would also bring up the SIZE of the floating crew, and how that affects results./
  /I think if I had asked it about what it meant by "distribution" earlier, it would have said that the crew splits up, not everyone focusing on one workstation./
 
-** User - What is missing?
+** Interviewer - What is missing?
 Okay, I think I have almost everything I need to specify a system for optimal release of product types except one thing. Can you guess what that is?
 
 /I asked something like this with craft brewing back in January. Both times it guessed correctly./
@@ -242,7 +243,7 @@ Okay, I think I have almost everything I need to specify a system for optimal re
 I believe the additional information you might need is the demand rate for each product type.
 This would indicate how many units of each type of tractor we need to produce within a specific period, an important factor when deciding on the optimal order of releasing product types to production.
 
-** User - Ask for demand by product type
+** Interviewer - Ask for demand by product type
 Yes! Can you provide an example demand rate for the four types that we can try?
 
 *** Agent 8
@@ -260,7 +261,7 @@ These figures are illustrative and actually fluctuate based on customer orders, 
 
  /Okay, I think. Seasonal trends would be more a lawn tractor thing, I'd think. Certainly market factors is an issue./
 
-** User - Start of additional features discussion
+** Interviewer - Start of additional features discussion
 Super. Let's suppose that I provided a solution that you are happy with, except that it doesn't account for the availability of inputs that you mentioned earlier.
 How would you like to deal with uncertainty in availability of component parts?
 Optimize how much inventory you hold?
@@ -284,7 +285,7 @@ In summary, adopting a combination of these approaches would give us a robust sy
   /This matches the priorities I heard back when I was working with a well-known company that makes heavy equipment./
   /Specifically, changing the schedule is a last resort. This is especially true on complex products./
 
-** User - What is the point of visibility
+** Interviewer - What is the point of visibility?
 What do you expect to gain by better visibility into your supply chains?
 
 *** Agent 8
@@ -306,7 +307,7 @@ All these aspects contribute to improving our operational efficiency and custome
 
 /This is ChatGPT doing what it does best. I'm not sure what I do with it, though!/
 
-** User - expedited shipping
+** Interviewer - expedited shipping
 Are you willing to expedite shipments (e.g. use air instead of ocean freight) to keep production schedules on track?
 
 *** Agent 8
