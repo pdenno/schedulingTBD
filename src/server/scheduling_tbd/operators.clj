@@ -162,13 +162,16 @@
    If target is :surrogate, the message is sent to ws/send-to-chat and then a response is ws/send-to-chat.
    In the :surrogate case, what is returned is content useful to db-actions (the discussion)."
   [pid target msg-obj]
+  (reset! diag msg-obj)
   (s/assert ::spec/chat-msg-obj msg-obj)
   (case target
     :human      (ws/send-to-chat msg-obj)
-    :surrogate  (let [text (msg-obj :msg-vec first :msg-text/string)]
+    :surrogate  (let [text (-> msg-obj :msg-vec first :msg-text/string)
+                      aid (db/get-assistant-id pid)
+                      tid (db/get-thread-id pid)]
                   (ws/send-to-chat msg-obj)
                   {:query text
-                   :response (llm/query-on-thread pid "user" text)})))
+                   :response (llm/query-on-thread :aid aid :tid tid :role "user" :msg-text text)})))
 
 
 ;;; Typically we won't save interview query messages to the DB until after receiving a response to it from the user.
@@ -183,6 +186,7 @@
   (log/info "!initial-question-surrogate: obj =" obj)
   (let [res (abstract-chat pid :surrogate
                            {:msg-vec (-> intro-prompt first (update :msg-text/string #(str % ".")) vector)
+                            :dispatch-key :surrogate-says
                             :client-id client-id})]
     (db-action obj res)))
 
@@ -235,7 +239,7 @@
 (defoperator :!query-process-durs [{:keys [plan-step client-id] :as obj}]
   (log/info "!query-process-durs: obj =" obj)
   (-> {:client-id client-id}
-      (assoc :msg-vec (msg-vec "Are the process process durations, blah, blah...\n(When done hit \"Submit\".)"))
+      (assoc :msg-vec (msg-vec "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)"))
       ws/send-to-chat
       (p/await wait-time-for-user-resp)
       (p/then  (fn [response] (db-action obj response)))

@@ -29,6 +29,7 @@
   (alias 'spec 'scheduling-tbd.specs)
   (alias 'sutil 'scheduling-tbd.sutil)
   (alias 'sur 'scheduling-tbd.surrogate)
+  (alias 'util 'scheduling-tbd.util)
   (alias 'ws 'scheduling-tbd.web.routes.websockets))
 
 (deftest valid-problem
@@ -48,11 +49,11 @@
 ;;; (tryme :aluminium-foil-production-scheduling)
 (defn ^:diag tryme []
   (plan/load-domain "data/planning-domains/process-interview.edn")
-  (db/recreate-dbs!)
   (plan/interview-loop
-   :new-project
+   :craft-beer-brewery-scheduling
    :process-interview
-   (ws/any-client!)))
+   {:start-facts (db/get-state :craft-beer-brewery-scheduling)}
+   (ws/recent-client!)))
 
 (defn ^:diag tryme-old
   ([] (tryme-old :snowboards-production-scheduling))
@@ -67,5 +68,5 @@
      (plan/interview-loop
       proj-id
       :process-interview
-      (ws/any-client!)
+      (ws/recent-client!)
       {:start-facts state-set}))))

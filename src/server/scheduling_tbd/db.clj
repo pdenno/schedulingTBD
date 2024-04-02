@@ -80,6 +80,10 @@
            :doc "A text string as part of :message/content."}
 
    ;; ---------------------- project
+   :project/code
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Code associated with the project."}
+
    :project/current-domain
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "a :domain/id (keyword in domains db) indicating where this project is currently working."}
@@ -154,16 +158,16 @@
         :doc "The short string identifying what this surrogate is good at minus the verb, which is in the system instruction.
               For example, this might just be 'craft beer'."}
 
-   :surrogate/thread-str ; Could this and :surrogate/id be combined?
+   :surrogate/thread-id ; Could this and :surrogate/id be combined?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant thread associated with this project. This is a string which can be read-string'ed to the "}
+        :doc "An OpenAI assistant thread associated with this project."}
 
    :surrogate/system-instruction
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The complete instruction provided in configuring an OpenAI (or similar) assistant.
               Typically this substitutes the subject-of-expertise into a template string."}
 
-   :surrogate/assistant-obj-str
+   :surrogate/assistant-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Stringified EDN for what OpenAI (or similar) returns when an assistant is created."}
 
@@ -302,10 +306,31 @@
                                   [?e :project/state-string ?s]]
                                 @conn)]
         (cond->> (edn/read-string state-str)
-          sort? (sort-by first))))))
+          sort? (sort-by first)
+          true vec)))))
+
+(defn get-thread-id
+  "Get the thread object of the argument PID."
+  [pid]
+  (let [eid (project-exists? pid)]
+    (-> (resolve-db-id {:db/id eid}
+                       (connect-atm pid)
+                       :keep-set #{:project/surrogate :surrogate/thread-id})
+        :project/surrogate
+        :surrogate/thread-id)))
+
+(defn get-assistant-id
+  "Get the thread object of the argument PID."
+  [pid]
+  (let [eid (project-exists? pid)]
+    (-> (resolve-db-id {:db/id eid}
+                       (connect-atm pid)
+                       :keep-set #{:project/surrogate :surrogate/assistant-id})
+        :project/surrogate
+        :surrogate/assistant-id)))
 
 (def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
-  #{:project/messages :message/id :message/from :message/content :message/time :msg-text/string :msg-link/uri})
+  #{:project/messages :message/id :message/from :message/content :message/time :msg-text/string :msg-link/uri :msg-link/text})
 
 (defn get-messages
   "For the argument project (pid) return messages sorted by their :message/id."

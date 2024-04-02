@@ -158,19 +158,13 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
-(def test-string
-  "We make acrylic bathtubs.
-The main scheduling problem in our business involves timely acquiring and managing parts and supplies from various global vendors.
-Coordinating these deliveries to align with our production schedule is challenging, especially given fluctuating lead times and possible delays.
-Additionally, synchronizing manufacturing processes to ensure a seamless assembly line operation while minimizing idle time is vital.
-It is also crucial to handle unexpected changes or disruptions in the schedule.
-Finally, ensuring maintenance and quality inspections are timely done to keep the production on schedule is equally critical.")
 
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
         [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
         [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
         [conversation set-conversation]       (hooks/use-state {:conv [] :conv-for "nobody"})
+        [code set-code]                       (hooks/use-state "xyz")
         useful-height (int (- height banner-height))
         chat-side-height useful-height
         code-side-height useful-height]
@@ -181,7 +175,8 @@ Finally, ensuring maintenance and quality inspections are timely done to keep th
           (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
                        (set-proj (:current-project %))
                        (-> (dba/get-conversation (:current-project %))
-                           (p/then (fn [pid] (set-conversation pid))))))))
+                           (p/then (fn [resp] (set-conversation resp)))
+                           (p/then (fn [resp] (set-code "abc" #_(:code resp)))))))))
     (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
               (log/info "--------- Calling change-project: p =" p) ; If p = :START-A-NEW-PROJECT, this will run again after server finds a name.
               (when-not (= p proj)                                 ; In that case, it will have updated the conversation, with the "Great,...".
@@ -206,7 +201,7 @@ Finally, ensuring maintenance and quality inspections are timely done to keep th
                        ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :change-proj-fn change-project}))
              :right ($ ShareUpDown
                        {:init-height code-side-height
-                        :up ($ Editor {:text test-string
+                        :up ($ Editor {:text code
                                        :name "code-editor"
                                        :height code-side-height})
                         :dn ($ Box)

@@ -115,7 +115,6 @@
 (defn ^:diag load-domain
   "Load a planning domain into the database."
   [path & {:keys [_force?] :or {_force? true}}] ; ToDo: check if exists.
-  (log/info "start load domain")
   (if-let [conn (connect-atm :planning-domains)]
     (->> path
          slurp
@@ -402,13 +401,15 @@
 ;;;  (ws/register-ws-dispatch :start-a-new-project plan/interview-for-new-project!)
 (defn resume-conversation
   [{:keys [project-id client-id]}]
-  (log/info "Calling interview-loop for new project: client-id =" client-id)
+  (log/info "Calling interview-loop for project" project-id)
   (if (= project-id :START-A-NEW-PROJECT)
     (interview-loop :new-project :process-interview client-id)
-    (log/info "Not yet resuming for existing projects.")))
+    (interview-loop project-id :process-interview client-id
+                    {:start-facts (db/get-state project-id)})
+    #_(log/info "Not yet resuming for existing projects: project-id =" project-id)))
 
 ;;; This makes recompilation smoother.
-(def test-the-planner? false)
+(def test-the-planner? true)
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!

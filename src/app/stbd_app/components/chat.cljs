@@ -80,7 +80,6 @@
 ;;; ToDo: Remove this and it usages?
 (def msg-index "This might be a waste of time. WS won't' print the same message twice in a row."  (atom 0))
 
-
 (defn msg-vec2rce
   "Rewrite the conversation DB-style messages to objects acceptable to the RCE component.
    Does not do clj->js on it, however."
