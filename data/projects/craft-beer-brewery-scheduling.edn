@@ -7,7 +7,10 @@
           :state-string "#{(ongoing-discussion craft-beer)
                            (proj-name craft-beer)
                            (system-model craft-beer flow)
-                           (well-known-process craft-beer)}"
+                           (well-known-process craft-beer)
+                           (have-process-steps craft-beer)
+                           (have-process-durs craft-beer)
+                           (have-process-ordering craft-beer)}"
           :messages [#:message{:from :system,
                                :id 0,
                                :content [{:msg-text/string "Describe your scheduling problem in a few sentences or "}

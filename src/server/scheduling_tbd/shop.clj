@@ -1342,10 +1342,10 @@
   "Recreate the plans db from .edn data. It uses the connect-atm, which is already established."
   []
   (let [cfg (db-cfg-map :planning-domains)]
+    (reset! diag cfg)
     (if (.exists (io/file "data/planning-domains/domains.edn")) ; ToDo: This will need to be better someday soon.
       (do (log/info "Recreating the planning domains database.")
-          (when (d/database-exists? cfg)
-            (d/delete-database cfg))
+          (when (d/database-exists? cfg) (d/delete-database cfg))
           (d/create-database cfg)
           (register-db :planning-domains cfg)
           (let [conn (connect-atm :planning-domains)]
@@ -1360,7 +1360,7 @@
 
 (def recreate-planning-domains-db?
   "If true it will recreate the Datahike database; it won't add any domains; that's done in the planner."
-  true)
+  false)
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-db-cfg

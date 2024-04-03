@@ -20,11 +20,12 @@
   (let [{:keys [client-id project-id]} (-> request :query-params keywordize-keys)
         project-id (keyword project-id)
         eid (db/project-exists? project-id)
-        msgs (when eid (db/get-messages project-id))]
+        msgs (when eid (db/get-messages project-id))
+        code (db/get-code project-id)]
     (ws/set-current-project client-id project-id)
     (log/info "get-conversation for" project-id)
     (cond (= project-id :START-A-NEW-PROJECT)     (http/ok {:conv-for project-id :conv []})
-          msgs                                    (http/ok {:conv-for project-id :conv msgs})
+          msgs                                    (http/ok {:conv-for project-id :conv msgs :code code})
           :else                                   (http/not-found))))
 
 (def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})

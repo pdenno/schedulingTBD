@@ -241,19 +241,19 @@
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
    (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
-  [proj-id]
-  (assert (keyword? proj-id))
+  [pid]
+  (assert (keyword? pid))
   (when (d/q '[:find ?e .
-               :in $ ?proj-id
+               :in $ ?pid
                :where
-               [?e :project/id ?proj-id]
+               [?e :project/id ?pid]
                (not [?e :project/deleted? true])]
-             @(connect-atm :system) proj-id)
+             @(connect-atm :system) pid)
     (d/q '[:find ?e .
-           :in $ ?proj-id
+           :in $ ?pid
            :where
-           [?e :project/id ?proj-id]]
-         @(connect-atm proj-id) proj-id)))
+           [?e :project/id ?pid]]
+         @(connect-atm pid) pid)))
 
 (defn get-project
   "Return the project structure."
@@ -342,6 +342,17 @@
         :project/messages
         (sort-by :message/id)
         vec)))
+
+(defn get-code
+  "Return the code string for the argument project (or an empty string if it does not exist)."
+  [pid]
+  (or (d/q '[:find ?t .
+             :in $ ?pid
+             :where
+             [?e :project/id ?pid]
+             [?e :project/code ?t]]
+           @(connect-atm pid) pid)
+      ""))
 
 (defn put-state
   "Write an updated state to the project database."
@@ -479,6 +490,7 @@
   "Create a message object and add it to the database with :project/id = id."
   [pid from msg-vec]
   (s/assert ::spec/chat-msg-vec msg-vec)
+  (log/info "add-msg: pid =" pid "msg-vec =" msg-vec)
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid))]
       (d/transact conn {:tx-data [{:db/id (project-exists? pid)

@@ -108,31 +108,39 @@
           ;; ToDo: There is evidence that when these are WebSocketTimeoutException, the java process burns cycles.
           ;; user/restart stops it but there ought to be a better way employed right here.
           (log/error "Client reports" (type msg) ": client-id =" client-id)
+          (close-ws-channels client-id)
           (when-not exit? (recur)))))
     (log/error "error-listener: Cannot find client-id" client-id)))
 
+;;; NOTE: You have to recompile handler.clj and restart when you change this!
 ;;; This is the only thing that listens on in.
+;;; https://clojure.org/news/2013/06/28/clojure-clore-async-channels:
+;;;   go is a macro that takes its body and examines it for any channel operations.
+;;;   It will turn the body into a state machine.
+;;;   Upon reaching any blocking operation, the state machine will be 'parked' and the actual thread of control will be released.
 (defn establish-websocket-handler
   "Handler for http:/ws request.
    Set up web socket in, out, and err channels."
   [request]
+  (log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
   (close-inactive-channels)
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
     (try (close-ws-channels client-id)
-        (let [{:keys [in out err]} (make-ws-channels client-id)]
-          ;;(log/info "Starting websocket handler for " id (now))
-          (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
-            (loop []
-              (when-let [msg (<! in)] ; Listen fo messages
-                (when-let [res (-> msg edn/read-string dispatch)]
-                  (when (contains? res :dispatch-key) (>! out (str res)))))
-              (when-not (-> @socket-channels (get client-id) :exit?) (recur))))
-          (log/warn "Exiting go loop.")
-          (error-listener client-id)   ; ...from from close-ws-channels above.
-          {:ring.websocket/listener (wsa/websocket-listener in out err)})
-        (catch Exception e
-          (log/error "Error in ws loop:" (type e))
-          (close-ws-channels client-id)))
+         (let [{:keys [in out err]} (make-ws-channels client-id)]
+           ;;(log/info "Starting websocket handler for " id (now))
+           (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
+             (loop []
+               (when-let [msg (<! in)] ; Listen for messages.
+                 (log/info "websocket: msg =" msg)
+                 (when-let [res (-> msg edn/read-string dispatch)]
+                   (when (contains? res :dispatch-key) (>! out (str res)))))
+               (when-not (-> @socket-channels (get client-id) :exit?) (recur))))
+           (log/warn "Exiting go loop.")
+           (error-listener client-id)   ; ...from from close-ws-channels above.
+           {:ring.websocket/listener (wsa/websocket-listener in out err)})
+         (catch Exception e
+           (close-ws-channels client-id)
+           (log/error "Error in ws loop:" (type e))))
     (log/error "Websocket client did not provide id.")))
 
 ;;; ----------------------- Promise management -------------------------------
@@ -201,7 +209,7 @@
 
 ;;;--------------------- Receiving a response from a client -----------------------
 (defn user-says
-  "Handle web-socket message with dispatch key :user-says. This will typically clear a promise-key."
+  "Handle websocket message with dispatch key :user-says. This will typically clear a promise-key."
   [{:keys [msg-text client-id promise-keys] :as msg}]
   (log/info "User-says:" msg)
   (if-let [prom-obj (select-promise promise-keys)]

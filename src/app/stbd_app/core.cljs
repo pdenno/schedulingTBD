@@ -107,40 +107,6 @@
         [{:key "Mod-Enter"
           :run (partial eval-cell on-result progress-bool)}])))
 
-(defn get-props [obj]
-  (when (map? (js->clj obj))
-    (js->clj (or (j/get obj :props) (get obj "props")))))
-
-(defn get-user-data
-  "Return the string content of the data editor."
-  []
-  (if-let [s (j/get-in (get-in @util/component-refs ["data-editor" :view]) [:state :doc])]
-    (.toString s)
-    ""))
-
-(defn get-user-code
-  "Return the string content of the data editor."
-  []
-  (if-let [s (j/get-in (get-in @util/component-refs ["code-editor" :view]) [:state :doc])]
-    (.toString s)
-    ""))
-
-#_(defn search-props
-  "Return the object that has a prop that passes the test."
-  [obj test]
-  (let [found? (atom nil)
-        cnt (atom 0)]
-    (letfn [(sp [obj]
-              (swap! cnt inc)
-              (cond @found?                 @found?,
-                    (> @cnt 500)            nil,    ; ToDo: Remove this.
-                    (test obj)              (reset! found? obj),
-                    (get-props obj)         (doseq [p (-> obj get-props vals)]
-                                              (sp p)),
-                    (vector? (js->clj obj)) (doseq [p (js->clj obj)] (sp p))))]
-      (sp obj)
-      @found?)))
-
 (def top-share-fns
   "These, for convenience, keep track of what methods need be called on resizing."
   {:left-share   {:on-stop-drag-lf (partial editor/resize-finish "data-editor")}
@@ -148,8 +114,6 @@
                   :on-resize-dn    (partial editor/resize "result")
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")
                   :on-stop-drag-dn (partial editor/resize-finish "result")}})
-
-(def really? (atom nil))
 
 ;;; ToDo: Needs work.
 (defn compute-progress
@@ -164,7 +128,7 @@
         [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
         [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
         [conversation set-conversation]       (hooks/use-state {:conv [] :conv-for "nobody"})
-        [code set-code]                       (hooks/use-state "xyz")
+        [code set-code]                       (hooks/use-state "")
         useful-height (int (- height banner-height))
         chat-side-height useful-height
         code-side-height useful-height]
@@ -175,15 +139,16 @@
           (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
                        (set-proj (:current-project %))
                        (-> (dba/get-conversation (:current-project %))
-                           (p/then (fn [resp] (set-conversation resp)))
-                           (p/then (fn [resp] (set-code "abc" #_(:code resp)))))))))
+                           (p/then (fn [resp] (set-conversation resp) resp))
+                           (p/then (fn [resp] (set-code (:code resp) resp))))))))
     (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
               (log/info "--------- Calling change-project: p =" p) ; If p = :START-A-NEW-PROJECT, this will run again after server finds a name.
               (when-not (= p proj)                                 ; In that case, it will have updated the conversation, with the "Great,...".
                 (set-proj p)
                 (set-conversation {:conv [] :conf-for proj})
                 (-> (dba/get-conversation p)
-                    (p/then #(set-conversation %)))))]
+                    (p/then (fn [resp] (set-conversation resp) resp))
+                    (p/then (fn [resp] (set-code (:code resp)) resp)))))]
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
             {:variant "h4"
@@ -255,7 +220,8 @@
                  first second))
   (reset! ws/connected? false)
   (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
-  (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 10000)) ; Ping to keep-alive the web-socket.
+  ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
+  (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 4000))
   (.render root ($ app)))
 
 (defn ^:export init []

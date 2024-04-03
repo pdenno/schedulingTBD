@@ -153,6 +153,13 @@
   (assert (string? s))
   [{:msg-text/string s}])
 
+(defn surrogate-record
+  "db/add-msg the query/response pair. The first argument is a map with two keys
+   :query, and :response, both of which are strings."
+  [{:keys [query response]} pid]
+  (db/add-msg pid :system (msg-vec query))
+  (db/add-msg pid :user (msg-vec response)))
+
 (defn abstract-chat
   "Chat with a human or a surrogate.
      PID     - a keyword identifying a project (i.e. :project/id).
@@ -170,9 +177,9 @@
                       aid (db/get-assistant-id pid)
                       tid (db/get-thread-id pid)]
                   (ws/send-to-chat msg-obj)
-                  {:query text
-                   :response (llm/query-on-thread :aid aid :tid tid :role "user" :msg-text text)})))
-
+                  (-> {:query text
+                       :response (llm/query-on-thread :aid aid :tid tid :role "user" :msg-text text)}
+                      (surrogate-record pid)))))
 
 ;;; Typically we won't save interview query messages to the DB until after receiving a response to it from the user.
 ;;; At that point, we'll also save the :project/state-string. This ensures that when we restart we can use the

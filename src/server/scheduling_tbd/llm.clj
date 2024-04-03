@@ -196,9 +196,9 @@
         (Thread/sleep 1000)
         (cond (> secs timeout-secs)                  (throw (ex-info "query-on-thread: Timeout:" {:msg-text msg-text})),
 
-              (= "completed" (:status r))            (let [[m1 m2] (-> (openai/list-messages {:thread_id tid :limit 2} {:api-key key})
-                                                                       :data
-                                                                       (sort-by :created))]
+              (= "completed" (:status r))            (let [[m1 m2] (as-> (openai/list-messages {:thread_id tid :limit 2} {:api-key key}) ?r
+                                                                     (:data ?r) ; Sometimes it returns "completed" but there is no :data!
+                                                                     (when (vector? ?r) (sort-by :created ?r)))]
                                                        (if (= msg-text (-> m2 :content first :text :value))
                                                          (-> m1 :content first :text :value)
                                                          (throw (ex-info "query-on-thread: Response not synced to query:" {:m1 m1 :m2 m2})))),
