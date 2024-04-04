@@ -3,7 +3,6 @@
   (:require
    [ajax.core        :refer [GET POST]]
    [promesa.core    :as p]
-   [stbd-app.util   :as util :refer [client-id]]
    [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
@@ -14,7 +13,7 @@
   "Return a promise that will resolve to a map {:current-project <project-info> :others [<project-info>...]}."
   []
   (let [prom (p/deferred)]
-    (GET (str "/api/list-projects?client-id=" client-id)
+    (GET (str "/api/list-projects?client-id=" @ws/client-id)
          {:timeout 3000
           :handler (fn [resp] (p/resolve! prom resp))
           :error-handler (fn [{:keys [status status-text]}]
@@ -30,7 +29,7 @@
   [{:project/keys [id]}]
   (log/info "Call to get-conversation for" id)
   (let [prom (p/deferred)]
-    (GET (str "/api/get-conversation?project-id=" (name id) "&client-id=" client-id)
+    (GET (str "/api/get-conversation?project-id=" (name id) "&client-id=" @ws/client-id)
          {:timeout 3000
           :handler (fn [resp] (p/resolve! prom resp))
           :error-handler (fn [{:keys [status status-text]}]

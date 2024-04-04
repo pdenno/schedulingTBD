@@ -131,8 +131,8 @@
            (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
              (loop []
                (when-let [msg (<! in)] ; Listen for messages.
-                 (log/info "websocket: msg =" msg)
                  (when-let [res (-> msg edn/read-string dispatch)]
+                   (when-not (#{:ping :ping-confirm} (:dispatch-key res)) (log/info "websocket: msg =" res))
                    (when (contains? res :dispatch-key) (>! out (str res)))))
                (when-not (-> @socket-channels (get client-id) :exit?) (recur))))
            (log/warn "Exiting go loop.")

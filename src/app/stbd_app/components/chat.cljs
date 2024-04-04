@@ -76,14 +76,13 @@
 (defn add-msg [msg-list msg]
   (-> msg-list js->clj (conj msg) clj->js))
 
-
 ;;; ========================= Component ===============================
 (defn make-resize-fns
   "These are used by ShareUpDown. The argument is a Hook state variable set- function."
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(defnc Chat [{:keys [chat-height conv-map change-proj-fn]}]
+(defnc Chat [{:keys [chat-height conv-map]}]
   (let [[msg-list set-msg-list]         (hooks/use-state (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js))
         [progress set-progress]         (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
@@ -93,8 +92,8 @@
         input-ref                       (hooks/use-ref nil)
         resize-fns (make-resize-fns set-box-height)]
     ;; ------------- Talk through web socket, initiated below.
-    (hooks/use-effect :once ; Start the web socket. ToDo: Could use something to restart it???
-      (when-not @ws/connected? (ws/connect! change-proj-fn set-tbd-obj)))
+    (hooks/use-effect :once ; set-tbd-obje is needed by ws/dispatch.
+      (reset! ws/set-tbd-obj-fn set-tbd-obj))
     (hooks/use-effect [conv-map] ; Put the entire conversation into the chat.
       (set-msg-list (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js)))
     (hooks/use-effect [tbd-obj]  ; Put TBD's (server's) message into the chat.
