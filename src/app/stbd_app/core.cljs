@@ -215,12 +215,16 @@
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
   (reset! ws/connected? false)
-  (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
-  ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
+  (when-let [proc @ping-process]    (js/window.clearInterval proc)) ; clear old ping-process, if any.
+  (when-let [proc @ws/fast-process] (js/window.clearInterval proc))
+  (when-let [proc @ws/slow-process] (js/window.clearInterval proc))
+  (reset! ws/fast-process nil)
+  (reset! ws/slow-process nil)
+  (reset! ws/reconnecting? false)
   (ws/connect!)
-  (-> (p/delay 1000)
-      (p/then (fn [_] (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 4000))))
-      (p/then (fn [_] (.render root ($ app))))))
+  ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
+  (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 4000))
+  (.render root ($ app)))
 
 (defn ^:export init []
   (start))

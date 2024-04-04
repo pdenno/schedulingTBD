@@ -3,6 +3,7 @@
   (:refer-clojure :exclude [send])
   (:require
    [clojure.core.unify    :as uni]
+   [clojure.edn           :as edn]
    [clojure.pprint        :refer [cl-format]]
    [clojure.spec.alpha    :as s]
    [clojure.string        :as str]
@@ -99,23 +100,40 @@
 (def intro-prompt
   "This is the DB form of the first message of a conversation."
   [{:msg-text/string "Describe your most significant scheduling problem in a few sentences"}
-   {:msg-text/string " or"}
-   {:msg-link/uri "http://localhost:3300/learn-more"
-    :msg-link/text "learn more about how this works"}
+   {:human-only [{:msg-text/string " or"}
+                 {:msg-link/uri "http://localhost:3300/learn-more"
+                  :msg-link/text "learn more about how this works"}]}
    {:msg-text/string "."}])
+
+(defn reword-for-agent
+  "Return the msg-vec with :human-only or :surrogate-only annotated sections removed as appropriate.
+   Remove the annotations too!"
+  [msg-vec surrogate?]
+  (let [human? (not surrogate?)
+        result (reduce (fn [res elem]
+                         (cond (and (contains? elem :human-only)     surrogate?)        res
+                               (and (contains? elem :surrogate-only) human?)            res
+                               (contains? elem :human-only)                            (into res (:human-only elem))
+                               (contains? elem :surrogate-only)                        (into res (:surrogate-only elem))
+                               :else                                                   (conj res elem)))
+                       []
+                       msg-vec)]
+    (s/assert ::spec/chat-msg-vec result)))
 
 (defn new-project-advance
   "Stuff done to create a new project through project-advance."
-  [{:keys [more-a-list project-name response state-string client-id] :as obj}]
+  [{:keys [more-a-list project-name response state-string client-id] :as obj}] ; ToDo: replace state-string with state.
   ;(log/info "npa: obj =" obj)
   ;(reset! diag obj)
   (if-let [pname-fact (find-fact '(project-name ?x) more-a-list)]
-    (let [pid   (-> pname-fact second str/lower-case (str/replace #"\s+" "-") keyword)
+    (let [state (edn/read-string state-string)
+          surrogate? (some #(uni/unify % '(surrogate ?x)) state)
+          pid   (-> pname-fact second str/lower-case (str/replace #"\s+" "-") keyword)
           pname (->>  (str/split project-name #"\s+") (mapv str/capitalize) (interpose " ") (apply str))
           pid   (db/create-proj-db! {:project/id pid :project/name  pname}) ; pid might not have been unique, thus this returns a new one.
           eid   (db/project-exists? pid)]
       (d/transact (connect-atm pid) [[:db/add eid :project/state-string state-string]])
-      (db/add-msg pid :system intro-prompt)
+      (db/add-msg pid :system (reword-for-agent intro-prompt surrogate?))
       (db/add-msg pid :user   [{:msg-text/string response}])
       (db/add-msg pid :system [{:msg-text/string (format "Great! We'll call your project '%s'." pname)}])
       ;; Now tell the client to 'look again' because we've added the "Great..." msg to what he sees, and
@@ -153,33 +171,36 @@
   (assert (string? s))
   [{:msg-text/string s}])
 
-(defn surrogate-record
+;;; <=============================================================================================== ToDo: Write to the proj DB messages :a-list, :d-list and new state.
+(defn record-interaction
   "db/add-msg the query/response pair. The first argument is a map with two keys
    :query, and :response, both of which are strings."
   [{:keys [query response]} pid]
   (db/add-msg pid :system (msg-vec query))
   (db/add-msg pid :user (msg-vec response)))
 
-(defn abstract-chat
-  "Chat with a human or a surrogate.
+
+(defn chat-pair
+  "Run one query/response pair of chat elements with a human or a surrogate.
+   On successful response, record both chat elements and call the db-actions for the tag.
      PID     - a keyword identifying a project (i.e. :project/id).
      TARGET  - #{:human :surrogate}
      MSG-OBJ - an object suitable for ws/send-to-chat, it has ::spec/chat-msg-vec and a :client-id
    If target is :human then the message is sent to ws/send-to-chat, a promise is returned.
    If target is :surrogate, the message is sent to ws/send-to-chat and then a response is ws/send-to-chat.
    In the :surrogate case, what is returned is content useful to db-actions (the discussion)."
-  [pid target msg-obj]
-  (reset! diag msg-obj)
-  (s/assert ::spec/chat-msg-obj msg-obj)
-  (case target
-    :human      (ws/send-to-chat msg-obj)
-    :surrogate  (let [text (-> msg-obj :msg-vec first :msg-text/string)
+  [{:keys [pid state msg-vec] :as conv-obj}] ; <======================================================================================= target wouldn't be part of it! Tag and state would.
+  (let [surrogate? (some #(uni/unify % '(surrogate ?x)) state)
+        msg-vec    (reword-for-agent msg-vec surrogate?)]
+    #_(case target
+    :human      (ws/send-to-chat conv-obj)
+    :surrogate  (let [text (-> msg-vec first :msg-text/string)
                       aid (db/get-assistant-id pid)
                       tid (db/get-thread-id pid)]
-                  (ws/send-to-chat msg-obj)
+                  (ws/send-to-chat conv-obj)
                   (-> {:query text
                        :response (llm/query-on-thread :aid aid :tid tid :role "user" :msg-text text)}
-                      (surrogate-record pid)))))
+                      (record-interaction pid))))))
 
 ;;; Typically we won't save interview query messages to the DB until after receiving a response to it from the user.
 ;;; At that point, we'll also save the :project/state-string. This ensures that when we restart we can use the
@@ -188,29 +209,15 @@
 ;;; The 'obj' parameter is a map containing client-id, plan-step, proj-id, and domain, typically.
 ;;; We carry it forward adding to it and destructuring it in function calls.
 
-;;; ----- :!initial-question-surrogate
-(defoperator :!initial-question-surrogate [{:keys [pid client-id] :as obj}]
-  (log/info "!initial-question-surrogate: obj =" obj)
-  (let [res (abstract-chat pid :surrogate
-                           {:msg-vec (-> intro-prompt first (update :msg-text/string #(str % ".")) vector)
-                            :dispatch-key :surrogate-says
-                            :client-id client-id})]
-    (db-action obj res)))
-
-(defaction :!initial-question-surrogate [{:keys [pid client-id] :as obj} reply]
-  (log/info "db-action !initial-question-surrogate: response =" reply "pid =" pid)
-  (ws/send-to-chat {:dispatch-key :tbd-says       :client-id client-id :msg-vec [{:msg-text/string (:query    reply)}]})
-  (ws/send-to-chat {:dispatch-key :surrogate-says :client-id client-id :msg-vec [{:msg-text/string (:response reply)}]})
-  (-> obj
-      (assoc  :pid pid)
-      (update :more-a-list #(into `[(~'ongoing-discussion ~(name pid))] %))
-      advance-plan))
-
+;;; ToDo: Needs work! I should aim to use :!initial-question and chat-pair only.
+;;;       They both have an async wait (either for user or assistant thread).
+;;;       There ought to be nothing in the planning domain that cares that the answer is from a surrogate.
+;;;       Maybe that means having a :human-only sort of thing in the query. See intro-prompt.
+;;;
 ;;; ----- :!initial-question
-(defoperator :!initial-question [{:keys [pid client-id] :as obj}]
-  (-> (abstract-chat pid :human {:msg-vec intro-prompt :client-id client-id})
-      (p/then (fn [response] (db-action obj response)))
-      (p/catch (fn [err] (log/error "Error in !initial-question:" err)))))
+(defoperator :!initial-question [obj]
+  (-> (assoc obj :msg-vec intro-prompt)
+      chat-pair))
 
 ;;; ToDo: Need a comprehensive solution to exceptions. (In the macro, I think.)
 ;;; It might involve trying the defaction again.
@@ -226,6 +233,26 @@
                                         (~'ongoing-discussion ~proj-name-sym)] %))
           advance-plan))
     (log/warn "Could not compute project-name")))
+
+
+;;; ----- :!initial-question-surrogate
+#_(defoperator :!initial-question-surrogate [{:keys [pid client-id] :as obj}]
+  (log/info "!initial-question-surrogate: obj =" obj)
+  (let [res (chat-pair pid :surrogate
+                           {:msg-vec (-> intro-prompt first (update :msg-text/string #(str % ".")) vector)
+                            :dispatch-key :surrogate-says
+                            :client-id client-id})]
+    (db-action obj res)))
+
+#_(defaction :!initial-question-surrogate [{:keys [pid client-id] :as obj} reply]
+  (log/info "db-action !initial-question-surrogate: response =" reply "pid =" pid)
+  (ws/send-to-chat {:dispatch-key :tbd-says       :client-id client-id :msg-vec [{:msg-text/string (:query    reply)}]})
+  (ws/send-to-chat {:dispatch-key :surrogate-says :client-id client-id :msg-vec [{:msg-text/string (:response reply)}]})
+  (-> obj
+      (assoc  :pid pid)
+      (update :more-a-list #(into `[(~'ongoing-discussion ~(name pid))] %))
+      advance-plan))
+
 
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-steps [{:keys [plan-step proj-id client-id domain] :as obj}]

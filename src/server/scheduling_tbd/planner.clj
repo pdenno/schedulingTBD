@@ -230,8 +230,8 @@
 (defn execute-plan!
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
-   Returns a vector ::spec/state-edits object that is the effect of running the plan."
-  [pid client-id domain plan]
+   Returns a vector ::spec/state-edits object that is the effect of running the plan." ; <======================== Post-SHOP this is good. Put it in the DB. It currently isn't the case.
+  [pid client-id state plan]
   (let [plan (translate-plan plan)]
     (log/info "execute-plan!: pid =" pid "plan =" plan)
     (doseq [plan-step plan] ; after translate-plan plan-steps have :operator :args and :cost.
@@ -240,9 +240,10 @@
       (op/run-op
        (:operator plan-step)
        {:plan-step plan-step
+        :tag (:operator plan-step)
         :pid pid
         :client-id client-id
-        :domain domain}))
+        :state state}))
     (db/get-state pid)))
 
 (defn discussion-stopped?
@@ -323,7 +324,7 @@
             (>= cnt limit)                  (sort-by first state)
             (empty? plans)                  (sort-by first state)
             (discussion-stopped? state)     (sort-by first state)
-            :else  (let [new-state   (execute-plan! pid client-id pruned (first plans)) ; ToDo: Deal with multiple plans.
+            :else  (let [new-state   (execute-plan! pid client-id state (first plans)) ; ToDo: Deal with multiple plans.
                          new-problem (assoc problem :problem/state-string (str new-state))
                          new-pruned  (prune-domain proj-domain new-state)]
                      (log/info "new-state = " new-state)

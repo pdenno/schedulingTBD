@@ -12,7 +12,7 @@
 (def change-proj-fn
   "We store this function -- which is set in Top and closes over some refs -- on an atom so we don't have send it around."
   (atom nil))
-(def set-tbd-obj-fn
+(def set-tbd-obj-fn ; ToDo: A more comprehensive registration method, like the server has for WS dispatch. Useful for share too.
   "Rationale for this is similar to change-proj-fn; set elsewhere, needed by websocket."
   (atom nil))
 (def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (atom nil))
@@ -22,7 +22,7 @@
 ;;; --------------------------promise-key management ---------------------------------------
 (def pending-promise-keys "These are created by the server to track what is being responded to." (atom #{}))
 
-(defn remember-promise ; Silly name?
+(defn remember-promise
   "When the server sends a message that is part of a conversation and requires a response, it adds a keyword
    that associates to a promise on the server side and allows the server to continue the conversation,
    interpreting the :user-says response which repeat this promise-key as answer to the :tbd-says ws message.
@@ -35,7 +35,7 @@
 (declare send-msg)
 (def recv-msg-type?
   #{:clear-promise-keys ; Server tells you to forget a promise.
-    :alive              ; Server is asking whether you are alive.
+    :alive?             ; Server is asking whether you are alive.
     :reload-proj        ; Server created new current project (e.g. starting, surrogates).
     :ping-confirm       ; Server confirms your ping.
     :tbd-says})         ; Message for the chat, a question, typically.
@@ -49,62 +49,86 @@
       :clear-promise-keys (clear-promise-keys! promise-keys)
       :alive?             (send-msg {:dispatch-key :alive? :alive? true})
       :reload-proj        (@change-proj-fn new-proj-map)
-      :ping-confirm       :ok
+      :ping-confirm       #_:ok (log/info "Ping confirm")
       :tbd-says           (do (when p-key (remember-promise p-key))
-                              (log/info "msg-obj =" msg)
+                              (log/info "tbd-says msg:" msg)
                               (@set-tbd-obj-fn msg))
       "default")))
 
-(def send-tries "Counts how many consecutive times send failed." (atom 0))
 (defn connect! []
-  (reset! send-tries 0)
   (reset! client-id (str (random-uuid)))
   (if-let [chan (js/WebSocket. (ws-url @client-id))]
-    (do (log/info "Websocket Connected!")
+    (do (log/info "Websocket Connected!" @client-id)
         (reset! channel chan)
         (reset! connected? true)
         (set! (.-onmessage chan)
               (fn [event]       ;; ToDo: Consider transit rather then edn/read-string.
                 (try (-> event .-data edn/read-string dispatch-msg)
-                     (catch :default e (log/warn "Error in :tbd-says socket reading:" e)))))
+                     (catch :default e (log/warn "Error in reading from websocket:" e)))))
         (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg)))) ; ToDo: investigate why it gets these.
-    (throw (ex-info "Websocket Connection Failed:" {:url ws-url}))))
+    (throw (ex-info "Websocket Connection Failed:" {:client-id @client-id}))))
+
+;;; Restarting concept: Start two processes:
+;;;    - fast-process  (1 sec) checks whether the socket becomes ready and delivers on the promise when it does.
+;;;    - slow-process (10 sec) tries to re-establish a connection.
+;;; The code waiting on the promise will clear the interval
+(def fast-process (atom nil))
+(def slow-process (atom nil))
+
+(defn check-channel
+  [prom]
+  (log/info "Check-channel: state =" (.-readyState @channel))
+  (when (and @channel (= 1 (.-readyState @channel)))
+    (log/info "Channel is READY!")
+    (p/resolve! prom)))
+
+(def reconnecting? (atom false))
+(defn reconnect!
+  "Wait Try to connect! and when successful, deliver on the promise."
+  [prom]
+  (log/info "Call to reconnect!")
+  (when-not @reconnecting?
+    (when-let [proc @fast-process] (js/window.clearInterval proc))
+    (when-let [proc @slow-process] (js/window.clearInterval proc))
+    (reset! fast-process (js/window.setInterval (fn [] (check-channel prom)) 2000))
+    (reset! slow-process (js/window.setInterval (fn [] (connect!)) 10000))
+    (reset! reconnecting? true)))
 
 (def send-msg-type?
   #{:ask-llm                ; User asked a "LLM:..." question at the chat prompt.
-    :close-channel          ; Close the ws. (Typically, client is ending.)
-    :ping                   ; Ping server.
-    :resume-conversation    ; Restart the planner (works for :START-A-NEW-PROJECT too).
     :start-surrogate        ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation.
+    :resume-conversation    ; Restart the planner (works for :START-A-NEW-PROJECT too).
+    :close-channel          ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
+    :ping                   ; Ping server.
     :user-says})            ; User wrote at the chat prompt (typically answering a question).
 
-
+;;; ToDo: The way this tries to recover is not quite right.
 (defn send-msg
-  "Send the message to the server. msg can be any Clojure object but if it is a map we add the :client-id.
-   Example usage: (ws-send-msg! {:dispatch-key :ping})"
+  "Add client-id and send the message to the server over the websocket.
+   Example usage: (send-msg {:dispatch-key :ping})"
   [{:keys [dispatch-key] :as msg-obj}]
   (if-not (send-msg-type? dispatch-key)
     (log/error "Invalid message type in" msg-obj)
     (let [msg-obj (assoc msg-obj :client-id @client-id)]
-      (when (> @send-tries 10)
-        (log/info "send-msg: send-tries = " @send-tries "reconnecting.")
-        (connect!)
-        (p/delay 1000))
-      ;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
-      (if-let [chan @channel]
-        (if (= 1 (.-readyState chan))
-          (do (.send chan (str msg-obj))
-              (when-not (= :ping dispatch-key) (log/info "send-msg: SENT msg-obj =" msg-obj))
-              (reset! send-tries 0))
-          (-> (p/delay 1000)
-              (p/then (fn [_] (log/info "send-msg not ready.Starting a ping process.")))
-              (p/then (fn [_] (swap! send-tries inc)))
-              (p/then (fn [_] (send-msg msg-obj)))))
+      (if @channel
+        (if (= 1 (.-readyState @channel)) ; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
+          (do (.send @channel (str msg-obj))
+              (when-not (= :ping dispatch-key) (log/info "send-msg: SENT msg-obj =" msg-obj)))
+          (let [prom (p/deferred)]
+            (reset! connected? false)
+            (reconnect! prom)
+            (-> prom
+                (p/then (fn [_] (log/info "After wait state is" (.-readyState @channel))))
+                (p/then (fn [_] (.send @channel (str msg-obj))))
+                (p/then (fn [_]
+                          (reset! reconnecting? false)
+                          (when-let [proc @fast-process] (js/window.clearInterval proc))
+                          (when-let [proc @slow-process] (js/window.clearInterval proc)))))))
         (throw (ex-info "Couldn't send message; no channel." {:msg-obj msg-obj}))))))
 
 (def ping-id (atom 0))
 (defn ping!
   "Ping the server to keep the socket alive."
   []
-  (log/info "Ping!")
-  (send-msg {:dispatch-key :ping, :client-id @client-id :ping-id (swap! ping-id inc)}))
+  ;(log/info "Ping attempt.")
+  (send-msg {:dispatch-key :ping, :ping-id (swap! ping-id inc)}))

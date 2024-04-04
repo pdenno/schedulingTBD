@@ -10,6 +10,11 @@
                                            clojure.test    [deftest is testing]
                                            ajax.core       [GET POST]}} ; Needs investigation; what it says is unresolved var.
 
+           ;; https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md#unresolved-var
+           ;; New versions of datahike don't actually have forms for these functions and macros.
+           ;; But there is lots of clojure.spec in DH, so many things will be caught at runtime.
+           :unresolved-var      {:exclude [datahike.api]}
+
            ;; :exclude-patterns is for bindings, not vars. See https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md
            #_#_:unused-binding {:exclude-patterns ["^recreate.*" "^unknown-projects" "^backup.*"]}
 
@@ -27,6 +32,7 @@
 
  ;; Gist for defstate: https://gist.github.com/ethpran/e1741a5c408aec831b5e3a7e24f40fea
  :hooks   {:analyze-call {mount.core/defstate hooks.defstate/defstate}}
+
 
  ;; https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#lint-a-custom-macro-like-a-built-in-macro --- Use defn, not defmacro.
  :lint-as {;https://andersmurphy.com/2024/01/03/clojure-clj-kondo-datalog-linting.html

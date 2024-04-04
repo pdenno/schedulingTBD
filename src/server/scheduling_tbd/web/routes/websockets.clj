@@ -17,7 +17,7 @@
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique client-id provided by the client." (atom {}))
 
-(def client-current-proj "Current project (keyword) indexed by client-id (string)."  (atom {}))
+(def client-current-proj "Current project (keyword) indexed by client-id (string)."  (atom {})) ; ToDo: eliminate this? Ask on ws.
 (defn clear-client-current-proj [] (reset! client-current-proj {}))
 (defn set-current-project
   "We track client's current project, but since clients are ephemeral, it isn't a DB thing."
@@ -34,19 +34,17 @@
   (let [chans {:in  (async/chan)
                :out (async/chan)
                :err (async/chan)
-               :exit? false}]  ; ToDo: It need not be an atom; the whole thing is in socket-channels. <=====================================
+               :exit? false}]
     (swap! socket-channels  #(assoc % id chans))
     chans))
 
-;;; ToDo: I think, before closing, I want to send something to the client so that it check it's exit?
 (defn close-ws-channels [client-id]
   (when (contains? @socket-channels client-id)
     (let [{:keys [in out err]} (get @socket-channels client-id)]
-      (log/info "Closing websocket channels for " client-id (now))
+      (log/info "Closing websocket channels for inactive" client-id (now))
       ;; Set exit? and send something so go loop will be jogged and see it.
       (swap! socket-channels #(assoc-in % [client-id :exit?] true))
       (>!! in (str {:dispatch-key :stop}))
-      ;; (>!! err "STOP") ; ToDo: Why do things stall when I do this?
       (-> (p/delay 500)
           (p/then (fn [_]
                     (async/close! in)
@@ -87,9 +85,6 @@
   []
   (->> @ping-dates seq (sort-by second) reverse first first))
 
-;;; ToDo: I'm using blocking versions (>!!, <!!) so you'd think I'd be checking for timeout.
-;;;       But some are closed and return nil. I suppose I should put the the test in a future just in case???
-;;;       Really, start by making a function alive? that takes a client-id and waits a sec.
 (defn close-inactive-channels
   "Close channels that don't respond to :alive?."
   []
@@ -105,10 +100,8 @@
     (go
       (loop []
         (when-let [msg (<! err)]
-          ;; ToDo: There is evidence that when these are WebSocketTimeoutException, the java process burns cycles.
-          ;; user/restart stops it but there ought to be a better way employed right here.
           (log/error "Client reports" (type msg) ": client-id =" client-id)
-          (close-ws-channels client-id)
+          (close-ws-channels client-id) ; Otherwise java burns cycles???
           (when-not exit? (recur)))))
     (log/error "error-listener: Cannot find client-id" client-id)))
 
@@ -135,7 +128,7 @@
                    (when-not (#{:ping :ping-confirm} (:dispatch-key res)) (log/info "websocket: msg =" res))
                    (when (contains? res :dispatch-key) (>! out (str res)))))
                (when-not (-> @socket-channels (get client-id) :exit?) (recur))))
-           (log/warn "Exiting go loop.")
+           (log/warn "Exiting go loop:" client-id)
            (error-listener client-id)   ; ...from from close-ws-channels above.
            {:ring.websocket/listener (wsa/websocket-listener in out err)})
          (catch Exception e
@@ -275,7 +268,7 @@
 (defn wsock-start []
   (clear-promises!)
   (reset! ping-dates {})
-  (clear-client-current-proj) ; ToDo: Restarting the server means we lose knowledge of their current project. Ok?
+  (clear-client-current-proj)
   (init-dispatch-table!))
 
 (defn wsock-stop []

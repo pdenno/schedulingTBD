@@ -10,8 +10,7 @@
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
    [wkok.openai-clojure.api      :as openai]
-   [scheduling-tbd.db            :as db]
-   [scheduling-tbd.sutil         :refer [get-api-key resolve-db-id connect-atm]]
+   [scheduling-tbd.sutil         :refer [get-api-key]]
    [scheduling-tbd.web.routes.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
    [clojure.pprint               :refer [cl-format]]
@@ -41,8 +40,7 @@
 
 (defn query-llm
   "Return a Clojure map that is read from the string created by the LLM given the vector of messages that is the argument."
-  [messages & {:keys [model-class raw-text?] :or {model :gpt-4} :as other}]
-  (reset! diag {:msg messages :other other})
+  [messages & {:keys [model-class raw-text?] :or {model-class :gpt-4}}]
   (if-let [key (get-api-key :llm)]
     (try (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class)
                                                        :messages messages}

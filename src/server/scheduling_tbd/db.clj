@@ -508,17 +508,13 @@
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
-;;; BTW, I don't have a good way to delete the project yet from the system-db.
-;;;    1) (db/backup-system-db)
-;;;    2) Edit the .edn to remove the project.
-;;;    3) (db/recreate-system-db!)
 (defn create-proj-db!
   "Create a project database for the argument project.
    The project-info map must include :project/id and :project/name.
      proj-info  - map containing at least :project/id and :project/name.
      additional - a vector of maps to add to the database.
      opts -  {:force? - overwrite project with same name}
-   Return the "
+   Return the PID of the project."
   ([proj-info] (create-proj-db! proj-info {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info))
   ([proj-info additional-info opts]
@@ -543,6 +539,11 @@
      (log/info "Created project database for" id)
      id)))
 
+;;; ToDo: Change this to use :db/retract and remove :project/deleted from both DBs.
+;;; BTW, I don't have a good way to delete the project yet from the system-db.
+;;;    1) (db/backup-system-db)
+;;;    2) Edit the .edn to remove the project.
+;;;    3) (db/recreate-system-db!)
 (defn delete-project
   "Remove project from the system DB and move its project directory to the the deleted directory.
    Both the :system and project databases can have a :project/deleted? attribute."
