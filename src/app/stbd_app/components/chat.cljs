@@ -102,7 +102,6 @@
           (set-msg-list (add-msg msg-list new-msg)))))
     (hooks/use-effect [user-text] ; Entered by user with arrow button. Send user-text to the server, and put it in the chat.
        (when (not-empty user-text)
-         (reset! diag user-text)
          (log/info "In user-text hook: user-text =" user-text)
          (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" user-text)
                [surrogate? product] (re-matches #"\s*SUR:(.*)" user-text)

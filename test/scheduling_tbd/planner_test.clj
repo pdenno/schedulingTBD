@@ -45,28 +45,32 @@
                         :problem/goal-string  "[(characterize-process craft-beer)]"
                         :problem/state-string "[(proj-name craft-beer) (ongoing-discussion craft-beer) (well-known-process craft-beer)]"})))))
 
+(defn ^:diag tryme []
+  (plan/load-domain "data/planning-domains/process-interview.edn")
+  (plan/interview-loop
+   :sur-plate-glass
+   :process-interview
+   (ws/recent-client!)
+   {:start-facts (db/get-state :sur-plate-glass)}))
+
+(defn aaa []
+  (println "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan."))
+
+(defn ^:diag tryme-0 []
+  (plan/load-domain "data/planning-domains/process-interview.edn")
+  (plan/interview-loop
+   :START-A-NEW-PROJECT
+   :process-interview
+   (ws/recent-client!)
+   {:start-facts (db/get-state :START-A-NEW-PROJECT)}))
+
+
 ;;; (tryme :snowboards-production-scheduling)
 ;;; (tryme :aluminium-foil-production-scheduling)
-(defn ^:diag tryme []
+(defn ^:diag tryme-2 []
   (plan/load-domain "data/planning-domains/process-interview.edn")
   (plan/interview-loop
    :craft-beer-brewery-scheduling
    :process-interview
    {:start-facts (db/get-state :craft-beer-brewery-scheduling)}
    (ws/recent-client!)))
-
-(defn ^:diag tryme-old
-  ([] (tryme-old :snowboards-production-scheduling))
-  ([proj-id]
-   (plan/load-domain "data/planning-domains/process-interview.edn")
-   (db/recreate-dbs!)
-   (let [state-set (-> proj-id
-                       db/get-project
-                       :project/state-string
-                       edn/read-string)]
-     (log/info "state-vec =" (cl-format nil "~{~%~A~^,~}" (sort-by first state-set)))
-     (plan/interview-loop
-      proj-id
-      :process-interview
-      (ws/recent-client!)
-      {:start-facts state-set}))))

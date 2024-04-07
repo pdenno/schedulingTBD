@@ -296,8 +296,8 @@
 
 (defn get-state
   [pid & {:keys [sort?] :or {sort? true}}]
-  (if (= pid :new-project)
-    []
+  (if (= pid :START-A-NEW-PROJECT)
+    '[(proj-id :START-A-NEW-PROJECT)]
     (let [conn (connect-atm pid)]
       (when-let [state-str (d/q '[:find ?s .
                                   :in $ ?pid
@@ -312,22 +312,26 @@
 (defn get-thread-id
   "Get the thread object of the argument PID."
   [pid]
-  (let [eid (project-exists? pid)]
-    (-> (resolve-db-id {:db/id eid}
-                       (connect-atm pid)
-                       :keep-set #{:project/surrogate :surrogate/thread-id})
-        :project/surrogate
-        :surrogate/thread-id)))
+  (let [eid (project-exists? pid)
+        res (-> (resolve-db-id {:db/id eid}
+                               (connect-atm pid)
+                               :keep-set #{:project/surrogate :surrogate/thread-id})
+                :project/surrogate
+                :surrogate/thread-id)]
+    (or res
+        (throw (ex-info "Did not find thread-id." {:pid pid})))))
 
 (defn get-assistant-id
   "Get the thread object of the argument PID."
   [pid]
-  (let [eid (project-exists? pid)]
-    (-> (resolve-db-id {:db/id eid}
-                       (connect-atm pid)
-                       :keep-set #{:project/surrogate :surrogate/assistant-id})
-        :project/surrogate
-        :surrogate/assistant-id)))
+  (let [eid (project-exists? pid)
+        res (-> (resolve-db-id {:db/id eid}
+                               (connect-atm pid)
+                               :keep-set #{:project/surrogate :surrogate/assistant-id})
+                :project/surrogate
+                :surrogate/assistant-id)]
+    (or res
+        (throw (ex-info "Did not find assistant-id." {:pid pid})))))
 
 (def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
   #{:project/messages :message/id :message/from :message/content :message/time :msg-text/string :msg-link/uri :msg-link/text})
@@ -489,12 +493,14 @@
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
   [pid from msg-vec]
-  (s/assert ::spec/chat-msg-vec msg-vec)
+  (reset! diag msg-vec)
+  (s/assert ::spec/chat-msg-vec msg-vec) ; ToDo: I might have to turn something on to see this!
+  (assert (#{:system :user} from))
   (log/info "add-msg: pid =" pid "msg-vec =" msg-vec)
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid))]
       (d/transact conn {:tx-data [{:db/id (project-exists? pid)
-                                  :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
+                                   :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn add-project
@@ -515,8 +521,8 @@
      additional - a vector of maps to add to the database.
      opts -  {:force? - overwrite project with same name}
    Return the PID of the project."
-  ([proj-info] (create-proj-db! proj-info {}))
-  ([proj-info additional-info] (create-proj-db! proj-info additional-info))
+  ([proj-info] (create-proj-db! proj-info {} {}))
+  ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
   ([proj-info additional-info opts]
    (s/assert ::project-info proj-info)
    (let [{:project/keys [id name]} (if (:force? opts) proj-info (unique-proj proj-info))

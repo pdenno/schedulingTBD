@@ -16,16 +16,6 @@
 
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique client-id provided by the client." (atom {}))
-
-(def client-current-proj "Current project (keyword) indexed by client-id (string)."  (atom {})) ; ToDo: eliminate this? Ask on ws.
-(defn clear-client-current-proj [] (reset! client-current-proj {}))
-(defn set-current-project
-  "We track client's current project, but since clients are ephemeral, it isn't a DB thing."
-  [client-id pid]
-  (when-not (some #(= client-id %) (keys @socket-channels))
-    (log/warn "Nothing know about client when setting current project. client-id =" client-id))
-  (swap! client-current-proj #(assoc % client-id pid)))
-
 (declare user-says send-to-chat dispatch)
 
 (defn make-ws-channels
@@ -206,9 +196,10 @@
   [{:keys [msg-text client-id promise-keys] :as msg}]
   (log/info "User-says:" msg)
   (if-let [prom-obj (select-promise promise-keys)]
-    (do (clear-keys client-id [(:p-key prom-obj)])
-        (log/info "Before resolve!: msg-text =" msg-text)
-        (p/resolve! (:prom prom-obj) msg-text))
+    (do (log/info "Before resolve!: prom-obj =" prom-obj)
+        (reset! diag prom-obj)
+        (p/resolve! (:prom prom-obj) msg-text)
+        (clear-keys client-id [(:p-key prom-obj)]))
     (log/error "user-says: no p-key (e.g. no question in play)")))
 
 ;;;-------------------- Sending questions to client --------------------------
@@ -268,12 +259,14 @@
 (defn wsock-start []
   (clear-promises!)
   (reset! ping-dates {})
-  (clear-client-current-proj)
   (init-dispatch-table!))
 
 (defn wsock-stop []
   (doseq [id (keys @socket-channels)]
     (close-ws-channels id))
+  (doseq [prom-obj @promise-stack]
+    (p/reject! (:prom prom-obj) :restarting))
+  (reset! promise-stack '())
   [:closed-sockets])
 
 (defstate wsock

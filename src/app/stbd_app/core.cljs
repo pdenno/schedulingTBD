@@ -132,7 +132,7 @@
       (log/info "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
       (reset! ws/change-proj-fn
-              (fn [p]
+              (fn [p] ; This is a map with two keys: :project/id :project/name (a proj-info element).
                 (when-not (= p proj)                                 ; In that case, it will have updated the conversation, with the "Great,...".
                 (set-proj p)
                 (set-conversation {:conv [] :conf-for proj})
@@ -204,7 +204,6 @@
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
-(defonce ping-process (atom nil))
 
 ;;; --------------- https://code.thheller.com/blog/shadow-cljs/2019/08/25/hot-reload-in-clojurescript.html ----------------------
 (defn ^{:after-load true, :dev/after-load true} start []
@@ -214,16 +213,7 @@
                  :min-level
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
-  (reset! ws/connected? false)
-  (when-let [proc @ping-process]    (js/window.clearInterval proc)) ; clear old ping-process, if any.
-  (when-let [proc @ws/fast-process] (js/window.clearInterval proc))
-  (when-let [proc @ws/slow-process] (js/window.clearInterval proc))
-  (reset! ws/fast-process nil)
-  (reset! ws/slow-process nil)
-  (reset! ws/reconnecting? false)
   (ws/connect!)
-  ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
-  (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 4000))
   (.render root ($ app)))
 
 (defn ^:export init []
@@ -235,7 +225,9 @@
 ;;; https://stackoverflow.com/questions/5004978/check-if-page-gets-reloaded-or-refreshed-in-javascript
 (defn ^{:before-load true, :dev/before-load true #_#_:dev/before-load-async true} stop []
   (log/info "STOP")
-  (when (and ws/connected? @ws/client-id)
+  (when-let [proc @ws/ping-process]  (js/window.clearInterval proc)) ; clear old ping-process, if any.
+  (when-let [proc @ws/check-process] (js/window.clearInterval proc))
+  (when (ws/channel-ready?)
     (log/info "Telling server to close channel for client-id = " @ws/client-id)
     (ws/send-msg {:dispatch-key :close-channel}) ; The client-id is appended by send-message!.
     (log/info "Message sent for client-id = " @ws/client-id)))

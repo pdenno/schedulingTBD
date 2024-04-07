@@ -17,6 +17,7 @@
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
    [promesa.core                 :as p]
+   [promesa.exec                 :as px]
    [taoensso.timbre              :as log]))
 
 (def ^:diag diag (atom nil))
@@ -171,39 +172,34 @@
   "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
     aid      - assistant ID (the OpenAI notion)
     tid      - thread ID (ttheOpenAI notion)
-   role     - #{'user' 'assistant'},
+    role     - #{'user' 'assistant'},
     msg-text - a string."
-  [& {:keys [tid aid role msg-text timeout-secs] :or {timeout-secs 40} :as _obj}]
-  (reset! diag _obj)
+  [& {:keys [tid aid role msg-text timeout-secs] :or {timeout-secs 40 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   (assert (#{"user" "assistant"} role))
   (assert (string? msg-text))
   (let [key (get-api-key :llm)
-        _msg (openai/create-message ; Apparently the thread_id links the run to msg.
-              {:thread_id tid
-               :role role
-               :content msg-text}
-              {:api-key key})
+        ;; Apparently the thread_id links the run to msg.
+        _msg (openai/create-message {:thread_id tid :role role :content msg-text} {:api-key key})
         ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
         ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
-        run (openai/create-run
-             {:thread_id tid
-              :assistant_id aid}
-             {:api-key key})]
-    (loop [secs 0]
-      (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} {:api-key key})]
-        (Thread/sleep 1000)
-        (cond (> secs timeout-secs)                  (throw (ex-info "query-on-thread: Timeout:" {:msg-text msg-text})),
+        run (openai/create-run  {:thread_id tid :assistant_id aid} {:api-key key})]
+    (px/submit!
+     (fn []
+       (loop [secs 0]
+         (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} {:api-key key})]
+           (Thread/sleep 1000)
+           (cond (> secs timeout-secs)                  (throw (ex-info "query-on-thread: Timeout:" {:msg-text msg-text})),
 
-              (= "completed" (:status r))            (let [[m1 m2] (as-> (openai/list-messages {:thread_id tid :limit 2} {:api-key key}) ?r
-                                                                     (:data ?r) ; Sometimes it returns "completed" but there is no :data!
-                                                                     (when (vector? ?r) (sort-by :created ?r)))]
-                                                       (if (= msg-text (-> m2 :content first :text :value))
-                                                         (-> m1 :content first :text :value)
-                                                         (throw (ex-info "query-on-thread: Response not synced to query:" {:m1 m1 :m2 m2})))),
+                 (= "completed" (:status r))            (let [[m1 m2] (as-> (openai/list-messages {:thread_id tid :limit 2} {:api-key key}) ?r
+                                                                        (:data ?r) ; Sometimes it returns "completed" but there is no :data!
+                                                                        (when (vector? ?r) (sort-by :created ?r)))]
+                                                          (if (= msg-text (-> m2 :content first :text :value))
+                                                            (-> m1 :content first :text :value)
+                                                            (throw (ex-info "query-on-thread: Response not synced to query:" {:m1 m1 :m2 m2})))),
 
-              (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)}))
+                 (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)}))
 
-              :else                                   (recur (inc secs)))))))
+                 :else                                   (recur (inc secs)))))))))
 
 (defn ^:diag get-assistant-openai
   "Retrieve the assistant object from OpenAI using its ID, a string you can

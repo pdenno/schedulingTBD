@@ -2,7 +2,9 @@
   "Scheduling domain prompts."
   (:require
    [clojure.string           :as str]
+   [promesa.exec             :as px]
    [scheduling-tbd.llm       :as llm :refer [query-llm]]
+   [scheduling-tbd.sutil     :as sutil]
    [taoensso.timbre          :as log]))
 
 (def ^:diag diag (atom nil))
@@ -296,3 +298,43 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                            :else   :unknown)]
          answer)
        (catch Throwable _e :huh?)))
+
+;;; ToDo: Implement more here.
+(defn prelim-analysis
+  "Analyze the response to the initial question, adding to the state vector."
+  [response state]
+  (log/info "prelim-analysis: state =" state "response =" response)
+  (px/submit!
+   (fn []
+     (let [[_ pid] (sutil/find-fact '(proj-id ?x) state)
+           state   (if (= pid :START-A-NEW-PROJECT)
+                     (let [proj-name (as-> (project-name response) ?s
+                                       (str/trim ?s)
+                                       (str/split ?s #"\s+")
+                                       (map str/capitalize ?s)
+                                       (interpose " " ?s)
+                                       (apply str ?s))
+                           proj-id (as-> proj-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (symbol ?s))]
+                       (into (filterv #(not= % '(proj-id START-A-NEW-PROJECT)) state)
+                             `[(~'proj-id ~proj-id)
+                               (~'proj-name ~proj-name)]))
+                     state)]
+       state))))
+
+#_(defn prelim-analysis-diag
+  "Analyze the response to the initial question, adding to the state vector."
+  [response state]
+  (let [[_ pid] (sutil/find-fact '(proj-id ?x) state)
+        state   (if (= pid :START-A-NEW-PROJECT)
+                  (let [proj-name (as-> (project-name response) ?s
+                                    (str/trim ?s)
+                                    (str/split ?s #"\s+")
+                                    (map str/capitalize ?s)
+                                    (interpose " " ?s)
+                                    (apply str ?s))
+                        proj-id (as-> proj-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (symbol ?s))]
+                    (into (filterv #(not= % '(proj-id START-A-NEW-PROJECT)) state)
+                          `[(~'proj-id ~proj-id)
+                            (~'proj-name ~proj-name)]))
+                  state)]
+    state))

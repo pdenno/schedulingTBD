@@ -63,14 +63,14 @@
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})
-        state-string (format "#{(proj-name %s) (surrogate %s)}" (name pid) (name pid))]
+        state-string (format "#{(proj-id %s) (surrogate %s)}" (name pid) (name pid))]
     (d/transact (connect-atm pid)
                 {:tx-data [{:db/id (db/project-exists? pid)
                             :project/state-string state-string}]})
     (ensure-surrogate pid)
     (ws/send-to-chat {:dispatch-key :reload-proj :client-id client-id  :promise? nil
                       :new-proj-map {:project/name pname :project/id pid}})
-    (plan/interview-loop pid :process-interview client-id :start-facts (edn/read-string state-string))))
+    (plan/interview-loop pid :process-interview client-id {:start-facts (edn/read-string state-string)})))
 
 (defn ^:diag delete-surrogate-assistants!
   "Delete all the OpenAI assistants that have metadata {:usage 'surrogate'}."

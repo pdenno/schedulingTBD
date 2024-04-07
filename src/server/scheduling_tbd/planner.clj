@@ -134,7 +134,7 @@
        @(connect-atm :planning-domains)
        domain-id))
 
-(defn get-domain
+(defn get-domain ; ToDo: This goes away with SHOP.
   "Return the domain in SHOP format."
   [domain-id & {:keys [form] :or {form :proj}}]
   (let [db-obj (if-let [eid (domain-eid domain-id)]
@@ -231,15 +231,15 @@
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
    Returns a vector ::spec/state-edits object that is the effect of running the plan." ; <======================== Post-SHOP this is good. Put it in the DB. It currently isn't the case.
-  [pid client-id state plan]
+  [pid client-id state plan domain-id]
   (let [plan (translate-plan plan)]
     (log/info "execute-plan!: pid =" pid "plan =" plan)
     (doseq [plan-step plan] ; after translate-plan plan-steps have :operator :args and :cost.
       (s/assert ::spec/plan-step plan-step)
       (log/info "run plan-step" plan-step)
-      (op/run-op
-       (:operator plan-step)
+      (op/operator-meth
        {:plan-step plan-step
+        :domain-id domain-id ; This is needed for a-list/d-list work.
         :tag (:operator plan-step)
         :pid pid
         :client-id client-id
@@ -263,12 +263,19 @@
           (throw (ex-info "Goal unifies with neither method-heads nor state-vec."
                           {:goal g :method-heads method-heads :state-vec state-vec}))))))
 
+#_(defn check-goals-are-ground ; ToDo: Goes away with SHOP?
+  [goal-vec]
+  (doseq [g goal-vec]
+    (when (some #(and (symbol? %) (= "?" (-> % name (subs 0 1)))) (rest g))
+      (throw (ex-info "goal vector must be ground:" {:goal g})))))
+
 (defn check-triple
   "Return a keyword naming an obvious error in the domain/problem/execute structure."
   [{:keys [domain problem _execute] :as pass-obj}]
   (let [state-vec (-> problem :problem/state-string edn/read-string vec)
         goal-vec (-> problem :problem/goal-string edn/read-string vec)]
     (check-domain-to-goals domain state-vec goal-vec) ; ToDo: Many more tests like this.
+    ;(check-goals-are-ground goal-vec) ; This is something for after translation, thus don't other with it.
     pass-obj))
 
 (defn translate-triple
@@ -310,21 +317,21 @@
   [pid domain-id client-id & {:keys [start-facts problem limit]
                               :or {start-facts '#{(characterize-process new-proj)},
                                    problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
-                                   limit 30}}] ; ToDo: Temporary
+                                   limit 2}}] ; ToDo: Temporary
   (s/assert ::spec/domain-problem problem)
   (let [proj-domain (-> domain-id (get-domain {:form :proj}))
         execute (:domain/execute proj-domain)] ; The execute statement is invariant to state changes.
     (loop [state   start-facts
            problem (-> problem (assoc :problem/state-string (str start-facts)))
            pruned  (prune-domain proj-domain start-facts)
-           plans   (-> {:domain  pruned :problem problem :execute execute} check-triple (translate-triple state) plan)
+           plans   (-> {:domain pruned :problem problem :execute execute} check-triple (translate-triple state) plan)
            cnt 1]
       (log/info "state = " state)
       (cond (= plans :bad-input)            :bad-input
             (>= cnt limit)                  (sort-by first state)
             (empty? plans)                  (sort-by first state)
             (discussion-stopped? state)     (sort-by first state)
-            :else  (let [new-state   (execute-plan! pid client-id state (first plans)) ; ToDo: Deal with multiple plans.
+            :else  (let [new-state   (execute-plan! pid client-id state (first plans) domain-id) ; ToDo: Deal with multiple plans.
                          new-problem (assoc problem :problem/state-string (str new-state))
                          new-pruned  (prune-domain proj-domain new-state)]
                      (log/info "new-state = " new-state)
@@ -399,15 +406,13 @@
     result))
 
 ;;; Run the following when you update interview-for-new-project!:
-;;;  (ws/register-ws-dispatch :start-a-new-project plan/interview-for-new-project!)
+;;;  (ws/register-ws-dispatch :resume-conversation plan/resume-conversation)
 (defn resume-conversation
+  "Start the interview loop. :resume-conversation is a dispatch key from client.
+   This is called even for where PID is :START-A-NEW-PROJECT."
   [{:keys [project-id client-id]}]
   (log/info "Calling interview-loop for project" project-id)
-  (if (= project-id :START-A-NEW-PROJECT)
-    (interview-loop :new-project :process-interview client-id)
-    (interview-loop project-id :process-interview client-id
-                    {:start-facts (db/get-state project-id)})
-    #_(log/info "Not yet resuming for existing projects: project-id =" project-id)))
+  (interview-loop project-id :process-interview client-id {:start-facts (db/get-state project-id)}))
 
 ;;; This makes recompilation smoother.
 (def test-the-planner? true)

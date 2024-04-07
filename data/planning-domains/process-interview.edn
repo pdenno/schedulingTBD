@@ -16,15 +16,12 @@
  :domain/execute "(find-plans 'talk-process :verbose :plans)" ; For example, "(defproblem process-interview pi () ((characterize-process craft-beer)))"
  :domain/elems [{:method/head (characterize-process ?proj)
                  :method/rhsides [{:method/case-name "from-scratch"
-                                   :method/preconds [(not (surrogate ?proj)) (not (ongoing-discussion ?proj))]
+                                   :method/preconds [(proj-id ?proj) (not (ongoing-discussion ?proj))] ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
                                    :method/task-list [(!initial-question ?proj)]}
 
-                                  {:method/case-name "surrogate"
-                                   :method/preconds [(surrogate ?proj) (not (ongoing-discussion ?proj))]
-                                   :method/task-list [(!initial-question-surrogate ?proj)]}
-
                                   {:method/case-name "ongoing-discussion"
-                                   :method/preconds [(ongoing-discussion ?proj)
+                                   :method/preconds [(ongoing-discussion ?proj)   ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
+                                                     (proj-id ?proj)
                                                      (not (process-defined ?proj))]
                                    :method/task-list [(get-process-steps ?proj)
                                                       (!query-process-durs ?proj)
@@ -33,15 +30,8 @@
                 ;; ====== (not (ongoing-discussion ?proj)) ===============================
                 ;; (!initial-question ?proj)
                 {:operator/head (!initial-question ?proj)                    ;ToDo: Need a decision: For the time being, a-list is treated like ':operator/postconds'. It can be used to check
-                 :operator/preconds [(not (ongoing-discussion ?proj))]       ;      that the operator asserted some particular propositions. (I can see there being, for example, an
-                 :operator/a-list [(project-name ?proj)                      ;      (or (well-known-process ?proj) (unknown-process ?proj)).
-                                   (ongoing-discussion ?proj)
-                                   (well-known-process ?proj)]}
-
-                {:operator/head (!initial-question-surrogate ?proj)
-                 :operator/preconds [(not (ongoing-discussion ?proj))]
-                 :operator/a-list [(project-name ?proj)
-                                   (ongoing-discussion ?proj)
+                 :operator/preconds [(not (ongoing-discussion ?proj))]       ;      that the operator asserted some particular propositions. (I can see there being, for example,
+                 :operator/a-list [(ongoing-discussion ?proj)                ;      an or (well-known-process ?proj) (unknown-process ?proj)).
                                    (well-known-process ?proj)]}
 
                 ;; ====== (ongoing-discussion ?proj) ===============================
@@ -55,12 +45,12 @@
 
                 ;; (!yes-no-process-steps ?proj)
                 {:operator/head (!yes-no-process-steps ?proj)
-                 :operator/preconds [(proj-name ?proj) (well-known-process ?proj)]
+                 :operator/preconds [(proj-id ?proj) (well-known-process ?proj)]
                  :operator/a-list [(have-process-steps ?proj)]}
 
                 ;; (!query-process-steps ?proj)
                 {:operator/head (!query-process-steps ?proj)
-                 :operator/preconds [(proj-name ?proj) (system-model ?proj flow)]
+                 :operator/preconds [(proj-id ?proj) (system-model ?proj flow)]
                  :operator/a-list [(have-process-steps ?proj)]}
 
                 ;; (!query-process-durs ?proj)

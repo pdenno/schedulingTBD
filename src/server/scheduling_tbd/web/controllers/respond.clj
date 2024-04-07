@@ -17,12 +17,11 @@
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."
   [request]
-  (let [{:keys [client-id project-id]} (-> request :query-params keywordize-keys)
+  (let [{:keys [project-id]} (-> request :query-params keywordize-keys)
         project-id (keyword project-id)
         eid (db/project-exists? project-id)
         msgs (when eid (db/get-messages project-id))
-        code (db/get-code project-id)]
-    (ws/set-current-project client-id project-id)
+        code (when eid (db/get-code project-id))]
     (log/info "get-conversation for" project-id)
     (cond (= project-id :START-A-NEW-PROJECT)     (http/ok {:conv-for project-id :conv []})
           msgs                                    (http/ok {:conv-for project-id :conv msgs :code code})
@@ -32,16 +31,13 @@
 
 (defn list-projects
   "Return a map containing :current-project and :others, which is a sorted list of every other project in the DB."
-  [request]
+  [_request]
   (letfn [(resolve-proj-info [pid]
             (resolve-db-id {:db/id (db/project-exists? pid)}
                            (connect-atm pid)
                            :keep-set #{:project/name :project/id}))]
     (let [proj-infos (mapv resolve-proj-info (db/list-projects))
-          client-id (-> request :query-params :client-id)
-          current (or (when-let [proj (get @ws/client-current-proj client-id)] (resolve-proj-info proj))
-                      (db/default-project)
-                      new-proj-entry)
+          current (or (db/default-project) new-proj-entry) ; ToDo: Client could tell you what its current project is.
           others (filterv #(not= % current) proj-infos)]
       (log/info "Call to list-projects")
       (http/ok

@@ -5,7 +5,7 @@
           :current-domain :process-interview,
           :name "Craft Beer Brewery Scheduling"
           :state-string "#{(ongoing-discussion craft-beer)
-                           (proj-name craft-beer)
+                           (proj-id craft-beer)
                            (system-model craft-beer flow)
                            (well-known-process craft-beer)
                            (have-process-steps craft-beer)
