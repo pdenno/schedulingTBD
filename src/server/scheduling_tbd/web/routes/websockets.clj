@@ -239,7 +239,7 @@
    Other entries in this table include (they are added by register-ws-dispatch):
        :start-a-new-project plan/interview-for-new-proj
        :surrogate-call      sur/start-surrogate
-       :ask-llm             llm/directly."
+       :ask-llm             llm/llm-directly."
   []
   (reset! dispatch-table {:ping                 ping-diag
                           :user-says            user-says

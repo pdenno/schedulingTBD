@@ -2,6 +2,7 @@
   "Functions and operators implementing surrogate users"
   (:require
    [clojure.edn              :as edn]
+   [clojure.pprint           :refer [cl-format]]
    [clojure.string           :as str]
    [datahike.api             :as d]
    [mount.core               :as mount :refer [defstate]]
@@ -35,7 +36,7 @@
    In either case, it returns the Openai assistant object ID associated with the pid.
      pid - the project ID (keyword) of a project with an established DB."
   [pid]
-  (or (db/get-assistant-id pid)
+  (or (db/get-assistant-id pid nil)
       (let [conn (connect-atm pid)
             eid (db/project-exists? pid)
             proj-info (resolve-db-id {:db/id eid} conn :keep-set #{:project/name})
@@ -63,7 +64,7 @@
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})
-        state-string (format "#{(proj-id %s) (surrogate %s)}" (name pid) (name pid))]
+        state-string (cl-format nil "#{(proj-id ~S) (surrogate ~S) (proj-name ~S)}" (name pid) (name pid) pname)]
     (d/transact (connect-atm pid)
                 {:tx-data [{:db/id (db/project-exists? pid)
                             :project/state-string state-string}]})

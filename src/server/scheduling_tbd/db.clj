@@ -311,27 +311,31 @@
 
 (defn get-thread-id
   "Get the thread object of the argument PID."
-  [pid]
-  (let [eid (project-exists? pid)
-        res (-> (resolve-db-id {:db/id eid}
-                               (connect-atm pid)
-                               :keep-set #{:project/surrogate :surrogate/thread-id})
-                :project/surrogate
-                :surrogate/thread-id)]
-    (or res
-        (throw (ex-info "Did not find thread-id." {:pid pid})))))
+  ([pid] (get-thread-id pid true))
+  ([pid fail-when-missing?]
+   (let [eid (project-exists? pid)
+         res (-> (resolve-db-id {:db/id eid}
+                                (connect-atm pid)
+                                :keep-set #{:project/surrogate :surrogate/thread-id})
+                 :project/surrogate
+                 :surrogate/thread-id)]
+     (cond res                         res
+           (not fail-when-missing?)    nil
+           :else                       (throw (ex-info "Did not find thread-id." {:pid pid}))))))
 
 (defn get-assistant-id
   "Get the thread object of the argument PID."
-  [pid]
-  (let [eid (project-exists? pid)
-        res (-> (resolve-db-id {:db/id eid}
-                               (connect-atm pid)
-                               :keep-set #{:project/surrogate :surrogate/assistant-id})
-                :project/surrogate
-                :surrogate/assistant-id)]
-    (or res
-        (throw (ex-info "Did not find assistant-id." {:pid pid})))))
+  ([pid] (get-assistant-id pid true))
+  ([pid fail-when-missing?]
+   (let [eid (project-exists? pid)
+         res (-> (resolve-db-id {:db/id eid}
+                                (connect-atm pid)
+                                :keep-set #{:project/surrogate :surrogate/assistant-id})
+                 :project/surrogate
+                 :surrogate/assistant-id)]
+     (cond res                         res
+           (not fail-when-missing?)    nil
+           :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))
 
 (def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
   #{:project/messages :message/id :message/from :message/content :message/time :msg-text/string :msg-link/uri :msg-link/text})
@@ -444,6 +448,7 @@
   (swap! sutil/databases-atm
          #(reduce-kv (fn [res k v] (if (keep-db? k) (assoc res k v) res)) {} %))
   (recreate-system-db!)
+  (log/info "Recreating these projects:" (list-projects))
   (doseq [pid (list-projects)]
     (recreate-project-db! pid)))
 

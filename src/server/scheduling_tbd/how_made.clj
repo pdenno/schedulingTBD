@@ -11,6 +11,7 @@
    [datahike.api            :as d]
    [hickory.core            :as hick] ; There might be easier ways, but I'd like to learn this tool.
    [mount.core              :as mount :refer [defstate]]
+   [promesa.core            :as p]
    [scheduling-tbd.db       :as proj-db]
    [scheduling-tbd.domain   :as dom]
    [scheduling-tbd.llm      :as llm]
@@ -212,7 +213,8 @@
   (if (segment-exists? seg-name)
     (if-let [challenge (-> (str "a company that makes " seg-name)
                              dom/pretend-you-manage-prompt
-                             (llm/query-llm {:model-class :gpt-4 :raw-text? true}))]
+                             (llm/query-llm {:model-class :gpt-4})
+                             (p/await))]
       (do (log/info "Intro Response: " challenge)
           (d/transact (connect-atm :him) {:tx-data [{:segment/name seg-name
                                                      :segment/challenge-intro challenge}]}))
