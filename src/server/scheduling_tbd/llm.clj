@@ -16,8 +16,6 @@
    [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
-   [promesa.core                 :as p]
-   [promesa.exec                 :as px]
    [taoensso.timbre              :as log]))
 
 (def ^:diag diag (atom nil))
@@ -39,16 +37,13 @@
   (assert (contains? @openai-models k))
   (get @openai-models k))
 
-;;; Note: p/let and p/-> is why this works.
-;;; If you change those back to ordinary let and -> and uncommenting the p/await!, you can walk through the code.
 (defn query-llm
   "Given the vector of messages that is the argument, return a string (default)
    or Clojure map (:raw-string? = false) that is read from the string created by the LLM."
   [messages & {:keys [model-class raw-text?] :or {model-class :gpt-4 raw-text? true}}]
-  (p/let [res (p/-> (px/submit! (fn [] (openai/create-chat-completion {:model (pick-llm model-class)
-                                                                       :messages messages}
-                                                                      {:api-key (get-api-key :llm)})))
-                ;;p/await!
+  (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class)
+                                                :messages messages}
+                                               {:api-key (get-api-key :llm)})
                 :choices
                 first
                 :message
@@ -58,14 +53,16 @@
       res
       (throw (ex-info "Did not produce a map nor string." {:result res})))))
 
+;;; When you update this code, call this again:
+;;; (ws/register-ws-dispatch  :ask-llm llm/llm-directly)
 (defn llm-directly
   "User can ask anything outside of session by starting the text with 'LLM:.
    This is a blocking call since the caller is a websocket thread and it responds with ws/send-to-chat."
   [{:keys [client-id question]}]
+  (log/info "llm-directly:" question)
   (try
-    (let [res (-> (query-llm [{:role "system"    :content "You are a helpful assistant."}
-                              {:role "user"      :content question}])
-                  (p/await! 20000))]
+    (let [res (query-llm [{:role "system"    :content "You are a helpful assistant."}
+                          {:role "user"      :content question}])]
       (if (nil? res)
         (throw (ex-info "Timeout or other exception." {}))
         (ws/send-to-chat {:client-id client-id :promise? false :msg-vec [{:msg-text/string res}]})))
@@ -74,7 +71,6 @@
       (ws/send-to-chat {:client-id client-id
                         :promise? false
                         :msg-vec [{:msg-text/string "There was a problem answering that."}]}))))
-
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-var-partial
@@ -105,15 +101,14 @@
   (when purpose
     (let [prompt (conj good-var-partial
                        {:role "user"
-                        :content (cl-format nil "[~A]" purpose)})]
-      (-> (query-llm prompt {:model-class :gpt-4 :raw-text? false})
-          (p/then (fn [res]
-                    (if-let [var-name (:name res)]
-                      (cond-> var-name
-                        (= :kebab-case string-type) (csk/->kebab-case-string)
-                        (= :snake-case string-type) (csk/->snake_case_string)
-                        capitalize?                 (str/capitalize))
-                      (throw (ex-info "No :name provided, or :name is not a string." {:res res})))))))))
+                        :content (cl-format nil "[~A]" purpose)})
+          res (query-llm prompt {:model-class :gpt-4 :raw-text? false})]
+      (if-let [var-name (:name res)]
+        (cond-> var-name
+          (= :kebab-case string-type) (csk/->kebab-case-string)
+          (= :snake-case string-type) (csk/->snake_case_string)
+          capitalize?                 (str/capitalize))
+        (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
 
 (defn select-openai-models!
   "Set the open-ai-models atom to models in each class"
@@ -188,38 +183,36 @@
     role     - #{'user' 'assistant'},
     msg-text - a string.
    Returns a promise."
-  [& {:keys [tid aid role msg-text timeout-secs] :or {timeout-secs 40 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
+  [& {:keys [tid aid role msg-text timeout-secs] :or {timeout-secs 120 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   (reset! diag {:_obj _obj})
   (log/info "query-on-thread: msg-text =" msg-text)
   (assert (#{"user" "assistant"} role))
   (assert (string? msg-text))
-  (px/submit!
-   (fn []
-     (let [key (get-api-key :llm)
-           ;; Apparently the thread_id links the run to msg.
-           _msg (openai/create-message {:thread_id tid :role role :content msg-text} {:api-key key})
-           ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
-           ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
-           run (openai/create-run  {:thread_id tid :assistant_id aid} {:api-key key})
-           timestamp (inst-ms (java.time.Instant/now))
-           run-timestamp (:created_at run)
-           timeout   (+ timestamp (* timeout-secs 1000))]
-       (swap! diag #(assoc % :run run))
-       (loop [now timeout]
-         (Thread/sleep 1000)
-         (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} {:api-key key})
-               msg-list (openai/list-messages {:thread_id tid :limit 20} {:api-key key})
-               response (message-after msg-list run-timestamp msg-text)]
-           (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:msg-text msg-text})),
+  (let [key (get-api-key :llm)
+        ;; Apparently the thread_id links the run to msg.
+        _msg (openai/create-message {:thread_id tid :role role :content msg-text} {:api-key key})
+        ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
+        ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
+        run (openai/create-run  {:thread_id tid :assistant_id aid} {:api-key key})
+        timestamp (inst-ms (java.time.Instant/now))
+        run-timestamp (:created_at run)
+        timeout   (+ timestamp (* timeout-secs 1000))]
+    (swap! diag #(assoc % :run run))
+    (loop [now timeout]
+      (Thread/sleep 1000)
+      (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} {:api-key key})
+            msg-list (openai/list-messages {:thread_id tid :limit 20} {:api-key key})
+            response (message-after msg-list run-timestamp msg-text)]
+        (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:msg-text msg-text})),
 
-                 ;; ToDo: How many messages do I have to retrieve to be sure I have the response, and can I trust the :created_at. It didn't see so.
-                 (and (= "completed" (:status r))
-                      (not-empty response))              response
+              ;; ToDo: How many messages do I have to retrieve to be sure I have the response, and can I trust the :created_at. It didn't see so.
+              (and (= "completed" (:status r))
+                   (not-empty response))              response
 
 
-                 (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)}))
+              (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)}))
 
-                 :else                                   (recur (inst-ms (java.time.Instant/now))))))))))
+              :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
 (defn ^:diag get-assistant-openai
   "Retrieve the assistant object from OpenAI using its ID, a string you can
@@ -243,11 +236,25 @@
     (openai/delete-assistant {:assistant_id id} {:api-key key})
     (log/warn "Couldn't get OpenAI API key.")))
 
+;;; (ws/register-ws-dispatch  :run-long llm/run-long)
+(defn run-long
+  "Diagnostic for exploring threading/blocking with websocket."
+  [& _]
+  (loop [cnt 0]
+    (log/info "Run-long: cnt =" cnt)
+    (Thread/sleep 5000) ; 5000 * 30, about 4 minutes.
+    (when (< cnt 20) (recur (inc cnt)))))
+
+(defn throw-it
+  [& _]
+  (throw (ex-info "Just because I felt like it." {})))
+
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []
   (ws/register-ws-dispatch  :ask-llm llm-directly)
-  (select-openai-models!)
-  [:ask-directly-registered :opena-models-selected])
+  (ws/register-ws-dispatch  :run-long run-long)
+  (ws/register-ws-dispatch  :throw-it throw-it)
+  [:ask-directly-registered])
 
 (defn llm-stop []
   (reset! openai-models {})

@@ -65,7 +65,7 @@
     (log/error "Invalid message type from server:" msg)
     (case dispatch-key
       :clear-promise-keys (clear-promise-keys! promise-keys)
-      :alive?             (send-msg {:dispatch-key :alive? :alive? true})
+      :alive?             (send-msg {:dispatch-key :alive-confirm})
       :reload-proj        (@change-proj-fn new-proj-map)
       :ping-confirm       #_:ok (log/info "Ping confirm")
       :tbd-says           (do (when p-key (remember-promise p-key))
@@ -82,7 +82,7 @@
     (send-msg {:dispatch-key :ping, :ping-id (swap! ping-id inc)})))
 
 (defn connect! []
-  (reset! client-id (str (random-uuid)))
+  (reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid when we start using transit.
   (reset-state)
   (if-let [chan (js/WebSocket. (ws-url @client-id))]
     (do (log/info "Websocket Connected!" @client-id)
@@ -124,12 +124,15 @@
     (reset! reconnecting? true)))
 
 (def send-msg-type?
-  #{:ask-llm                ; User asked a "LLM:..." question at the chat prompt.
+  #{:alive-confirm          ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected.
+    :ask-llm                ; User asked a "LLM:..." question at the chat prompt.
     :start-surrogate        ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation.
     :resume-conversation    ; Restart the planner (works for :START-A-NEW-PROJECT too).
     :close-channel          ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
     :ping                   ; Ping server.
-    :user-says})            ; User wrote at the chat prompt (typically answering a question).
+    :user-says              ; User wrote at the chat prompt (typically answering a question).
+    :run-long
+    :throw-it})             ; diagnostic <==============================
 
 (defn send-msg
   "Add client-id and send the message to the server over the websocket.

@@ -64,7 +64,7 @@
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})
-        state-string (cl-format nil "#{(proj-id ~S) (surrogate ~S) (proj-name ~S)}" (name pid) (name pid) pname)]
+        state-string (cl-format nil "#{(proj-id ~A) (surrogate ~A) (proj-name ~S)}" (-> pid name symbol) (-> pid name symbol) pname)]
     (d/transact (connect-atm pid)
                 {:tx-data [{:db/id (db/project-exists? pid)
                             :project/state-string state-string}]})

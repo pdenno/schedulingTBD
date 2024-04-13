@@ -38,11 +38,13 @@
                               #(every? (fn [step] (s/valid? ::shop-step step)) %)))
 (s/def ::shop-step (s/keys :req-un [::op ::cost]))
 
+;;; ------ These concern out-bound on ws/send-to-chat. -------------------
 (s/def :msg-text/string string?)
 (s/def :msg-link/uri string?)
 (s/def :msg-link/text string?)
 (s/def ::msg-text-elem (s/keys :req [:msg-text/string]))
 (s/def ::msg-link-elem (s/keys :req [:msg-link/uri :msg-link/text]))
+
 (s/def ::chat-msg-vec (s/or
                        :something (s/and vector?
                                          #(every? (fn [elem]
@@ -51,6 +53,12 @@
                                                   %))
                        :nothing nil?))
 
-(s/def ::client-id string?)
-(s/def ::dispatch-key keyword?)
-(s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key]))
+(defn out-bound-dispatch-key? [x] (#{:run-long           ; <=================================
+                                     :clear-promise-keys ; Server tells you to forget a promise.
+                                     :alive?             ; Server is asking whether you are alive.
+                                     :reload-proj        ; Server created new current project (e.g. starting, surrogates).
+                                     :ping-confirm       ; Server confirms your ping.
+                                     :tbd-says} x))
+(s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
+(s/def ::dispatch-key out-bound-dispatch-key?)
+(s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key] :opt-un [::chat-msg-vec]))

@@ -3,7 +3,6 @@
   (:require
    [clojure.string           :as str]
    [promesa.core             :as p]
-   [promesa.exec             :as px]
    [scheduling-tbd.llm       :as llm :refer [query-llm]]
    [scheduling-tbd.sutil     :as sutil]
    [taoensso.timbre          :as log]))

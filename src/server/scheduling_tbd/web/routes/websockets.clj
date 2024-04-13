@@ -2,13 +2,15 @@
   "Set up a websockets and message routing for async communication with the client using ring.websocket.async."
   (:refer-clojure :exclude [send])
   (:require
-   [clojure.core.async       :as async :refer [<! >! <!! >!! go]]
+   ;[clj-async-profiler.core  :as prof]
+   [clojure.core.async       :as async :refer [<! >! >!! go]]
    [clojure.edn              :as edn]
    [clojure.spec.alpha       :as s]
    [clojure.walk             :as walk  :refer [keywordize-keys]]
    ;;[cognitect.transit        :as transit]
    [mount.core               :as mount :refer [defstate]]
    [promesa.core             :as p]
+   [promesa.exec             :as px]
    [ring.websocket.async     :as wsa]
    [scheduling-tbd.specs     :as spec]
    [scheduling-tbd.util      :refer [now]]
@@ -24,23 +26,35 @@
   (let [chans {:in  (async/chan)
                :out (async/chan)
                :err (async/chan)
+               :alive? true
                :exit? false}]
     (swap! socket-channels  #(assoc % id chans))
     chans))
 
+(defn exiting? [client-id] (get-in @socket-channels [client-id :exit?]))
+
 (defn close-ws-channels [client-id]
   (when (contains? @socket-channels client-id)
     (let [{:keys [in out err]} (get @socket-channels client-id)]
-      (log/info "Closing websocket channels for inactive" client-id (now))
+      (log/info "Closing websocket channels for inactive client" client-id (now))
       ;; Set exit? and send something so go loop will be jogged and see it.
       (swap! socket-channels #(assoc-in % [client-id :exit?] true))
-      (>!! in (str {:dispatch-key :stop}))
-      (-> (p/delay 500)
+      (go (>! in (str {:dispatch-key :stop}))) ; <====================================================================== I don't see this!
+      ;; Keep delay high to be sure :stop is seen. (p/submit! is probably helpful here; promises are executed async an out of order.
+      (-> (p/delay 3000)
           (p/then (fn [_]
                     (async/close! in)
                     (async/close! out)
                     (async/close! err)
+                    (Thread/sleep 1000)
                     (swap! socket-channels #(dissoc % client-id))))))))
+
+(defn ^:diag inject-stop
+  "Send a message to incoming on the socket to exit the go loop.
+   I wrote this because I don't see it happening in close-ws-channels above."
+  [client-id]
+  (let [{:keys [in]} (get @socket-channels client-id)]
+    (go (>! in (str {:dispatch-key :stop})))))
 
 (declare clear-promises! clear-keys select-promise)
 
@@ -53,12 +67,15 @@
   (clear-promises! client-id))
 
 (def ping-dates  "Indexed by client-id, value is last time it pinged."  (atom {}))
-(defn ping-diag
+(defn ping-confirm
   "Create a ping confirmation for use in middle of a round-trip."
   [{:keys [client-id]}] ; also ping-id
+  ;(log/info "confirming ping.")
   (swap! ping-dates #(assoc % client-id (now)))
-  {:dispatch-key :ping-confirm})
+  {:dispatch-key :ping-confirm}
+  nil) ; <========================================================================================================================== Does confirming help in any way? Should I let the client close?
 
+;;; Not to be confused with sending an :alive? dispatch-key
 (defn alive?
   "Return true if client had recent ping activity.
    option :recent defaults to 30 seconds."
@@ -91,7 +108,7 @@
       (loop []
         (when-let [msg (<! err)]
           (log/error "Client reports" (type msg) ": client-id =" client-id)
-          (close-ws-channels client-id) ; Otherwise java burns cycles???
+          (close-ws-channels client-id)
           (when-not exit? (recur)))))
     (log/error "error-listener: Cannot find client-id" client-id)))
 
@@ -101,28 +118,55 @@
 ;;;   go is a macro that takes its body and examines it for any channel operations.
 ;;;   It will turn the body into a state machine.
 ;;;   Upon reaching any blocking operation, the state machine will be 'parked' and the actual thread of control will be released.
+;;;
+;;; https://github.com/clojure/core.async/blob/master/examples/walkthrough.clj :
+;;; The `go` macro asynchronously executes its body in a special pool of threads.
+;;; Channel operations that would block will pause execution instead, blocking no threads.
+
+;;; go blocks should not (either directly or indirectly) perform operations
+;;; that may block indefinitely. Doing so risks depleting the fixed pool of
+;;; go block threads, causing all go block processing to stop.
+
+;;; Why I'm using CompleteableFutures (promesa) rather than Futures (clojure.core):
+;;; https://medium.com/@reetesh043/difference-between-completablefuture-and-future-in-java-4f7e00bcdb56
+(defn dispatching-loop
+  "Run the listening and dispatching loop for the client's channel."
+  [client-id]
+  (let [{:keys [in out]} (get @socket-channels client-id)]
+    (go
+      (loop []
+        (when-let [msg (<! in)] ; Listen for messages.
+          (log/info "In loop msg =" msg)
+          (let [msg (edn/read-string msg)]
+            (if (= :stop (:dispatch-key msg))
+              (swap! socket-channels #(assoc-in % [client-id :exit?] true))
+              (let [prom (px/submit! (fn [] (dispatch msg)))]
+                (-> prom
+                    (p/then (fn [r] (log/info "dispatch returning:" r) r))
+                    (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like :resume-conversation don't return anything themselves.
+                    (p/catch (fn [err] (log/error "Error dispatching on socket: client-id =" client-id "err =" err))))))
+            (when-not (exiting? client-id) (recur)))))
+      ;; There are many reasons a websocket connection might be dropped. It is absolutely necessary that it exits the go loop
+      ;; when the socket closes. It closes when, for example, there is a WebSocketTimeoutException from the client (see error-listener).
+      (log/info "Exiting dispatching loop:" client-id))))
+
 (defn establish-websocket-handler
-  "Handler for http:/ws request.
-   Set up web socket in, out, and err channels."
+  "Handler for http:/ws request. Returns nothing interesting.
+   Set up web socket in, out, and err channels.
+   This is called for each client. Client can call it more than once if, for example,
+   it finds that the channel has become unusable (e.g. using (.-readyState) in JS.
+   In that case, the old channel will eventually get destroyed by close-inactive-channels."
   [request]
   (log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
-  (close-inactive-channels)
+  (close-inactive-channels) ; <==============================================================================================
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
     (try (close-ws-channels client-id)
          (let [{:keys [in out err]} (make-ws-channels client-id)]
-           ;;(log/info "Starting websocket handler for " id (now))
-           (go ; This was wrapped in a try with (finally (close-ws-channels id)) but closing wasn't working out.
-             (loop []
-               (when-let [msg (<! in)] ; Listen for messages.
-                 (when-let [res (-> msg edn/read-string dispatch)]
-                   (when-not (#{:ping :ping-confirm} (:dispatch-key res)) (log/info "websocket: msg =" res))
-                   (when (contains? res :dispatch-key) (>! out (str res)))))
-               (when-not (-> @socket-channels (get client-id) :exit?) (recur))))
-           (log/warn "Exiting go loop:" client-id)
-           (error-listener client-id)   ; ...from from close-ws-channels above.
+           (error-listener client-id)   ; This and next are go loops,
+           (dispatching-loop client-id) ; which means they are non-blocking.
            {:ring.websocket/listener (wsa/websocket-listener in out err)})
-         (catch Exception e
-           (close-ws-channels client-id)
+         (catch Exception e ; ToDo: Never happens
+           ;(close-ws-channels client-id) ; <=========================================================================
            (log/error "Error in ws loop:" (type e))))
     (log/error "Websocket client did not provide id.")))
 
@@ -139,7 +183,7 @@
 ;;;     - When the system has decided where to route the question, it can also tell the client to remove that key from its set.
 ;;;       + This last step is important because the server needs to get old promise-keys off the stack.
 ;;;
-;;; Note that the whole process is run in websockets. REST is only used for less interactive UI activities (e.g. changing projects).
+;;; Note that the whole chat process is run in websockets. REST is only used for less interactive UI activities (e.g. changing projects).
 (s/def ::promise (s/keys :req-un [::prom ::p-key ::client-id ::timestamp]))
 (s/def ::prom p/promise?)
 (s/def ::p-key keyword?)
@@ -231,8 +275,14 @@
 (defn register-ws-dispatch
   "Add a function to the websocket dispatch table."
   [k func]
+  (assert (fn? func))
   (swap! dispatch-table #(assoc % k func))
   (log/info "Registered function for websocket:" k))
+
+(defn client-confirms-alive
+  "Because the ws go loop can drop, we use this as part of reconnecting."
+  [{:keys [client-id]}]
+  (swap! socket-channels #(assoc-in % [client-id :alive] true)))
 
 (defn init-dispatch-table!
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets.
@@ -241,8 +291,9 @@
        :surrogate-call      sur/start-surrogate
        :ask-llm             llm/llm-directly."
   []
-  (reset! dispatch-table {:ping                 ping-diag
+  (reset! dispatch-table {:ping                 ping-confirm
                           :user-says            user-says
+                          :alive-confirm        client-confirms-alive
                           :close-channel        forget-client}))
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]

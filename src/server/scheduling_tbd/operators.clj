@@ -9,6 +9,7 @@
    [clojure.string        :as str]
    [datahike.api          :as d]
    [promesa.core          :as p]
+   [promesa.exec          :as px]
    [scheduling-tbd.db     :as db]
    [scheduling-tbd.domain :as dom]
    [scheduling-tbd.llm    :as llm]
@@ -193,7 +194,7 @@
         pid   (db/create-proj-db! {:project/id pid :project/name  pname})] ; pid might not have been unique, thus this returns a new one.
       pid))
 
-(defn new-state-from-domain-lists
+(defn operator-update-state
   "Update the project's DB, specifically :project/state-string with infromation from last response and operator a-list and d-list.
       - plan-step   - a map such as {:operator :!yes-no-process-steps, :args [aluminium-foil]},
       - proj-id     - the keyword identifying a project by its :project/id.
@@ -234,7 +235,19 @@
                "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan."}
   )
 
-(def diag1 (atom nil))
+(defn make-human-project
+  "Surrogate already has a project db, but human doesn't. This creates the db and returns and returns state (possibly updated).
+   This is called after dom/prelim-analysis, which looks at the human response to define a proj-name predicate."
+  [state]
+  (log/info "Human project: state =" state)
+  (if-let [[_ pname] (find-fact '(proj-name ?x) state)]
+    (let [[_ orig-pid] (find-fact '(proj-id ?x) state)
+          pid (db/create-proj-db! {:project/name pname :project/id (keyword orig-pid)})]
+      (if (not= orig-pid pid) ; creating the DB may assign a different PID. ToDo: Need a (proj-name too).
+        (conj (filterv #(not= % orig-pid) state)
+              `(~'proj-id ~(name pid)))
+        state))
+    (throw (ex-info "Couldn't find PID in human project." {:state state}))))
 
 (defn chat-pair
   "Run one query/response pair of chat elements with a human or a surrogate.
@@ -247,12 +260,12 @@
         tid (db/get-thread-id pid nil)
         agent-type (if (surrogate? state) :surrogate :human)
         prom (if (= :surrogate agent-type)
-               (llm/query-on-thread :tid tid :aid aid :msg-text (msg-vec2text agent-msg-vec)) ; This can timeout.
-               (ws/send-to-chat (assoc obj :msg-vec agent-msg-vec)))]                         ; This cannot timeout.
-      (-> prom
-          (p/then (fn [response] (log/info agent-type "responds: " response) response))
-          (p/then (fn [response] (assoc obj :response response)))
-          (p/catch (fn [err] (log/error (str "chat-pair " agent-type " error =" err)))))))
+               (px/submit! (fn [] (llm/query-on-thread :tid tid :aid aid :msg-text (msg-vec2text agent-msg-vec)))) ; This can timeout.
+               (ws/send-to-chat (assoc obj :msg-vec agent-msg-vec)))]                                              ; This cannot timeout.
+    (as-> prom ?response
+      (p/await! ?response)
+      (do (log/info agent-type "responds: " ?response) ?response)
+      (assoc obj :response ?response))))
 
 ;;;=================================================== Operators ======================
 ;;; ----- :!initial-question
@@ -260,83 +273,61 @@
 (defoperator :!initial-question [{:keys [state] :as obj}]
   (let [agent-msg-vec (reword-for-agent intro-prompt (surrogate? state))]
     (-> (chat-pair (assoc obj :agent-msg-vec agent-msg-vec))
-        (p/then (fn [x] (db-action x)))
-        (p/catch (fn [err] (log/error ":!initial-question (op)" err))))))
+        db-action)))
 
 ;;; (op/db-action (assoc op/example :client-id (ws/recent-client!)))
 (defaction :!initial-question [{:keys [state response client-id agent-msg-vec plan-step domain-id] :as _obj}]
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
   (reset! diag _obj)
-  ;; The body is a letfn so we can walk through it in testing, with p/await, or remove p/await for production.
-  (letfn [(process-response [state]
-            (log/info "prelim-analysis returns state:" state)
-            (let [new-state (atom state)]
-              (when (not (surrogate? @new-state))
-                ;; Surrogate already has a project db, but human doesn't.
-                (log/info "This is not a surrogate!:" @new-state)
-                (if-let [[_ pname] (find-fact '(proj-name ?x) @new-state)]
-                  (let [[_ orig-pid] (find-fact '(proj-id ?x) @new-state)
-                        pid (db/create-proj-db! {:project/name pname :project/id (keyword orig-pid)})] ; rebind pid.
-                    (when (not= orig-pid pid)
-                      (swap! new-state (fn [state]
-                                         (conj (filterv #(not= % orig-pid) state)
-                                               `(~'proj-id ~(name pid)))))))
-                  (throw (ex-info "Couldn't find PID in human project." {:state state}))))
-              ;; Now human/surrogate can be treated identically.
-              (let [[_ pid]   (find-fact '(proj-id ?x) @new-state)
-                    [_ pname] (find-fact '(proj-name ?x) @new-state)
-                    pid (keyword pid)
-                    full-state (new-state-from-domain-lists plan-step domain-id @new-state)]
-                (log/info "DB and app actions on PID =" pid)
-                (db/add-msg pid :system agent-msg-vec)  ; ToDo: I'm not catching the error when this is wrong!
-                (db/add-msg pid :user (str2msg-vec response))
-                (db/add-msg pid :system (str2msg-vec (format "Great, we'll call your project %s." pname)))
-                (db/put-state pid full-state)
-                (ws/send-to-chat {:promise? false
-                                  :client-id client-id
-                                  :dispatch-key :reload-proj
-                                  :new-proj-map {:project/id pid :project/name pname}}))))]
-    (-> (dom/prelim-analysis response state) ; promise that resolves to an updated state vector.
-        (p/then (fn [new-state] (process-response new-state)))
-        (p/catch (fn [err] (log/error "!initial-question (action):" err))))))
+  (let [analysis-state (dom/prelim-analysis response state)] ; updated state vector.
+    (when-not (surrogate? state) (make-human-project analysis-state))
+    ;; Now human/surrogate can be treated identically.
+    (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
+          [_ pname] (find-fact '(proj-name ?x) analysis-state)
+          pid (keyword pid)
+          new-state (operator-update-state plan-step domain-id analysis-state)]
+      (log/info "DB and app actions on PID =" pid)
+      (db/add-msg pid :system agent-msg-vec)  ; ToDo: I'm not catching the error when this is wrong!
+      (db/add-msg pid :user (str2msg-vec response))
+      (db/add-msg pid :system (str2msg-vec (format "Great, we'll call your project %s." pname)))
+      (db/put-state pid new-state)
+      (ws/send-to-chat {:promise? false
+                        :client-id client-id
+                        :dispatch-key :reload-proj
+                        :new-proj-map {:project/id pid :project/name pname}}))))
 
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-steps [obj]
   (let [msg-vec (str2msg-vec "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)")]
     (-> (chat-pair (assoc obj :msg-vec msg-vec))
-        (p/then (fn [x] (db-action x)))
-        (p/catch (fn [err] (log/error "!yes-no-process-steps:" err))))))
+        db-action)))
 
 (defaction :!yes-no-process-steps [{:keys [pid response plan-step domain-id state] :as _obj}]
   ;; Nothing to do here but update state from a-list.
   (log/info "!yes-no-process-steps (action): response =" response)
-  (let [full-state (new-state-from-domain-lists plan-step domain-id state)]
-    (db/put-state pid full-state)))
+  (let [new-state (operator-update-state plan-step domain-id state)]
+    (db/put-state pid new-state)))
 
 ;;; ----- :!query-process-durs
-(defoperator :!query-process-durs [{:keys [client-id] :as obj}]
-  (log/info "!query-process-durs: obj =" obj)
-  (-> {:client-id client-id}
-      (assoc :msg-vec (str2msg-vec "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)"))
-      ws/send-to-chat
-      (p/await wait-time-for-user-resp)
-      (p/then  (fn [response] (db-action obj response)))
-      (p/catch (fn [err] (log/error "Error in !query-process-durs:" err)))))
+(defoperator :!query-process-durs [obj]
+  (log/info "!query-process-durs: response =" obj)
+  (let [msg-vec (str2msg-vec "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)")]
+    (-> (chat-pair (assoc obj :msg-vec msg-vec))
+        db-action)))
 
-#_(defaction :!query-process-durs [{:keys [response] :as obj}]
+(defaction :!query-process-durs [{:keys [response plan-step domain-id state pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
-  (update-state obj))
+  (let [new-state (operator-update-state plan-step domain-id state)]
+    (db/put-state pid new-state)))
 
 ;;; ----- :!yes-no-process-steps
-(defoperator :!yes-no-process-ordering [{:keys [plan-step client-id] :as obj}]
-  (log/info "!yes-no-process-ordering: plan-step =" plan-step)
-  (-> {:client-id client-id}
-      (assoc :msg-vec (str2msg-vec "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"))
-      ws/send-to-chat
-      (p/await wait-time-for-user-resp)
-      (p/then  (fn [response] (db-action obj response)))
-      (p/catch (fn [err] (log/error "Error in !yes-no-process-ordering:" err)))))
+(defoperator :!yes-no-process-ordering [obj]
+  (log/info "!yes-no-process-ordering: obj =" obj)
+  (let [msg-vec (str2msg-vec "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)")]
+    (-> (chat-pair (assoc obj :msg-vec msg-vec))
+        db-action)))
 
-#_(defaction :!yes-no-process-ordering [{:keys [response] :as obj}]
+(defaction :!yes-no-process-ordering [{:keys [response plan-step domain-id state pid] :as obj}]
   (log/info "!yes-no-process-ordering (action): response =" response "obj =" obj)
-  (update-state obj))
+    (let [new-state (operator-update-state plan-step domain-id state)]
+      (db/put-state pid new-state)))

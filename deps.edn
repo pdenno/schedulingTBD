@@ -1,7 +1,7 @@
 {:paths   ["src/lib"]
  :deps    {camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
-           cider/cider-nrepl                   {:mvn/version "0.47.0"}  ; <===== added for frustrating mismatch problem. No help.
+           cider/cider-nrepl                   {:mvn/version "0.47.1"}  ; <===== added for frustrating mismatch problem. No help.
            com.cemerick/url                    {:mvn/version "0.1.1"}
            ;;com.cognitect/transit-clj           {:mvn/version "1.0.333"}
            ;;com.github.pdenno/explainlib        {:mvn/version "1.0.33"} ; was 1.0.12
@@ -26,18 +26,20 @@
            org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"} ;  "0.1.19" Does not exist.
            org.slf4j/slf4j-nop                 {:mvn/version "2.0.12"}    ; Stop spurious logging!
            ring/ring-defaults                  {:mvn/version "0.4.0"}
-           ring/ring-jetty-adapter             {:mvn/version "1.12.0"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
-           ring/ring-core                      {:mvn/version "1.12.0"}  ;; I switched to try org.ring-clojure/ring-websocket-async
-           ring/ring-devel                     {:mvn/version "1.12.0"}  ;; Of course, both could have been accommodated.
+           ring/ring-jetty-adapter             {:mvn/version "1.12.1"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
+           ring/ring-core                      {:mvn/version "1.12.1"}  ;; I switched to try org.ring-clojure/ring-websocket-async
+           ring/ring-devel                     {:mvn/version "1.12.1"}  ;; Of course, both could have been accommodated.
            ring-cors/ring-cors                 {:mvn/version "0.1.13"}
            selmer/selmer                       {:mvn/version "1.12.59"}} ; Used for home.html.
 
  ;; See .dir-locals.el for some defaults on CIDER C-c M-j
  :aliases {:dev          {:extra-paths    ["src/server" "test" "env/dev" "resources"]
-                          :jvm-opts       ["-XX:-OmitStackTraceInFastThrow"] ; https://www.metosin.fi/blog/missing-stacktraces/
+                          :jvm-opts       ["-XX:-OmitStackTraceInFastThrow" ; https://www.metosin.fi/blog/missing-stacktraces/
+                                           #_"-Djdk.attach.allowAttachSelf"]  ; https://github.com/clojure-goes-fast/clj-async-profiler
                           ;; :dev includes src/server (for use with exerciser) thus much of this stuff.
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
-                                           cider/cider-nrepl               {:mvn/version "0.47.0"}
+                                           ;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
+                                           cider/cider-nrepl               {:mvn/version "0.47.1"}
                                            com.lambdaisland/classpath      {:mvn/version "0.5.48"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
                                            lilactown/helix                 {:mvn/version "0.2.0"}
@@ -47,24 +49,24 @@
 
            :test       {:extra-paths    ["src/server" "test" "env/dev"]
                         :main-opts      ["-m" "kaocha.runner"]
-                        :extra-deps     {lambdaisland/kaocha          {:mvn/version "1.87.1366"}
+                        :extra-deps     {lambdaisland/kaocha          {:mvn/version "1.88.1376"}
                                          ;; Since I'm running from the command line, bin/koacha, need to repeat these.
                                          com.lambdaisland/classpath   {:mvn/version "0.5.48"}
                                          org.clojure/tools.namespace  {:mvn/version "1.5.0"}}}
 
            :app       {:extra-paths ["src/app" "src/server" "test"] ; src/server has shared util.cljc
-                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.27.5"}
+                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.28.3"}
                                      lilactown/helix                {:mvn/version "0.2.0"}
                                      cljs-ajax/cljs-ajax            {:mvn/version "0.8.4"}
                                      applied-science/js-interop     {:mvn/version "0.4.2"}}}
 
            :kaochaSTBD {:extra-paths    ["test" "env/dev"]
-                        :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.27.5"}
-                                         lambdaisland/kaocha       {:mvn/version "1.87.1366"}
+                        :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.28.3"}
+                                         lambdaisland/kaocha       {:mvn/version "1.88.1376"}
                                          lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                                          com.lambdaisland/glogi    {:mvn/version "1.3.169"}
                                          nrepl/nrepl               {:mvn/version "1.1.1"}
-                                         cider/cider-nrepl         {:mvn/version "0.47.0"}}}
+                                         cider/cider-nrepl         {:mvn/version "0.47.1"}}}
 
            :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.10.0"} #_{:git/tag "v0.9.4" :git/sha "76b78fe"}}
                       :ns-default build}
@@ -74,19 +76,17 @@
                                                                 :git/sha "9d6f2c1ede8be7ab4508065fe6b7e40e0c099ab6"}}
                             :main-opts       ["-m" "thomasa.morpheus.main"]}}}
 
+
 ;;; clj -T:search/outdated
-;;;  |    :file |                                 :name |     :current |      :latest |
-;;;  |----------+---------------------------------------+--------------+--------------|
-;;;  | deps.edn |                   com.taoensso/timbre |        6.4.0 |        6.5.0 |
-;;;  |          |         io.github.clojure/tools.build |        0.9.6 |       0.10.0 |
-;;;  |          |                io.replikativ/datahike |     0.6.1538 |     0.6.1558 |  ; Not doing this one yet.
-;;;  |          |                      metosin/muuntaja |        0.6.8 |       0.6.10 |
-;;;  |          |                           mount/mount |       0.1.17 |       0.1.18 |
-;;;  |          |    org.apache.logging.log4j/log4j-api |       2.23.0 |       2.23.1 |
-;;;  |          |   org.apache.logging.log4j/log4j-core |       2.23.0 |       2.23.1 |
-;;;  |          | org.ring-clojure/ring-websocket-async |  0.1.0-beta2 |       0.1.19 |  ; search/outdated will say 0.1.19 is new, but it cannot be found.
-;;;  |          |                        ring/ring-core | 1.11.0-beta2 | 2.0.0-alpha1 |  ; Not doing these. 2.0.0 is not happening any time soon.
-;;;  |          |                       ring/ring-devel | 1.11.0-beta2 | 2.0.0-alpha1 |  ; org.ring-clojure/ring-websocket-async
-;;;  |          |               ring/ring-jetty-adapter | 1.11.0-beta2 | 2.0.0-alpha1 |  ; is a problem. Conversation with James Reeves; 1.11.1 is up to date (not .0-beta2)
-;;;  |          |                  thheller/shadow-cljs |       2.27.4 |       2.27.5 |
-;;;  |          |                  thheller/shadow-cljs |       2.27.4 |       2.27.5 |
+;;;  |    :file |                   :name |  :current |   :latest |
+;;;  |----------+-------------------------+-----------+-----------|
+;;;  | deps.edn |       cider/cider-nrepl |    0.47.0 |    0.47.1 |
+;;;  |          |       cider/cider-nrepl |    0.47.0 |    0.47.1 |
+;;;  |          |       cider/cider-nrepl |    0.47.0 |    0.47.1 |
+;;;  |          |     lambdaisland/kaocha | 1.87.1366 | 1.88.1376 |
+;;;  |          |     lambdaisland/kaocha | 1.87.1366 | 1.88.1376 |
+;;;  |          |          ring/ring-core |    1.12.0 |    1.12.1 |
+;;;  |          |         ring/ring-devel |    1.12.0 |    1.12.1 |
+;;;  |          | ring/ring-jetty-adapter |    1.12.0 |    1.12.1 |
+;;;  |          |    thheller/shadow-cljs |    2.27.5 |    2.28.3 |
+;;;  |          |    thheller/shadow-cljs |    2.27.5 |    2.28.3 |
