@@ -124,15 +124,15 @@
     (reset! reconnecting? true)))
 
 (def send-msg-type?
-  #{:alive-confirm          ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected.
+  #{:alive-confirm          ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected. ToDo: Remove it? Not implemented.
     :ask-llm                ; User asked a "LLM:..." question at the chat prompt.
     :start-surrogate        ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation.
     :resume-conversation    ; Restart the planner (works for :START-A-NEW-PROJECT too).
     :close-channel          ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
     :ping                   ; Ping server.
     :user-says              ; User wrote at the chat prompt (typically answering a question).
-    :run-long
-    :throw-it})             ; diagnostic <==============================
+    :run-long               ; diagnostic
+    :throw-it})             ; diagnostic
 
 (defn send-msg
   "Add client-id and send the message to the server over the websocket.

@@ -4,6 +4,7 @@
    [clojure.pprint          :refer [cl-format]]
    [clojure.spec.alpha      :as s]
    [clojure.test            :refer [deftest is testing]]
+   [mznp.rewrite            :as rw]
    [scheduling-tbd.db       :as db]
    [scheduling-tbd.planner  :as plan]
    [scheduling-tbd.specs    :as specs]
@@ -79,3 +80,9 @@
    :process-interview
    {:start-facts (db/get-state :craft-beer-brewery-scheduling)}
    (ws/recent-client!)))
+
+
+(defn tryme []
+  (rw/rewrite*
+   :mznp/gen-call-expr
+   "sum (j in Jobs) (if (LineOfJob[j] == lin) then WorkersOnJob[j,w1] else 0 endif)"))
