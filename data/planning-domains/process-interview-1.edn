@@ -1,0 +1,84 @@
+;;; This is a proj-format structure. See shop.clj.
+;;; This example is being used to explore the idea that we can use state information to prune the domain outside of SHOP.
+;;; Thus instead of (stop-plan) all over the place, we place editing information into the domain that is used to prune off
+;;; parts of the domain that aren't relevant given state.
+
+;;; What I learned (I think!):
+;;;  - It is an error (:bad-input) to have a fact that unifies with the head of an axiom! Try this with craft beer and (process-defined craft-beer).
+
+{:domain/id :process-interview
+ :domain/ename "pi"  ; This is appended to every :domain/element, so we keep it short.
+ :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
+ :domain/problem {:problem/ename "talk-process"
+                  :problem/domain :process-interview
+                  :problem/goal   (characterize-process ?proj)
+                  :problem/state #{(ongoing-discussion craft-beer)
+                                   (proj-id craft-beer)
+                                   (system-model craft-beer flow)
+                                   (well-known-process craft-beer)}}
+ :domain/elems [{:method/head (characterize-process ?proj)
+                 :method/rhsides [{:method/case-name "from-scratch"
+                                   :method/preconds [(proj-id ?proj) (not (ongoing-discussion ?proj))] ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
+                                   :method/task-list [(!initial-question ?proj)]}
+
+                                  {:method/case-name "ongoing-discussion"
+                                   :method/preconds [(ongoing-discussion ?proj)   ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
+                                                     (proj-id ?proj)
+                                                     (not (process-defined ?proj))]
+                                   :method/task-list [(get-process-steps ?proj)
+                                                      (!query-process-durs ?proj)
+                                                      (!yes-no-process-ordering ?proj)]}]}
+
+                ;; ====== (not (ongoing-discussion ?proj)) ===============================
+                ;; (!initial-question ?proj)
+                {:operator/head (!initial-question ?proj)                    ;ToDo: Need a decision: For the time being, a-list is treated like ':operator/postconds'. It can be used to check
+                 :operator/preconds [(not (ongoing-discussion ?proj))]       ;      that the operator asserted some particular propositions. (I can see there being, for example,
+                 :operator/a-list [(ongoing-discussion ?proj)                ;      an or (well-known-process ?proj) (unknown-process ?proj)).
+                                   (well-known-process ?proj)]}
+
+                ;; ====== (ongoing-discussion ?proj) ===============================
+                {:method/head (get-process-steps ?proj)
+                 :method/rhsides [{:method/case-name "well-known"
+                                   :method/preconds [(well-known-process ?proj)]
+                                   :method/task-list [(!yes-no-process-steps ?proj)]}
+                                  {:method/case-name "not-well-known"
+                                   :method/preconds [(not (well-known-process ?proj))]
+                                   :method/task-list [(!query-process-steps ?proj)]}]}
+
+                ;; (!yes-no-process-steps ?proj)
+                {:operator/head (!yes-no-process-steps ?proj)
+                 :operator/preconds [(proj-id ?proj) (well-known-process ?proj)]
+                 :operator/a-list [(have-process-steps ?proj)]}
+
+                ;; (!query-process-steps ?proj)
+                {:operator/head (!query-process-steps ?proj)
+                 :operator/preconds [(proj-id ?proj) (system-model ?proj flow)]
+                 :operator/a-list [(have-process-steps ?proj)]}
+
+                ;; (!query-process-durs ?proj)
+                {:operator/head (!query-process-durs ?proj)
+                 :operator/preconds [(system-model ?proj flow)]
+                 :operator/a-list [(have-process-durs ?proj)]}
+
+                ;; (!yes-no-process-ordering ?proj)
+                {:operator/head (!yes-no-process-ordering ?proj)
+                 :operator/preconds [(well-known-process ?proj) (system-model ?proj flow)]
+                 :operator/a-list [(have-process-ordering ?proj)]}
+
+                ;; (!query-process-ordering ?proj)
+                {:operator/head (!query-process-ordering ?proj)
+                 :operator/preconds [(not (well-known-process ?proj)) (system-model ?proj flow)]
+                 :operator/a-list [(have-process-ordering ?proj)]}
+
+                ;; (:- (process-defined ?proj)  ; ToDo: Maybe wait until shop disappears, but would like to use process-defined in filtering.
+                {:axiom/head (process-defined ?proj)
+                 :axiom/rhsides [{:axiom/rhs [(have-process-steps ?proj)
+                                              (have-process-ordering ?proj) ; ToDo: This might be solved by whether or not is it 'job-shop' style.
+                                              (have-process-durs ?proj)]}]}
+
+                ;; (:- (same ?x ?x) ())
+                {:axiom/head (same ?x ?x)}
+
+                ;; (:- (different ?x ?y) ((not (same ?x ?y))))
+                {:axiom/head (different ?x ?y)
+                 :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}]}

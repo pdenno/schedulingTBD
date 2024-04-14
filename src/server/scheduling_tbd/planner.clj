@@ -78,6 +78,126 @@
      :std-out std
      :err-out err}))
 
+;;;=================================================== Dynamic planner ===========================================================
+;;; ToDo:
+;;;   - Use a DB for managing stack/navigation???
+;;;      cons: - literal structures, yuk
+;;;            - distracting from the development goal, at least early on.
+;;;      pros: - potentially better manipulation for backtracking and reordering priorities as costs change.
+;;;            - leverage existing structure in shop.clj.
+;;;            - persistent! (useful for debugging and saving user's state).
+(def ^:diag domain (-> "data/planning-domains/process-interview-1.edn" slurp edn/read-string))
+
+(defn head-of    [elem] (or (:method/head elem)(:operator/head elem) (:axiom/head elem)))
+
+(defn axiom? [elem]
+  (when (contains? elem :axiom/head) elem))
+
+(defn method? [elem]
+  (when (contains? elem :method/head) elem))
+
+(defn operator? [elem]
+  (when (contains? elem :operator/head) elem))
+
+(defn unify-head?
+  "Return a map of :elem and :bindings if the elem's head unifies with the argument literal."
+  [lit elem]
+  (when-let [bindings (uni/unify lit (head-of elem))]
+    {:bindings bindings
+     :elem elem}))
+
+(defn not-lit?
+  "Return the positive literal if argument is a negative literal, otherwise nil."
+  [lit]
+  (when (= 'not (first lit)) (second lit)))
+
+(defn satisfied?
+  "Returns truthy if the state satisfies the argument condition.
+   (1) If the condition is a positive literal, it is satisfied by unify with some element of the state.
+   (2) If condition literal is negative, it is satisfied by its positive variant not unifying with any proposition of the state.
+   In case (1) it returns the a map containing the bindings. When the condition and state are identical, this is an empty map.
+   In case (2) it just returns the empty map."
+  [condition state]
+  (if-let [lit (not-lit? condition)]
+    (when (not-any? #(uni/unify lit %) state) {})
+    (some #(when-let [binds (uni/unify condition %)] binds) state)))
+
+(defn consistent-bindings?
+  "Argument is a vector of bindings maps.
+   Return a merged binding map if the bindings among the arguments maps are consistent and nil otherwise.
+   Examples: (consistent-bindings '[{:a 1 :b 2} {:a 1 :c 3}]) ==> {:a1 :b2 :c3}
+             (consistent-bindings '[{:a 1 :b 2} {:b 3}]) ==> nil."
+  [bindings]
+  (try (reduce (fn [res mval] ; Value here is a map.
+                 (reduce-kv (fn [_ k v]
+                              (if (contains? res k)
+                                (if (= v (get res k))
+                                  res
+                                  (throw (ex-info "Inconsistent bindings" {})))
+                                (assoc res k v)))
+                            res
+                            mval))
+               (first bindings)
+               (rest bindings))
+       (catch Exception _e nil)))
+
+;;; ToDo: This should return the elements with substitutions.
+;;; ToDo: The variable bindings must be consistent among the preconditions.
+(defn satisfies-preconds?
+  "Return a vector of maps of the satisfying :elem  and :binding if theelem if its preconditions satisfy the state.
+   Note that methods have multiple RHS, so for methods the :elem is contains only thos RHS's that were satisfied."
+  [elem state]
+  (cond (operator? elem)    (let [bindings (mapv #(satisfied? % state) (:operator/preconds elem))]
+                              (when-let [bindings (and (every? identity bindings) (consistent-bindings? bindings))]
+                                [{:bindings bindings :elem elem}]))
+
+        (method? elem)      (->> (map (fn [rhs]
+                                        (let [bindings (mapv #(satisfied? % state) (:method/preconds rhs))]
+                                          (when-let [bindings (and (every? identity bindings) (consistent-bindings? bindings))]
+                                            {:bindings bindings :elem (-> rhs (assoc :method/head (:method/head elem)))})))
+                                      (:method/rhsides elem))
+                                 (filterv identity))))
+
+;;; This only works on the head partial plan, right? (That's even true once I have alternatives, right?)
+;;; Later, this is the place to execute the plan by running operators that interact with the user to update state.
+;;; I think I can borrow the inference engine from explain lib. It might also be useful for making full navigations to calculate plan cost.
+(defn update-state
+  "Update the state of the plan by updating the active partial plan, advancing it by whatever the active satisfying elem requires.
+   The active satisfying elem (currently first selem) may have multiple tasks in its RHS.
+   Assuming that it does not encounter an unsatisfiable precondition, it iterates through the operators and axioms in the RHS until it encounters a method.
+   Operators and axioms can thereby update the state.
+   Once it encounters a method (or axiom?), it returns a new partial, which has the un-executed method, and anything after pushed onto new-tasks."
+  [partials selems])
+
+
+;;; partials is a vector of maps containing a navigation of the planning domain. Each map contains the following keys:
+;;;    :plan       - is a current traversal of the domain.
+;;;    :new-tasks  - are the current active edges, about to be traversed (method) or acted upon (operators).
+;;;                  When new-tasks is empty, the plan has been completed.
+;;;    :state      - is the state of the world in which the plan is being carried out.
+;;;                  It is modified by the actions operators (interacting with the user) and the d-lists and a-lists of operators.
+
+;;; First  implementation: (1) don't handle axioms, (2) don't backtrack, (3) don't create alternatives (domain doesn't have these anyway), (4) costs.
+;;; (plan1 domain)
+(defn ^:diag plan1
+  "Dynamic HTN planner"
+  [{:domain/keys [elems problem]}]
+  (let [state   (:problem/state problem) ; A vector of ground literals.
+        goal    (:problem/goal problem)] ; A literal.
+    (loop [partials [{:plan [goal] :new-tasks [goal] :state [state]}]
+           cnt 1]
+      (let [head (-> partials first :plan first) ;
+            matching-elems   (filter #(unify-head? head %) elems)
+            satisfying-elems (filter #(satisfies-preconds? % state) matching-elems)]
+        (cond
+          (-> partials first :new-tasks empty?)     {:state :success :plan (first partials)}
+          (> cnt 3)                                 {:state :stopped :partials partials}
+          (empty? satisfying-elems)                 {:state :failure :partials partials}
+          :else                                     (recur (update-state partials satisfying-elems)
+                                                           (inc cnt)))))))
+
+;;;=================================================== End Dynamic planner =======================================================
+
 (defn plan
   "Communicate to shop3 whatever is specified in the arguments, which may include one or more of:
       1) :domain  - a domain in shop format (an s-expression).
@@ -415,7 +535,7 @@
   (interview-loop project-id :process-interview client-id {:start-facts (db/get-state project-id)}))
 
 ;;; This makes recompilation smoother.
-(def test-the-planner? true)
+(def test-the-planner? false)
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!

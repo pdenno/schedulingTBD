@@ -260,8 +260,8 @@
         tid (db/get-thread-id pid nil)
         agent-type (if (surrogate? state) :surrogate :human)
         prom (if (= :surrogate agent-type)
-               (px/submit! (fn [] (llm/query-on-thread :tid tid :aid aid :msg-text (msg-vec2text agent-msg-vec)))) ; This can timeout.
-               (ws/send-to-chat (assoc obj :msg-vec agent-msg-vec)))]                                              ; This cannot timeout.
+               (px/submit! (fn [] (llm/query-on-thread :tid tid :aid aid :query-text (msg-vec2text agent-msg-vec)))) ; This can timeout.
+               (ws/send-to-chat (assoc obj :msg-vec agent-msg-vec)))]                                                ; This cannot timeout.
     (as-> prom ?response
       (p/await! ?response)
       (do (log/info agent-type "responds: " ?response) ?response)

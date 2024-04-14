@@ -314,11 +314,12 @@
   ([pid] (get-thread-id pid true))
   ([pid fail-when-missing?]
    (let [eid (project-exists? pid)
-         res (-> (resolve-db-id {:db/id eid}
-                                (connect-atm pid)
-                                :keep-set #{:project/surrogate :surrogate/thread-id})
-                 :project/surrogate
-                 :surrogate/thread-id)]
+         res (when eid
+               (-> (resolve-db-id {:db/id eid}
+                                  (connect-atm pid)
+                                  :keep-set #{:project/surrogate :surrogate/thread-id})
+                   :project/surrogate
+                   :surrogate/thread-id))]
      (cond res                         res
            (not fail-when-missing?)    nil
            :else                       (throw (ex-info "Did not find thread-id." {:pid pid}))))))
@@ -328,11 +329,12 @@
   ([pid] (get-assistant-id pid true))
   ([pid fail-when-missing?]
    (let [eid (project-exists? pid)
-         res (-> (resolve-db-id {:db/id eid}
-                                (connect-atm pid)
-                                :keep-set #{:project/surrogate :surrogate/assistant-id})
-                 :project/surrogate
-                 :surrogate/assistant-id)]
+         res (when eid
+               (-> (resolve-db-id {:db/id eid}
+                                  (connect-atm pid)
+                                  :keep-set #{:project/surrogate :surrogate/assistant-id})
+                   :project/surrogate
+                   :surrogate/assistant-id))]
      (cond res                         res
            (not fail-when-missing?)    nil
            :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))

@@ -183,14 +183,14 @@
     role     - #{'user' 'assistant'},
     msg-text - a string.
    Returns a promise."
-  [& {:keys [tid aid role msg-text timeout-secs] :or {timeout-secs 120 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
+  [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 120 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   (reset! diag {:_obj _obj})
-  (log/info "query-on-thread: msg-text =" msg-text)
+  (log/info "query-on-thread: query-text =" query-text)
   (assert (#{"user" "assistant"} role))
-  (assert (string? msg-text))
+  (assert (string? query-text))
   (let [key (get-api-key :llm)
         ;; Apparently the thread_id links the run to msg.
-        _msg (openai/create-message {:thread_id tid :role role :content msg-text} {:api-key key})
+        _msg (openai/create-message {:thread_id tid :role role :content query-text} {:api-key key})
         ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
         ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
         run (openai/create-run  {:thread_id tid :assistant_id aid} {:api-key key})
@@ -202,8 +202,8 @@
       (Thread/sleep 1000)
       (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} {:api-key key})
             msg-list (openai/list-messages {:thread_id tid :limit 20} {:api-key key})
-            response (message-after msg-list run-timestamp msg-text)]
-        (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:msg-text msg-text})),
+            response (message-after msg-list run-timestamp query-text)]
+        (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text})),
 
               ;; ToDo: How many messages do I have to retrieve to be sure I have the response, and can I trust the :created_at. It didn't see so.
               (and (= "completed" (:status r))

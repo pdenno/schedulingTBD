@@ -61,10 +61,15 @@
 (defn forget-client
   "Close the channel and forget the promises associated with the client.
    This is typically from a client unmount."
-  [{:keys [client-id]}]
+  [client-id]
   (log/info client-id "closes its websocket.")
   (close-ws-channels client-id)
   (clear-promises! client-id))
+
+(defn close-channel
+  "This is called from a client (that is closing)."
+  [{:keys [client-id]}]
+  (forget-client client-id))
 
 (def ping-dates  "Indexed by client-id, value is last time it pinged. Possibly only useful for diagnostics"
   (atom {}))
@@ -290,7 +295,7 @@
   (reset! dispatch-table {:ping                 ping-confirm
                           :user-says            user-says
                           :alive-confirm        client-confirms-alive
-                          :close-channel        forget-client}))
+                          :close-channel        close-channel}))
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]
   (when-not (= :ping dispatch-key)  (log/info "dispatch: Received msg:" msg))

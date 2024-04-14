@@ -26,7 +26,7 @@
            org.clojure/spec-alpha2             {:git/url "https://github.com/clojure/spec-alpha2.git" ; This is TEMPORARY for mznp
                                                 :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}
            org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"} ;  "0.1.19" Does not exist.
-           org.slf4j/slf4j-nop                 {:mvn/version "2.0.12"}    ; Stop spurious logging!
+           org.slf4j/slf4j-nop                 {:mvn/version "2.0.13"}    ; Stop spurious logging!
            ring/ring-defaults                  {:mvn/version "0.4.0"}
            ring/ring-jetty-adapter             {:mvn/version "1.12.1"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
            ring/ring-core                      {:mvn/version "1.12.1"}  ;; I switched to try org.ring-clojure/ring-websocket-async
