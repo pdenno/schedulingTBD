@@ -101,10 +101,10 @@
 
 (defn matching-task?
   "Return a map of :elem and :bindings if the elem's head unifies with the argument literal."
-  [lit elem]
-  (when-let [bindings (uni/unify lit (head-of elem))]
+  [lit task]
+  (when-let [bindings (uni/unify lit (head-of task))]
     {:bindings bindings
-     :elem elem}))
+     :task task}))
 
 (defn not-lit?
   "Return the positive literal if argument is a negative literal, otherwise nil."
@@ -125,21 +125,23 @@
 (defn consistent-bindings?
   "Argument is a vector of bindings maps.
    Return a merged binding map if the bindings among the arguments maps are consistent and nil otherwise.
-   Examples: (consistent-bindings '[{:a 1 :b 2} {:a 1 :c 3}]) ==> {:a1 :b2 :c3}
+   Examples: (consistent-bindings '[{:a 1 :b 2} {:a 1 :c 3}]) ==> {:a 1 :b 2 :c 3}
              (consistent-bindings '[{:a 1 :b 2} {:b 3}]) ==> nil."
   [bindings]
-  (try (reduce (fn [res mval] ; Value here is a map.
-                 (reduce-kv (fn [_ k v]
-                              (if (contains? res k)
-                                (if (= v (get res k))
-                                  res
-                                  (throw (ex-info "Inconsistent bindings" {})))
-                                (assoc res k v)))
-                            res
-                            mval))
-               (first bindings)
-               (rest bindings))
-       (catch Exception _e nil)))
+  (if (empty? bindings)
+    {}
+    (try (reduce (fn [res mval] ; Value here is a map.
+                   (reduce-kv (fn [_ k v]
+                                (if (contains? res k)
+                                  (if (= v (get res k))
+                                    res
+                                    (throw (ex-info "Inconsistent bindings" {})))
+                                  (assoc res k v)))
+                              res
+                              mval))
+                 (first bindings)
+                 (rest bindings))
+         (catch Exception _e nil))))
 
 ;;; ToDo: This should return the elements with substitutions.
 ;;; ToDo: The variable bindings must be consistent among the preconditions.
@@ -152,7 +154,9 @@
                                 [{:bindings bindings :task task}]))
 
         (method? task)      (reduce (fn [res rhs]
-                                      (if-let [bindings (mapv #(satisfied? % state) (:method/preconds rhs))]
+                                      (if-let [bindings (if-let [preconds (:method/preconds rhs)]
+                                                          (mapv #(satisfied? % state) preconds)
+                                                          {})]
                                         (if-let [bindings (and (every? identity bindings) (consistent-bindings? bindings))]
                                           (conj res {:bindings bindings :task (-> {:method/head (:method/head task)}
                                                                                   (assoc :method/rhs (:method/task-list rhs)))})
@@ -160,6 +164,20 @@
                                         res))
                                     []
                                     (:method/rhsides task))))
+
+(defn satisfying-tasks
+  "Return edited task patterns for operators and methods matching given, task (a positive literal), patterns, and state."
+  [task patterns state]
+  (let [matching-tasks (reduce (fn [res pat] (if-let [m (matching-task? task pat)] (conj res m) res))
+                               []
+                               patterns)
+        res (reduce (fn [res {:keys [task bindings]}]
+                      (if-let [r (satisfying-elems task state)]
+                        (into res (map (fn [sat-elem] (update sat-elem :bindings #(merge bindings %))) r))
+                        res))
+                    []
+                    matching-tasks)]
+  res))
 
 ;;; Similar in operator.clj
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
@@ -169,16 +187,13 @@
      facts - a set of ::spec/positive-proposition.
      a map - with keys :add and :delete being collections of :specs/positive-proposition.
              These need not be ground propositions; everything that unifies with a form in delete will be deleted.
-             A variable in the add list will be treated as a skolem.
-             reset? is truthy."
+             A variable in the add list will be treated as a skolem."
   [facts a-list d-list]
   (assert set? facts)
   (assert (every? #(s/valid? ::spec/positive-proposition %) facts))
-  (as-> facts ?f
-    (if d-list
-      (->> ?f (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
-      ?f)
-    (if a-list (into ?f a-list) ?f)))
+  (cond-> facts
+    (not-empty d-list) (->> (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
+    (not-empty a-list) (->> (into a-list) set)))
 
 ;;; Similar is in operator.clj
 (defn update-state-by-op-actions
@@ -192,11 +207,15 @@
         d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))]
     (add-del-facts old-state a-list d-list)))
 
+;;; Currently this either fails or returns the argument state.
 (defn run-operator
-  "Run the action associated with the operator, returning an updated state."
-  [op-head state]
-  (log/info "Running operator" op-head)
-  state)
+  "Run the action associated with the operator, returning an updated state EXCEPT where."
+  [op-head state inject-failures]
+  (if (some #(uni/unify op-head %) inject-failures)
+    (do  (log/info "FAILURE (injected):" op-head)
+         (throw (ex-info "run-operator injected failure" {:op-head op-head})))
+    (do (log/info "Running operator" op-head)
+        state)))
 
 ;;; This only needs to work on the head partial plan, right? (That's even true once I have alternatives, right?)
 ;;; Later, this is the place to execute the plan by running operators that interact with the user to update state.
@@ -223,37 +242,30 @@
       :state      - is the state of the world in which the plan is being carried out.
                     It is modified by the actions operators (interacting with the user) and the d-lists and a-lists of operators.
 
-   stasks (satisfying-elements) is a map containing the following keys:
+   s-tasks (satisfying-elements) is a map containing the following keys:
       :bindings  - is a map of variable bindings,
       :task      - is information from the operator or method RHS satisfying RHS the preconditions."
-  [partials stasks]
+  [partials s-tasks {:keys [inject-failures] :as _opts}]
   (let [part (first partials)
-        {:keys [task bindings]} (first stasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
-    (reset! diag stasks)
-    (cond (empty? stasks)    (-> partials rest vec) ; No way forward from this navigation. The partial can be removed.
+        {:keys [task bindings]} (first s-tasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
+    (cond (empty? s-tasks)    (-> partials rest vec) ; No way forward from this navigation. The partial can be removed.
 
-          ;; Execute the operator. If it succeeds, update state, new-tasks, and plan. If it fails, [remove this partial???]
+          ;; Execute the operator. If it succeeds, update state, new-tasks, and plan.
           (operator? task)   (let [op-head (-> task :operator/head (uni/subst bindings))
-                                    new-partial (try (-> part
-                                                         (update :state #(run-operator op-head %))
-                                                         (update :state #(update-state-by-op-actions % task bindings))
-                                                         (update :new-tasks #(-> % rest vec))
-                                                         (update :plan #(conj % op-head))
-                                                         vector)
-                                                     (catch Exception _e []))]
-                                (into new-partial (rest partials)))
+                                   new-partial (try (-> part ; ToDo: Assumes only run-operator can throw.
+                                                        (update :state #(run-operator op-head % inject-failures))
+                                                        (update :state #(update-state-by-op-actions % task bindings))
+                                                        (update :new-tasks #(-> % rest vec))
+                                                        (update :plan #(conj % op-head))
+                                                        vector)
+                                                    (catch Exception e
+                                                      [(assoc part :failure (.data e))]))]
+                               (into new-partial (rest partials)))
 
           ;; Update the task list with the tasks from the RHS
-          (method? task)     (let [new-partial (update part :new-tasks #(into (-> % rest vec) ; drop this task; add the steps
-                                                                              (map (fn [t] (uni/subst t bindings)) (:method/rhs task))))]
+          (method? task)     (let [new-partial (update part :new-tasks #(into (mapv (fn [t] (uni/subst t bindings)) (:method/rhs task))
+                                                                              (-> % rest vec)))] ; drop this task; add the steps
                                (into [new-partial] (rest partials))))))
-
-;;; Is there is a problem here?
-;;; The operator code updates :new-tasks, removing the one it executed.
-;;; But how does this mesh with plan9? I think plan9 needs to know whether the head task is a method or operator.
-;;; The stuff I'm doing about satisfying-tasks is about navigating next states, but when task is an operator, you just do it.
-;;; +I think this means update-planning gets called earlier with operators+ NO.
-;;;  I think this means that operator must preserve knowledge of what vars are bound.
 
 ;;; (plan/plan9 domain)
 (defn ^:diag plan9
@@ -261,26 +273,27 @@
    Operates on a stack (vector) of 'partials' (described in the docstring of update-planning).
    Initialize the stack to a partial from a problem definition.
    Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
-  [{:domain/keys [elems problem]}]
+  [{:domain/keys [elems problem]} & opts]
   (let [state   (:problem/state problem) ; A vector of ground literals.
         goal    (:problem/goal problem)] ; A literal.
-    (loop [partials [{:plan [goal] :new-tasks [goal] :state state}]
+    (loop [partials [{:plan [] :new-tasks [goal] :state state}]
            cnt 1]
-      (log/info "new-tasks =" (-> partials first :new-tasks))
+      ;;(log/info "new-tasks =" (-> partials first :new-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
+      (log/info "partial = " (first partials))
       (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
-            matching-tasks   (filter #(matching-task? task %) elems)
-            satisfying-tasks (reduce (fn [res task]
-                                       (if-let [r (satisfying-elems task state)]
-                                         (into res r)
-                                         res))
-                                     []
-                                     matching-tasks)]
+            s-tasks (satisfying-tasks task elems (-> partials first :state))]
         (cond
-          (-> partials first :new-tasks empty?)     {:state :success :plan (first partials)}
-          (empty? partials)                         {:state :failure}
-          (> cnt 10)                                {:state :stopped :partials partials}
-          :else                                     (recur (update-planning partials satisfying-tasks)
-                                                           (inc cnt)))))))
+          (empty? partials)                         {:result :failure :reason :no-successful-plans}
+          (-> partials first :new-tasks empty?)     {:result :success :plan (first partials)}
+          (empty? s-tasks)                          {:result :failure :reason :empty-satisfiers :task task}
+          (> cnt 10)                                {:result :stopped :partials partials}
+          :else  (let [partials (update-planning partials s-tasks opts)
+                       partials (if-let [err (-> partials first :failure)]
+                                  (do (log/info "***Plan fails owing to operator" err)
+                                      (-> partials rest vec))
+                                  partials)]
+                     (recur partials
+                            (inc cnt))))))))
 
 ;;;=================================================== End Dynamic planner =======================================================
 
