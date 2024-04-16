@@ -10,14 +10,12 @@
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
    [wkok.openai-clojure.api      :as openai]
-   [scheduling-tbd.db            :as db]
-   [scheduling-tbd.sutil         :refer [get-api-key resolve-db-id connect-atm]]
+   [scheduling-tbd.sutil         :refer [get-api-key]]
    [scheduling-tbd.web.routes.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
    [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
-   [promesa.core                 :as p]
    [taoensso.timbre              :as log]))
 
 (def ^:diag diag (atom nil))
@@ -40,41 +38,39 @@
   (get @openai-models k))
 
 (defn query-llm
-  "Return a Clojure map that is read from the string created by the LLM given the vector of messages that is the argument."
-  [messages & {:keys [model-class raw-text?] :or {model :gpt-4} :as other}]
-  (reset! diag {:msg messages :other other})
-  (if-let [key (get-api-key :llm)]
-    (try (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class)
-                                                       :messages messages}
-                                                      {:api-key key})
-                       :choices
-                       first
-                       :message
-                       :content)
-               res (cond-> res (not raw-text?) edn/read-string)]
-           (if (or (map? res) (string? res))
-             res
-             (throw (ex-info "Did not produce a map." {:result res}))))
-         (catch Throwable e
-           (log/error "Call to query-llm failed.")
-           (ex-info "OpenAI API call failed." {:message (.getMessage e)})))
-    (throw (ex-info "No key for use of LLM API found." {}))))
+  "Given the vector of messages that is the argument, return a string (default)
+   or Clojure map (:raw-string? = false) that is read from the string created by the LLM."
+  [messages & {:keys [model-class raw-text?] :or {model-class :gpt-4 raw-text? true}}]
+  (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class)
+                                                :messages messages}
+                                               {:api-key (get-api-key :llm)})
+                :choices
+                first
+                :message
+                :content
+                (cond-> (not raw-text?) edn/read-string))]
+    (if (or (map? res) (string? res))
+      res
+      (throw (ex-info "Did not produce a map nor string." {:result res})))))
 
-;;; (llm/llm-start)
+;;; When you update this code, call this again:
+;;; (ws/register-ws-dispatch  :ask-llm llm/llm-directly)
 (defn llm-directly
-  "User can ask anything outside of session by starting the text with 'LLM:."
+  "User can ask anything outside of session by starting the text with 'LLM:.
+   This is a blocking call since the caller is a websocket thread and it responds with ws/send-to-chat."
   [{:keys [client-id question]}]
-  (-> (p/future (query-llm [{:role "system"    :content "You are a helpful assistant."}
-                            {:role "user"      :content question}]
-                           {:raw-text? true}))
-      (p/await 20000)
-      (p/then #(ws/send-to-chat {:client-id client-id :promise? false :msg-vec [{:msg-text/string %}]}))
-      (p/catch (fn [e]
-                 (log/error "Failure in llm-directly:")
-                 (ws/send-to-chat {:client-id client-id
-                                   :promise? false
-                                   :msg-vec [{:msg-text/string "There was a problem answering that."}]})))))
-
+  (log/info "llm-directly:" question)
+  (try
+    (let [res (query-llm [{:role "system"    :content "You are a helpful assistant."}
+                          {:role "user"      :content question}])]
+      (if (nil? res)
+        (throw (ex-info "Timeout or other exception." {}))
+        (ws/send-to-chat {:client-id client-id :promise? false :msg-vec [{:msg-text/string res}]})))
+    (catch Exception e
+      (log/error "Failure in llm-directly:" e)
+      (ws/send-to-chat {:client-id client-id
+                        :promise? false
+                        :msg-vec [{:msg-text/string "There was a problem answering that."}]}))))
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-var-partial
@@ -105,18 +101,14 @@
   (when purpose
     (let [prompt (conj good-var-partial
                        {:role "user"
-                        :content (cl-format nil "[~A]" purpose)})]
-      (try (let [res (query-llm prompt {:model-class :gpt-4})]
-             (if-let [var-name (:name res)]
-               (cond-> var-name
-                 (= :kebab-case string-type) (csk/->kebab-case-string)
-                 (= :snake-case string-type) (csk/->snake_case_string)
-                 capitalize?                 (str/capitalize))
-               (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))
-           (catch Throwable e
-             (throw (ex-info "OpenAI API call failed."
-                             {:message (.getMessage e)
-                              #_#_:details (-> e .getData :body json/read-str)})))))))
+                        :content (cl-format nil "[~A]" purpose)})
+          res (query-llm prompt {:model-class :gpt-4 :raw-text? false})]
+      (if-let [var-name (:name res)]
+        (cond-> var-name
+          (= :kebab-case string-type) (csk/->kebab-case-string)
+          (= :snake-case string-type) (csk/->snake_case_string)
+          capitalize?                 (str/capitalize))
+        (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
 
 (defn select-openai-models!
   "Set the open-ai-models atom to models in each class"
@@ -169,43 +161,58 @@
                            :metadata metadata}
                           {:api-key key})))
 
+(def diag1 (atom nil))
+
+(defn message-after
+  "Sort the message list and return the message after the one that has the argument text."
+  [msg-list timestamp text]
+  (reset! diag1 [msg-list timestamp text])
+  (let [[a q] (->> msg-list
+                   :data
+                   (filter #(>= (:created_at %) timestamp))
+                   (group-by :created_at) ; ToDo: I'm getting to entries at most timestamps, both from the same role! (My bug.)
+                   (reduce-kv (fn [r _k v] (conj r (first v))) [])
+                   (sort-by :created_at >))]
+    (when (= (-> q :content first :text :value) text)
+      (-> a :content first :text :value))))
+
 (defn query-on-thread
   "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
     aid      - assistant ID (the OpenAI notion)
     tid      - thread ID (ttheOpenAI notion)
-   role     - #{'user' 'assistant'},
-    msg-text - a string."
-  [& {:keys [tid aid role msg-text timeout-secs] :or {timeout-secs 40} :as _obj}]
-  (reset! diag _obj)
+    role     - #{'user' 'assistant'},
+    msg-text - a string.
+   Returns a promise."
+  [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 120 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
+  (reset! diag {:_obj _obj})
+  (log/info "query-on-thread: query-text =" query-text)
   (assert (#{"user" "assistant"} role))
-  (assert (string? msg-text))
+  (assert (string? query-text))
   (let [key (get-api-key :llm)
-        _msg (openai/create-message ; Apparently the thread_id links the run to msg.
-              {:thread_id tid
-               :role role
-               :content msg-text}
-              {:api-key key})
+        ;; Apparently the thread_id links the run to msg.
+        _msg (openai/create-message {:thread_id tid :role role :content query-text} {:api-key key})
         ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
         ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
-        run (openai/create-run
-             {:thread_id tid
-              :assistant_id aid}
-             {:api-key key})]
-    (loop [secs 0]
-      (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} {:api-key key})]
-        (Thread/sleep 1000)
-        (cond (> secs timeout-secs)                  (throw (ex-info "query-on-thread: Timeout:" {:msg-text msg-text})),
+        run (openai/create-run  {:thread_id tid :assistant_id aid} {:api-key key})
+        timestamp (inst-ms (java.time.Instant/now))
+        run-timestamp (:created_at run)
+        timeout   (+ timestamp (* timeout-secs 1000))]
+    (swap! diag #(assoc % :run run))
+    (loop [now timeout]
+      (Thread/sleep 1000)
+      (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} {:api-key key})
+            msg-list (openai/list-messages {:thread_id tid :limit 20} {:api-key key})
+            response (message-after msg-list run-timestamp query-text)]
+        (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text})),
 
-              (= "completed" (:status r))            (let [[m1 m2] (-> (openai/list-messages {:thread_id tid :limit 2} {:api-key key})
-                                                                       :data
-                                                                       (sort-by :created))]
-                                                       (if (= msg-text (-> m2 :content first :text :value))
-                                                         (-> m1 :content first :text :value)
-                                                         (throw (ex-info "query-on-thread: Response not synced to query:" {:m1 m1 :m2 m2})))),
+              ;; ToDo: How many messages do I have to retrieve to be sure I have the response, and can I trust the :created_at. It didn't see so.
+              (and (= "completed" (:status r))
+                   (not-empty response))              response
+
 
               (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)}))
 
-              :else                                   (recur (inc secs)))))))
+              :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
 (defn ^:diag get-assistant-openai
   "Retrieve the assistant object from OpenAI using its ID, a string you can
@@ -229,11 +236,25 @@
     (openai/delete-assistant {:assistant_id id} {:api-key key})
     (log/warn "Couldn't get OpenAI API key.")))
 
+;;; (ws/register-ws-dispatch  :run-long llm/run-long)
+(defn run-long
+  "Diagnostic for exploring threading/blocking with websocket."
+  [& _]
+  (loop [cnt 0]
+    (log/info "Run-long: cnt =" cnt)
+    (Thread/sleep 5000) ; 5000 * 30, about 4 minutes.
+    (when (< cnt 20) (recur (inc cnt)))))
+
+(defn throw-it
+  [& _]
+  (throw (ex-info "Just because I felt like it." {})))
+
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []
   (ws/register-ws-dispatch  :ask-llm llm-directly)
-  (select-openai-models!)
-  [:ask-directly-registered :opena-models-selected])
+  (ws/register-ws-dispatch  :run-long run-long)
+  (ws/register-ws-dispatch  :throw-it throw-it)
+  [:ask-directly-registered])
 
 (defn llm-stop []
   (reset! openai-models {})

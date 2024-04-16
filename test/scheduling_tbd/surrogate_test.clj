@@ -2,11 +2,13 @@
   "Testing of human expert surrogatehis may grow to serve as a surrogate human expert for testing SchedulingTBD's interview process.
    Currently this just tests Wkok's API for OpenAI assistants with the Craft Beer Conversation, data/interviews/2024-01-05-craft-brewing.org."
   (:require
-   [clojure.edn             :as edn]
-   [clojure.string          :as str]
-   [clojure.test            :refer [deftest is testing]]
-   [scheduling-tbd.db       :as db]
-   [scheduling-tbd.sutil    :as sutil :refer [get-api-key connect-atm resolve-db-id db-cfg-map]]
+   [clojure.edn              :as edn]
+   [clojure.string           :as str]
+   [clojure.test             :refer [deftest is testing]]
+   [scheduling-tbd.db        :as db]
+   [scheduling-tbd.llm       :as llm]
+   [scheduling-tbd.sutil     :as sutil :refer [get-api-key connect-atm resolve-db-id db-cfg-map]]
+   [scheduling-tbd.surrogate :as sur]
    [taoensso.timbre :as log]
    [wkok.openai-clojure.api :as openai]))
 
@@ -78,11 +80,20 @@
 
 (defonce assist
   (let [key (get-api-key :llm)]
-    (openai/create-assistant {:name         "Example Assistant from Clojure: Beer"
+    (llm/create-assistant {:name         "Example Assistant from Clojure: Beer"
                               :model        "gpt-4-1106-preview"
                               :instructions (format system-instruction (:surrogate/subject-of-expertise beer-example))
                               :tools        [{:type "code_interpreter"}]} ; Will be good for csv and xslx, at least.
-                             {:api-key key})))
+                          {:api-key key})))
+
+(deftest making-assistant
+  (testing "Testing code to make an assistant."
+    (let [expertise "plate glass"
+          instructions (format sur/system-instruction expertise)
+          asst (llm/make-assistant :name (str expertise " surrogate") :instructions instructions :metadata {:usage :surrogate})]
+      (is (= "assistant" (:object asst)))
+      (log/info "id = " (:id asst))
+      (llm/delete-assistant-openai (:id asst)))))
 
 (defn tryme
   "If I can't find this assistant in the DB, I create it again."

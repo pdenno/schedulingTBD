@@ -2,7 +2,6 @@
   "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
    [applied-science.js-interop :as j]
-   [clojure.edn                :as edn]
    [helix.core                 :refer [defnc $]]
    [helix.hooks                :as hooks]
    ["@mui/icons-material/Send$default" :as Send]
@@ -39,29 +38,6 @@
               (+ @progress-atm 2))]
     res))
 
-;;; --------------------------promise-key management ---------------------------------------
-(def pending-promise-keys "These are created by the server to track what is being responded to." (atom #{}))
-
-(defn remember-promise ; Silly name?
-  "When the server sends a message that is part of a conversation and requires a response, it adds a keyword
-   that associates to a promise on the server side and allows the server to continue the conversation,
-   interpreting the :user-says response which repeat this promise-key as answer to the :tbd-says ws message.
-   This function just adds to the list, which in most cases will be empty when the argument key is added here."
-  [k]  (when k (swap! pending-promise-keys conj k)))
-
-(defn clear-promise-keys! [ks]
-  (doseq [k ks] (when k (swap! pending-promise-keys disj k))))
-
-;;; :tbd-says isn't in this because it sets the set-system-text hook.
-(defn dispatch-msg
-  "Call a function depending on the value of :dispatch-key in the message."
-  [{:keys [dispatch-key promise-keys new-proj-map] :as _msg} change-proj-fn]
-  (case dispatch-key
-    :clear-promise-keys (clear-promise-keys! promise-keys)
-    :alive?             (ws/send-msg {:dispatch-key :alive? :alive? true})
-    :reload-proj        (change-proj-fn new-proj-map)
-    :ping-confirm       :ok
-    "default"))
 
 ;;; ------------------------- active stuff ------------------------------------
 (def item-keys "Atom for a unique :key of some UI object." (atom 0))
@@ -106,7 +82,7 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(defnc Chat [{:keys [chat-height conv-map change-proj-fn]}]
+(defnc Chat [{:keys [chat-height conv-map]}]
   (let [[msg-list set-msg-list]         (hooks/use-state (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js))
         [progress set-progress]         (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
@@ -115,25 +91,9 @@
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         input-ref                       (hooks/use-ref nil)
         resize-fns (make-resize-fns set-box-height)]
-    ;; ------------- talk through web socket; server-initiated.
-    (letfn [(connect! [] ; 2024-03-19: This really does seem to need to be inside the component!
-              (if-let [chan (js/WebSocket. ws/ws-url)]
-                (do (log/info "Websocket Connected!")
-                    (reset! ws/channel chan)
-                    (reset! ws/connected? true)
-                    (set! (.-onmessage chan)
-                          (fn [event]       ;; ToDo: Consider transit rather then edn/read-string.
-                            (try (let [{:keys [p-key dispatch-key] :as msg-obj} (-> event .-data edn/read-string)]
-                                   (dispatch-msg msg-obj change-proj-fn)
-                                   (when (= :tbd-says dispatch-key)
-                                     (when p-key (remember-promise p-key))
-                                     (log/info "msg-obj =" msg-obj)
-                                     (set-tbd-obj msg-obj)))
-                                 (catch :default e (log/warn "Error in :tbd-says socket reading:" e)))))
-                    (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg)))) ; ToDo: investigate why it gets these.
-                (throw (ex-info "Websocket Connection Failed:" {:url ws/ws-url}))))]
-    (hooks/use-effect :once ; Start the web socket.
-      (when-not @ws/connected? (connect!)))
+    ;; ------------- Talk through web socket, initiated below.
+    (hooks/use-effect :once ; set-tbd-obje is needed by ws/dispatch.
+      (reset! ws/set-tbd-obj-fn set-tbd-obj))
     (hooks/use-effect [conv-map] ; Put the entire conversation into the chat.
       (set-msg-list (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js)))
     (hooks/use-effect [tbd-obj]  ; Put TBD's (server's) message into the chat.
@@ -147,7 +107,7 @@
                [surrogate? product] (re-matches #"\s*SUR:(.*)" user-text)
                msg (cond  ask-llm?      {:dispatch-key :ask-llm :question question}
                           surrogate?    {:dispatch-key :start-surrogate :product product}
-                          :else         {:dispatch-key :user-says :msg-text user-text :promise-keys @pending-promise-keys})]
+                          :else         {:dispatch-key :user-says :msg-text user-text :promise-keys @ws/pending-promise-keys})]
            (log/info "Before ws/send-msg: msg =" msg)
            (ws/send-msg msg))))
       ;; -------------- progress stuff (currentl not hooked up)
@@ -191,4 +151,4 @@
                                                  (set-msg-list (add-msg msg-list (msg-vec2rce [{:msg-text/string text}] :user)))
                                          (j/assoc! iref :value "")
                                          (set-user-text text)))}
-                       ($ Send))))}))))
+                       ($ Send))))})))

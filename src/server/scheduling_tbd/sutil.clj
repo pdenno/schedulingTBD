@@ -1,6 +1,7 @@
 (ns scheduling-tbd.sutil
   "Server utilities."
   (:require
+   [clojure.core.unify      :as uni]
    [clojure.java.io         :as io]
    [datahike.api            :as d]
    [datahike.pull-api       :as dp]
@@ -157,3 +158,8 @@
        (p/await ~timeout)
        (p/then #(log/info "Long-running:" %))
        (p/catch #(log/warn "Long-running (exception):" %))))
+
+(defn find-fact
+  "Unify the fact (which need not be ground) to the fact-list"
+  [fact fact-list]
+  (some #(when (uni/unify fact %) %) fact-list))

@@ -2,7 +2,7 @@
 #:project{:id :aluminium-foil-production-scheduling,
           :current-domain :process-interview
           :name "Aluminium foil production scheduling"
-          :state-string "#{(proj-name foil) (system-model foil flow) (ongoing-discussion foil) (well-known-process foil)}"
+          :state-string "#{(proj-id foil) (system-model foil flow) (ongoing-discussion foil) (well-known-process foil)}"
           :messages [#:message{:content
                                [#:msg-text{:string
                                            "Describe your most significant scheduling problem in a few sentences or "}

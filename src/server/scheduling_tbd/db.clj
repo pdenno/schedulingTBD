@@ -241,19 +241,19 @@
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
    (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
-  [proj-id]
-  (assert (keyword? proj-id))
+  [pid]
+  (assert (keyword? pid))
   (when (d/q '[:find ?e .
-               :in $ ?proj-id
+               :in $ ?pid
                :where
-               [?e :project/id ?proj-id]
+               [?e :project/id ?pid]
                (not [?e :project/deleted? true])]
-             @(connect-atm :system) proj-id)
+             @(connect-atm :system) pid)
     (d/q '[:find ?e .
-           :in $ ?proj-id
+           :in $ ?pid
            :where
-           [?e :project/id ?proj-id]]
-         @(connect-atm proj-id) proj-id)))
+           [?e :project/id ?pid]]
+         @(connect-atm pid) pid)))
 
 (defn get-project
   "Return the project structure."
@@ -296,8 +296,8 @@
 
 (defn get-state
   [pid & {:keys [sort?] :or {sort? true}}]
-  (if (= pid :new-project)
-    []
+  (if (= pid :START-A-NEW-PROJECT)
+    '[(proj-id :START-A-NEW-PROJECT)]
     (let [conn (connect-atm pid)]
       (when-let [state-str (d/q '[:find ?s .
                                   :in $ ?pid
@@ -311,23 +311,33 @@
 
 (defn get-thread-id
   "Get the thread object of the argument PID."
-  [pid]
-  (let [eid (project-exists? pid)]
-    (-> (resolve-db-id {:db/id eid}
-                       (connect-atm pid)
-                       :keep-set #{:project/surrogate :surrogate/thread-id})
-        :project/surrogate
-        :surrogate/thread-id)))
+  ([pid] (get-thread-id pid true))
+  ([pid fail-when-missing?]
+   (let [eid (project-exists? pid)
+         res (when eid
+               (-> (resolve-db-id {:db/id eid}
+                                  (connect-atm pid)
+                                  :keep-set #{:project/surrogate :surrogate/thread-id})
+                   :project/surrogate
+                   :surrogate/thread-id))]
+     (cond res                         res
+           (not fail-when-missing?)    nil
+           :else                       (throw (ex-info "Did not find thread-id." {:pid pid}))))))
 
 (defn get-assistant-id
   "Get the thread object of the argument PID."
-  [pid]
-  (let [eid (project-exists? pid)]
-    (-> (resolve-db-id {:db/id eid}
-                       (connect-atm pid)
-                       :keep-set #{:project/surrogate :surrogate/assistant-id})
-        :project/surrogate
-        :surrogate/assistant-id)))
+  ([pid] (get-assistant-id pid true))
+  ([pid fail-when-missing?]
+   (let [eid (project-exists? pid)
+         res (when eid
+               (-> (resolve-db-id {:db/id eid}
+                                  (connect-atm pid)
+                                  :keep-set #{:project/surrogate :surrogate/assistant-id})
+                   :project/surrogate
+                   :surrogate/assistant-id))]
+     (cond res                         res
+           (not fail-when-missing?)    nil
+           :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))
 
 (def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
   #{:project/messages :message/id :message/from :message/content :message/time :msg-text/string :msg-link/uri :msg-link/text})
@@ -342,6 +352,17 @@
         :project/messages
         (sort-by :message/id)
         vec)))
+
+(defn get-code
+  "Return the code string for the argument project (or an empty string if it does not exist)."
+  [pid]
+  (or (d/q '[:find ?t .
+             :in $ ?pid
+             :where
+             [?e :project/id ?pid]
+             [?e :project/code ?t]]
+           @(connect-atm pid) pid)
+      ""))
 
 (defn put-state
   "Write an updated state to the project database."
@@ -429,6 +450,7 @@
   (swap! sutil/databases-atm
          #(reduce-kv (fn [res k v] (if (keep-db? k) (assoc res k v) res)) {} %))
   (recreate-system-db!)
+  (log/info "Recreating these projects:" (list-projects))
   (doseq [pid (list-projects)]
     (recreate-project-db! pid)))
 
@@ -478,11 +500,14 @@
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
   [pid from msg-vec]
-  (s/assert ::spec/chat-msg-vec msg-vec)
+  (reset! diag msg-vec)
+  (s/assert ::spec/chat-msg-vec msg-vec) ; ToDo: I might have to turn something on to see this!
+  (assert (#{:system :user} from))
+  (log/info "add-msg: pid =" pid "msg-vec =" msg-vec)
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid))]
       (d/transact conn {:tx-data [{:db/id (project-exists? pid)
-                                  :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
+                                   :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn add-project
@@ -496,19 +521,15 @@
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
-;;; BTW, I don't have a good way to delete the project yet from the system-db.
-;;;    1) (db/backup-system-db)
-;;;    2) Edit the .edn to remove the project.
-;;;    3) (db/recreate-system-db!)
 (defn create-proj-db!
   "Create a project database for the argument project.
    The project-info map must include :project/id and :project/name.
      proj-info  - map containing at least :project/id and :project/name.
      additional - a vector of maps to add to the database.
      opts -  {:force? - overwrite project with same name}
-   Return the "
-  ([proj-info] (create-proj-db! proj-info {}))
-  ([proj-info additional-info] (create-proj-db! proj-info additional-info))
+   Return the PID of the project."
+  ([proj-info] (create-proj-db! proj-info {} {}))
+  ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
   ([proj-info additional-info opts]
    (s/assert ::project-info proj-info)
    (let [{:project/keys [id name]} (if (:force? opts) proj-info (unique-proj proj-info))
@@ -531,6 +552,11 @@
      (log/info "Created project database for" id)
      id)))
 
+;;; ToDo: Change this to use :db/retract and remove :project/deleted from both DBs.
+;;; BTW, I don't have a good way to delete the project yet from the system-db.
+;;;    1) (db/backup-system-db)
+;;;    2) Edit the .edn to remove the project.
+;;;    3) (db/recreate-system-db!)
 (defn delete-project
   "Remove project from the system DB and move its project directory to the the deleted directory.
    Both the :system and project databases can have a :project/deleted? attribute."

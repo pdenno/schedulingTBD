@@ -11,20 +11,17 @@
    ["@mui/material/styles" :as styles] ; See it used here: https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
    ["@mui/material/Typography$default" :as Typography]
    [promesa.core :as p]
-   ["react-dom/client" :as react-dom]
-   [scheduling-tbd.util :as sutil]
-   [stbd-app.components.chat :as chat :refer [Chat]] ; clojure-lsp error? I use it!
-   [stbd-app.components.editor :as editor :refer [Editor set-editor-text get-editor-text]]
+   ["react-dom/client"          :as react-dom]
+   [scheduling-tbd.util         :as sutil]
+   [stbd-app.components.chat    :as chat]
+   [stbd-app.components.editor  :as editor :refer [Editor]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
-   [stbd-app.components.share :as share :refer [ShareUpDown ShareLeftRight]]
+   [stbd-app.components.share   :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.db-access :as dba]
-   [stbd-app.util   :as util]
    [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom {}))
-
-(declare get-user-data get-user-code)
 
 (def progress-handle
   "The thing that can be called by js/window.clearInterval to stop incrementing progress under js/window.setInterval."
@@ -67,7 +64,7 @@
   [source]
   (log/info "run-code: running some code")
   (when-some [code (not-empty (str/trim source))]
-    (let [user-data (get-user-data)
+    (let [user-data (get-editor-text "data-editor")
           ;_zippy (log/info "******* For RM eval: CODE = \n" code)
           ;_zippy (log/info "******* For RM eval: DATA = \n" user-data)
           result (try (ev/processRM :ptag/exp code  {:pprint? true :execute? true :sci? true :user-data user-data})
@@ -107,40 +104,6 @@
         [{:key "Mod-Enter"
           :run (partial eval-cell on-result progress-bool)}])))
 
-(defn get-props [obj]
-  (when (map? (js->clj obj))
-    (js->clj (or (j/get obj :props) (get obj "props")))))
-
-(defn get-user-data
-  "Return the string content of the data editor."
-  []
-  (if-let [s (j/get-in (get-in @util/component-refs ["data-editor" :view]) [:state :doc])]
-    (.toString s)
-    ""))
-
-(defn get-user-code
-  "Return the string content of the data editor."
-  []
-  (if-let [s (j/get-in (get-in @util/component-refs ["code-editor" :view]) [:state :doc])]
-    (.toString s)
-    ""))
-
-#_(defn search-props
-  "Return the object that has a prop that passes the test."
-  [obj test]
-  (let [found? (atom nil)
-        cnt (atom 0)]
-    (letfn [(sp [obj]
-              (swap! cnt inc)
-              (cond @found?                 @found?,
-                    (> @cnt 500)            nil,    ; ToDo: Remove this.
-                    (test obj)              (reset! found? obj),
-                    (get-props obj)         (doseq [p (-> obj get-props vals)]
-                                              (sp p)),
-                    (vector? (js->clj obj)) (doseq [p (js->clj obj)] (sp p))))]
-      (sp obj)
-      @found?)))
-
 (def top-share-fns
   "These, for convenience, keep track of what methods need be called on resizing."
   {:left-share   {:on-stop-drag-lf (partial editor/resize-finish "data-editor")}
@@ -149,8 +112,6 @@
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")
                   :on-stop-drag-dn (partial editor/resize-finish "result")}})
 
-(def really? (atom nil))
-
 ;;; ToDo: Needs work.
 (defn compute-progress
   "Use either progress-atm or timeout-info to return a percent done."
@@ -158,32 +119,32 @@
   (let [#_#_now (.getTime (js/Date.))]
     (+ @progress-atm 2)))
 
-
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
         [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
         [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
         [conversation set-conversation]       (hooks/use-state {:conv [] :conv-for "nobody"})
-        [code set-code]                       (hooks/use-state "xyz")
+        [code set-code]                       (hooks/use-state "")
         useful-height (int (- height banner-height))
         chat-side-height useful-height
         code-side-height useful-height]
     (hooks/use-effect :once
       (log/info "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
+      (reset! ws/change-proj-fn
+              (fn [p] ; This is a map with two keys: :project/id :project/name (a proj-info element).
+                (when-not (= p proj)                                 ; In that case, it will have updated the conversation, with the "Great,...".
+                (set-proj p)
+                (set-conversation {:conv [] :conf-for proj})
+                (-> (dba/get-conversation p)
+                    (p/then (fn [resp] (set-conversation resp) resp))
+                    (p/then (fn [resp] (set-code (:code resp)) resp))))))
       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
           (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
                        (set-proj (:current-project %))
                        (-> (dba/get-conversation (:current-project %))
-                           (p/then (fn [resp] (set-conversation resp)))
-                           (p/then (fn [resp] (set-code "abc" #_(:code resp)))))))))
-    (letfn [(change-project [p] ; p is a map of containing :project/name and :project/id.
-              (log/info "--------- Calling change-project: p =" p) ; If p = :START-A-NEW-PROJECT, this will run again after server finds a name.
-              (when-not (= p proj)                                 ; In that case, it will have updated the conversation, with the "Great,...".
-                (set-proj p)
-                (set-conversation {:conv [] :conf-for proj})
-                (-> (dba/get-conversation p)
-                    (p/then #(set-conversation %)))))]
+                           (p/then (fn [resp] (set-conversation resp) resp))
+                           (p/then (fn [resp] (set-code (:code resp) resp))))))))
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
             {:variant "h4"
@@ -195,10 +156,10 @@
             ($ Stack {:direction "row"}
                "schedulingTBD"
                ($ Box
-                  ($ SelectProject {:current-proj proj :proj-infos proj-infos :change-proj-fn change-project}))))
+                  ($ SelectProject {:current-proj proj :proj-infos proj-infos #_#_ :change-proj-fn change-project}))))
          ($ ShareLeftRight
             {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
-                       ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :change-proj-fn change-project}))
+                       ($ chat/Chat {:chat-height chat-side-height :conv-map conversation #_#_:change-proj-fn change-project}))
              :right ($ ShareUpDown
                        {:init-height code-side-height
                         :up ($ Editor {:text code
@@ -208,7 +169,7 @@
                         :share-fns (:right-share top-share-fns)})
              :share-fns (:left-share top-share-fns)
              :lf-pct 0.50
-             :init-width width})))))
+             :init-width width}))))
 
 (defnc app []
   {:helix/features {:check-invalid-hooks-usage true}}
@@ -243,7 +204,6 @@
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
 (defonce root (react-dom/createRoot (js/document.getElementById "app")))
-(defonce ping-process (atom nil))
 
 ;;; --------------- https://code.thheller.com/blog/shadow-cljs/2019/08/25/hot-reload-in-clojurescript.html ----------------------
 (defn ^{:after-load true, :dev/after-load true} start []
@@ -253,9 +213,7 @@
                  :min-level
                  (filter #(-> % first (contains? "stbd-app.*")))
                  first second))
-  (reset! ws/connected? false)
-  (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
-  (reset! ping-process (js/window.setInterval (fn [] (ws/ping!)) 10000)) ; Ping to keep-alive the web-socket.
+  (ws/connect!)
   (.render root ($ app)))
 
 (defn ^:export init []
@@ -267,7 +225,9 @@
 ;;; https://stackoverflow.com/questions/5004978/check-if-page-gets-reloaded-or-refreshed-in-javascript
 (defn ^{:before-load true, :dev/before-load true #_#_:dev/before-load-async true} stop []
   (log/info "STOP")
-  (when (and ws/connected? util/client-id)
-    (log/info "Telling server to close channel for client-id = " util/client-id)
+  (when-let [proc @ws/ping-process]  (js/window.clearInterval proc)) ; clear old ping-process, if any.
+  (when-let [proc @ws/check-process] (js/window.clearInterval proc))
+  (when (ws/channel-ready?)
+    (log/info "Telling server to close channel for client-id = " @ws/client-id)
     (ws/send-msg {:dispatch-key :close-channel}) ; The client-id is appended by send-message!.
-    (log/info "Message sent for client-id = " util/client-id)))
+    (log/info "Message sent for client-id = " @ws/client-id)))

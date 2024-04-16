@@ -2,7 +2,9 @@
   "Scheduling domain prompts."
   (:require
    [clojure.string           :as str]
+   [promesa.core             :as p]
    [scheduling-tbd.llm       :as llm :refer [query-llm]]
+   [scheduling-tbd.sutil     :as sutil]
    [taoensso.timbre          :as log]))
 
 (def ^:diag diag (atom nil))
@@ -95,15 +97,16 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    Returns a string consisting of just a few words."
   [user-text]
   (reset! diag user-text)
-  (if-let [res (-> (conj project-name-partial
-                      {:role "user" :content (str "[ " user-text " ]")})
-                (query-llm {:model-class :gpt-4}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
-                :project-name)]
-    res
-    (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text}))))
+  (-> (conj project-name-partial
+            {:role "user" :content (str "[ " user-text " ]")})
+      (query-llm {:model-class :gpt-4 :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
+      (p/then #(:project-name %))
+      (p/then #(if (string? %)
+                 %
+                 (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text}))))))
 
 
-(defn pretend-you-manage-interview [what-you-manage & desc]
+#_(defn pretend-you-manage-interview [what-you-manage & desc]
   (let [high-level-desc (or (first desc)
                             (-> what-you-manage
                                 pretend-you-manage-prompt
@@ -148,7 +151,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
  Lastly, ensuring synergies with marketing timelines and release dates is necessary to avoid any mismatch between supply and market launch."})
 
 ;;; ToDo: I've seen :snack-food going from {:service 0.5, :artifact 0.5}, {:service 0.0, :artifact 1.0}. I suppose delivering to a supply-chain partner....
-(defn test-service-vs-artifact
+#_(defn test-service-vs-artifact
   []
   (reduce-kv (fn [m k v]
                (try
@@ -286,13 +289,31 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (defn text-cites-raw-material-challenge?
   "Return :yes, :no, or :unknown depending on whether the text cites an inventory challenge."
   [text]
-  (try (let [yes-or-no (-> (conj raw-material-challenge-partial
-                                 {:role "user" :content (format "[%s]" text)})
-                           (query-llm {:raw-text? true :model-class :gpt-3.5}))
-             yes-pos (re-matches #"\s*yes\s*" yes-or-no)
-             no-pos  (when-not yes-pos (re-matches #"\s*no\s*" yes-or-no))
-             answer  (cond yes-pos :yes
-                           no-pos  :no
-                           :else   :unknown)]
-         answer)
-       (catch Throwable _e :huh?)))
+  (p/let [yes-or-no (-> (conj raw-material-challenge-partial
+                              {:role "user" :content (format "[%s]" text)})
+                        (query-llm {:model-class :gpt-3.5}))
+          yes-pos (re-matches #"\s*yes\s*" yes-or-no)
+          no-pos  (when-not yes-pos (re-matches #"\s*no\s*" yes-or-no))
+          answer  (cond yes-pos :yes
+                        no-pos  :no
+                        :else   :unknown)]
+    answer))
+
+(defn prelim-analysis
+  "Analyze the response to the initial question, adding to the state vector."
+  [response state]
+  (log/info "prelim-analysis: state =" state "response =" response)
+  (let [[_ pid] (sutil/find-fact '(proj-id ?x) state)]
+    (if (= pid :START-A-NEW-PROJECT)
+      (let [proj-name (as-> (-> (project-name response) p/await!) ?s ; ToDo: Blocking.
+                        (str/trim ?s)
+                        (str/split ?s #"\s+")
+                        (map str/capitalize ?s)
+                        (interpose " " ?s)
+                        (apply str ?s))
+            proj-id (as-> proj-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (symbol ?s))]
+        (into (filterv #(not= % '(proj-id START-A-NEW-PROJECT)) state)
+              `[(~'proj-id ~proj-id)
+                (~'proj-name ~proj-name)]))
+      ;; just continue if it isn't a new project. There will be more here... soon?
+      state)))

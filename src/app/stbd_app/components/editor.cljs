@@ -1,6 +1,5 @@
 (ns stbd-app.components.editor
   (:require
-   [clojure.string :as str]
    [stbd-app.rm-mode.parser :as parser]
    [stbd-app.rm-mode.state :as state]
    ["@codemirror/language" :refer [foldGutter syntaxHighlighting defaultHighlightStyle]]
@@ -9,16 +8,13 @@
    ["@codemirror/state" :refer [EditorState Compartment ChangeSet Transaction]]
    [applied-science.js-interop :as j]
    ;["@mui/system/sizing" :as sizing] ; ToDo: Investigate
-   ["@mui/material/FormControl$default" :as FormControl]
-   ["@mui/material/MenuItem$default" :as MenuItem]
-   ["@mui/material/Select$default" :as Select]
    [stbd-app.util :as util]
    [stbd-app.components.share :as share]
    [helix.core :as helix :refer [defnc $]]
    [helix.hooks :as hooks]
    [helix.dom :as d]
-   ["react" :as react]
-   [taoensso.timbre :as log :refer-macros [info debug log]]))
+   ;["react" :as react]
+   #_[taoensso.timbre :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -56,7 +52,7 @@
 (defonce style-compartment (new Compartment))
 
 (defn extensions
-  [height name]
+  [height]
   #js[(.of style-compartment (editor-theme height))
       (history) ; This means you can undo things!
       (syntaxHighlighting defaultHighlightStyle)
@@ -101,15 +97,16 @@
       (.dispatch view trans))))
 
 (defnc Editor
-  [{:keys [text ext-adds name height] :or {ext-adds #js []}}]
+  [{:keys [text name height]}]
   (let [ed-ref (hooks/use-ref nil)
-        txt (if (string? text) text (or (:success text) (:failure text) ""))
         view-dom (atom nil)]
-    (hooks/use-effect [name]
-       (when-let [parent (j/get ed-ref :current)]
-         (let [editor-state (state/make-state (-> (extensions height name) (.concat ext-adds)) txt)
-               view (new EditorView (j/obj :state editor-state :parent parent))]
-           (reset! view-dom (j/get view :dom))
-           (swap! util/component-refs #(assoc % name {:ref parent :view view})))))
+    (hooks/use-effect :once ; [name]
+      (when-let [parent (j/get ed-ref :current)]
+        (let [editor-state (state/make-state (-> (extensions height) (.concat #js [])) "abc")
+              view (new EditorView (j/obj :state editor-state :parent parent))]
+          (reset! view-dom (j/get view :dom))
+          (swap! util/component-refs #(assoc % name {:ref parent :view view})))))
+    (hooks/use-effect [text]
+      (set-editor-text name text))
     (d/div {:ref ed-ref :id name} ; style works but looks ugly because it wraps editor tightly.
-           @view-dom)))
+      @view-dom)))

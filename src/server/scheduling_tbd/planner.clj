@@ -78,6 +78,225 @@
      :std-out std
      :err-out err}))
 
+;;;=================================================== Dynamic planner ===========================================================
+;;; ToDo:
+;;;   - Use a DB for managing stack/navigation???
+;;;      cons: - literal structures, yuk
+;;;            - distracting from the development goal, at least early on.
+;;;      pros: - potentially better manipulation for backtracking and reordering priorities as costs change.
+;;;            - leverage existing structure in shop.clj.
+;;;            - persistent! (useful for debugging and saving user's state).
+(def ^:diag domain (-> "data/planning-domains/process-interview-1.edn" slurp edn/read-string))
+
+(defn head-of    [elem] (or (:method/head elem)(:operator/head elem) (:axiom/head elem)))
+
+(defn axiom? [elem]
+  (when (contains? elem :axiom/head) elem))
+
+(defn method? [elem]
+  (when (contains? elem :method/head) elem))
+
+(defn operator? [elem]
+  (when (contains? elem :operator/head) elem))
+
+(defn matching-task?
+  "Return a map of :elem and :bindings if the elem's head unifies with the argument literal."
+  [lit task]
+  (when-let [bindings (uni/unify lit (head-of task))]
+    {:bindings bindings
+     :task task}))
+
+(defn not-lit?
+  "Return the positive literal if argument is a negative literal, otherwise nil."
+  [lit]
+  (when (= 'not (first lit)) (second lit)))
+
+(defn satisfied?
+  "Returns truthy if the state satisfies the argument condition.
+   (1) If the condition is a positive literal, it is satisfied by unify with some element of the state.
+   (2) If condition literal is negative, it is satisfied by its positive variant not unifying with any proposition of the state.
+   In case (1) it returns the a map containing the bindings. When the condition and state are identical, this is an empty map.
+   In case (2) it just returns the empty map."
+  [condition state]
+  (if-let [lit (not-lit? condition)]
+    (when (not-any? #(uni/unify lit %) state) {})
+    (some #(when-let [binds (uni/unify condition %)] binds) state)))
+
+(defn consistent-bindings?
+  "Argument is a vector of bindings maps.
+   Return a merged binding map if the bindings among the arguments maps are consistent and nil otherwise.
+   Examples: (consistent-bindings '[{:a 1 :b 2} {:a 1 :c 3}]) ==> {:a 1 :b 2 :c 3}
+             (consistent-bindings '[{:a 1 :b 2} {:b 3}]) ==> nil."
+  [bindings]
+  (if (empty? bindings)
+    {}
+    (try (reduce (fn [res mval] ; Value here is a map.
+                   (reduce-kv (fn [_ k v]
+                                (if (contains? res k)
+                                  (if (= v (get res k))
+                                    res
+                                    (throw (ex-info "Inconsistent bindings" {})))
+                                  (assoc res k v)))
+                              res
+                              mval))
+                 (first bindings)
+                 (rest bindings))
+         (catch Exception _e nil))))
+
+;;; ToDo: This should return the elements with substitutions.
+;;; ToDo: The variable bindings must be consistent among the preconditions.
+(defn satisfying-elems
+  "Return a vector of maps describing the specific tasks (e.g. the operator or specific element of :method/rhsides) and bindings when
+   that specific element satisfies state. Return nil otherwise."
+  [task state]
+  (cond (operator? task)    (let [bindings (mapv #(satisfied? % state) (:operator/preconds task))]
+                              (when-let [bindings (and (every? identity bindings) (consistent-bindings? bindings))]
+                                [{:bindings bindings :task task}]))
+
+        (method? task)      (reduce (fn [res rhs]
+                                      (if-let [bindings (if-let [preconds (:method/preconds rhs)]
+                                                          (mapv #(satisfied? % state) preconds)
+                                                          {})]
+                                        (if-let [bindings (and (every? identity bindings) (consistent-bindings? bindings))]
+                                          (conj res {:bindings bindings :task (-> {:method/head (:method/head task)}
+                                                                                  (assoc :method/rhs (:method/task-list rhs)))})
+                                          res)
+                                        res))
+                                    []
+                                    (:method/rhsides task))))
+
+(defn satisfying-tasks
+  "Return edited task patterns for operators and methods matching given, task (a positive literal), patterns, and state."
+  [task patterns state]
+  (let [matching-tasks (reduce (fn [res pat] (if-let [m (matching-task? task pat)] (conj res m) res))
+                               []
+                               patterns)
+        res (reduce (fn [res {:keys [task bindings]}]
+                      (if-let [r (satisfying-elems task state)]
+                        (into res (map (fn [sat-elem] (update sat-elem :bindings #(merge bindings %))) r))
+                        res))
+                    []
+                    matching-tasks)]
+  res))
+
+;;; Similar in operator.clj
+;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
+;;;       For the time being, I'm just adding uniquely
+(defn add-del-facts
+  "Update the facts by adding, deleting or resetting to empty.
+     facts - a set of ::spec/positive-proposition.
+     a map - with keys :add and :delete being collections of :specs/positive-proposition.
+             These need not be ground propositions; everything that unifies with a form in delete will be deleted.
+             A variable in the add list will be treated as a skolem."
+  [facts a-list d-list]
+  (assert set? facts)
+  (assert (every? #(s/valid? ::spec/positive-proposition %) facts))
+  (cond-> facts
+    (not-empty d-list) (->> (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
+    (not-empty a-list) (->> (into a-list) set)))
+
+;;; Similar is in operator.clj
+(defn update-state-by-op-actions
+  "Update the project's DB, specifically :project/state-string with infromation from last response and operator a-list and d-list.
+      - plan-step   - a map such as {:operator :!yes-no-process-steps, :args [aluminium-foil]},
+      - proj-id     - the keyword identifying a project by its :project/id.
+      - domain-id   - a keyword identifying the domain, for example, :process-interview.
+   Returns the new state."
+  [old-state op-obj bindings]
+  (let [a-list (mapv #(uni/subst % bindings) (:operator/a-list op-obj))
+        d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))]
+    (add-del-facts old-state a-list d-list)))
+
+;;; Currently this either fails or returns the argument state.
+(defn run-operator
+  "Run the action associated with the operator, returning an updated state EXCEPT where."
+  [op-head state inject-failures]
+  (if (some #(uni/unify op-head %) inject-failures)
+    (do  (log/info "FAILURE (injected):" op-head)
+         (throw (ex-info "run-operator injected failure" {:op-head op-head})))
+    (do (log/info "Running operator" op-head)
+        state)))
+
+;;; This only needs to work on the head partial plan, right? (That's even true once I have alternatives, right?)
+;;; Later, this is the place to execute the plan by running operators that interact with the user to update state.
+;;; I think I can borrow the inference engine from explain lib. It might also be useful for making full navigations to calculate plan cost.
+;;; Currently: (1) don't handle axioms, (2) don't create alternatives (domain doesn't have these anyway), (3) costs.
+(defn update-planning
+  "Update the state of planning by updating the active partial plan, advancing it by whatever the active satisfying elem requires.
+   The active satisfying elem (currently first selem) may have multiple tasks in its RHS.
+   Assuming that it does not encounter an unsatisfiable precondition, it iterates through the operators and axioms in the RHS until it encounters a method.
+   Operators and axioms can thereby update the state.
+   Once it encounters a method (or axiom?), it returns a new partial, which has the un-executed method, and anything after pushed onto new-tasks.
+
+   Backtracking is built-in to this algorithm; partials is a stack of choice points.
+
+   stasks is a vector of 'satisfying tasks' that navigate one edge each to new plans.
+   A new partial is generated for each satisfying task in this vector.
+
+   partials is a vector of maps containing a navigation of the planning domain. Each map contains the following keys:
+      :plan       - A vector describing what plan steps have been executed, that is, the current traversal of the domain for this partial plan.
+                    Its first element in the goal, all others are (ground ?) operator heads.
+      :new-tasks  - Maps of the current active edges, about to be traversed (method) or acted upon (operators).
+                    Each map has :pred and :bindings from
+                    When new-tasks is empty, the plan has been completed.
+      :state      - is the state of the world in which the plan is being carried out.
+                    It is modified by the actions operators (interacting with the user) and the d-lists and a-lists of operators.
+
+   s-tasks (satisfying-elements) is a map containing the following keys:
+      :bindings  - is a map of variable bindings,
+      :task      - is information from the operator or method RHS satisfying RHS the preconditions."
+  [partials s-tasks {:keys [inject-failures] :as _opts}]
+  (let [part (first partials)
+        {:keys [task bindings]} (first s-tasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
+    (cond (empty? s-tasks)    (-> partials rest vec) ; No way forward from this navigation. The partial can be removed.
+
+          ;; Execute the operator. If it succeeds, update state, new-tasks, and plan.
+          (operator? task)   (let [op-head (-> task :operator/head (uni/subst bindings))
+                                   new-partial (try (-> part ; ToDo: Assumes only run-operator can throw.
+                                                        (update :state #(run-operator op-head % inject-failures))
+                                                        (update :state #(update-state-by-op-actions % task bindings))
+                                                        (update :new-tasks #(-> % rest vec))
+                                                        (update :plan #(conj % op-head))
+                                                        vector)
+                                                    (catch Exception e
+                                                      [(assoc part :failure (.data e))]))]
+                               (into new-partial (rest partials)))
+
+          ;; Update the task list with the tasks from the RHS
+          (method? task)     (let [new-partial (update part :new-tasks #(into (mapv (fn [t] (uni/subst t bindings)) (:method/rhs task))
+                                                                              (-> % rest vec)))] ; drop this task; add the steps
+                               (into [new-partial] (rest partials))))))
+
+;;; (plan/plan9 domain)
+(defn ^:diag plan9
+  "A dynamic HTN planner.
+   Operates on a stack (vector) of 'partials' (described in the docstring of update-planning).
+   Initialize the stack to a partial from a problem definition.
+   Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
+  [{:domain/keys [elems problem]} & opts]
+  (let [state   (:problem/state problem) ; A vector of ground literals.
+        goal    (:problem/goal problem)] ; A literal.
+    (loop [partials [{:plan [] :new-tasks [goal] :state state}]
+           cnt 1]
+      ;;(log/info "new-tasks =" (-> partials first :new-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
+      (log/info "partial = " (first partials))
+      (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
+            s-tasks (satisfying-tasks task elems (-> partials first :state))]
+        (cond
+          (empty? partials)                         {:result :failure :reason :no-successful-plans}
+          (-> partials first :new-tasks empty?)     {:result :success :plan (first partials)}
+          (empty? s-tasks)                          {:result :failure :reason :empty-satisfiers :task task}
+          (> cnt 10)                                {:result :stopped :partials partials}
+          :else  (let [partials (update-planning partials s-tasks opts)
+                       partials (if-let [err (-> partials first :failure)]
+                                  (do (log/info "***Plan fails owing to operator" err)
+                                      (-> partials rest vec))
+                                  partials)]
+                     (recur partials
+                            (inc cnt))))))))
+
+;;;=================================================== End Dynamic planner =======================================================
+
 (defn plan
   "Communicate to shop3 whatever is specified in the arguments, which may include one or more of:
       1) :domain  - a domain in shop format (an s-expression).
@@ -134,7 +353,7 @@
        @(connect-atm :planning-domains)
        domain-id))
 
-(defn get-domain
+(defn get-domain ; ToDo: This goes away with SHOP.
   "Return the domain in SHOP format."
   [domain-id & {:keys [form] :or {form :proj}}]
   (let [db-obj (if-let [eid (domain-eid domain-id)]
@@ -146,6 +365,9 @@
       :shop   (shop/db2shop db-obj)
       :canon  (shop/db2canon db-obj))))
 
+;;; ToDo: This isn't quite the whole story. What's missing is that there can be multiple binding sets
+;;;       owing to data about the same predicate used with different role values. I have something nice
+;;;       to deal with this in explainlib.
 (defn condition-satisfies?
   "Return true if the positive condition argument unifies with any fact,
    OR if the negative condition argument unifies with no fact.
@@ -230,19 +452,20 @@
 (defn execute-plan!
   "Execute the operators of the plan, producing side-effects such as asking the user
    and fact-updates (a map of :add and :delete vectors of propositions).
-   Returns a vector ::spec/state-edits object that is the effect of running the plan."
-  [pid client-id domain plan]
+   Returns a vector ::spec/state-edits object that is the effect of running the plan." ; <======================== Post-SHOP this is good. Put it in the DB. It currently isn't the case.
+  [pid client-id state plan domain-id]
   (let [plan (translate-plan plan)]
     (log/info "execute-plan!: pid =" pid "plan =" plan)
     (doseq [plan-step plan] ; after translate-plan plan-steps have :operator :args and :cost.
       (s/assert ::spec/plan-step plan-step)
       (log/info "run plan-step" plan-step)
-      (op/run-op
-       (:operator plan-step)
+      (op/operator-meth
        {:plan-step plan-step
+        :domain-id domain-id ; This is needed for a-list/d-list work.
+        :tag (:operator plan-step)
         :pid pid
         :client-id client-id
-        :domain domain}))
+        :state state}))
     (db/get-state pid)))
 
 (defn discussion-stopped?
@@ -262,12 +485,19 @@
           (throw (ex-info "Goal unifies with neither method-heads nor state-vec."
                           {:goal g :method-heads method-heads :state-vec state-vec}))))))
 
+#_(defn check-goals-are-ground ; ToDo: Goes away with SHOP?
+  [goal-vec]
+  (doseq [g goal-vec]
+    (when (some #(and (symbol? %) (= "?" (-> % name (subs 0 1)))) (rest g))
+      (throw (ex-info "goal vector must be ground:" {:goal g})))))
+
 (defn check-triple
   "Return a keyword naming an obvious error in the domain/problem/execute structure."
   [{:keys [domain problem _execute] :as pass-obj}]
   (let [state-vec (-> problem :problem/state-string edn/read-string vec)
         goal-vec (-> problem :problem/goal-string edn/read-string vec)]
     (check-domain-to-goals domain state-vec goal-vec) ; ToDo: Many more tests like this.
+    ;(check-goals-are-ground goal-vec) ; This is something for after translation, thus don't other with it.
     pass-obj))
 
 (defn translate-triple
@@ -309,21 +539,21 @@
   [pid domain-id client-id & {:keys [start-facts problem limit]
                               :or {start-facts '#{(characterize-process new-proj)},
                                    problem (-> domain-id (get-domain {:form :proj}) :domain/problem)
-                                   limit 30}}] ; ToDo: Temporary
+                                   limit 2}}] ; ToDo: Temporary
   (s/assert ::spec/domain-problem problem)
   (let [proj-domain (-> domain-id (get-domain {:form :proj}))
         execute (:domain/execute proj-domain)] ; The execute statement is invariant to state changes.
     (loop [state   start-facts
            problem (-> problem (assoc :problem/state-string (str start-facts)))
            pruned  (prune-domain proj-domain start-facts)
-           plans   (-> {:domain  pruned :problem problem :execute execute} check-triple (translate-triple state) plan)
+           plans   (-> {:domain pruned :problem problem :execute execute} check-triple (translate-triple state) plan)
            cnt 1]
       (log/info "state = " state)
       (cond (= plans :bad-input)            :bad-input
             (>= cnt limit)                  (sort-by first state)
             (empty? plans)                  (sort-by first state)
             (discussion-stopped? state)     (sort-by first state)
-            :else  (let [new-state   (execute-plan! pid client-id pruned (first plans)) ; ToDo: Deal with multiple plans.
+            :else  (let [new-state   (execute-plan! pid client-id state (first plans) domain-id) ; ToDo: Deal with multiple plans.
                          new-problem (assoc problem :problem/state-string (str new-state))
                          new-pruned  (prune-domain proj-domain new-state)]
                      (log/info "new-state = " new-state)
@@ -398,18 +628,16 @@
     result))
 
 ;;; Run the following when you update interview-for-new-project!:
-;;;  (ws/register-ws-dispatch :start-a-new-project plan/interview-for-new-project!)
+;;;  (ws/register-ws-dispatch :resume-conversation plan/resume-conversation)
 (defn resume-conversation
+  "Start the interview loop. :resume-conversation is a dispatch key from client.
+   This is called even for where PID is :START-A-NEW-PROJECT."
   [{:keys [project-id client-id]}]
   (log/info "Calling interview-loop for project" project-id)
-  (if (= project-id :START-A-NEW-PROJECT)
-    (interview-loop :new-project :process-interview client-id)
-    (interview-loop project-id :process-interview client-id
-                    {:start-facts (db/get-state project-id)})
-    #_(log/info "Not yet resuming for existing projects: project-id =" project-id)))
+  (interview-loop project-id :process-interview client-id {:start-facts (db/get-state project-id)}))
 
 ;;; This makes recompilation smoother.
-(def test-the-planner? true)
+(def test-the-planner? false)
 
 ;;; From a shell: ./pzmq-shop3-2024-02-15 --non-interactive --disable-debugger --eval '(in-package :shop3-zmq)' --eval '(setf *endpoint* 31888)'
 (defn init-planner!
