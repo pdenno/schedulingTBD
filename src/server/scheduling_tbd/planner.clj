@@ -99,7 +99,7 @@
 (defn operator? [elem]
   (when (contains? elem :operator/head) elem))
 
-(defn unify-head?
+(defn matching-task?
   "Return a map of :elem and :bindings if the elem's head unifies with the argument literal."
   [lit elem]
   (when-let [bindings (uni/unify lit (head-of elem))]
@@ -143,57 +143,143 @@
 
 ;;; ToDo: This should return the elements with substitutions.
 ;;; ToDo: The variable bindings must be consistent among the preconditions.
-(defn satisfies-preconds?
-  "Return a vector of maps of the satisfying :elem  and :binding if theelem if its preconditions satisfy the state.
-   Note that methods have multiple RHS, so for methods the :elem is contains only thos RHS's that were satisfied."
-  [elem state]
-  (cond (operator? elem)    (let [bindings (mapv #(satisfied? % state) (:operator/preconds elem))]
+(defn satisfying-elems
+  "Return a vector of maps describing the specific tasks (e.g. the operator or specific element of :method/rhsides) and bindings when
+   that specific element satisfies state. Return nil otherwise."
+  [task state]
+  (cond (operator? task)    (let [bindings (mapv #(satisfied? % state) (:operator/preconds task))]
                               (when-let [bindings (and (every? identity bindings) (consistent-bindings? bindings))]
-                                [{:bindings bindings :elem elem}]))
+                                [{:bindings bindings :task task}]))
 
-        (method? elem)      (->> (map (fn [rhs]
-                                        (let [bindings (mapv #(satisfied? % state) (:method/preconds rhs))]
-                                          (when-let [bindings (and (every? identity bindings) (consistent-bindings? bindings))]
-                                            {:bindings bindings :elem (-> rhs (assoc :method/head (:method/head elem)))})))
-                                      (:method/rhsides elem))
-                                 (filterv identity))))
+        (method? task)      (reduce (fn [res rhs]
+                                      (if-let [bindings (mapv #(satisfied? % state) (:method/preconds rhs))]
+                                        (if-let [bindings (and (every? identity bindings) (consistent-bindings? bindings))]
+                                          (conj res {:bindings bindings :task (-> {:method/head (:method/head task)}
+                                                                                  (assoc :method/rhs (:method/task-list rhs)))})
+                                          res)
+                                        res))
+                                    []
+                                    (:method/rhsides task))))
 
-;;; This only works on the head partial plan, right? (That's even true once I have alternatives, right?)
+;;; Similar in operator.clj
+;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
+;;;       For the time being, I'm just adding uniquely
+(defn add-del-facts
+  "Update the facts by adding, deleting or resetting to empty.
+     facts - a set of ::spec/positive-proposition.
+     a map - with keys :add and :delete being collections of :specs/positive-proposition.
+             These need not be ground propositions; everything that unifies with a form in delete will be deleted.
+             A variable in the add list will be treated as a skolem.
+             reset? is truthy."
+  [facts a-list d-list]
+  (assert set? facts)
+  (assert (every? #(s/valid? ::spec/positive-proposition %) facts))
+  (as-> facts ?f
+    (if d-list
+      (->> ?f (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
+      ?f)
+    (if a-list (into ?f a-list) ?f)))
+
+;;; Similar is in operator.clj
+(defn update-state-by-op-actions
+  "Update the project's DB, specifically :project/state-string with infromation from last response and operator a-list and d-list.
+      - plan-step   - a map such as {:operator :!yes-no-process-steps, :args [aluminium-foil]},
+      - proj-id     - the keyword identifying a project by its :project/id.
+      - domain-id   - a keyword identifying the domain, for example, :process-interview.
+   Returns the new state."
+  [old-state op-obj bindings]
+  (let [a-list (mapv #(uni/subst % bindings) (:operator/a-list op-obj))
+        d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))]
+    (add-del-facts old-state a-list d-list)))
+
+(defn run-operator
+  "Run the action associated with the operator, returning an updated state."
+  [op-head state]
+  (log/info "Running operator" op-head)
+  state)
+
+;;; This only needs to work on the head partial plan, right? (That's even true once I have alternatives, right?)
 ;;; Later, this is the place to execute the plan by running operators that interact with the user to update state.
 ;;; I think I can borrow the inference engine from explain lib. It might also be useful for making full navigations to calculate plan cost.
-(defn update-state
-  "Update the state of the plan by updating the active partial plan, advancing it by whatever the active satisfying elem requires.
+;;; Currently: (1) don't handle axioms, (2) don't create alternatives (domain doesn't have these anyway), (3) costs.
+(defn update-planning
+  "Update the state of planning by updating the active partial plan, advancing it by whatever the active satisfying elem requires.
    The active satisfying elem (currently first selem) may have multiple tasks in its RHS.
    Assuming that it does not encounter an unsatisfiable precondition, it iterates through the operators and axioms in the RHS until it encounters a method.
    Operators and axioms can thereby update the state.
-   Once it encounters a method (or axiom?), it returns a new partial, which has the un-executed method, and anything after pushed onto new-tasks."
-  [partials selems])
+   Once it encounters a method (or axiom?), it returns a new partial, which has the un-executed method, and anything after pushed onto new-tasks.
 
+   Backtracking is built-in to this algorithm; partials is a stack of choice points.
 
-;;; partials is a vector of maps containing a navigation of the planning domain. Each map contains the following keys:
-;;;    :plan       - is a current traversal of the domain.
-;;;    :new-tasks  - are the current active edges, about to be traversed (method) or acted upon (operators).
-;;;                  When new-tasks is empty, the plan has been completed.
-;;;    :state      - is the state of the world in which the plan is being carried out.
-;;;                  It is modified by the actions operators (interacting with the user) and the d-lists and a-lists of operators.
+   stasks is a vector of 'satisfying tasks' that navigate one edge each to new plans.
+   A new partial is generated for each satisfying task in this vector.
 
-;;; First  implementation: (1) don't handle axioms, (2) don't backtrack, (3) don't create alternatives (domain doesn't have these anyway), (4) costs.
-;;; (plan1 domain)
-(defn ^:diag plan1
-  "Dynamic HTN planner"
+   partials is a vector of maps containing a navigation of the planning domain. Each map contains the following keys:
+      :plan       - A vector describing what plan steps have been executed, that is, the current traversal of the domain for this partial plan.
+                    Its first element in the goal, all others are (ground ?) operator heads.
+      :new-tasks  - Maps of the current active edges, about to be traversed (method) or acted upon (operators).
+                    Each map has :pred and :bindings from
+                    When new-tasks is empty, the plan has been completed.
+      :state      - is the state of the world in which the plan is being carried out.
+                    It is modified by the actions operators (interacting with the user) and the d-lists and a-lists of operators.
+
+   stasks (satisfying-elements) is a map containing the following keys:
+      :bindings  - is a map of variable bindings,
+      :task      - is information from the operator or method RHS satisfying RHS the preconditions."
+  [partials stasks]
+  (let [part (first partials)
+        {:keys [task bindings]} (first stasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
+    (reset! diag stasks)
+    (cond (empty? stasks)    (-> partials rest vec) ; No way forward from this navigation. The partial can be removed.
+
+          ;; Execute the operator. If it succeeds, update state, new-tasks, and plan. If it fails, [remove this partial???]
+          (operator? task)   (let [op-head (-> task :operator/head (uni/subst bindings))
+                                    new-partial (try (-> part
+                                                         (update :state #(run-operator op-head %))
+                                                         (update :state #(update-state-by-op-actions % task bindings))
+                                                         (update :new-tasks #(-> % rest vec))
+                                                         (update :plan #(conj % op-head))
+                                                         vector)
+                                                     (catch Exception _e []))]
+                                (into new-partial (rest partials)))
+
+          ;; Update the task list with the tasks from the RHS
+          (method? task)     (let [new-partial (update part :new-tasks #(into (-> % rest vec) ; drop this task; add the steps
+                                                                              (map (fn [t] (uni/subst t bindings)) (:method/rhs task))))]
+                               (into [new-partial] (rest partials))))))
+
+;;; Is there is a problem here?
+;;; The operator code updates :new-tasks, removing the one it executed.
+;;; But how does this mesh with plan9? I think plan9 needs to know whether the head task is a method or operator.
+;;; The stuff I'm doing about satisfying-tasks is about navigating next states, but when task is an operator, you just do it.
+;;; +I think this means update-planning gets called earlier with operators+ NO.
+;;;  I think this means that operator must preserve knowledge of what vars are bound.
+
+;;; (plan/plan9 domain)
+(defn ^:diag plan9
+  "A dynamic HTN planner.
+   Operates on a stack (vector) of 'partials' (described in the docstring of update-planning).
+   Initialize the stack to a partial from a problem definition.
+   Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
   [{:domain/keys [elems problem]}]
   (let [state   (:problem/state problem) ; A vector of ground literals.
         goal    (:problem/goal problem)] ; A literal.
-    (loop [partials [{:plan [goal] :new-tasks [goal] :state [state]}]
+    (loop [partials [{:plan [goal] :new-tasks [goal] :state state}]
            cnt 1]
-      (let [head (-> partials first :plan first) ;
-            matching-elems   (filter #(unify-head? head %) elems)
-            satisfying-elems (filter #(satisfies-preconds? % state) matching-elems)]
+      (log/info "new-tasks =" (-> partials first :new-tasks))
+      (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
+            matching-tasks   (filter #(matching-task? task %) elems)
+            satisfying-tasks (reduce (fn [res task]
+                                       (if-let [r (satisfying-elems task state)]
+                                         (into res r)
+                                         res))
+                                     []
+                                     matching-tasks)]
         (cond
           (-> partials first :new-tasks empty?)     {:state :success :plan (first partials)}
-          (> cnt 3)                                 {:state :stopped :partials partials}
-          (empty? satisfying-elems)                 {:state :failure :partials partials}
-          :else                                     (recur (update-state partials satisfying-elems)
+          (empty? partials)                         {:state :failure}
+          (> cnt 10)                                {:state :stopped :partials partials}
+          :else                                     (recur (update-planning partials satisfying-tasks)
                                                            (inc cnt)))))))
 
 ;;;=================================================== End Dynamic planner =======================================================
@@ -266,6 +352,9 @@
       :shop   (shop/db2shop db-obj)
       :canon  (shop/db2canon db-obj))))
 
+;;; ToDo: This isn't quite the whole story. What's missing is that there can be multiple binding sets
+;;;       owing to data about the same predicate used with different role values. I have something nice
+;;;       to deal with this in explainlib.
 (defn condition-satisfies?
   "Return true if the positive condition argument unifies with any fact,
    OR if the negative condition argument unifies with no fact.
