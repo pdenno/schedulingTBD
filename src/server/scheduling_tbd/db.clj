@@ -1,6 +1,6 @@
 (ns scheduling-tbd.db
   "System and project database schemas and database initialization.
-   There are other databases, see for example, shop.clj."
+   There are other databases, see for example, him.clj."
   (:require
    [clojure.core :as c]
    [clojure.edn  :as edn]
@@ -16,9 +16,7 @@
    [scheduling-tbd.util  :as util :refer [now]]
    [scheduling-tbd.specs :as spec]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id]]
-   [taoensso.timbre :as log :refer [debug]])
-  (:import
-   java.time.LocalDateTime))
+   [taoensso.timbre :as log :refer [debug]]))
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
@@ -224,12 +222,6 @@
    :work/objective-sentence
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The sentence from user description best describing the scheduling objective."}})
-
-;;; ToDo: This was used in the old get-project. I'll keep it around for a while to see if it is useful.
-#_(def db-object-ids
-  (reduce-kv (fn [res k v] (if (= :db.unique/identity (:db/unique v)) (conj res k) res))
-             []
-             db-schema-proj+))
 
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
@@ -442,7 +434,7 @@
         cfg)
     (log/error "Not recreating DB because backup file does not exist:" backup-file))))
 
-(def keep-db? #{:him :planning-domains})
+(def keep-db? #{:him})
 (defn recreate-dbs!
   "Recreate the system DB on storage from backup.
    For each project it lists, recreate it from backup if such backup exists."

@@ -163,3 +163,10 @@
   "Unify the fact (which need not be ground) to the fact-list"
   [fact fact-list]
   (some #(when (uni/unify fact %) %) fact-list))
+
+(def planning-domains "An atom that associates a keyword key with a planning domain stucture (containing :domain/elems, :domain/problem)."
+  (atom {}))
+
+(defn register-planning-domain [id domain] (swap! planning-domains #(assoc % id domain)))
+(defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
+(defn get-domain [id] (get @planning-domains id))

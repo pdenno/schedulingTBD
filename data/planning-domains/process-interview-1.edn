@@ -7,10 +7,8 @@
 ;;;  - It is an error (:bad-input) to have a fact that unifies with the head of an axiom! Try this with craft beer and (process-defined craft-beer).
 
 {:domain/id :process-interview
- :domain/ename "pi"  ; This is appended to every :domain/element, so we keep it short.
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
- :domain/problem {:problem/ename "talk-process"
-                  :problem/domain :process-interview
+ :domain/problem {:problem/domain :process-interview
                   :problem/goal   (characterize-process ?proj)
                   :problem/state #{(ongoing-discussion craft-beer)
                                    (proj-id craft-beer)
