@@ -14,7 +14,6 @@
    [scheduling-tbd.domain :as dom]
    [scheduling-tbd.llm    :as llm]
    [scheduling-tbd.specs  :as spec]
-   [scheduling-tbd.shop   :as shop]
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm resolve-db-id db-cfg-map find-fact]]
    [scheduling-tbd.web.routes.websockets  :as ws]
    [taoensso.timbre       :as log]))
@@ -42,7 +41,7 @@
 (def ^:diag diag (atom nil))
 
 (defmacro defoperator
-  "Macro to wrap methods for translating shop to database format."
+  "Macro to wrap planner operator methods."
   {:clj-kondo/lint-as 'clojure.core/defmacro ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
    :arglists '([arg-map] & body)} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
   [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
@@ -52,29 +51,6 @@
        (if (seq? res#) (doall res#) res#)
        (do (when @debugging?     (println (cl-format nil "<-- ~A (op) returns ~S" ~tag res#)))
            res#))))
-
-;;; ToDo: (docstring) https://stackoverflow.com/questions/22882068/add-optional-docstring-to-def-macros
-#_(defmacro defoperator
-  "Macro to wrap methods for translating shop to database format."
-  {:clj-kondo/lint-as 'clojure.core/defmacro ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
-   :arglists '(tag [arg-map] & body)} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
-  [tag doc? [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod operator-meth ~tag [~'_tag ~arg-map]
-     (when @debugging? (println (cl-format nil "==> ~A" ~tag)))
-     (let [res# (do ~@body)]
-       (if (seq? res#) (doall res#) res#)
-       (do (when @debugging?
-             (println (cl-format nil "<-- ~A returns ~S" ~tag res#)))
-           res#))))
-
-#_(defn operator-meth-dispatch
-  "Parameters to operator-meth have form [plan-step proj-id domain & other-args]
-   This dispatch function choose a method by return (:operator plan-step)."
-  [tag & _]
-  (log/info "operator-meth-dispatch: tag =" tag)
-  (cond
-    (keyword? tag) tag
-    :else (throw (ex-info "operator-meth-dispatch: No dispatch value for tag" {:tag tag}))))
 
 (defn operator-meth-dispatch
   "Parameters to operator-meth have form [plan-step proj-id domain & other-args]
@@ -110,21 +86,11 @@
 (defmulti db-action #'db-action-dispatch)
 
 ;;; -------------------------- Domain manipulation for a-list and d-list -----------------------------
-(defn get-domain ; ToDo: This goes away with SHOP. There's a similar one in planner.clj!
-  "Return the domain in SHOP format."
-  [domain-id]
-  (let [eid (d/q '[:find ?eid .
-                   :in $ ?dname
-                   :where [?eid :domain/id ?dname]]
-                 @(connect-atm :planning-domains) domain-id)
-        db-obj  (resolve-db-id {:db/id eid} (connect-atm :planning-domains))]
-    (shop/db2proj db-obj)))
-
 ;;; plan-step =  {:cost 1.0, :operator :!yes-no-process-steps, :args [craft-beer]}
 (defn domain-operator
   "Return the argument operator from the domain."
   [domain-id operator]
-  (->> (get-domain domain-id)
+  (->> (sutil/get-domain domain-id)
        :domain/elems
        (some #(when (= (-> % :operator/head first) operator) %))))
 
@@ -186,13 +152,41 @@
           ""
           v))
 
-(defn new-human-project
+;;; Currently this either fails or returns the argument state.
+(defn run-operator
+  "Run the action associated with the operator, returning an updated state EXCEPT where."
+  [op-head state {:keys [inject-failures] :as opts}]
+  (if (some #(uni/unify op-head %) inject-failures)
+    (do  (log/info "FAILURE (injected):" op-head)
+         (throw (ex-info "run-operator injected failure" {:op-head op-head})))
+    (do (log/info "Running operator" op-head)
+        state)))
+
+#_(defn new-human-project
   "Create a project for a human given response. Return its PID."
   [project-name] ; ToDo: replace state-string with state.
   (let [pid   (-> project-name str/lower-case (str/replace #"\s+" "-") keyword)
         pname (->>  (str/split project-name #"\s+") (mapv str/capitalize) (interpose " ") (apply str))
         pid   (db/create-proj-db! {:project/id pid :project/name  pname})] ; pid might not have been unique, thus this returns a new one.
-      pid))
+    pid))
+
+;;; For reference, this is what plan9 was using before it was integrated.
+
+;;; For reference, this is what plan9 was using before it was integrated.
+;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
+;;;       For the time being, I'm just adding uniquely
+(defn add-del-facts
+  "Update the facts by adding, deleting or resetting to empty.
+     facts - a set of ::spec/positive-proposition.
+     a map - with keys :add and :delete being collections of :specs/positive-proposition.
+             These need not be ground propositions; everything that unifies with a form in delete will be deleted.
+             A variable in the add list will be treated as a skolem."
+  [facts a-list d-list]
+  (assert set? facts)
+  (assert (every? #(s/valid? ::spec/positive-proposition %) facts))
+  (cond-> facts
+    (not-empty d-list) (->> (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
+    (not-empty a-list) (->> (into a-list) set)))
 
 (defn operator-update-state
   "Update the project's DB, specifically :project/state-string with infromation from last response and operator a-list and d-list.
@@ -200,17 +194,26 @@
       - proj-id     - the keyword identifying a project by its :project/id.
       - domain-id   - a keyword identifying the domain, for example, :process-interview.
    Returns the new state."
-  [plan-step domain-id old-state]
+  [old-state op-obj bindings]
+  (let [a-list (mapv #(uni/subst % bindings) (:operator/a-list op-obj))
+        d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))]
+    (add-del-facts old-state a-list d-list)))
+
+;;; This one was used by the SHOP planner.
+#_(defn operator-update-state
+  "Update the project's DB, specifically :project/state-string with infromation from last response and operator a-list and d-list.
+      - plan-step   - a map such as {:operator :!yes-no-process-steps, :args [aluminium-foil]},
+      - proj-id     - the keyword identifying a project by its :project/id.
+      - domain-id   - a keyword identifying the domain, for example, :process-interview.
+   Returns the new state."
+  [plan-step domain-id old-state {:keys [pid] :as opts}]
   (let [{:keys [operator args]} plan-step
         op-sym (-> operator name symbol)
-        op-obj (domain-operator domain-id op-sym) ; ToDo: This simplifies when shop is gone.
+        op-obj (domain-operator domain-id op-sym)
         bindings (zipmap (-> op-obj :operator/head rest) args)
         a-list (mapv #(uni/subst % bindings) (:operator/a-list op-obj))
         d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))]
     (add-del-facts old-state {:add a-list :delete d-list})))
-
-
-(def wait-time-for-user-resp "The number of milliseconds to wait for the user to reply to a query." 20000)
 
 (defn surrogate?
   "Return true if state has a predicate unifying with (surrogate ?x)."

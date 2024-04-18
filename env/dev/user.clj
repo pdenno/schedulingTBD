@@ -23,7 +23,7 @@
 
 (alter-var-root #'s/*explain-out* (constantly expound/printer))
 (add-tap (bound-fn* clojure.pprint/pprint))
-(set-refresh-dirs "test/rad_mapper/server")  ; put as many as you need here
+(set-refresh-dirs "src/server/scheduling_tbd" "test/scheduling_tbd")  ; Put here as many as you need.
 
 (defn start
   "Start the web server"
@@ -48,6 +48,5 @@
   to recompile, and then use `start` once things are good."
   []
   (stop)
-  (java.lang.Thread/sleep 2000) ; Planner needs this.
   (tools-ns/refresh :after 'user/start)
   (llm/select-openai-models!))

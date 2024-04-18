@@ -7,7 +7,6 @@
    [clojure.string]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.db   :refer [sys&proj-database-cfgs]] ; for mount
-   [scheduling-tbd.shop  :refer [plans-db-cfg]]          ; for mount
    [scheduling-tbd.how-made :refer [him-cfg]]            ; for mount
    [scheduling-tbd.paillier :refer [api-key]]            ; for mount
    [scheduling-tbd.planner :refer [plan-server]]         ; for mount
@@ -34,7 +33,7 @@
   (reset! system nil)
   (when (= profile :prod) (shutdown-agents)))
 
-(defn test-server [port]
+(defn ^:diag test-server [port]
   (try
     ;; Convert the Ring handler into a running web server.
     (GET (str "http://localhost:" port "/api/health")

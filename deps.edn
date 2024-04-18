@@ -9,7 +9,6 @@
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
            funcool/promesa                     {:mvn/version "11.0.678"}
-           io.djy/ezzmq                        {:mvn/version "0.8.2"}
            io.replikativ/datahike              {:mvn/version "0.6.1558"}
            metosin/muuntaja                    {:mvn/version "0.6.10"}
            metosin/reitit                      {:mvn/version "0.6.0"}
