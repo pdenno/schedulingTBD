@@ -1,68 +1,38 @@
 [
-#:project{:desc
+#:project{:code
+          " int : nProducts = 5;\n set of int: Product = 1..nProducts;\n set of int: Day = -36..365;\n enum Task = {mill, ferment, bright};\n array [Product, Task] of int: taskDuration = [|1, 20, 20 |   % processing times for\n                                                1, 20, 20 |   % various beers, perhaps\n                                                1, 30, 11 |   % from a screenshot of a\n                                                1, 21, 11 |   % of spreadsheet the\n                                                1, 18, 19 |]; % user provided.\n\n array [Product] of Day: neededDate = [50, 80, 130, 140, 150];\n\n % We assume a task uses one major resource; resources are synonymous with tasks.\n array [Product, Task] of var Day: taskStarts; % 'var' means it is a decision variable.\n array [Product, Task] of var Day: taskEnds;\n\n % We'll use this below to ensure a resource can only be used by one product at a time.\n array [Task, Day] of var Product: busyWith;\n\n % The first two Product are already in the fermentation tank and bright tank respectively.\n constraint taskStarts[1,mill] = -35;   % Product 1 is therefore in the bright tank...\n constraint taskStarts[2,mill] = -5;    % ...and out before this one moves there.\n\n % Next task must start right after previous task ends. No place to put WIP.\n constraint forall (p in Product) (taskEnds[p, mill   ] + 1 == taskStarts[p, ferment]);\n constraint forall (p in Product) (taskEnds[p, ferment] + 1 == taskStarts[p, bright]);\n\n % A task ends taskDuration days after it starts.\n constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n % A resource(task) can only be used with one product at a time.\n constraint forall (t in Task, p in Product, d in Day where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])\n                    (busyWith[t,d] == p);\n\n % Aim to have it done when it is needed.\n solve minimize sum (p in Product) (abs(neededDate[p] - taskEnds[p,bright]));",
+          :desc
           "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan.",
           :id :craft-beer-brewery-scheduling,
-          :current-domain :process-interview,
-          :name "Craft Beer Brewery Scheduling"
-          :state-string "#{(ongoing-discussion craft-beer)
-                           (proj-id craft-beer)
-                           (system-model craft-beer flow)
-                           (well-known-process craft-beer)
-                           (have-process-steps craft-beer)
-                           (have-process-durs craft-beer)
-                           (have-process-ordering craft-beer)}"
-          :messages [#:message{:from :system,
-                               :id 0,
-                               :content [{:msg-text/string "Describe your scheduling problem in a few sentences or "}
-                                         {:msg-link/uri "http://localhost:3300/learn-more"
-                                          :msg-link/text "learn more about how this works"}
-                                         {:msg-text/string "."}]
-                               :time #inst "2023-11-11T10:12:49.625-00:00"}
-
-                     #:message{:from :user,
-                               :id 1,
-                               :content [{:msg-text/string "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan."}]
-                               :time #inst "2023-11-11T10:12:49.648-00:00"}
-
-                     #:message{:from :system,
-                               :id 2,
-                               :content [{:msg-text/string "Great! We'll call your project 'craft-beer-brewery-scheduling'."}]
-                               :time #inst "2023-11-11T10:12:49.671-00:00"}]
-          :code " int : nProducts = 5;
- set of int: Product = 1..nProducts;
- set of int: Day = -36..365;
- enum Task = {mill, ferment, bright};
- array [Product, Task] of int: taskDuration = [|1, 20, 20 |   % processing times for
-                                                1, 20, 20 |   % various beers, perhaps
-                                                1, 30, 11 |   % from a screenshot of a
-                                                1, 21, 11 |   % of spreadsheet the
-                                                1, 18, 19 |]; % user provided.
-
- array [Product] of Day: neededDate = [50, 80, 130, 140, 150];
-
- % We assume a task uses one major resource; resources are synonymous with tasks.
- array [Product, Task] of var Day: taskStarts; % 'var' means it is a decision variable.
- array [Product, Task] of var Day: taskEnds;
-
- % We'll use this below to ensure a resource can only be used by one product at a time.
- array [Task, Day] of var Product: busyWith;
-
- % The first two Product are already in the fermentation tank and bright tank respectively.
- constraint taskStarts[1,mill] = -35;   % Product 1 is therefore in the bright tank...
- constraint taskStarts[2,mill] = -5;    % ...and out before this one moves there.
-
- % Next task must start right after previous task ends. No place to put WIP.
- constraint forall (p in Product) (taskEnds[p, mill   ] + 1 == taskStarts[p, ferment]);
- constraint forall (p in Product) (taskEnds[p, ferment] + 1 == taskStarts[p, bright]);
-
- % A task ends taskDuration days after it starts.
- constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);
-
- % A resource(task) can only be used with one product at a time.
- constraint forall (t in Task, p in Product, d in Day where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])
-                    (busyWith[t,d] == p);
-
- % Aim to have it done when it is needed.
- solve minimize sum (p in Product) (abs(neededDate[p] - taskEnds[p,bright]));"}
+          :messages
+          [#:message{:content
+                     [#:msg-text{:string
+                                 "Describe your scheduling problem in a few sentences or "}
+                      #:msg-link{:text
+                                 "learn more about how this works",
+                                 :uri
+                                 "http://localhost:3300/learn-more"}
+                      #:msg-text{:string "."}],
+                     :from :system,
+                     :id 0,
+                     :time #inst "2023-11-11T10:12:49.625-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan."}],
+                     :from :user,
+                     :id 1,
+                     :time #inst "2023-11-11T10:12:49.648-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "Great! We'll call your project 'craft-beer-brewery-scheduling'."}],
+                     :from :system,
+                     :id 2,
+                     :time #inst "2023-11-11T10:12:49.671-00:00"}],
+          :name "Craft Beer Brewery Scheduling",
+          :planning-problem
+          #:problem{:domain :process-interview,
+                    :goal-string "(characterize-process ?proj)",
+                    :state-string
+                    "#{(ongoing-discussion craft-beer) (proj-id craft-beer) (system-model craft-beer flow) (well-known-process craft-beer) (have-process-steps craft-beer) (have-process-durs craft-beer)  (have-process-ordering craft-beer)}"}}
 
 ]

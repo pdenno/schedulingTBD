@@ -27,7 +27,7 @@
    [reitit.http.interceptors.dev :as dev] ; for testing
    [reitit.http.spec :as spec]
    [scheduling-tbd.web.controllers.respond :as resp]
-   [scheduling-tbd.web.routes.websockets   :as wsock]
+   [scheduling-tbd.web.websockets   :as wsock]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
    [spec-tools.spell :as spell]))

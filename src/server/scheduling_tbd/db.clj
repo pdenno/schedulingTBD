@@ -76,15 +76,22 @@
    :msg-text/string
       #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
            :doc "A text string as part of :message/content."}
+   ;; ---------------------- problem (the planning problem and current state)
+   :problem/domain
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "A keyword identifying the problem domain map"}
+   :problem/goal-string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "A string that can be edn/read-string into a predicate."}
+   :problem/state-string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "A string that can be edn/read-string into a set of predicates"}
 
    ;; ---------------------- project
    :project/code
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Code associated with the project."}
 
-   :project/current-domain
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a :domain/id (keyword in domains db) indicating where this project is currently working."}
    :project/deleted?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "a boolean marking the projected as no longer existing.
@@ -104,9 +111,9 @@
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
-   :project/state-string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string, that can be edn/read-string into a vector of propositions."}
+   :project/planning-problem
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "an object with keys :problem/domain, :problem/goal-string, and :problem/state-string at least."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
@@ -286,21 +293,6 @@
             (not [?e :project/deleted? true])]
           @(connect-atm :system)))))
 
-(defn get-state
-  [pid & {:keys [sort?] :or {sort? true}}]
-  (if (= pid :START-A-NEW-PROJECT)
-    '[(proj-id :START-A-NEW-PROJECT)]
-    (let [conn (connect-atm pid)]
-      (when-let [state-str (d/q '[:find ?s .
-                                  :in $ ?pid
-                                  :where
-                                  [?e :project/id ?pid]
-                                  [?e :project/state-string ?s]]
-                                @conn)]
-        (cond->> (edn/read-string state-str)
-          sort? (sort-by first)
-          true vec)))))
-
 (defn get-thread-id
   "Get the thread object of the argument PID."
   ([pid] (get-thread-id pid true))
@@ -345,6 +337,15 @@
         (sort-by :message/id)
         vec)))
 
+(defn get-problem
+  "Return the planning problem. We add new keys for the things that end in -string,
+   that is, for :problem/goal-string and :problem/state-string :goal and :state are added respectively."
+  [pid]
+  (as-> (get-project pid) ?x
+    (:project/planning-problem ?x)
+    (assoc ?x :goal (-> ?x :problem/goal-string edn/read-string))
+    (assoc ?x :state (-> ?x :problem/state-string edn/read-string))))
+
 (defn get-code
   "Return the code string for the argument project (or an empty string if it does not exist)."
   [pid]
@@ -357,11 +358,14 @@
       ""))
 
 (defn put-state
-  "Write an updated state to the project database."
-  [pid state-vec]
-  (let [eid (project-exists? pid)
-        conn (connect-atm pid)]
-    (d/transact conn {:tx-data [[:db/add eid :project/state-string (str state-vec)]]})))
+  "Write an updated state to the project database. Argument is a vector or set. "
+  [pid state]
+  (assert (every? #(s/valid? ::spec/positive-proposition %) state))
+  (let [state-set (set state)
+        conn (connect-atm pid)
+        eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
+    (d/transact conn
+                {:tx-data [[:db/add eid :problem/state-string (str state-set)]]})))
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
@@ -384,7 +388,7 @@
   "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir.
    Example usage: (backup-proj-dbs)."
   [& {:keys [target-dir] :or {target-dir "data/projects/"}}]
-  (doseq [{:project/keys [id]} (list-projects)]
+  (doseq [id (list-projects)]
     (backup-proj-db id {:target-dir target-dir})))
 
 (defn backup-system-db
@@ -444,6 +448,7 @@
   (recreate-system-db!)
   (log/info "Recreating these projects:" (list-projects))
   (doseq [pid (list-projects)]
+    (log/info "PID = " pid)
     (recreate-project-db! pid)))
 
 (defn unknown-projects
@@ -536,8 +541,7 @@
      ;; Add to project db
      (d/transact (connect-atm id) db-schema-proj)
      (d/transact (connect-atm id) {:tx-data [{:project/id id
-                                              :project/name name
-                                              :project/state-string "[]"}]})
+                                              :project/name name}]})
      (when (not-empty additional-info)
        (d/transact (connect-atm id) additional-info))
      ;; Add knowledge of this project to the system db.

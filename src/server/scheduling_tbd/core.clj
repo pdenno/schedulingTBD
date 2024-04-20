@@ -8,12 +8,11 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.db   :refer [sys&proj-database-cfgs]] ; for mount
    [scheduling-tbd.how-made :refer [him-cfg]]            ; for mount
-   [scheduling-tbd.paillier :refer [api-key]]            ; for mount
-   [scheduling-tbd.planner :refer [plan-server]]         ; for mount
+   [scheduling-tbd.planner :refer [planning]]            ; for mount
    [scheduling-tbd.surrogate :refer [surrogates]]        ; for mount
    [scheduling-tbd.util :refer [util-state]]             ; for mount
    [scheduling-tbd.web.handler :refer [app]]             ; for mount
-   [scheduling-tbd.web.routes.websockets :refer [wsock]] ; for mount
+   [scheduling-tbd.web.websockets :refer [wsock]] ; for mount
    [ring.adapter.jetty :as jetty]
    [taoensso.timbre :as log])
   (:gen-class))

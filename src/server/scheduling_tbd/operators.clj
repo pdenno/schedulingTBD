@@ -3,19 +3,16 @@
   (:refer-clojure :exclude [send])
   (:require
    [clojure.core.unify    :as uni]
-   [clojure.edn           :as edn]
    [clojure.pprint        :refer [cl-format]]
    [clojure.spec.alpha    :as s]
-   [clojure.string        :as str]
-   [datahike.api          :as d]
    [promesa.core          :as p]
    [promesa.exec          :as px]
    [scheduling-tbd.db     :as db]
    [scheduling-tbd.domain :as dom]
    [scheduling-tbd.llm    :as llm]
    [scheduling-tbd.specs  :as spec]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm resolve-db-id db-cfg-map find-fact]]
-   [scheduling-tbd.web.routes.websockets  :as ws]
+   [scheduling-tbd.sutil  :as sutil :refer [find-fact]]
+   [scheduling-tbd.web.websockets  :as ws]
    [taoensso.timbre       :as log]))
 
 ;;; Two method types are associated with each plan operator. For both method types, a 'tag' (keyword) selects the
@@ -39,18 +36,20 @@
 
 (def debugging? (atom true))
 (def ^:diag diag (atom nil))
+(def operator-method? "A set of operator symbols, one for each method defined by defoperator." (atom #{}))
 
 (defmacro defoperator
   "Macro to wrap planner operator methods."
   {:clj-kondo/lint-as 'clojure.core/defmacro ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
    :arglists '([arg-map] & body)} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
   [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod operator-meth ~tag [~arg-map]
-     (when @debugging? (println (cl-format nil "==> ~A (op)" ~tag)))
-     (let [res# (do ~@body)]
-       (if (seq? res#) (doall res#) res#)
-       (do (when @debugging?     (println (cl-format nil "<-- ~A (op) returns ~S" ~tag res#)))
-           res#))))
+  `(do (swap! operator-method? #(conj % '~tag))
+       (defmethod operator-meth ~tag [~arg-map]
+         (when @debugging? (println (cl-format nil "==> ~A (op)" ~tag)))
+         (let [res# (do ~@body)]
+           (if (seq? res#) (doall res#) res#)
+           (do (when @debugging?     (println (cl-format nil "<-- ~A (op) returns ~S" ~tag res#)))
+               res#)))))
 
 (defn operator-meth-dispatch
   "Parameters to operator-meth have form [plan-step proj-id domain & other-args]
@@ -152,91 +151,50 @@
           ""
           v))
 
-;;; Currently this either fails or returns the argument state.
 (defn run-operator
-  "Run the action associated with the operator, returning an updated state EXCEPT where."
-  [op-head state {:keys [inject-failures] :as opts}]
-  (if (some #(uni/unify op-head %) inject-failures)
-    (do  (log/info "FAILURE (injected):" op-head)
-         (throw (ex-info "run-operator injected failure" {:op-head op-head})))
-    (do (log/info "Running operator" op-head)
-        state)))
+  "Run the action associated with the operator, returning an updated state EXCEPT where fails."
+  [state {:operator/keys [head a-list] :as _task} {:keys [inject-failures] :as opts}]
+  (reset! diag _task)
+  (let [op-tag (-> head first keyword)]
+    (cond (some #(uni/unify head %) inject-failures)         (do (log/info "FAILURE (injected):" op-tag)
+                                                                  (throw (ex-info "run-operator injected failure" {:op-head op-tag})))
+          (every?
+           (fn [a-item]
+             (some #(uni/unify a-item %) state)) a-list)     (do
+                                                               (log/info "+++Operator" op-tag "pass-through (satisfied)")
+                                                               state)
 
-#_(defn new-human-project
-  "Create a project for a human given response. Return its PID."
-  [project-name] ; ToDo: replace state-string with state.
-  (let [pid   (-> project-name str/lower-case (str/replace #"\s+" "-") keyword)
-        pname (->>  (str/split project-name #"\s+") (mapv str/capitalize) (interpose " ") (apply str))
-        pid   (db/create-proj-db! {:project/id pid :project/name  pname})] ; pid might not have been unique, thus this returns a new one.
-    pid))
+          (@operator-method? op-tag)                          (operator-meth
+                                                               (-> opts
+                                                                   (assoc :state state)
+                                                                   (assoc :tag op-tag)
+                                                                   (dissoc :inject-failures)))
 
-;;; For reference, this is what plan9 was using before it was integrated.
+          :else                                               (do (log/info "+++Operator" op-tag "pass-through (not recognized)")
+                                                                  state))))
 
-;;; For reference, this is what plan9 was using before it was integrated.
+
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
 ;;;       For the time being, I'm just adding uniquely
-(defn add-del-facts
-  "Update the facts by adding, deleting or resetting to empty.
-     facts - a set of ::spec/positive-proposition.
-     a map - with keys :add and :delete being collections of :specs/positive-proposition.
-             These need not be ground propositions; everything that unifies with a form in delete will be deleted.
-             A variable in the add list will be treated as a skolem."
-  [facts a-list d-list]
-  (assert set? facts)
-  (assert (every? #(s/valid? ::spec/positive-proposition %) facts))
-  (cond-> facts
-    (not-empty d-list) (->> (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
-    (not-empty a-list) (->> (into a-list) set)))
-
 (defn operator-update-state
   "Update the project's DB, specifically :project/state-string with infromation from last response and operator a-list and d-list.
-      - plan-step   - a map such as {:operator :!yes-no-process-steps, :args [aluminium-foil]},
-      - proj-id     - the keyword identifying a project by its :project/id.
-      - domain-id   - a keyword identifying the domain, for example, :process-interview.
+      - old-state   - a set of proposition.
+      - proj-id     - task a planner operator destructure
+      - bindings    - variable binding established when unifying with this operator.
    Returns the new state."
-  [old-state op-obj bindings]
-  (let [a-list (mapv #(uni/subst % bindings) (:operator/a-list op-obj))
-        d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))]
-    (add-del-facts old-state a-list d-list)))
-
-;;; This one was used by the SHOP planner.
-#_(defn operator-update-state
-  "Update the project's DB, specifically :project/state-string with infromation from last response and operator a-list and d-list.
-      - plan-step   - a map such as {:operator :!yes-no-process-steps, :args [aluminium-foil]},
-      - proj-id     - the keyword identifying a project by its :project/id.
-      - domain-id   - a keyword identifying the domain, for example, :process-interview.
-   Returns the new state."
-  [plan-step domain-id old-state {:keys [pid] :as opts}]
-  (let [{:keys [operator args]} plan-step
-        op-sym (-> operator name symbol)
-        op-obj (domain-operator domain-id op-sym)
-        bindings (zipmap (-> op-obj :operator/head rest) args)
-        a-list (mapv #(uni/subst % bindings) (:operator/a-list op-obj))
-        d-list (mapv #(uni/subst % bindings) (:operator/d-list op-obj))]
-    (add-del-facts old-state {:add a-list :delete d-list})))
+  [old-state task bindings]
+  (assert (every? #(s/valid? ::spec/positive-proposition %) old-state))
+  (let [a-list (mapv #(uni/subst % bindings) (:operator/a-list task))
+        d-list (mapv #(uni/subst % bindings) (:operator/d-list task))]
+    (cond-> old-state
+      (not-empty d-list) (->> (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
+      (not-empty a-list) (->> (into a-list) set))))
 
 (defn surrogate?
   "Return true if state has a predicate unifying with (surrogate ?x)."
   [state]
   (find-fact '(surrogate ?x) state))
 
-;;; Useful example!
-(def example '{:plan-step  {:cost 1.0, :operator :!initial-question, :args [start-a-new-project]},
-               :domain-id :process-interview,
-               :tag :!initial-question,
-               :pid :START-A-NEW-PROJECT,
-               :client-id "df838eb5-26d6-474f-84b3-910fae59e3a9",
-               :state [(proj-id :START-A-NEW-PROJECT)],
-               :agent-msg-vec
-               [#:msg-text{:string
-                           "Describe your most significant scheduling problem in a few sentences"}
-                #:msg-text{:string " or "}
-                #:msg-link{:uri "http://localhost:3300/learn-more",
-                           :text "learn more about how this works"}
-                #:msg-text{:string "."}],
-               :response
-               "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan."}
-  )
 
 (defn make-human-project
   "Surrogate already has a project db, but human doesn't. This creates the db and returns and returns state (possibly updated).
@@ -265,6 +223,7 @@
         prom (if (= :surrogate agent-type)
                (px/submit! (fn [] (llm/query-on-thread :tid tid :aid aid :query-text (msg-vec2text agent-msg-vec)))) ; This can timeout.
                (ws/send-to-chat (assoc obj :msg-vec agent-msg-vec)))]                                                ; This cannot timeout.
+    (log/info "prom =" prom)
     (as-> prom ?response
       (p/await! ?response)
       (do (log/info agent-type "responds: " ?response) ?response)
@@ -279,16 +238,16 @@
         db-action)))
 
 ;;; (op/db-action (assoc op/example :client-id (ws/recent-client!)))
-(defaction :!initial-question [{:keys [state response client-id agent-msg-vec plan-step domain-id] :as _obj}]
+(defaction :!initial-question [{:keys [state task bindings response client-id agent-msg-vec domain-id] :as _obj}]
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
-  (reset! diag _obj)
+  ;(reset! diag _obj)
   (let [analysis-state (dom/prelim-analysis response state)] ; updated state vector.
     (when-not (surrogate? state) (make-human-project analysis-state))
     ;; Now human/surrogate can be treated identically.
     (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
           [_ pname] (find-fact '(proj-name ?x) analysis-state)
           pid (keyword pid)
-          new-state (operator-update-state plan-step domain-id analysis-state)]
+          new-state (operator-update-state analysis-state task bindings)]
       (log/info "DB and app actions on PID =" pid)
       (db/add-msg pid :system agent-msg-vec)  ; ToDo: I'm not catching the error when this is wrong!
       (db/add-msg pid :user (str2msg-vec response))
@@ -305,10 +264,10 @@
     (-> (chat-pair (assoc obj :msg-vec msg-vec))
         db-action)))
 
-(defaction :!yes-no-process-steps [{:keys [pid response plan-step domain-id state] :as _obj}]
+(defaction :!yes-no-process-steps [{:keys [pid response state task bindings] :as _obj}]
   ;; Nothing to do here but update state from a-list.
   (log/info "!yes-no-process-steps (action): response =" response)
-  (let [new-state (operator-update-state plan-step domain-id state)]
+  (let [new-state (operator-update-state state task bindings)]
     (db/put-state pid new-state)))
 
 ;;; ----- :!query-process-durs
@@ -318,9 +277,9 @@
     (-> (chat-pair (assoc obj :msg-vec msg-vec))
         db-action)))
 
-(defaction :!query-process-durs [{:keys [response plan-step domain-id state pid] :as obj}]
+(defaction :!query-process-durs [{:keys [response state task bindings pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
-  (let [new-state (operator-update-state plan-step domain-id state)]
+  (let [new-state (operator-update-state state task bindings)]
     (db/put-state pid new-state)))
 
 ;;; ----- :!yes-no-process-steps
@@ -330,7 +289,7 @@
     (-> (chat-pair (assoc obj :msg-vec msg-vec))
         db-action)))
 
-(defaction :!yes-no-process-ordering [{:keys [response plan-step domain-id state pid] :as obj}]
+(defaction :!yes-no-process-ordering [{:keys [response state task bindings pid] :as obj}]
   (log/info "!yes-no-process-ordering (action): response =" response "obj =" obj)
-    (let [new-state (operator-update-state plan-step domain-id state)]
+    (let [new-state (operator-update-state state task bindings)]
       (db/put-state pid new-state)))

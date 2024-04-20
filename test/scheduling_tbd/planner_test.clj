@@ -9,7 +9,7 @@
    [scheduling-tbd.planner  :as plan]
    [scheduling-tbd.specs    :as specs]
    [scheduling-tbd.sutil    :as sutil]
-   [scheduling-tbd.web.routes.websockets :as ws]
+   [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log]))
 
 (defn ^:diag ns-setup!
@@ -34,40 +34,11 @@
   (alias 'sur    'scheduling-tbd.surrogate)
   ;(alias 'surt   'scheduling-tbd.surrogate-test)
   (alias 'util   'scheduling-tbd.util)
-  (alias 'ws     'scheduling-tbd.web.routes.websockets)
+  (alias 'ws     'scheduling-tbd.web.websockets)
   (alias 'openai 'wkok.openai-clojure.api))
-
-
-#_(defn ^:diag tryme []
-  (plan/load-domain "data/planning-domains/process-interview.edn")
-  (plan/interview-loop
-   :sur-plate-glass
-   :process-interview
-   (ws/recent-client!)
-   {:start-facts (db/get-state :sur-plate-glass)}))
-
 
 (defn aaa []
   (println "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan."))
-
-#_(defn ^:diag tryme-0 []
-  (plan/load-domain "data/planning-domains/process-interview.edn")
-  (plan/interview-loop
-   :START-A-NEW-PROJECT
-   :process-interview
-   (ws/recent-client!)
-   {:start-facts (db/get-state :START-A-NEW-PROJECT)}))
-
-
-;;; (tryme :snowboards-production-scheduling)
-;;; (tryme :aluminium-foil-production-scheduling)
-#_(defn ^:diag tryme-2 []
-  (plan/load-domain "data/planning-domains/process-interview.edn")
-  (plan/interview-loop
-   :craft-beer-brewery-scheduling
-   :process-interview
-   {:start-facts (db/get-state :craft-beer-brewery-scheduling)}
-   (ws/recent-client!)))
 
 (defn tryme []
   (rw/rewrite*
@@ -77,9 +48,6 @@
 ;;; ============================================= plan9 =================================================================
 (def travel-domain '{:domain/id :travel-plan
                      :domain/description "Testing stepping through simple sequence. BTW, these aren't good plans; state is too sparse/vague, etc."
-                     :domain/problem {:problem/domain :travel-plan
-                                      :problem/goal   (go-home me)
-                                      :problem/state #{(at-work me) (have-car me)}}
                      :domain/elems [{:method/head (go-home ?person)
                                      :method/rhsides [{:method/case-name "take car"
                                                        :method/preconds [(have-car ?person)]
@@ -120,10 +88,15 @@
                                     {:operator/head (!exit-bus ?person)
                                      :operator/a-list  [(at-home ?person)]}]})
 
+(def travel-problem '{:problem/domain :travel-plan
+                      :goal   (go-home me)
+                      :state #{(at-work me) (have-car me)}})
+
 (deftest valid-problem
   (testing "That the spec for planning problems works."
-    (is (s/valid? ::specs/domain-problem (:domain/problem travel-domain)))))
+    (is (s/valid? ::specs/domain-problem travel-problem))))
 
+;;; Typically, the id will be a client-id (a UUID string), but in planner_test, at least, this is not the case.
 (defmacro with-planning-domain [[id domain] & body]
   `(try (sutil/register-planning-domain ~id ~domain)
         ~@body
@@ -133,25 +106,23 @@
 (deftest simple-plans
   (testing "Testing a simple sequential plan."
     (is (= '{:result :success,
-             :plan
-             {:plan
-              [(!walk-to-car me) (!drive-car me) (!walk-garage-to-home me)],
-              :new-tasks [],
-              :state #{(have-car me) (at-home me)}}}
+             :plan-info {:plan [(!walk-to-car me) (!drive-car me) (!walk-garage-to-home me)],
+                         :new-tasks [],
+                         :state #{(have-car me) (at-home me)}}}
            (with-planning-domain [:travel-domain travel-domain]
-             (plan/plan9 :travel-domain)))))
+             (plan/plan9 :travel-domain travel-problem)))))
 
   (testing "Testing a simple sequential plan, negated pre-condition."
     (is (= '{:result :success,
-             :plan
-             {:plan [(!walk-to-bus-stop me) (!board-bus me) (!exit-bus me)],
-              :new-tasks [],
-              :state #{(at-home me)}}}
+             :plan-info {:plan
+                         [(!walk-to-car me) (!drive-car me) (!walk-garage-to-home me)],
+                         :new-tasks [],
+                         :state #{(have-car me) (at-home me)}}}
            (let [no-car (assoc-in travel-domain [:domain/problem :problem/state] '#{(at-work me)})]
              (with-planning-domain [:no-car no-car]
-               (plan/plan9 :no-car ))))))
+               (plan/plan9 :no-car travel-problem))))))
 
   (testing "Testing failure of the only possible plan."
     (is (= '{:result :failure, :reason :no-successful-plans}
            (with-planning-domain [:travel-domain travel-domain]
-             (plan/plan9 :travel-domain {:inject-failures '[(!drive-car ?person)]}))))))
+             (plan/plan9 :travel-domain travel-problem {:inject-failures '[(!drive-car ?person)]}))))))

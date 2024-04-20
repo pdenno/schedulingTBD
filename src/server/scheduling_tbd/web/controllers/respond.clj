@@ -6,7 +6,7 @@
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.planner   :as plan]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
-   [scheduling-tbd.web.routes.websockets :as ws]
+   [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log])
   (:import
    [java.util Date]))
