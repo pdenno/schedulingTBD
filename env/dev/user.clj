@@ -9,11 +9,11 @@
    [clojure.tools.namespace.repl :as tools-ns :refer [disable-reload! refresh clear set-refresh-dirs]]
    [expound.alpha :as expound]
    [mount.core :as mount]
-   [lambdaisland.classpath.watch-deps :as watch-deps]      ;; hot loading for deps
-   [scheduling-tbd.core :refer [server]] ; for mount
-   [scheduling-tbd.llm  :as llm]         ; Because of deep synchronization problems when this is from mount.
-   [scheduling-tbd.planner :refer [plan-server]]
-   [scheduling-tbd.web.handler]          ; for mount, defines rm.server.config/config, and router stuff.
+   [lambdaisland.classpath.watch-deps :as watch-deps]      ; hot loading for deps.
+   [scheduling-tbd.core :refer [server]]                   ; for mount.
+   [scheduling-tbd.llm  :as llm]                           ; Because of deep synchronization problems when this is from mount.
+   [scheduling-tbd.planner :refer [planning]]              ; for mount
+   [scheduling-tbd.web.handler]                            ; for mount, defines rm.server.config/config, and router stuff.
    [taoensso.timbre :as log]))
 
 ;;; If you get stuck do: (clojure.tools.namespace.repl/refresh)
@@ -30,7 +30,6 @@
   []
   (let [res (mount/start)
         info (str "   " (clojure.string/join ",\n    " (:started res)))]
-    (llm/select-openai-models!)
     (log/info "started:\n" info)))
 
 (defn stop
@@ -48,5 +47,4 @@
   to recompile, and then use `start` once things are good."
   []
   (stop)
-  (tools-ns/refresh :after 'user/start)
-  (llm/select-openai-models!))
+  (tools-ns/refresh :after 'user/start))

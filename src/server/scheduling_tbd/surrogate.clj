@@ -1,16 +1,14 @@
 (ns scheduling-tbd.surrogate
   "Functions and operators implementing surrogate users"
   (:require
-   [clojure.edn              :as edn]
-   [clojure.pprint           :refer [cl-format]]
    [clojure.string           :as str]
    [datahike.api             :as d]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.llm       :as llm]
    [scheduling-tbd.planner   :as plan]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
-   [scheduling-tbd.web.routes.websockets :as ws]
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id get-domain]]
+   [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log]))
 
 (def system-instruction
@@ -30,12 +28,20 @@
         pattern (re-pattern (format "%s(-\\d+)?" pid-str))]
     (some #(when (re-matches pattern %) (keyword %)) projects)))
 
+(defn surrogate-init-problem
+  "Create the initial :project/planning-problem for a surrogate."
+  [pid pname]
+  (let [pid-sym (-> pid name symbol)]
+    `{:problem/domain :process-interview
+      :problem/goal-string ~(format "(characterize-process %s)" (name pid))
+      :problem/state-string ~(format "#{(proj-id %s) (surrogate %s) (proj-name \"%s\")}" pid-sym pid-sym pname)}))
+
 (defn ensure-surrogate
   "If a surrogate with given expertise exists (if its project exists), return it (the project object resolved from the DB).
    Otherwise create and store a project with the given expertise and the OpenAI assistant object.
    In either case, it returns the Openai assistant object ID associated with the pid.
      pid - the project ID (keyword) of a project with an established DB."
-  [pid]
+  [pid pname]
   (or (db/get-assistant-id pid nil)
       (let [conn (connect-atm pid)
             eid (db/project-exists? pid)
@@ -45,8 +51,10 @@
             instructions (format system-instruction expertise)
             assist (llm/make-assistant :name (str expertise " surrogate") :instructions instructions :metadata {:usage :surrogate})
             aid    (:id assist)
-            thread (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}})] ; Surrogates have just one thread.
+            thread (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}})
+            prob (surrogate-init-problem pid pname)] ; Surrogates have just one thread.
         (d/transact conn {:tx-data [{:db/id (db/project-exists? pid)
+                                     :project/planning-problem prob
                                      :project/surrogate {:surrogate/id pid
                                                          :surrogate/subject-of-expertise expertise
                                                          :surrogate/system-instruction instructions
@@ -54,7 +62,7 @@
                                                          :surrogate/thread-id (:id thread)}}]})
         (db/get-assistant-id pid))))
 
-;;; (sur/start-surrogate {:product "plate glass" :client-id (ws/any-client!)})
+;;; (sur/start-surrogate {:product "plate glass" :client-id (ws/recent-client!)})
 (defn start-surrogate
   "Create or recover a surrogate and update the conversation accordingly.
      product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
@@ -63,21 +71,18 @@
   (log/info "Start a surrogate: product =" product)
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
-        pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})
-        state-string (cl-format nil "#{(proj-id ~A) (surrogate ~A) (proj-name ~S)}" (-> pid name symbol) (-> pid name symbol) pname)]
-    (d/transact (connect-atm pid)
-                {:tx-data [{:db/id (db/project-exists? pid)
-                            :project/state-string state-string}]})
-    (ensure-surrogate pid)
-    (ws/send-to-chat {:dispatch-key :reload-proj :client-id client-id  :promise? nil
-                      :new-proj-map {:project/name pname :project/id pid}})
-    (plan/interview-loop pid :process-interview client-id {:start-facts (edn/read-string state-string)})))
-
-(defn ^:diag delete-surrogate-assistants!
-  "Delete all the OpenAI assistants that have metadata {:usage 'surrogate'}."
-  []
-  (doseq [s (->> (llm/list-assistants-openai) :data (filter #(= "surrogate" (-> % :metadata :usage))))]
-    (llm/delete-assistant-openai (:id s))))
+        pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})]
+    (try
+      (ensure-surrogate pid pname)
+      (ws/send-to-chat {:dispatch-key :reload-proj :client-id client-id  :promise? nil
+                        :new-proj-map {:project/name pname :project/id pid}})
+      (catch Exception e
+        (log/warn "Failed to start surrogate.")
+        (log/error "Error starting surrogate:" e)))
+    ;; This has its own way of dealing with errors.
+    (plan/plan9 :process-interview
+                (db/get-problem pid)
+                {:pid pid :client-id client-id})))
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []

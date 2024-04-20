@@ -2,13 +2,22 @@
   "Server utilities."
   (:require
    [clojure.core.unify      :as uni]
-   [clojure.java.io         :as io]
    [datahike.api            :as d]
    [datahike.pull-api       :as dp]
-   [scheduling-tbd.paillier :refer [api-key]]
    [taoensso.timbre         :as log]))
 
-(defn get-api-key [_] api-key)
+(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
+(defn api-credentials [provider]
+  (let [res (case provider
+                :openai {:api-key (System/getenv "OPENAI_API_KEY")}
+                :azure  {:api-key (System/getenv "AZURE_OPENAI_API_KEY")
+                         :api-endpoint "https://myopenairesourcepod.openai.azure.com"
+                         :impl :azure})]
+    (when-not (:api-key res)
+      (if (= provider :openai)
+        (log/error "Specify an API key in the environment variable OPENAI_API_KEY")
+        (log/error "Specify an API key in the environment variable AZURE_OPENAI_API_KEY")))
+    res))
 
 (defonce databases-atm (atom {}))
 
@@ -28,7 +37,7 @@
   "Hitchhiker file-based DBs follow this form."
   {:store {:backend :file :path "Provide a value!"} ; This is path to the database's root directory
    :keep-history? false
-   :base-dir "Provide a value!"                    ; For convenience, this is just above the database's root directory.
+   :base-dir "Provide a value!"                     ; For convenience, this is just above the database's root directory.
    :recreate-dbs? false                             ; If true, it will recreate the system DB and project directories too.
    :schema-flexibility :write})
 
@@ -150,7 +159,7 @@
                                           [(java.nio.file.StandardCopyOption/ATOMIC_MOVE)
                                            (java.nio.file.StandardCopyOption/REPLACE_EXISTING)]))))
 
-;;; Keep this around; it might get used eventually!
+;;; Keep this around for a while; it might get used eventually!
 #_(defmacro report-long-running
   "Return the string from writing to *out* after this runs in a future."
   [[timeout] & body]

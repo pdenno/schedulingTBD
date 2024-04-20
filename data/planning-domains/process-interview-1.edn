@@ -8,12 +8,6 @@
 
 {:domain/id :process-interview
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
- :domain/problem {:problem/domain :process-interview
-                  :problem/goal   (characterize-process ?proj)
-                  :problem/state #{(ongoing-discussion craft-beer)
-                                   (proj-id craft-beer)
-                                   (system-model craft-beer flow)
-                                   (well-known-process craft-beer)}}
  :domain/elems [{:method/head (characterize-process ?proj)
                  :method/rhsides [{:method/case-name "from-scratch"
                                    :method/preconds [(proj-id ?proj) (not (ongoing-discussion ?proj))] ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
@@ -46,7 +40,7 @@
                 ;; (!yes-no-process-steps ?proj)
                 {:operator/head (!yes-no-process-steps ?proj)
                  :operator/preconds [(proj-id ?proj) (well-known-process ?proj)]
-                 :operator/a-list [(have-process-steps ?proj)]}
+                 :operator/a-list [(have-process-steps ?proj)]} ; We've arranged so that if you already have all the a-list facts, it runs a no-op.
 
                 ;; (!query-process-steps ?proj)
                 {:operator/head (!query-process-steps ?proj)

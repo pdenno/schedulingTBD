@@ -10,8 +10,8 @@
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
    [wkok.openai-clojure.api      :as openai]
-   [scheduling-tbd.sutil         :refer [get-api-key]]
-   [scheduling-tbd.web.routes.websockets :as ws]
+   [scheduling-tbd.sutil         :refer [api-credentials llm-provider]]
+   [scheduling-tbd.web.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
    [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
@@ -20,22 +20,24 @@
 
 (def ^:diag diag (atom nil))
 
-(def openai-models
+(def llms-used
   "A map keyed by 'simple' keywords associating a model name recognized by openai. Example {:gpt4 'gpt-4-turbo-preview'...}"
   (atom {}))
 
-(def openai-models-preferred
+(def preferred-llms
   "These names (keywords) are the models we use, and the models we've been using lately."
-  {:gpt-3.5     "gpt-3.5-turbo-0125"
-   :gpt-4       "gpt-4-0125-preview"
-   :davinci     "davinci-002"})
+  {:openai {:gpt-3.5     "gpt-3.5-turbo-0125"
+            :gpt-4       "gpt-4-0125-preview"
+            :davinci     "davinci-002"}
+   :azure  {:gpt-3.5     "gpt-3.5-turbo-0125"}})
 
 (defn pick-llm
   "Return a string recognizable by OpenAI naming a model of the class provide.
    For example (pick-llm :gpt-4) --> 'gpt-4-0125-preview'."
-  [k]
-  (assert (contains? @openai-models k))
-  (get @openai-models k))
+  ([k] (pick-llm k llm-provider))
+  ([k provider]
+   (assert (contains? (get @llms-used provider) k))
+   (-> @llms-used provider k)))
 
 (defn query-llm
   "Given the vector of messages that is the argument, return a string (default)
@@ -43,7 +45,7 @@
   [messages & {:keys [model-class raw-text?] :or {model-class :gpt-4 raw-text? true}}]
   (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class)
                                                 :messages messages}
-                                               {:api-key (get-api-key :llm)})
+                                               (api-credentials llm-provider))
                 :choices
                 first
                 :message
@@ -110,26 +112,34 @@
           capitalize?                 (str/capitalize))
         (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
 
-(defn select-openai-models!
+(defn select-llm-models-openai
+  []
+  (let [models (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse)]
+    (swap! llms-used
+           (fn [atm] (assoc atm :openai
+                            (reduce (fn [res k]
+                                      (let [preferred (-> preferred-llms :openai k)
+                                            chosen (or (some #(when (= preferred (:id %)) (:id %)) models)
+                                                       (let [pattern (re-pattern (str "^" (name k) ".*"))]
+                                                         (some #(when (re-matches pattern (:id %)) (:id %)) models)))]
+                                        (assoc res k chosen)))
+                                    {}
+                                    (-> preferred-llms :openai keys)))))
+    (when-not (every? #(-> @llms-used :openai %) (-> preferred-llms :openai keys))
+      (throw (ex-info "No openai-model found for a required model type." {:models (:openai @llms-used)})))
+    (doseq [[k mod] (-> @llms-used :openai)]
+      (when (not= mod (-> preferred-llms :openai k))
+        (log/warn "Preferred model for" k "was not available. Chose" mod)))))
+
+(defn select-llm-models-azure []
+  (swap! llms-used #(assoc % :azure {:gpt-3.5 "mygpt-35"})))
+
+(defn select-llm-models!
   "Set the open-ai-models atom to models in each class"
   []
-  (if-let [api-key (get-api-key :llm)]
-    (let [models (->> (openai/list-models {:api-key api-key}) :data  (sort-by :created) reverse)]
-      (reset! openai-models
-              (reduce (fn [res k]
-                        (let [preferred (get openai-models-preferred k)
-                              chosen (or (some #(when (= preferred (:id %)) (:id %)) models)
-                                         (let [pattern (re-pattern (str "^" (name k) ".*"))]
-                                           (some #(when (re-matches pattern (:id %)) (:id %)) models)))]
-                          (assoc res k chosen)))
-                      {}
-                      (keys openai-models-preferred))))
-    (throw (ex-info "Could not find LLM api key." {})))
-  (when-not (every? #(get @openai-models %) (keys openai-models-preferred))
-    (throw (ex-info "No openai-model found for a required model type." {:models @openai-models})))
-  (doseq [[k mod] @openai-models]
-    (when (not= mod (get openai-models-preferred k))
-      (log/warn "Preferred model for" k "was not available. Chose" mod))))
+  (select-llm-models-openai)
+  (select-llm-models-azure))
+
 
 ;;;------------------------------------- assistants ----------------------------------------------------
 (s/def ::name string?)
@@ -146,20 +156,18 @@
            metadata {}
            tools [{:type "code_interpreter"}]} :as obj}]
   (s/valid? ::assistant-args obj)
-  (let [key (get-api-key :llm)]
-    (openai/create-assistant {:name         name
-                              :model        (pick-llm model-class)
-                              :metadata     metadata
-                              :instructions instructions
-                              :tools        tools} ; Will be good for csv and xslx, at least.
-                             {:api-key key})))
+  (openai/create-assistant {:name         name
+                            :model        (pick-llm model-class)
+                            :metadata     metadata
+                            :instructions instructions
+                            :tools        tools} ; Will be good for csv and xslx, at least.
+                           (api-credentials llm-provider)))
 
 (defn make-thread
   [& {:keys [assistant-id metadata] :or {metadata {}}}]
-  (let [key (get-api-key :llm)]
-    (openai/create-thread {:assistant_id assistant-id
-                           :metadata metadata}
-                          {:api-key key})))
+  (openai/create-thread {:assistant_id assistant-id
+                         :metadata metadata}
+                        (api-credentials llm-provider)))
 
 (def diag1 (atom nil))
 
@@ -188,20 +196,20 @@
   (log/info "query-on-thread: query-text =" query-text)
   (assert (#{"user" "assistant"} role))
   (assert (string? query-text))
-  (let [key (get-api-key :llm)
+  (let [creds (api-credentials llm-provider)
         ;; Apparently the thread_id links the run to msg.
-        _msg (openai/create-message {:thread_id tid :role role :content query-text} {:api-key key})
+        _msg (openai/create-message {:thread_id tid :role role :content query-text} creds)
         ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
         ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
-        run (openai/create-run  {:thread_id tid :assistant_id aid} {:api-key key})
+        run (openai/create-run  {:thread_id tid :assistant_id aid} creds)
         timestamp (inst-ms (java.time.Instant/now))
         run-timestamp (:created_at run)
         timeout   (+ timestamp (* timeout-secs 1000))]
     (swap! diag #(assoc % :run run))
     (loop [now timeout]
       (Thread/sleep 1000)
-      (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} {:api-key key})
-            msg-list (openai/list-messages {:thread_id tid :limit 20} {:api-key key})
+      (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
+            msg-list (openai/list-messages {:thread_id tid :limit 20} creds)
             response (message-after msg-list run-timestamp query-text)]
         (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text})),
 
@@ -218,23 +226,23 @@
   "Retrieve the assistant object from OpenAI using its ID, a string you can
    find on the list-assistants, or while logged into the OpenAI website."
   [id]
-  (if-let [key (get-api-key :llm)]
-    (openai/retrieve-assistant {:assistant_id id}
-                               {:api-key key})
-    (log/warn "Couldn't get OpenAI API key.")))
+  (openai/retrieve-assistant {:assistant_id id} (api-credentials llm-provider)))
 
-(defn list-assistants-openai
-  []
-  (if-let [key (get-api-key :llm)]
-    (openai/list-assistants {:limit 30} {:api-key key})
-    (log/warn "Couldn't get OpenAI API key.")))
+(defn list-assistants-openai [] (openai/list-assistants {:limit 30} (api-credentials llm-provider)))
 
 (defn delete-assistant-openai
   "Delete the assistant having the given ID, a string."
   [id]
-  (if-let [key (get-api-key :llm)]
-    (openai/delete-assistant {:assistant_id id} {:api-key key})
-    (log/warn "Couldn't get OpenAI API key.")))
+  (openai/delete-assistant {:assistant_id id} (api-credentials llm-provider)))
+
+(defn delete-assistants-openai!
+  "Delete from the openai account all assistants that match the argument filter function.
+   The default function check for metadata :usage='surrogate'."
+  ([] (delete-assistants-openai! #(= "surrogate" (-> % :metadata (get :usage)))))
+  ([selection-fn]
+   (doseq [a (->> (list-assistants-openai) :data (filterv selection-fn))]
+     (log/info "Deleting assistant" (:name a) (:id a))
+     (delete-assistant-openai (:id a)))))
 
 ;;; (ws/register-ws-dispatch  :run-long llm/run-long)
 (defn run-long
@@ -251,13 +259,14 @@
 
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []
+  (select-llm-models!)
   (ws/register-ws-dispatch  :ask-llm llm-directly)
   (ws/register-ws-dispatch  :run-long run-long)
   (ws/register-ws-dispatch  :throw-it throw-it)
   [:ask-directly-registered])
 
 (defn llm-stop []
-  (reset! openai-models {})
+  (reset! llms-used {})
   :llm-stopped)
 
 (defstate llm-tools

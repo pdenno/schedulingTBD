@@ -8,8 +8,8 @@
    [scheduling-tbd.db         :as db]
    [scheduling-tbd.operators  :as op]
    [scheduling-tbd.specs      :as spec]
-   [scheduling-tbd.sutil      :as sutil]
-   [scheduling-tbd.web.routes.websockets :as ws]
+   [scheduling-tbd.sutil      :as sutil :refer [get-domain register-planning-domain]]
+   [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre           :as log]))
 
 (def ^:diag diag (atom nil))
@@ -155,7 +155,7 @@
    s-tasks (satisfying-elements) is a map containing the following keys:
       :bindings  - is a map of variable bindings,
       :task      - is information from the operator or method RHS satisfying RHS the preconditions."
-  [partials s-tasks opts]
+  [partials s-tasks {:keys [] :as opts}]
   (let [part (first partials)
         {:keys [task bindings]} (first s-tasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
     (cond (empty? s-tasks)   (do
@@ -165,13 +165,13 @@
           ;; Execute the operator. If it succeeds, update state, new-tasks, and plan.
           (operator? task)   (let [op-head (-> task :operator/head (uni/subst bindings))
                                    new-partial (try (-> part ; ToDo: Assumes only run-operator can throw.
-                                                        (update :state #(op/run-operator op-head % opts))
+                                                        (update :state #(op/run-operator % task opts))
                                                         (update :state #(op/operator-update-state % task bindings))
                                                         (update :new-tasks #(-> % rest vec))
                                                         (update :plan #(conj % op-head))
                                                         vector)
                                                     (catch Exception e
-                                                      [(assoc part :failure (.data e))]))]
+                                                      [(assoc part :failure e)]))]
                                (into new-partial (rest partials)))
 
           ;; Update the task list with the tasks from the RHS
@@ -185,11 +185,10 @@
    Operates on a stack (vector) of 'partials' (described in the docstring of update-planning).
    Initialize the stack to a partial from a problem definition.
    Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
-  [domain-id  & {:as opts} ]
-  (let [domain  (sutil/get-domain domain-id)
-        {:domain/keys [elems problem]} domain
-        state   (:problem/state problem) ; A vector of ground literals.
-        goal    (:problem/goal problem)] ; A literal.
+  [domain-id problem & {:as opts} ]
+  (let [elems   (-> (sutil/get-domain domain-id) :domain/elems)
+        state   (:state problem) ; A vector of ground literals.
+        goal    (:goal problem)] ; A literal.
     (loop [partials [{:plan [] :new-tasks [goal] :state state}]
            cnt 1]
       ;;(log/info "new-tasks =" (-> partials first :new-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
@@ -198,11 +197,13 @@
             s-tasks (satisfying-tasks task elems (-> partials first :state))]
         (cond
           (empty? partials)                         {:result :failure :reason :no-successful-plans}
-          (-> partials first :new-tasks empty?)     {:result :success :plan (first partials)}
+          (-> partials first :new-tasks empty?)     {:result :success :plan-info (first partials)}
+
           (> cnt 10)                                {:result :stopped :partials partials}
           :else  (let [partials (update-planning partials s-tasks opts)
                        partials (if-let [err (-> partials first :failure)]
-                                  (do (log/info "***Plan fails owing to operator" err)
+                                  (do (log/warn "***Plan fails owing to s-tasks" s-tasks)
+                                      (log/error err)
                                       (-> partials rest vec))
                                   partials)]
                      (recur partials
@@ -260,13 +261,14 @@
   "Start the interview loop. :resume-conversation is a dispatch key from client.
    This is called even for where PID is :START-A-NEW-PROJECT."
   [{:keys [project-id client-id]}]
-  (log/info "Calling interview-loop for project" project-id)
-  (plan9 project-id :process-interview client-id {:start-facts (db/get-state project-id)}))
+  #_(plan9 :process-interview
+         (db/get-problem project-id)
+         {:client-id client-id :pid project-id}))
 
 (defn init-planner!
   []
   (ws/register-ws-dispatch :resume-conversation resume-conversation)
-  (sutil/register-planning-domain
+  (register-planning-domain
    :process-interview
    (-> "data/planning-domains/process-interview-1.edn" slurp edn/read-string)))
 
@@ -274,6 +276,6 @@
   "Quit the planner. It can be restarted with a shell command through mount."
   [])
 
-(defstate plan-server
+(defstate planning
   :start (init-planner!)
   :stop  (quit-planner!))

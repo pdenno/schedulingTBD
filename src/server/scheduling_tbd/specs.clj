@@ -28,9 +28,9 @@
 (s/def ::state-edits (s/keys :req-un [:edits/add :edits/delete]))
 
 (s/def :problem/domain keyword?)
-(s/def :problem/goal seq?)
-(s/def :problem/state (s/coll-of seq?))
-(s/def ::domain-problem  (s/keys :req [:problem/domain :problem/goal :problem/state]))
+(s/def ::goal seq?)
+(s/def ::state (s/coll-of seq?))
+(s/def ::domain-problem  (s/keys :req [:problem/domain] :req-un[::goal ::state]))
 
 ;;; ------ These concern out-bound on ws/send-to-chat. -------------------
 (s/def :msg-text/string string?)

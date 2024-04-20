@@ -1,4 +1,4 @@
-(ns scheduling-tbd.web.routes.websockets
+(ns scheduling-tbd.web.websockets
   "Set up a websockets and message routing for async communication with the client using ring.websocket.async."
   (:refer-clojure :exclude [send])
   (:require
@@ -191,11 +191,15 @@
 (s/def ::client-id string?)
 (s/def ::timestamp #(instance? java.util.Date %))
 
-(def promise-stack "A stack of promise objects." (atom ()))
+(def promise-stack "A stack of promise objects. The are objects with :prom, :p-key, :client-id, and :timestamp." (atom ()))
 
 (defn clear-promises!
   ([] (reset! promise-stack '()))
-  ([client-id] (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %))))
+  ([client-id]
+   (doseq [p (filter #(= client-id (:client-id %)) @promise-stack)]
+     (log/info "Clearing (rejecting) promise" p)
+     (p/reject! (:prom p) (ex-info "client forgotten")))
+   (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %))))
 
 (defn remove-promise!
   "Remove the promise identified by the argument :p-key from the promise-stack."
