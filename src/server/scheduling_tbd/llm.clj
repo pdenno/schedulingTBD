@@ -9,14 +9,15 @@
   (:require
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
-   [wkok.openai-clojure.api      :as openai]
    [scheduling-tbd.sutil         :refer [api-credentials llm-provider]]
    [scheduling-tbd.web.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
    [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
-   [taoensso.timbre              :as log]))
+   [promesa.core                 :as p]
+   [taoensso.timbre              :as log]
+   [wkok.openai-clojure.api      :as openai]))
 
 (def ^:diag diag (atom nil))
 
@@ -190,12 +191,13 @@
     tid      - thread ID (ttheOpenAI notion)
     role     - #{'user' 'assistant'},
     msg-text - a string.
-   Returns a promise."
-  [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 120 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
+   Returns text but uses promesa internally to deal with errors."
+  [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 60 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   (reset! diag {:_obj _obj})
   (log/info "query-on-thread: query-text =" query-text)
   (assert (#{"user" "assistant"} role))
   (assert (string? query-text))
+  (assert (re-matches #"\w.*"  query-text))
   (let [creds (api-credentials llm-provider)
         ;; Apparently the thread_id links the run to msg.
         _msg (openai/create-message {:thread_id tid :role role :content query-text} creds)
@@ -205,7 +207,6 @@
         timestamp (inst-ms (java.time.Instant/now))
         run-timestamp (:created_at run)
         timeout   (+ timestamp (* timeout-secs 1000))]
-    (swap! diag #(assoc % :run run))
     (loop [now timeout]
       (Thread/sleep 1000)
       (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)

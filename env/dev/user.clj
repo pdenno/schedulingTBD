@@ -23,7 +23,7 @@
 
 (alter-var-root #'s/*explain-out* (constantly expound/printer))
 (add-tap (bound-fn* clojure.pprint/pprint))
-(set-refresh-dirs "src/server/scheduling_tbd" "test/scheduling_tbd")  ; Put here as many as you need.
+(set-refresh-dirs "src/server/scheduling_tbd" #_"test/scheduling_tbd")  ; Put here as many as you need. test messes with ns-setup!
 
 (defn start
   "Start the web server"

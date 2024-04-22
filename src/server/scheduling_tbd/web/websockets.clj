@@ -2,7 +2,6 @@
   "Set up a websockets and message routing for async communication with the client using ring.websocket.async."
   (:refer-clojure :exclude [send])
   (:require
-   ;[clj-async-profiler.core  :as prof]
    [clojure.core.async       :as async :refer [<! >! go]]
    [clojure.edn              :as edn]
    [clojure.spec.alpha       :as s]

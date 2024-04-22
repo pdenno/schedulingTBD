@@ -8,6 +8,11 @@
         (-> % first symbol?)
         (not-any? coll? %))) ; There are not functional terms allowed here, etc.
 
+(s/def ::ground-positive-proposition
+  (s/and ::positive-proposition
+         #(not-any? (fn [role] (and (symbol? role) (= "?" (subs (name role) 0 1))))
+                    (rest %))))
+
 (s/def ::negated-proposition
   #(and (= 'not (first %))
         (-> % second seq?)

@@ -357,15 +357,32 @@
            @(connect-atm pid) pid)
       ""))
 
+(defn get-state
+  "Return the state vector for the argument project, or [] if none."
+  [pid]
+  (if-let [state-str (d/q '[:find ?s .
+                            :where
+                            [_ :project/planning-problem ?pp]
+                            [?pp :problem/state-string ?s]]
+                          @(connect-atm pid) pid)]
+    (edn/read-string state-str)
+    []))
+
 (defn put-state
   "Write an updated state to the project database. Argument is a vector or set. "
   [pid state]
-  (assert (every? #(s/valid? ::spec/positive-proposition %) state))
+  (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
   (let [state-set (set state)
         conn (connect-atm pid)
         eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
     (d/transact conn
                 {:tx-data [[:db/add eid :problem/state-string (str state-set)]]})))
+
+(defn add-state
+  "Add the argument vector of ground proposition to state."
+  [pid more-state]
+  (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
+  (put-state pid (into (get-state pid) more-state)))
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
@@ -499,6 +516,7 @@
   [pid from msg-vec]
   (reset! diag msg-vec)
   (s/assert ::spec/chat-msg-vec msg-vec) ; ToDo: I might have to turn something on to see this!
+  (assert (not-empty msg-vec))
   (assert (#{:system :user} from))
   (log/info "add-msg: pid =" pid "msg-vec =" msg-vec)
   (if-let [conn (connect-atm pid)]
