@@ -173,7 +173,7 @@
                                                         vector)]
                                     (db/put-state pid new-state) ; Because op/operator-update-state doesn't do this!
                                     (into new-partial (rest partials)))
-                                  (catch Exception e [(assoc part :failure e)]))
+                                  (catch Exception e [(assoc part :error e)]))
 
           ;; Update the task list with the tasks from the RHS
           (method? task)     (let [new-partial (update part :new-tasks #(into (mapv (fn [t] (uni/subst t bindings)) (:method/rhs task))
@@ -201,12 +201,12 @@
                      (-> partials first :new-tasks empty?)     {:result :success :plan-info (first partials)}
                      (> cnt 5)                                 {:result :stopped :partials partials}
                      :else  (let [partials (update-planning partials s-tasks opts)
-                                  partials (if-let [err (-> partials first :failure)]
+                                  partials (if-let [err (-> partials first :error)]
                                              (do (log/warn "***Plan fails owing to s-tasks" s-tasks)
                                                  (log/error err)
                                                  (-> partials rest vec)
                                                  (ws/send-to-chat {:promise? false, :client-id client-id,
-                                                                   :msg-vec (error-for-chat "We had a problem in this conversation:\n" err)}))
+                                                                   :msg-vec (error-for-chat "We had a continuable problem in this conversation:\n" err)}))
                                              partials)]
                               (recur partials
                                      (inc cnt))))))

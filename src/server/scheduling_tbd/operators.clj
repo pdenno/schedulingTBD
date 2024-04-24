@@ -84,34 +84,6 @@
 
 (defmulti db-action #'db-action-dispatch)
 
-;;; -------------------------- Domain manipulation for a-list and d-list -----------------------------
-;;; plan-step =  {:cost 1.0, :operator :!yes-no-process-steps, :args [craft-beer]}
-(defn domain-operator
-  "Return the argument operator from the domain."
-  [domain-id operator]
-  (->> (sutil/get-domain domain-id)
-       :domain/elems
-       (some #(when (= (-> % :operator/head first) operator) %))))
-
-;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
-;;;       For the time being, I'm just adding uniquely
-(defn add-del-facts
-  "Update the facts by adding, deleting or resetting to empty.
-     facts - a set of ::spec/positive-proposition.
-     a map - with keys :add and :delete being collections of :specs/positive-proposition.
-             These need not be ground propositions; everything that unifies with a
-             form in delete will be deleted.
-             A variable in the add list will be treated as a skolem.
-             reset? is truthy."
-  [facts {:keys [add delete reset?]}]
-  (assert set? facts)
-  (assert (every? #(s/valid? ::spec/positive-proposition %) facts))
-  (as-> (if reset? #{} facts) ?f
-    (if delete
-      (->> ?f (remove (fn [fact] (some #(uni/unify fact %) delete))) set)
-      ?f)
-    (if add (into ?f add) ?f)))
-
 (defn reword-for-agent
   "Return the msg-vec with :human-only or :surrogate-only annotated sections removed as appropriate.
    Remove the annotations too!"
@@ -205,12 +177,13 @@
         tid (db/get-thread-id pid nil)
         agent-type (if (surrogate? state) :surrogate :human)
         prom (if (= :surrogate agent-type)
-               (px/submit! (fn [] (llm/query-on-thread :tid tid :aid aid :query-text (msg-vec2text agent-msg-vec)))) ; This can timeout.
-               (ws/send-to-chat (assoc obj :msg-vec agent-msg-vec)))]                                                ; This cannot timeout.
+               (px/submit! (fn []
+                             (try
+                               (llm/query-on-thread :tid tid :aid aid :query-text (msg-vec2text agent-msg-vec))   ; This can timeout.
+                               (catch Exception e {:error e}))))
+               (ws/send-to-chat (assoc obj :msg-vec agent-msg-vec)))]                                             ; This cannot timeout.
     (log/info "prom =" prom)
-    (-> prom
-        p/await ; You can't put anything else here or a promise will be passed)
-        #_(p/catch (fn [_err] {:result :failure :reason "awaiting response"})))))
+    (p/await prom))); You can't put anything else here or a promise will be passed!
 
 ;;;=================================================== Operators ======================================
 ;;; Operator db-actions update state in the db (db/add-state) and return nil.
@@ -229,9 +202,15 @@
   (try (let [agent-msg-vec (reword-for-agent intro-prompt (surrogate? state))
              obj (assoc obj :agent-msg-vec agent-msg-vec)
              response (chat-pair obj)]
-         (-> obj
-             (assoc :response response) ; Owing to weirdness of chat-pair p/await call this is done here.
-             db-action))
+         ;; Owing to weirdness of chat-pair p/await call this is done here.
+         (cond (string? response)                   (-> obj
+                                                        (assoc :response response)
+                                                        db-action) ; Continue
+               (and (map? response)
+                    (contains? response :error))        response    ; Error
+
+               :else (throw (ex-info "Unknown response from !initial-question (operator)"
+                                     {:response response}))))
        (catch Exception e
          (log/error "!initial-question error:" e)
          {:result :failure :reason "processing response"})))

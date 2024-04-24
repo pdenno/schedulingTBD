@@ -514,7 +514,6 @@
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
   [pid from msg-vec]
-  (reset! diag msg-vec)
   (s/assert ::spec/chat-msg-vec msg-vec) ; ToDo: I might have to turn something on to see this!
   (assert (not-empty msg-vec))
   (assert (#{:system :user} from))
