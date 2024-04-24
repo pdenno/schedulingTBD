@@ -11,13 +11,16 @@
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log]))
 
-(def system-instruction
+(defn system-instruction
   "This is the instruction that configures the role of the OpenAI assistant."
-
-  "You manage a company that makes %s.
-   You are an expert in production of the company's products and management of its supply chains.
+   [role]
+  (format "
+   You manage a company that makes %s.
+   You are an expert in the production of %s and manage your company's supply chains.
    You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.
-   Your answers typically are short, just a few sentences each.")
+   Your answers typically are short, just a few sentences each.
+   If you don’t have information to answer my questions, you provide a plausible answer nonetheless." role role))
+
 
 #_(defn similar-surrogate?
   "Return a :project/id of a project named similar to the argument if one exists.
@@ -48,11 +51,12 @@
             proj-info (resolve-db-id {:db/id eid} conn :keep-set #{:project/name})
             [_ _ expertise] (re-matches #"(SUR )?(.*)" (:project/name proj-info)) ; ToDo: Ugh!
             expertise (str/lower-case expertise)
-            instructions (format system-instruction expertise)
+            instructions (system-instruction expertise)
             assist (llm/make-assistant :name (str expertise " surrogate") :instructions instructions :metadata {:usage :surrogate})
             aid    (:id assist)
             thread (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}})
             prob (surrogate-init-problem pid pname)] ; Surrogates have just one thread.
+        (log/info "Made assistant" aid "for instructions" instructions)
         (d/transact conn {:tx-data [{:db/id (db/project-exists? pid)
                                      :project/planning-problem prob
                                      :project/surrogate {:surrogate/id pid
@@ -64,11 +68,12 @@
 
 ;;; (sur/start-surrogate {:product "plate glass" :client-id (ws/recent-client!)})
 (defn start-surrogate
-  "Create or recover a surrogate and update the conversation accordingly.
+  "Create or recover a surrogate and ask client to :reload-proj. :reload-proj will start the planner; not done here directly.
      product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
-               Any of the :segment/name from the 'How it's Made' DB would work here."
+               Any of the :segment/name from the 'How it's Made' DB would work here.
+  "
   [{:keys [product client-id]} & {:keys [force?] :or {force? true}}] ; ToDo: handle force?=false, See similar-surrogate?
-  (log/info "Start a surrogate: product =" product)
+  (log/info "======= Start a surrogate: product =" product "=======================")
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})]
@@ -78,11 +83,7 @@
                         :new-proj-map {:project/name pname :project/id pid}})
       (catch Exception e
         (log/warn "Failed to start surrogate.")
-        (log/error "Error starting surrogate:" e)))
-    ;; This has its own way of dealing with errors.
-    (plan/plan9 :process-interview
-                (db/get-problem pid)
-                {:pid pid :client-id client-id})))
+        (log/error "Error starting surrogate:" e)))))
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []

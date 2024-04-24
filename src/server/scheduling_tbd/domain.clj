@@ -1,11 +1,13 @@
 (ns scheduling-tbd.domain
   "Scheduling domain prompts."
   (:require
-   [clojure.string           :as str]
-   [promesa.core             :as p]
-   [scheduling-tbd.llm       :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil     :as sutil]
-   [taoensso.timbre          :as log]))
+   [clojure.string                :as str]
+   [promesa.core                  :as p]
+   [scheduling-tbd.db             :as db]
+   [scheduling-tbd.llm            :as llm :refer [query-llm]]
+   [scheduling-tbd.sutil          :as sutil :refer [find-fact yes-no-unknown str2msg-vec]]
+   [scheduling-tbd.web.websockets :as ws]
+   [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
 
@@ -97,14 +99,11 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    Returns a string consisting of just a few words."
   [user-text]
   (reset! diag user-text)
-  (-> (conj project-name-partial
-            {:role "user" :content (str "[ " user-text " ]")})
-      (query-llm {:model-class :gpt-4 :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
-      (p/then #(:project-name %))
-      (p/then #(if (string? %)
-                 %
-                 (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text}))))))
-
+  (as-> (conj project-name-partial
+              {:role "user" :content (str "[ " user-text " ]")}) ?r
+    (query-llm ?r {:model-class :gpt-4 :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
+    (:project-name ?r)
+    (if (string? ?r) ?r (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text})))))
 
 #_(defn pretend-you-manage-interview [what-you-manage & desc]
   (let [high-level-desc (or (first desc)
@@ -289,31 +288,44 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (defn text-cites-raw-material-challenge?
   "Return :yes, :no, or :unknown depending on whether the text cites an inventory challenge."
   [text]
-  (p/let [yes-or-no (-> (conj raw-material-challenge-partial
-                              {:role "user" :content (format "[%s]" text)})
-                        (query-llm {:model-class :gpt-3.5}))
-          yes-pos (re-matches #"\s*yes\s*" yes-or-no)
-          no-pos  (when-not yes-pos (re-matches #"\s*no\s*" yes-or-no))
-          answer  (cond yes-pos :yes
-                        no-pos  :no
-                        :else   :unknown)]
-    answer))
+  (-> (conj raw-material-challenge-partial
+            {:role "user" :content (format "[%s]" text)})
+      (query-llm {:model-class :gpt-3.5})
+      yes-no-unknown))
 
 (defn prelim-analysis
-  "Analyze the response to the initial question, adding to the state vector."
-  [response state]
-  (log/info "prelim-analysis: state =" state "response =" response)
-  (let [[_ pid] (sutil/find-fact '(proj-id ?x) state)]
-    (if (= pid :START-A-NEW-PROJECT)
-      (let [proj-name (as-> (-> (project-name response) p/await!) ?s ; ToDo: Blocking.
-                        (str/trim ?s)
-                        (str/split ?s #"\s+")
-                        (map str/capitalize ?s)
-                        (interpose " " ?s)
-                        (apply str ?s))
-            proj-id (as-> proj-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (symbol ?s))]
-        (into (filterv #(not= % '(proj-id START-A-NEW-PROJECT)) state)
-              `[(~'proj-id ~proj-id)
-                (~'proj-name ~proj-name)]))
-      ;; just continue if it isn't a new project. There will be more here... soon?
-      state)))
+  "Analyze the response to the initial question, adding to the init-state vector."
+  [response init-state {:keys [client-id] :as opts}]
+  (log/info "prelim-analysis: init-state =" init-state "response =" response)
+  (let [[_ pid] (sutil/find-fact '(proj-id ?x) init-state)
+        proj-state (if (= pid :START-A-NEW-PROJECT)
+                     (let [proj-name (as-> (project-name response) ?s
+                                       (str/trim ?s)
+                                       (str/split ?s #"\s+")
+                                       (map str/capitalize ?s)
+                                       (interpose " " ?s)
+                                       (apply str ?s))
+                           proj-id (as-> proj-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (symbol ?s))]
+                       (into (filterv #(not= % '(proj-id START-A-NEW-PROJECT)) init-state)
+                             `[(~'proj-id ~proj-id)
+                               (~'proj-name ~proj-name)]))
+                     ;; Otherwise, it is a surrogate; proj-id and proj-name are already known.
+                     init-state)]
+    (if (= :yes (text-cites-raw-material-challenge? response))
+        (conj proj-state (list 'cites-raw-material-challenge (-> pid name symbol)))
+      proj-state)))
+
+(defn yes-no-process-steps
+  "Return state addition for analyzing a Y/N user response about process steps."
+  [_response]
+  [])
+
+(defn query-process-durs
+  "Return state addition for analyzing a query to user about process durations."
+  [_response]
+  [])
+
+(defn yes-no-process-ordering
+  "Return state addition for analyzing a Y/N user response about process ordering."
+  [_response]
+  [])

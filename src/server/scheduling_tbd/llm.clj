@@ -9,14 +9,15 @@
   (:require
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
-   [wkok.openai-clojure.api      :as openai]
    [scheduling-tbd.sutil         :refer [api-credentials llm-provider]]
    [scheduling-tbd.web.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
    [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
-   [taoensso.timbre              :as log]))
+   [promesa.core                 :as p]
+   [taoensso.timbre              :as log]
+   [wkok.openai-clojure.api      :as openai]))
 
 (def ^:diag diag (atom nil))
 
@@ -169,33 +170,39 @@
                          :metadata metadata}
                         (api-credentials llm-provider)))
 
-(def diag1 (atom nil))
+(defn openai-messages-matching
+  "Argument is a vector of openai messages from an assistant.
+   Return a vector of messages matching the argument conditions.
+     :role  - #{'assistant', 'user'}
+     :text  - A complete match on the (-> % :content first :text value).
+     :after - Messages with :created_at >= than this."
+  [msg-list {:keys [role text after]}]
+  (cond->> msg-list
+    role     (filterv #(= role (:role %)))
+    text     (filterv #(= text (-> % :content first :text :value)))
+    after    (filterv #(<= after (:created_at %)))))
 
-(defn message-after
-  "Sort the message list and return the message after the one that has the argument text."
-  [msg-list timestamp text]
-  (reset! diag1 [msg-list timestamp text])
-  (let [[a q] (->> msg-list
-                   :data
-                   (filter #(>= (:created_at %) timestamp))
-                   (group-by :created_at) ; ToDo: I'm getting to entries at most timestamps, both from the same role! (My bug.)
-                   (reduce-kv (fn [r _k v] (conj r (first v))) [])
-                   (sort-by :created_at >))]
-    (when (= (-> q :content first :text :value) text)
-      (-> a :content first :text :value))))
+(defn response-msg
+  "Return the text that is response to the argument question."
+  [question msg-list]
+  (when-let [question-time (-> (openai-messages-matching msg-list {:role "user" :text question}) first :created_at)]
+    (when-let [responses (openai-messages-matching msg-list {:role "assistant" :after question-time})]
+      (->> responses (sort-by :created_at) first :content first :text :value))))
 
+;;; You can also use this with role 'assistant', but the use cases might be a bit esoteric. (I can't think of any.)
+;;; https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-role
 (defn query-on-thread
   "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
     aid      - assistant ID (the OpenAI notion)
     tid      - thread ID (ttheOpenAI notion)
     role     - #{'user' 'assistant'},
     msg-text - a string.
-   Returns a promise."
+   Returns text but uses promesa internally to deal with errors."
   [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 120 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
-  (reset! diag {:_obj _obj})
   (log/info "query-on-thread: query-text =" query-text)
   (assert (#{"user" "assistant"} role))
   (assert (string? query-text))
+  (assert (re-matches #"\w.*"  query-text))
   (let [creds (api-credentials llm-provider)
         ;; Apparently the thread_id links the run to msg.
         _msg (openai/create-message {:thread_id tid :role role :content query-text} creds)
@@ -205,12 +212,11 @@
         timestamp (inst-ms (java.time.Instant/now))
         run-timestamp (:created_at run)
         timeout   (+ timestamp (* timeout-secs 1000))]
-    (swap! diag #(assoc % :run run))
     (loop [now timeout]
       (Thread/sleep 1000)
       (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
-            msg-list (openai/list-messages {:thread_id tid :limit 20} creds)
-            response (message-after msg-list run-timestamp query-text)]
+            msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data)
+            response (response-msg query-text msg-list)]
         (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text})),
 
               ;; ToDo: How many messages do I have to retrieve to be sure I have the response, and can I trust the :created_at. It didn't see so.

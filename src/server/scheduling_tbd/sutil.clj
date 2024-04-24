@@ -179,3 +179,28 @@
 (defn register-planning-domain [id domain] (swap! planning-domains #(assoc % id domain)))
 (defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
 (defn get-domain [id] (get @planning-domains id))
+
+(defn str2msg-vec
+  [s]
+  (assert (string? s))
+  [{:msg-text/string s}])
+
+(defn error-for-chat
+  "Create a msg-vec to explain in the chat the error we experienced."
+  ([s] (error-for-chat s nil))
+  ([s err]
+   (if (instance? Throwable err)
+     (let [m (Throwable->map err)]
+       (if-let [msg (-> m :via first :message)]
+         (if-let [data (:data m)]
+           (into (str2msg-vec (str s ": " msg))  (str2msg-vec (str "\ndata:" data)))
+           (str2msg-vec (str s ": " msg)))
+         (str2msg-vec s)))
+     (str2msg-vec s))))
+
+(defn yes-no-unknown
+  "Return :yes :no or :unknown based on lexical analysis of the argument answer text."
+  [s]
+  (cond (or (= s "yes") (= s "Yes") (= s "Yes.") (re-matches #"(?i)\s*yes\s*" s)) :yes
+        (or (= s "no")  (= s "No")  (= s "No.")  (re-matches #"(?i)\s*no\s*"  s)) :no
+        :else :unknown))
