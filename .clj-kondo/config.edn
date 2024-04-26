@@ -4,13 +4,13 @@
 
  :linters {;; unused-referred-var is about :refer. https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md#unused-referred-var
            :unused-referred-var {:exclude {taoensso.timbre [error debug info log]
-                                           clojure.test    [deftest is testing]
-                                           ajax.core       [GET POST]}} ; Needs investigation; what it says is unresolved var.
+                                           clojure.test    [deftest is testing]}}
 
            ;; https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md#unresolved-var
            ;; New versions of datahike don't actually have forms for these functions and macros.
            ;; But there is lots of clojure.spec in DH, so many things will be caught at runtime.
-           :unresolved-var      {:exclude [datahike.api]}
+           ;; ajax.core has similar problems.
+           :unresolved-var      {:exclude [datahike.api ajax.core]}
            :unused-pubic-var    {:exclude-when-contains-meta #{:diag}}
 
            ;; :exclude-patterns is for bindings, not vars. See https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md
@@ -37,11 +37,9 @@
  :lint-as {;https://andersmurphy.com/2024/01/03/clojure-clj-kondo-datalog-linting.html
            applied-science.js-interop/defn           clojure.core/defn
            datahike.api/q                            datascript.core/q
-           scheduling-tbd.web.controllers.respond/report-long/running clojure.core/defmacro
-           scheduling-tbd.operators/defoperator      clojure.core/defn
-           scheduling-tbd.operators/defaction        clojure.core/defn
-           mount.core/defstate                       clj-kondo.lint-as/def-catch-all   ; Because the hook is not working!
-           ajax.core/GET                             clojure.core/defn}}               ; I haven't seen defmacro being used; this 'works' as well as def-catch-all.
+           scheduling-tbd.operators/defoperator      clojure.core/defmethod              ; Suddenly, nothing works for these.
+           scheduling-tbd.operators/defaction        clj-kondo-list-as/def-catch-all     ; Suddenly, nothing works for these.
+           mount.core/defstate                       clj-kondo.lint-as/def-catch-all}}   ; Because the hook is not working!
 
 ;;; Hooks are used for macros for which :lint-as doesn't work. Currently mine for defstate doesn't work at all!
 ;;; 2024-04-23: Now I'm trying to put the mount/defstate stuff in its own directory and copy ns setup from other examples. No help.

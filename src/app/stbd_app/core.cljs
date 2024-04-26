@@ -159,7 +159,7 @@
                   ($ SelectProject {:current-proj proj :proj-infos proj-infos #_#_ :change-proj-fn change-project}))))
          ($ ShareLeftRight
             {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
-                       ($ chat/Chat {:chat-height chat-side-height :conv-map conversation #_#_:change-proj-fn change-project}))
+                       ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :proj-info proj}))
              :right ($ ShareUpDown
                        {:init-height code-side-height
                         :up ($ Editor {:text code
