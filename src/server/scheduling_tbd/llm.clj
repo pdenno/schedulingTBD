@@ -15,7 +15,6 @@
    [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
-   [promesa.core                 :as p]
    [taoensso.timbre              :as log]
    [wkok.openai-clojure.api      :as openai]))
 
@@ -63,17 +62,16 @@
    This is a blocking call since the caller is a websocket thread and it responds with ws/send-to-chat."
   [{:keys [client-id question]}]
   (log/info "llm-directly:" question)
-  (try
-    (let [res (query-llm [{:role "system"    :content "You are a helpful assistant."}
-                          {:role "user"      :content question}])]
-      (if (nil? res)
-        (throw (ex-info "Timeout or other exception." {}))
-        (ws/send-to-chat {:client-id client-id :promise? false :msg-vec [{:msg-text/string res}]})))
-    (catch Exception e
-      (log/error "Failure in llm-directly:" e)
-      (ws/send-to-chat {:client-id client-id
-                        :promise? false
-                        :msg-vec [{:msg-text/string "There was a problem answering that."}]}))))
+  (let [chat-args {:client-id client-id :dispatch-key :tbd-says :promise? false}]
+    (try
+      (let [res (query-llm [{:role "system"    :content "You are a helpful assistant."}
+                            {:role "user"      :content question}])]
+        (if (nil? res)
+          (throw (ex-info "Timeout or other exception." {}))
+          (ws/send-to-chat (assoc chat-args :msg-vec [{:msg-text/string res}]))))
+      (catch Exception e
+        (log/error "Failure in llm-directly:" e)
+        (ws/send-to-chat (assoc chat-args :msg-vec [{:msg-text/string "There was a problem answering that."}]))))))
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-var-partial
@@ -141,7 +139,6 @@
   (select-llm-models-openai)
   (select-llm-models-azure))
 
-
 ;;;------------------------------------- assistants ----------------------------------------------------
 (s/def ::name string?)
 (s/def ::instructions string?)
@@ -198,33 +195,34 @@
     role     - #{'user' 'assistant'},
     msg-text - a string.
    Returns text but uses promesa internally to deal with errors."
-  [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 120 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
+  [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 60 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   (log/info "query-on-thread: query-text =" query-text)
   (assert (#{"user" "assistant"} role))
   (assert (string? query-text))
-  (assert (re-matches #"\w.*"  query-text))
+  (assert (not-empty query-text))
   (let [creds (api-credentials llm-provider)
         ;; Apparently the thread_id links the run to msg.
         _msg (openai/create-message {:thread_id tid :role role :content query-text} creds)
         ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
         ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
-        run (openai/create-run  {:thread_id tid :assistant_id aid} creds)
+        run (openai/create-run {:thread_id tid :assistant_id aid} creds)
         timestamp (inst-ms (java.time.Instant/now))
-        run-timestamp (:created_at run)
         timeout   (+ timestamp (* timeout-secs 1000))]
     (loop [now timeout]
       (Thread/sleep 1000)
       (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
-            msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data)
+            msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data) ; ToDo: 20 is a guess.
             response (response-msg query-text msg-list)]
         (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text})),
 
-              ;; ToDo: How many messages do I have to retrieve to be sure I have the response, and can I trust the :created_at. It didn't see so.
               (and (= "completed" (:status r))
-                   (not-empty response))              response
+                   (not-empty response))              response,
+
+              (and (= "completed" (:status r))
+                   (empty? response))                 (throw (ex-info "query-on-thread empty response:" {:status (:status r)})),
 
 
-              (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)}))
+              (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)})),
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
@@ -241,7 +239,7 @@
   [id]
   (openai/delete-assistant {:assistant_id id} (api-credentials llm-provider)))
 
-(defn delete-assistants-openai!
+(defn ^:diag delete-assistants-openai!
   "Delete from the openai account all assistants that match the argument filter function.
    The default function check for metadata :usage='surrogate'."
   ([] (delete-assistants-openai! #(= "surrogate" (-> % :metadata (get :usage)))))
@@ -251,7 +249,7 @@
      (delete-assistant-openai (:id a)))))
 
 ;;; (ws/register-ws-dispatch  :run-long llm/run-long)
-(defn run-long
+(defn ^:diag run-long
   "Diagnostic for exploring threading/blocking with websocket."
   [& _]
   (loop [cnt 0]
@@ -259,17 +257,17 @@
     (Thread/sleep 5000) ; 5000 * 30, about 4 minutes.
     (when (< cnt 20) (recur (inc cnt)))))
 
-(defn throw-it
+(defn ^:diag throw-it
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
 
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []
   (select-llm-models!)
-  (ws/register-ws-dispatch  :ask-llm llm-directly)
-  (ws/register-ws-dispatch  :run-long run-long)
-  (ws/register-ws-dispatch  :throw-it throw-it)
-  [:ask-directly-registered])
+  (ws/register-ws-dispatch :ask-llm llm-directly)
+  (ws/register-ws-dispatch :run-long run-long)
+  (ws/register-ws-dispatch :throw-it throw-it)
+  [:llm-fns-registered-for-ws-dispatch])
 
 (defn llm-stop []
   (reset! llms-used {})

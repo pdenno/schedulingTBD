@@ -52,12 +52,13 @@
                                                   %))
                        :nothing nil?))
 
-(defn out-bound-dispatch-key? [x] (#{:run-long           ; <=================================
+(defn outbound-dispatch-key? [x] (#{:run-long           ; <=================================
                                      :clear-promise-keys ; Server tells you to forget a promise.
                                      :alive?             ; Server is asking whether you are alive.
                                      :reload-proj        ; Server created new current project (e.g. starting, surrogates).
                                      :ping-confirm       ; Server confirms your ping.
+                                     :sur-says
                                      :tbd-says} x))
 (s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
-(s/def ::dispatch-key out-bound-dispatch-key?)
+(s/def ::dispatch-key outbound-dispatch-key?)
 (s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key] :opt-un [::chat-msg-vec]))

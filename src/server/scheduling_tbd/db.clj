@@ -53,7 +53,7 @@
    ;; ---------------------- message
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The agent, either :user or :system, issuing the message."}
+        :doc "The agent issuing the message, #{:human :surrogate :system}."}
    :message/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
         :doc "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, which aren't stored, some values can be skipped."}
@@ -117,6 +117,9 @@
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
+   :project/surrogate?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "true if domain expertise is provided by an artificial agent."}
 
    ;; ---------------------- summary
    :summary/name
@@ -516,7 +519,7 @@
   [pid from msg-vec]
   (s/assert ::spec/chat-msg-vec msg-vec) ; ToDo: I might have to turn something on to see this!
   (assert (not-empty msg-vec))
-  (assert (#{:system :user} from))
+  (assert (#{:system :human :surrogate} from))
   (log/info "add-msg: pid =" pid "msg-vec =" msg-vec)
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid))]

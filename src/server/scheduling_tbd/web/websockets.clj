@@ -17,7 +17,7 @@
 
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique client-id provided by the client." (atom {}))
-(declare user-says send-to-chat dispatch)
+(declare domain-expert-says send-to-chat dispatch)
 
 (defn make-ws-channels
   "Create channels and store them keyed by the unique ID provided by the client."
@@ -95,7 +95,7 @@
   (let [clients (keys @socket-channels)]
     (doseq [client-id clients]
       (swap! socket-channels #(assoc-in % [client-id :alive?] false))
-      (send-to-chat {:client-id client-id :dispatch-key :alive? :promise? false}))
+      (send-to-chat {:client-id client-id :dispatch-key :alive?}))
     (Thread/sleep 2000) ; 2 seconds to respond.
     (doseq [client-id clients]
       (when-not (get-in @socket-channels [client-id :alive?])
@@ -159,7 +159,8 @@
    Set up web socket in, out, and err channels.
    This is called for each client. Client can call it more than once if, for example,
    it finds that the channel has become unusable (e.g. using (.-readyState) in JS.
-   In that case, the old channel will eventually get destroyed by close-inactive-channels."
+   In that case, the old channel will eventually get destroyed by close-inactive-channels.
+   Returns a map with value for key :ring.websocket/listener."
   [request]
   (log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
   (close-inactive-channels) ; ToDo: This takes time. Fix it.
@@ -173,13 +174,13 @@
 ;;; ----------------------- Promise management -------------------------------
 ;;;   * By design, the server waits for a response before sending another question (except for maybe some future where there is a "Are you still there?").
 ;;;     - Questions always are transmitted over the websocket; they are the beginning of something new.
-;;;   * The user, however might be able to send multiple chat responses before the next question.
+;;;   * The domain-expert, however might be able to send multiple chat responses before the next question.
 ;;;   * promise-keys are an attempt to match the question to the responses.
 ;;;     - When the server asks a question, it adds a promise key to the question; the client manages a set of these keys.
-;;;     - When the user does a user-says, it tells the server what keys it has.
-;;;     - As the system processes a user-says, it decides what keys to tell the client to erase.
-;;;     - The system uses the keys to match a question to a user-says.
-;;;       + It picks the key top-most on its stack that is also in the set sent by the client with user-says.
+;;;     - When the domain-expert does a domain-expert-says, it tells the server what keys it has.
+;;;     - As the system processes a domain-expert-says, it decides what keys to tell the client to erase.
+;;;     - The system uses the keys to match a question to a domain-expert-says.
+;;;       + It picks the key top-most on its stack that is also in the set sent by the client with domain-expert-says.
 ;;;     - When the system has decided where to route the question, it can also tell the client to remove that key from its set.
 ;;;       + This last step is important because the server needs to get old promise-keys off the stack.
 ;;;
@@ -197,7 +198,7 @@
   ([client-id]
    (doseq [p (filter #(= client-id (:client-id %)) @promise-stack)]
      (log/info "Clearing (rejecting) promise" p)
-     (p/reject! (:prom p) (ex-info "client forgotten")))
+     (p/reject! (:prom p) (ex-info "client forgotten" {})))
    (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %))))
 
 (defn remove-promise!
@@ -207,7 +208,7 @@
 
 (defn new-promise
   "Return a vector of [key, promise] to a new promise.
-   We use this key to match returning responses from ws-send :user-says, to know
+   We use this key to match returning responses from ws-send :domain-expert-says, to know
    what is being responded to." ; ToDo: This is not fool-proof.
   [client-id]
   (let [k (-> (gensym "promise-") keyword)
@@ -239,25 +240,33 @@
     (log/error "Could not find out async channel for client" client-id)))
 
 ;;;--------------------- Receiving a response from a client -----------------------
-(defn user-says
-  "Handle websocket message with dispatch key :user-says. This will typically clear a promise-key."
+(defn domain-expert-says
+  "Handle websocket message with dispatch key :domain-expert-says. This will typically clear a promise-key.
+   Note that we call it 'domain-expert' rather than 'user' because the role is just that, and it can be
+   filled by a human or surrogate expert."
   [{:keys [msg-text client-id promise-keys] :as msg}]
-  (log/info "User-says:" msg)
+  (log/info "domain-expert-says:" msg)
   (if-let [prom-obj (select-promise promise-keys)]
     (do (log/info "Before resolve!: prom-obj =" prom-obj)
         (reset! diag prom-obj)
         (p/resolve! (:prom prom-obj) msg-text)
         (clear-keys client-id [(:p-key prom-obj)]))
-    (log/error "user-says: no p-key (e.g. no question in play)")))
+    (log/error "domain-expert-says: no p-key (e.g. no question in play)")))
 
 ;;;-------------------- Sending questions etc. to a client --------------------------
+(defn use-promise?
+  "Return true if a promise should be generated for the argument type of dispatch."
+  [dispatch-key] ; The complete list of these is ::spec/outbound-dispatch-key.
+  (#{:tbd-says} dispatch-key))
+
 (defn send-to-chat
   "Send the argument message-vec to the current project (or some other destination if a client-id is provided.
-   Return a promise that is resolved when the user responds to the message, by whatever means (http or ws).
+   Return a promise that is resolved when the domain-expert responds to the message, by whatever means (http or ws).
      msg-vec is is a vector of ::spec/msg-text-elem and :spec/msg-link-elem. See specs.cljs."
-  [{:keys [promise? client-id dispatch-key msg-vec] :or  {promise? true} :as content}]
+  [{:keys [client-id dispatch-key msg-vec] :or {dispatch-key :tbd-says} :as content}]
   (s/assert ::spec/chat-msg-vec msg-vec)
-  (let [content (cond-> content ; Just so that we can uses s/assert below!
+  (let [promise? (if (contains? content :promise?) (:promise? content) (use-promise? dispatch-key))
+        content (cond-> content ; Just so that we can uses s/assert below!
                   (not (contains? content :dispatch-key))  (assoc :dispatch-key :tbd-says))]
     (s/assert ::spec/chat-msg-obj content)
     (log/info "send-to-chat: content =" content)
@@ -265,7 +274,6 @@
     (if-let [out (->> client-id (get @socket-channels) :out)]
       (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
             msg-obj (cond-> content
-                      true                (assoc :dispatch-key (or dispatch-key :tbd-says))
                       p-key               (assoc :p-key p-key)
                       true                (assoc :timestamp (now)))]
         (go (>! out (str msg-obj)))
@@ -296,7 +304,7 @@
        :ask-llm             llm/llm-directly."
   []
   (reset! dispatch-table {:ping                 ping-confirm
-                          :user-says            user-says
+                          :domain-expert-says   domain-expert-says
                           :alive-confirm        client-confirms-alive
                           :close-channel        close-channel}))
 

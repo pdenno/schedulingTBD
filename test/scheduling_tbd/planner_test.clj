@@ -22,6 +22,7 @@
   (alias 'mount  'mount.core)
   (alias 'p      'promesa.core)
   (alias 'px     'promesa.exec)
+  (alias 'core   'scheduling-tbd.core)
   (alias 'dom    'scheduling-tbd.domain)
   ;(alias 'domt    'scheduling-tbd.domain-test)
   (alias 'how    'scheduling-tbd.how-made)

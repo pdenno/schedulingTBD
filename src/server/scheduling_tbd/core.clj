@@ -12,7 +12,7 @@
    [scheduling-tbd.surrogate :refer [surrogates]]        ; for mount
    [scheduling-tbd.util :refer [util-state]]             ; for mount
    [scheduling-tbd.web.handler :refer [app]]             ; for mount
-   [scheduling-tbd.web.websockets :refer [wsock]] ; for mount
+   [scheduling-tbd.web.websockets :refer [wsock]]        ; for mount
    [ring.adapter.jetty :as jetty]
    [taoensso.timbre :as log])
   (:gen-class))
@@ -51,7 +51,7 @@
         host (-> base-config :server/http :host)]
     (try (let [server (jetty/run-jetty #'scheduling-tbd.web.handler/app {:port port, :join? false})]
            (reset! system server)
-           #_(test-server port) ; ToDo: Later!
+           ;(test-server port)
            (log/info "Started server on port" port))
          (catch Throwable t
            (log/error t "Server failed to start on host " host " port " port ".")))))

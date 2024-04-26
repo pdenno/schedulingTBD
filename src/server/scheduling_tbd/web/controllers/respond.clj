@@ -35,7 +35,7 @@
   (letfn [(resolve-proj-info [pid]
             (resolve-db-id {:db/id (db/project-exists? pid)}
                            (connect-atm pid)
-                           :keep-set #{:project/name :project/id}))]
+                           :keep-set #{:project/name :project/id :project/surrogate?}))]
     (let [proj-infos (mapv resolve-proj-info (db/list-projects))
           current (or (db/default-project) new-proj-entry) ; ToDo: Client could tell you what its current project is.
           others (filterv #(not= % current) proj-infos)]

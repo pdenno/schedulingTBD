@@ -76,24 +76,10 @@
 ;;; --------- (require '[develop.dutil :as devl]) ; Of course, you'll have to (user/restart) when you update things here.
 ;;; --------- Try it with :reitit.interceptor/transform dev/print-context-diffs. See below.
 ;;; --------- (devl/ajax-test "/api/user-says" {:user-text "LLM: What's the capital of Iowa?"} {:method ajax.core/POST})
-(s/def ::user-says-request  (s/keys :req-un [::client-id ::user-text] :opt-un [::user-text] :opt [:promise/keys]))
-(s/def :promise/keys (st/spec {:spec (s/coll-of keyword?)
-                               :name :promise-keys
-                               :description "Data sent with a question put to the users, that is used to match to their responses."
-                               :json-schema/default ["promise-42"]}))
-(s/def ::user-text   (st/spec {:spec  string?
-                               :name "user-text"
-                               :description "The text of the user's message."
-                               :json-schema/default "LLM: What is the capital of Iowa?"}))
-
 (s/def :message/content (s/coll-of map?))
 (s/def :message/id integer?)
 (s/def :message/from keyword?)
 (s/def :message/time inst?)
-(s/def :message/ack boolean?) ; Typically true; your response does not add to the chat.
-(s/def :promise/pending-keys (s/coll-of keyword?))
-;;; ToDo: Either :message/ack or :message/content
-(s/def ::user-says-response (s/keys :opt [:message/content :message/id :message/from :message/time :message/ack :promise/pending-keys]))
 
 ;;; -------- (devl/ajax-test "/api/list-projects" [])
 (s/def ::others (s/coll-of map?))
@@ -147,7 +133,7 @@
                :tags ["SchedulingTBD functions"]}}
 
     ["/get-conversation"
-     {:get {;:no-doc true ; <=====================================================================
+     {:get {;:no-doc true
             :summary "Get the project's conversation from its project DB."
             :parameters {:query ::get-conversation-request}
             :responses {200 {:body ::get-conversation-response}}

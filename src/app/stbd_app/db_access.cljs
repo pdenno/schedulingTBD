@@ -36,5 +36,4 @@
                            (p/reject! prom (ex-info "CLJS-AJAX error on /api/get-conversation"
                                                     {:status status :status-text status-text})))})
     (ws/send-msg {:dispatch-key :resume-conversation :project-id id})
-    (reset! diag prom)
     prom))

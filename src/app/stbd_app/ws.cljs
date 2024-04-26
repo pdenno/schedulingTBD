@@ -18,7 +18,12 @@
 (def change-proj-fn
   "We store this function -- which is set in Top and closes over some refs -- on an atom so we don't have send it around."
   (atom nil))
-(def set-tbd-obj-fn
+
+(def set-tbd-text-fn
+  "Rationale for this is similar to change-proj-fn; set elsewhere, needed by websocket."
+  (atom nil))
+
+(def set-sur-text-fn
   "Rationale for this is similar to change-proj-fn; set elsewhere, needed by websocket."
   (atom nil))
 
@@ -42,7 +47,7 @@
 (defn remember-promise
   "When the server sends a message that is part of a conversation and requires a response, it adds a keyword
    that associates to a promise on the server side and allows the server to continue the conversation,
-   interpreting the :user-says response which repeat this promise-key as answer to the :tbd-says ws message.
+   interpreting the :domain-expert-says response which repeat this promise-key as answer to the :tbd-says ws message.
    This function just adds to the list, which in most cases will be empty when the argument key is added here."
   [k]  (when k (swap! pending-promise-keys conj k)))
 
@@ -56,6 +61,7 @@
     :alive?             ; Server is asking whether you are alive.
     :reload-proj        ; Server created new current project (e.g. starting, surrogates).
     :ping-confirm       ; Server confirms your ping.
+    :sur-says           ; Surrogate response to a question.
     :tbd-says})         ; Message for the chat, a question, typically.
 
 (defn dispatch-msg
@@ -70,7 +76,10 @@
       :ping-confirm       #_:ok (log/info "Ping confirm")
       :tbd-says           (do (when p-key (remember-promise p-key))
                               (log/info "tbd-says msg:" msg)
-                              (@set-tbd-obj-fn msg))
+                              (@set-tbd-text-fn msg))
+      :sur-says           (do (when p-key (remember-promise p-key))
+                              (log/info "tbd-says msg:" msg)
+                              (@set-sur-text-fn msg))
       "default")))
 
 (def ping-id (atom 0))
@@ -127,10 +136,11 @@
   #{:alive-confirm          ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected. ToDo: Remove it? Not implemented.
     :ask-llm                ; User asked a "LLM:..." question at the chat prompt.
     :start-surrogate        ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation.
+    :surrogate-follow-up    ; User wrote "SUR?" <some question about dialog to date>
     :resume-conversation    ; Restart the planner (works for :START-A-NEW-PROJECT too).
     :close-channel          ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
     :ping                   ; Ping server.
-    :user-says              ; User wrote at the chat prompt (typically answering a question).
+    :domain-expert-says     ; Human user wrote at the chat prompt (typically answering a question).
     :run-long               ; diagnostic
     :throw-it})             ; diagnostic
 

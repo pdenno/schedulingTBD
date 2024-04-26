@@ -1,19 +1,23 @@
 [
 #:system{:default-project-id :craft-beer-brewery-scheduling, :name "SYSTEM"}
 
-#:project{:dir
-          "/opt/scheduling/projects/craft-beer-brewery-scheduling",
+#:project{:dir "/opt/scheduling/projects/craft-beer-brewery-scheduling",
           :id :craft-beer-brewery-scheduling,
-          :name "craft-beer-brewery-scheduling"}
+          :name "Craft Beer Brewery Scheduling"}
 
-#:project{:dir
-          "/opt/scheduling/projects/snowboards-production-scheduling",
+#:project{:dir "/opt/scheduling/projects/snowboards-production-scheduling",
           :id :snowboards-production-scheduling,
-          :name "Snowboards production scheduling"}
+          :name "Snowboards Production Scheduling"}
 
-#:project{:dir
-          "/opt/scheduling/projects/aluminium-foil-production-scheduling",
+#:project{:dir "/opt/scheduling/projects/aluminium-foil-production-scheduling",
           :id :aluminium-foil-production-scheduling,
-          :name "Aluminium foil production scheduling"}
+          :name "Aluminium Foil Production Scheduling"}
 
+#:project{:dir "/opt/scheduling/projects/sur-canned-corn",
+          :id :sur-canned-corn,
+          :name "Sur Canned Corn"}
+
+#:project{:dir "/opt/scheduling/projects/sur-canned-vegetables",
+          :id :sur-canned-vegetables,
+          :name "Sur Canned Vegetables"}
 ]

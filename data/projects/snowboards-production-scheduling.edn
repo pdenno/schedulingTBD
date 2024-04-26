@@ -15,7 +15,7 @@
            #:message{:content
                      [#:msg-text{:string
                                  "Our principal scheduling problem boils down to efficiently coordinating multiple variable elements in our production process. These include reconciling supplier timelines for raw materials delivery, regulating internal manufacturing stages, accounting for fluctuating seasonal demand, and ensuring timely shipment to retailers. Additionally, unanticipated demand surge or supply chain disruptions pose considerable challenges. The issue is mainly compounded by the product's seasonality, which calls for careful forecasting and demand planning. Finally, the production process for custom-designed snowboards results in frequent changes in the production schedule."}],
-                     :from :user,
+                     :from :human,
                      :id 2,
                      :time #inst "2023-11-14T10:05:40.007-00:00"}
            #:message{:content

@@ -50,8 +50,9 @@
            :href href}
      text))
 
-(def msg-style {:system {:name "TBD" :color "Red"   :position "left"}
-                :user   {:name "You" :color "Green" :position "right"}})
+(def msg-style {:system    {:name "TBD"              :color "Red"   :position "left"}
+                :human     {:name "You"              :color "Green" :position "right"}
+                :surrogate {:name "Surrogate expert" :color "Green" :position "right"}})
 
 ;;; ToDo: Remove this and it usages?
 (def msg-index "This might be a waste of time. WS won't' print the same message twice in a row."  (atom 0))
@@ -82,32 +83,41 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(defnc Chat [{:keys [chat-height conv-map]}]
+(defnc Chat [{:keys [chat-height conv-map proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js))
         [progress set-progress]         (hooks/use-state 0)
         [progressing? _set-progressing] (hooks/use-state false)
         [user-text     set-user-text]   (hooks/use-state "")                         ; Something the user said, plain text.
-        [tbd-obj set-tbd-obj]           (hooks/use-state "")                         ; Something the system said, a dispatch-obj with :msg-vec.
+        [sur-text      set-sur-text]    (hooks/use-state "")                         ; Something said by a surrogate, different path of execution than user-text.
+        [tbd-text set-tbd-text]         (hooks/use-state "")                         ; Something the system said, a dispatch-obj with :msg-vec.
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         input-ref                       (hooks/use-ref nil)
         resize-fns (make-resize-fns set-box-height)]
+    (log/info "proj-info = " proj-info)
     ;; ------------- Talk through web socket, initiated below.
-    (hooks/use-effect :once ; set-tbd-obje is needed by ws/dispatch.
-      (reset! ws/set-tbd-obj-fn set-tbd-obj))
+    (hooks/use-effect :once ; set-tbd-text-fn is needed by ws/dispatch.
+      (reset! ws/set-tbd-text-fn set-tbd-text)
+      (reset! ws/set-sur-text-fn set-sur-text)) ; This one because surrogates programmatically do this.
     (hooks/use-effect [conv-map] ; Put the entire conversation into the chat.
       (set-msg-list (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js)))
-    (hooks/use-effect [tbd-obj]  ; Put TBD's (server's) message into the chat.
-      (when (not-empty tbd-obj)
-        (let [new-msg (-> tbd-obj :msg-vec (msg-vec2rce :system) clj->js)]
+    (hooks/use-effect [tbd-text]  ; Put TBD's (server's) message into the chat.
+      (when (not-empty tbd-text)
+        (let [new-msg (-> tbd-text :msg-vec (msg-vec2rce :system) clj->js)]
+          (set-msg-list (add-msg msg-list new-msg)))))
+    (hooks/use-effect [sur-text]  ; Put TBD's (server's) message into the chat.
+      (when (not-empty sur-text)
+        (let [new-msg (-> sur-text :msg-vec (msg-vec2rce :surrogate) clj->js)]
           (set-msg-list (add-msg msg-list new-msg)))))
     (hooks/use-effect [user-text] ; Entered by user with arrow button. Send user-text to the server, and put it in the chat.
        (when (not-empty user-text)
          (log/info "In user-text hook: user-text =" user-text)
          (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" user-text)
                [surrogate? product] (re-matches #"\s*SUR:(.*)" user-text)
-               msg (cond  ask-llm?      {:dispatch-key :ask-llm :question question}
-                          surrogate?    {:dispatch-key :start-surrogate :product product}
-                          :else         {:dispatch-key :user-says :msg-text user-text :promise-keys @ws/pending-promise-keys})]
+               [sur-follow-up? q] (re-matches #"\s*SUR\?:(.*)" user-text)
+               msg (cond  ask-llm?       {:dispatch-key :ask-llm :question question}
+                          surrogate?     {:dispatch-key :start-surrogate :product product}
+                          sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:project/id proj-info) :question q}
+                          :else          {:dispatch-key :domain-expert-says :msg-text user-text :promise-keys @ws/pending-promise-keys})]
            (log/info "Before ws/send-msg: msg =" msg)
            (ws/send-msg msg))))
       ;; -------------- progress stuff (currentl not hooked up)
@@ -148,7 +158,9 @@
                                   :multiline true})
                     ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
                                                (when-let [text (not-empty (j/get iref :value))]
-                                                 (set-msg-list (add-msg msg-list (msg-vec2rce [{:msg-text/string text}] :user)))
+                                                 (let [tbd-injection? (re-matches #"\s*SUR\?:(.*)" text)]
+                                                   (set-msg-list (add-msg msg-list (msg-vec2rce [{:msg-text/string text}]
+                                                                                                (if tbd-injection? :system :human)))))
                                          (j/assoc! iref :value "")
                                          (set-user-text text)))}
                        ($ Send))))})))

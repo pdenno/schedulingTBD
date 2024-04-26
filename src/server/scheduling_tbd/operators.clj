@@ -181,7 +181,9 @@
                              (try
                                (llm/query-on-thread :tid tid :aid aid :query-text (msg-vec2text agent-msg-vec))   ; This can timeout.
                                (catch Exception e {:error e}))))
-               (ws/send-to-chat (assoc obj :msg-vec agent-msg-vec)))]                                             ; This cannot timeout.
+               (ws/send-to-chat (-> obj
+                                    (assoc :msg-vec agent-msg-vec)
+                                    (assoc :dispatch-key :tbd-says))))]                                             ; This cannot timeout.
     (log/info "prom =" prom)
     (p/await prom))); You can't put anything else here or a promise will be passed!
 
@@ -219,9 +221,10 @@
 (defaction :!initial-question [{:keys [state response client-id agent-msg-vec] :as _obj}]
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
   ;(reset! diag _obj)
-  (let [analysis-state (dom/prelim-analysis response state {:client-id client-id})] ; return state props proj-id and proj-name if human, otherwise argument state.
-    (when-not (surrogate? state) (make-human-project analysis-state))
-    ;; Now human/surrogate can be treated identically.
+  (let [surrogate? (surrogate? state)
+        analysis-state (dom/prelim-analysis response state {:client-id client-id})] ; return state props proj-id and proj-name if human, otherwise argument state.
+    (when-not surrogate? (make-human-project analysis-state))
+    ;; Now human/surrogate can be treated nearly identically.
     (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
           [_ pname] (find-fact '(proj-name ?x) analysis-state)
           cites-supply? (find-fact '(cites-raw-material-challenge ?x) analysis-state)
@@ -229,11 +232,11 @@
       (db/add-state pid analysis-state)
       (log/info "DB and app actions on PID =" pid)
       (db/add-msg pid :system agent-msg-vec)  ; ToDo: I'm not catching the error when this is wrong!
-      (db/add-msg pid :user (str2msg-vec response))
+      (db/add-msg pid (if surrogate? :surrogate :human) (str2msg-vec response))
       (db/add-msg pid :system (str2msg-vec (format "Great, we'll call your project %s." pname)))
       (when cites-supply?
         (let [msg-vec (str2msg-vec (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
-                                        "we'd like to put that aside for a minute and talk about processes."))]
+                                        "we'd like to put that aside for a minute and talk about the processes that make product."))]
           (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg-vec msg-vec})
           (db/add-msg pid :system msg-vec)))
       (ws/send-to-chat {:promise? false

@@ -6,8 +6,7 @@
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.llm       :as llm]
-   [scheduling-tbd.planner   :as plan]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id get-domain]]
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id str2msg-vec]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log]))
 
@@ -85,10 +84,27 @@
         (log/warn "Failed to start surrogate.")
         (log/error "Error starting surrogate:" e)))))
 
+;;; ToDo: Do I want this in the database?
+(defn surrogate-follow-up
+  "Handler for 'SUR?:' manual follow-up questions to a surrogate."
+  [{:keys [client-id pid question] :as obj}]
+  (log/info "SUR follow-up:" obj)
+  (let [chat-args {:client-id client-id :dispatch-key :sur-says}]
+    (when-let [aid (db/get-assistant-id pid nil)]
+      (when-let [tid (db/get-thread-id pid nil)]
+        (try (when-let [answer (llm/query-on-thread :tid tid :aid aid :query-text question)]
+               (log/info "SUR's answer:" answer)
+               (when (string? answer)
+                 (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec answer)))))
+             (catch Exception e
+               (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
+               (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec "We had a problem answering this questions.")))))))))
+
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []
   (ws/register-ws-dispatch :start-surrogate start-surrogate)
-  :surrogates-started)
+  (ws/register-ws-dispatch :surrogate-follow-up surrogate-follow-up)
+  :surrogate-ws-fns-registered)
 
 (defn stop-surrogates! []
   :done)
