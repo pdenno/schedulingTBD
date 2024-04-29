@@ -163,15 +163,15 @@
                                (-> partials rest vec)) ; No way forward from this navigation. The partial can be removed.
 
           ;; Execute the operator. If it succeeds, update state, new-tasks, and plan.
-          (operator? task)   (try (op/run-operator! (db/get-state pid) task opts) ; ToDo: Assumes only run-operator can throw.
-                                  (let [new-state (op/operator-update-state (db/get-state pid) task bindings)
+          (operator? task)   (try (op/run-operator! (db/get-planning-state pid) task opts) ; ToDo: Assumes only run-operator can throw.
+                                  (let [new-state (op/operator-update-state (db/get-planning-state pid) task bindings)
                                         op-head (-> task :operator/head (uni/subst bindings))
                                         new-partial (-> part
                                                         (assoc :state new-state)
                                                         (update :new-tasks #(-> % rest vec))
                                                         (update :plan #(conj % op-head))
                                                         vector)]
-                                    (db/put-state pid new-state) ; Because op/operator-update-state doesn't do this!
+                                    (db/put-planning-state pid new-state) ; Because op/operator-update-state doesn't do this!
                                     (into new-partial (rest partials)))
                                   (catch Exception e [(assoc part :error e)]))
 

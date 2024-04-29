@@ -360,8 +360,8 @@
            @(connect-atm pid) pid)
       ""))
 
-(defn get-state
-  "Return the state vector for the argument project, or [] if none."
+(defn get-planning-state
+  "Return the planning state vector (a collection of ground propositions) for the argument project, or [] if none."
   [pid]
   (if-let [state-str (d/q '[:find ?s .
                             :where
@@ -371,7 +371,7 @@
     (edn/read-string state-str)
     []))
 
-(defn put-state
+(defn put-planning-state
   "Write an updated state to the project database. Argument is a vector or set. "
   [pid state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
@@ -381,11 +381,11 @@
     (d/transact conn
                 {:tx-data [[:db/add eid :problem/state-string (str state-set)]]})))
 
-(defn add-state
+(defn add-planning-state
   "Add the argument vector of ground proposition to state."
   [pid more-state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
-  (put-state pid (into (get-state pid) more-state)))
+  (put-planning-state pid (into (get-planning-state pid) more-state)))
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db

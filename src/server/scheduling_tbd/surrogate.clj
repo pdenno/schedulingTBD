@@ -95,7 +95,9 @@
         (try (when-let [answer (llm/query-on-thread :tid tid :aid aid :query-text question)]
                (log/info "SUR's answer:" answer)
                (when (string? answer)
-                 (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec answer)))))
+                 (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec answer)))
+                 (db/add-msg pid :system (str2msg-vec question))
+                 (db/add-msg pid :surrogate (str2msg-vec answer))))
              (catch Exception e
                (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
                (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec "We had a problem answering this questions.")))))))))

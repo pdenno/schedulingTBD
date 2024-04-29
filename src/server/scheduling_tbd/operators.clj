@@ -124,7 +124,7 @@
                                                                                     (assoc :state state)
                                                                                     (assoc :tag op-tag)
                                                                                     (dissoc :inject-failures)))
-                                                                 (log/info "+++Operator" op-tag "ran (ACTUAL) state = " (db/get-state pid)))
+                                                                 (log/info "+++Operator" op-tag "ran (ACTUAL) state = " (db/get-planning-state pid)))
 
           :else                                               (log/info "+++Operator" op-tag "pass-through (NOT RECOGNIZED)"))))
 
@@ -150,7 +150,6 @@
   "Return true if state has a predicate unifying with (surrogate ?x)."
   [state]
   (find-fact '(surrogate ?x) state))
-
 
 (defn make-human-project
   "Surrogate already has a project db, but human doesn't. This creates the db and returns and returns state (possibly updated).
@@ -188,7 +187,7 @@
     (p/await prom))); You can't put anything else here or a promise will be passed!
 
 ;;;=================================================== Operators ======================================
-;;; Operator db-actions update state in the db (db/add-state) and return nil.
+;;; Operator db-actions update state in the db (db/add-plannin-state) and return nil.
 ;;; The update does not include the call to operator-update-state, which applies the d-list and a-list.
 ;;; operator-update-state is called by the planner, plan/update-planning.
 
@@ -222,14 +221,14 @@
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
   ;(reset! diag _obj)
   (let [surrogate? (surrogate? state)
-        analysis-state (dom/prelim-analysis response state {:client-id client-id})] ; return state props proj-id and proj-name if human, otherwise argument state.
+        analysis-state (dom/project-name-analysis response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
     (when-not surrogate? (make-human-project analysis-state))
-    ;; Now human/surrogate can be treated nearly identically.
+    ;;--------  Now human/surrogate can be treated nearly identically ---------
     (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
           [_ pname] (find-fact '(proj-name ?x) analysis-state)
           cites-supply? (find-fact '(cites-raw-material-challenge ?x) analysis-state)
           pid (keyword pid)]
-      (db/add-state pid analysis-state)
+      (db/add-planning-state pid analysis-state)
       (log/info "DB and app actions on PID =" pid)
       (db/add-msg pid :system agent-msg-vec)  ; ToDo: I'm not catching the error when this is wrong!
       (db/add-msg pid (if surrogate? :surrogate :human) (str2msg-vec response))
@@ -242,7 +241,9 @@
       (ws/send-to-chat {:promise? false
                         :client-id client-id
                         :dispatch-key :reload-proj
-                        :new-proj-map {:project/id pid :project/name pname}}))))
+                        :new-proj-map {:project/id pid :project/name pname}})
+      ;; Complete preliminary analysis in a parallel agent that, in the case of a human expert, works independently.
+      (dom/parallel-expert-prelim-analysis pid))))
 
 ;;; ----- :!yes-no-process-steps
 #_(def process-steps-prompt ;<============================================================================================================================================== Start here.
@@ -261,7 +262,7 @@
   ;; Nothing to do here but update state from a-list.
   (log/info "!yes-no-process-steps (action): response =" response)
   (let [more-state (dom/yes-no-process-steps response)]
-    (db/add-state pid more-state)))
+    (db/add-planning-state pid more-state)))
 
 ;;; ----- :!query-process-durs
 (defoperator :!query-process-durs [obj]
@@ -276,7 +277,7 @@
 (defaction :!query-process-durs [{:keys [response pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
   (let [more-state (dom/query-process-durs response)]
-    (db/add-state pid more-state)))
+    (db/add-planning-state pid more-state)))
 
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-ordering [obj]
@@ -291,4 +292,4 @@
 (defaction :!yes-no-process-ordering [{:keys [response pid] :as obj}]
   (log/info "!yes-no-process-ordering (action): response =" response "obj =" obj)
     (let [more-state (dom/yes-no-process-ordering response)]
-      (db/add-state pid more-state)))
+      (db/add-planning-state pid more-state)))
