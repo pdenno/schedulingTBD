@@ -8,7 +8,7 @@
    [scheduling-tbd.db         :as db]
    [scheduling-tbd.operators  :as op]
    [scheduling-tbd.specs      :as spec]
-   [scheduling-tbd.sutil      :as sutil :refer [error-for-chat register-planning-domain]]
+   [scheduling-tbd.sutil      :as sutil :refer [error-for-chat register-planning-domain find-fact]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre           :as log]))
 
@@ -125,7 +125,18 @@
                         res))
                     []
                     matching-tasks)]
-  res))
+    res))
+
+;;; ToDo: I think it is probably wrong to use an HTTP call for get-conversation, but for the time being, that's what we are using.
+;;;       This will cause the client to make that HTTP call.
+;;; ToDo: Should this and a few others have promises? And should :promise? be called :round-trip?
+(defn refresh-client
+  "Send a message to the client to reload the conversation. Typically done with surrogate."
+  [client-id pid]
+  (ws/send-to-chat {:promise? false
+                    :client-id client-id
+                    :dispatch-key :request-conversation
+                    :pid pid}))
 
 ;;; This only needs to work on the head partial plan, right? (That's even true once I have alternatives, right?)
 ;;; Later, this is the place to execute the plan by running operators that interact with the user to update state.
@@ -155,7 +166,7 @@
    s-tasks (satisfying-elements) is a map containing the following keys:
       :bindings  - is a map of variable bindings,
       :task      - is information from the operator or method RHS satisfying RHS the preconditions."
-  [partials s-tasks {:keys [pid] :as opts}]
+  [partials s-tasks {:keys [pid client-id] :as opts}]
   (let [part (first partials)
         {:keys [task bindings]} (first s-tasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
     (cond (empty? s-tasks)   (do
@@ -163,15 +174,17 @@
                                (-> partials rest vec)) ; No way forward from this navigation. The partial can be removed.
 
           ;; Execute the operator. If it succeeds, update state, new-tasks, and plan.
-          (operator? task)   (try (op/run-operator! (db/get-state pid) task opts) ; ToDo: Assumes only run-operator can throw.
-                                  (let [new-state (op/operator-update-state (db/get-state pid) task bindings)
+          (operator? task)   (try (op/run-operator! (db/get-planning-state pid) task opts) ; ToDo: Assumes only run-operator can throw.
+                                  (let [new-state (op/operator-update-state (db/get-planning-state pid) task bindings)
                                         op-head (-> task :operator/head (uni/subst bindings))
                                         new-partial (-> part
                                                         (assoc :state new-state)
                                                         (update :new-tasks #(-> % rest vec))
                                                         (update :plan #(conj % op-head))
                                                         vector)]
-                                    (db/put-state pid new-state) ; Because op/operator-update-state doesn't do this!
+                                    (db/put-planning-state pid new-state) ; Because op/operator-update-state doesn't do this!
+                                    (when (find-fact '(surrogate ?x) new-state) ; If it is a surrogate, update the client's view of the conversation.
+                                      (refresh-client client-id pid))
                                     (into new-partial (rest partials)))
                                   (catch Exception e [(assoc part :error e)]))
 
@@ -180,16 +193,14 @@
                                                                               (-> % rest vec)))] ; drop this task; add the steps
                                (into [new-partial] (rest partials))))))
 
-;;; (plan/plan9 project-id :process-interview client-id {:start-facts (db/get-state project-id)}))
+;;; (plan/plan9 project-id :process-interview-1 client-id {:start-facts (db/get-state project-id)}))
 (defn ^:diag plan9
   "A dynamic HTN planner.
    Operates on a stack (vector) of 'partials' (partial plans, described in the docstring of update-planning).
    Initialize the stack to a partial from a problem definition.
    Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
-  [domain-id problem & {:keys [client-id] :as opts}]  ; opts typically includes :pid.
+  [domain-id state goal & {:keys [client-id] :as opts}]  ; opts typically includes :pid.
   (let [elems   (-> (sutil/get-domain domain-id) :domain/elems)
-        state   (:state problem) ; A vector of ground literals.
-        goal    (:goal problem)  ; A literal.
         result (loop [partials [{:plan [] :new-tasks [goal] :state state}]
                       cnt 1]
                  ;;(log/info "new-tasks =" (-> partials first :new-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
@@ -269,9 +280,9 @@
   "Start the interview loop. :resume-conversation is a dispatch key from client.
    This is called even for where PID is :START-A-NEW-PROJECT."
   [{:keys [project-id client-id]}]
-  (plan9 :process-interview
-         (db/get-problem project-id)
-         {:client-id client-id :pid project-id}))
+  (let [{:keys [state goal]} (db/get-problem project-id)]
+    (log/info "----- resume conversation: planning-state = " state)
+    (plan9 :process-interview state goal {:client-id client-id :pid project-id})))
 
 (defn init-planner!
   []

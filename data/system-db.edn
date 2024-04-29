@@ -20,4 +20,29 @@
 #:project{:dir "/opt/scheduling/projects/sur-canned-vegetables",
           :id :sur-canned-vegetables,
           :name "Sur Canned Vegetables"}
+
+#:project{:dir "/opt/scheduling/projects/sur-aluminium-cans",
+          :id :sur-aluminium-cans
+          :name "Sur Aluminium Cans"}
+
+#:project{:dir "/opt/scheduling/projects/sur-remanufactured-alternators"
+          :id :sur-remanufactured-alternators
+          :name "Sur Remanufactured Alternators"}
+
+#:project{:dir "/opt/scheduling/projects/sur-ice-hockey-sticks"
+          :id :sur-ice-hockey-sticks
+          :name "Sur Ice Hockey Sticks"}
+
+#:project{:dir "/opt/scheduling/projects/sur-craft-beer"
+          :id :sur-craft-beer
+          :name "Sur Craft Beer"}
+
+#:project{:dir "/opt/scheduling/projects/sur-plate-glass",
+          :id :sur-plate-glass
+          :name "Sur Plate Glass"}
+
+#:project{:dir "/opt/scheduling/projects/sur-injection-molds"
+          :id :sur-injection-molds
+          :name "Sur Injection Molds"}
+
 ]

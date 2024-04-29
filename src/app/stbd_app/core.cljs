@@ -18,6 +18,7 @@
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.db-access :as dba]
+   [stbd-app.util   :as util :refer [register-dispatch-fn]]
    [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
@@ -131,18 +132,26 @@
     (hooks/use-effect :once
       (log/info "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
-      (reset! ws/change-proj-fn
+      (register-dispatch-fn :set-conversation set-conversation)
+      (register-dispatch-fn :set-code set-code)
+      (register-dispatch-fn :core-load-proj
               (fn [p] ; This is a map with two keys: :project/id :project/name (a proj-info element).
                 (when-not (= p proj)                                 ; In that case, it will have updated the conversation, with the "Great,...".
                 (set-proj p)
                 (set-conversation {:conv [] :conf-for proj})
-                (-> (dba/get-conversation p)
+                (-> p
+                    :project/id
+                    dba/get-conversation
                     (p/then (fn [resp] (set-conversation resp) resp))
-                    (p/then (fn [resp] (set-code (:code resp)) resp))))))
+                    (p/then (fn [resp] (set-code (:code resp)) resp))
+                    (p/then (fn [_] (ws/send-msg {:dispatch-key :resume-conversation :project-id (:project/id p)})))))))
       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
           (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
                        (set-proj (:current-project %))
-                       (-> (dba/get-conversation (:current-project %))
+                       (-> %
+                           :current-project
+                           :project/id
+                           dba/get-conversation
                            (p/then (fn [resp] (set-conversation resp) resp))
                            (p/then (fn [resp] (set-code (:code resp) resp))))))))
       ($ Stack {:direction "column" :height useful-height}
@@ -156,7 +165,7 @@
             ($ Stack {:direction "row"}
                "schedulingTBD"
                ($ Box
-                  ($ SelectProject {:current-proj proj :proj-infos proj-infos #_#_ :change-proj-fn change-project}))))
+                  ($ SelectProject {:current-proj proj :proj-infos proj-infos}))))
          ($ ShareLeftRight
             {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
                        ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :proj-info proj}))

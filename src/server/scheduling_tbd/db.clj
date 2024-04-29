@@ -23,10 +23,6 @@
      - The project's name and db directory
      - Planning domains, methods, operators, and axioms"
   {;; ---------------------- project
-   :project/deleted?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "a boolean marking the projected as no longer existing.
-              It won't be written to backup. The DB will be moved under the 'deleted' directory."}
    :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
         :doc "a string naming a subdirectory containing a project."}
@@ -92,10 +88,6 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Code associated with the project."}
 
-   :project/deleted?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "a boolean marking the projected as no longer existing.
-              It won't be written to backup. The DB will be moved under the 'deleted' directory."}
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
@@ -248,8 +240,7 @@
   (when (d/q '[:find ?e .
                :in $ ?pid
                :where
-               [?e :project/id ?pid]
-               (not [?e :project/deleted? true])]
+               [?e :project/id ?pid]]
              @(connect-atm :system) pid)
     (d/q '[:find ?e .
            :in $ ?pid
@@ -260,10 +251,10 @@
 (defn get-project
   "Return the project structure."
   ([pid] (get-project pid #{:db/id}))
-  ([pid filter-set]
+  ([pid drop-set]
    (let [conn (connect-atm pid)]
      (when-let [eid (project-exists? pid)]
-       (resolve-db-id {:db/id eid} conn filter-set)))))
+       (resolve-db-id {:db/id eid} conn :drop-set drop-set)))))
 
 (defn default-project
   "Return a map of the  default :project/id and :project/name.
@@ -275,7 +266,6 @@
                    [?entity :system/name "SYSTEM"]
                    [?entity :system/default-project-id ?proj]]
                  @(connect-atm :system))]
-    (get-project pid #{:project/name})
     (when-let [eid (project-exists? pid)]
       (resolve-db-id {:db/id eid} (connect-atm pid)
                      :keep-set #{:project/name :project/id}))))
@@ -292,8 +282,7 @@
      ;; Otherwise we list using system db. These are the 'legitmate' projects (they aren't :project/deleted? = true).
      (d/q '[:find [?proj-id ...]
             :where
-            [?e :project/id  ?proj-id]
-            (not [?e :project/deleted? true])]
+            [?e :project/id  ?proj-id]]
           @(connect-atm :system)))))
 
 (defn get-thread-id
@@ -344,7 +333,7 @@
   "Return the planning problem. We add new keys for the things that end in -string,
    that is, for :problem/goal-string and :problem/state-string :goal and :state are added respectively."
   [pid]
-  (as-> (get-project pid) ?x
+  (as-> (get-project pid #{:db/id :project/messages :project/surrogate :project/code}) ?x
     (:project/planning-problem ?x)
     (assoc ?x :goal (-> ?x :problem/goal-string edn/read-string))
     (assoc ?x :state (-> ?x :problem/state-string edn/read-string))))
@@ -360,8 +349,8 @@
            @(connect-atm pid) pid)
       ""))
 
-(defn get-state
-  "Return the state vector for the argument project, or [] if none."
+(defn get-planning-state
+  "Return the planning state vector (a collection of ground propositions) for the argument project, or [] if none."
   [pid]
   (if-let [state-str (d/q '[:find ?s .
                             :where
@@ -371,7 +360,7 @@
     (edn/read-string state-str)
     []))
 
-(defn put-state
+(defn put-planning-state
   "Write an updated state to the project database. Argument is a vector or set. "
   [pid state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
@@ -381,11 +370,12 @@
     (d/transact conn
                 {:tx-data [[:db/add eid :problem/state-string (str state-set)]]})))
 
-(defn add-state
+(defn add-planning-state
   "Add the argument vector of ground proposition to state."
   [pid more-state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
-  (put-state pid (into (get-state pid) more-state)))
+  (log/info "add-planning-state: more-state = " more-state)
+  (put-planning-state pid (into (get-planning-state pid) more-state)))
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
@@ -468,7 +458,6 @@
   (recreate-system-db!)
   (log/info "Recreating these projects:" (list-projects))
   (doseq [pid (list-projects)]
-    (log/info "PID = " pid)
     (recreate-project-db! pid)))
 
 (defn unknown-projects
@@ -516,16 +505,17 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
-  [pid from msg-vec]
-  (s/assert ::spec/chat-msg-vec msg-vec) ; ToDo: I might have to turn something on to see this!
-  (assert (not-empty msg-vec))
+  [pid from str-or-msg-vec]
   (assert (#{:system :human :surrogate} from))
-  (log/info "add-msg: pid =" pid "msg-vec =" msg-vec)
-  (if-let [conn (connect-atm pid)]
-    (let [msg-id (inc (max-msg-id pid))]
-      (d/transact conn {:tx-data [{:db/id (project-exists? pid)
-                                   :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
-    (throw (ex-info "Could not connect to DB." {:pid pid}))))
+  (let [msg-vec (cond (s/valid? ::spec/chat-msg-vec str-or-msg-vec) str-or-msg-vec
+                      (string? str-or-msg-vec)                      (sutil/str2msg-vec str-or-msg-vec)
+                      :else (throw (ex-info "Invalid msg to add-msg" {:msg str-or-msg-vec})))]
+    (log/info "add-msg: pid =" pid "str-or-msg-vec =" str-or-msg-vec)
+    (if-let [conn (connect-atm pid)]
+      (let [msg-id (inc (max-msg-id pid))]
+        (d/transact conn {:tx-data [{:db/id (project-exists? pid)
+                                     :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
+      (throw (ex-info "Could not connect to DB." {:pid pid})))))
 
 (defn add-project
   "Add the argument project (a db-cfg map) to the system database."
@@ -568,29 +558,16 @@
      (log/info "Created project database for" id)
      id)))
 
-;;; ToDo: Change this to use :db/retract and remove :project/deleted from both DBs.
-;;; BTW, I don't have a good way to delete the project yet from the system-db.
-;;;    1) (db/backup-system-db)
-;;;    2) Edit the .edn to remove the project.
-;;;    3) (db/recreate-system-db!)
 (defn delete-project
-  "Remove project from the system DB and move its project directory to the the deleted directory.
-   Both the :system and project databases can have a :project/deleted? attribute."
+  "Remove project from the system."
   [pid]
-  (if (and (some #(= % pid) (list-projects {:from-storage? true}))
-           (some #(= % pid) (list-projects)))
-    (let [cfg (db-cfg-map :project pid)
-          source (-> cfg :store :path)
-          filename (-> source io/file .getName)
-          target (str (:base-dir cfg) "/deleted/" filename)
-          eid (project-exists? pid)
-          sys-proj-eid (d/q `[find ?e . :where [?e :project/id ~pid]] (connect-atm :system))]
-      (log/warn "Deleting project" pid (str ". (Moving it to" target ")"))
-      (d/transact (connect-atm :system) [[:db/add sys-proj-eid :project/deleted? true]])
-      (d/transact (connect-atm pid)     [[:db/add eid          :project/deleted? true]])
-      (sutil/deregister-db pid)
-      (log/warn "Moving project" pid "to " target)
-      (sutil/move-file source target))
+  (if (some #(= % pid) (list-projects))
+    (let [conn-atm (connect-atm :system)]
+      (when-let [s-eid (d/q '[:find ?e . :in $ ?pid :where [?e :project/id ?pid]] @conn-atm pid)]
+        (let [obj (resolve-db-id {:db/id s-eid} conn-atm)]
+          (d/transact (connect-atm :system) {:tx-data (for [[k v] obj] [:db/retract s-eid k v])})
+          (sutil/deregister-db pid)
+          nil)))
     (log/warn "Delete-project: Project not found:" pid)))
 
 ;;; -------------------- Starting and stopping -------------------------

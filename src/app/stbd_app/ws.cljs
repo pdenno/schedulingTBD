@@ -3,7 +3,7 @@
   (:require
    [clojure.edn     :as edn]
    [promesa.core    :as p]
-   [stbd-app.util   :as util]
+   [stbd-app.util   :as util :refer [dispatch-table get-dispatch-fn register-dispatch-fn]]
    [taoensso.timbre :as log  :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
@@ -13,19 +13,6 @@
 (def check-process "A process that is run every second once problems are encountered to check socket readiness." (atom nil))
 (def check-count "After a certain number of check for readiness, if still not ready, we try connect! again." (atom 0))
 (def ping-process "A process run intermittently by js/window.setInterval" (atom nil))
-
-;;; ToDo: A more comprehensive registration method, like the server has for WS dispatch. Useful for share too.
-(def change-proj-fn
-  "We store this function -- which is set in Top and closes over some refs -- on an atom so we don't have send it around."
-  (atom nil))
-
-(def set-tbd-text-fn
-  "Rationale for this is similar to change-proj-fn; set elsewhere, needed by websocket."
-  (atom nil))
-
-(def set-sur-text-fn
-  "Rationale for this is similar to change-proj-fn; set elsewhere, needed by websocket."
-  (atom nil))
 
 ;;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
 (defn channel-ready? [] (and @channel (= 1 (.-readyState @channel))))
@@ -56,31 +43,28 @@
   (doseq [k ks] (when k (swap! pending-promise-keys disj k))))
 
 (declare send-msg)
-(def recv-msg-type?
-  #{:clear-promise-keys ; Server tells you to forget a promise.
-    :alive?             ; Server is asking whether you are alive.
-    :reload-proj        ; Server created new current project (e.g. starting, surrogates).
-    :ping-confirm       ; Server confirms your ping.
-    :sur-says           ; Surrogate response to a question.
-    :tbd-says})         ; Message for the chat, a question, typically.
+(defn recv-msg-type? [k] (contains? @dispatch-table k))
+
+;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, and maybe other places.
+(register-dispatch-fn :clear-promise-keys    (fn [obj] (-> obj :promis-keys clear-promise-keys!)))
+(register-dispatch-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
+(register-dispatch-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
+(register-dispatch-fn :load-proj             (fn [{:keys [new-proj-map]}] ((get-dispatch-fn :core-load-proj) new-proj-map)))
+(register-dispatch-fn :tbd-says              (fn [{:keys [p-key] :as msg}]
+                                               (when p-key (remember-promise p-key))
+                                               (log/info "tbd-says msg:" msg)
+                                               ((get-dispatch-fn :set-tbd-text) msg)))
+(register-dispatch-fn :sur-says              (fn [{:keys [p-key] :as msg}]
+                                               (when p-key (remember-promise p-key))
+                                               (log/info "sur-says msg:" msg)
+                                               ((get-dispatch-fn :set-sur-text) msg)))
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
-  [{:keys [p-key dispatch-key promise-keys new-proj-map] :as msg}]
+  [{:keys [dispatch-key] :as msg}]
   (if-not (recv-msg-type? dispatch-key)
     (log/error "Invalid message type from server:" msg)
-    (case dispatch-key
-      :clear-promise-keys (clear-promise-keys! promise-keys)
-      :alive?             (send-msg {:dispatch-key :alive-confirm})
-      :reload-proj        (@change-proj-fn new-proj-map)
-      :ping-confirm       #_:ok (log/info "Ping confirm")
-      :tbd-says           (do (when p-key (remember-promise p-key))
-                              (log/info "tbd-says msg:" msg)
-                              (@set-tbd-text-fn msg))
-      :sur-says           (do (when p-key (remember-promise p-key))
-                              (log/info "tbd-says msg:" msg)
-                              (@set-sur-text-fn msg))
-      "default")))
+    ((get-dispatch-fn dispatch-key) msg)))
 
 (def ping-id (atom 0))
 (defn ping!

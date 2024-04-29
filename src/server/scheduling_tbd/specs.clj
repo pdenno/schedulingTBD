@@ -52,13 +52,15 @@
                                                   %))
                        :nothing nil?))
 
-(defn outbound-dispatch-key? [x] (#{:run-long           ; <=================================
-                                     :clear-promise-keys ; Server tells you to forget a promise.
-                                     :alive?             ; Server is asking whether you are alive.
-                                     :reload-proj        ; Server created new current project (e.g. starting, surrogates).
-                                     :ping-confirm       ; Server confirms your ping.
-                                     :sur-says
-                                     :tbd-says} x))
+;;; ToDo: I need to be able to push an update to the conversation!
+(defn outbound-dispatch-key? [x] (#{:run-long             ; diagnostic
+                                    :clear-promise-keys   ; Server tells you to forget a promise.
+                                    :alive?               ; Server is asking whether you are alive.
+                                    :load-proj            ; Make a request to restart the project, including doing a resume-conversation
+                                    :request-conversation ; Like :load-proj but don't do a resume-conversation.
+                                    :ping-confirm         ; Server confirms your ping.
+                                    :sur-says
+                                    :tbd-says} x))
 (s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
 (s/def ::dispatch-key outbound-dispatch-key?)
 (s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key] :opt-un [::chat-msg-vec]))

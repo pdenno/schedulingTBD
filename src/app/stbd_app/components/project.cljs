@@ -8,8 +8,8 @@
    ["@mui/material/Select$default"      :as Select]
    ;;["@mui/material/styles"              :as styles :refer [createTheme themeOptions ThemeProvider]] ; WIP
    [helix.core         :as helix :refer [defnc $]]
-   [stbd-app.ws        :as ws]
-   [taoensso.timbre    :as log :refer-macros [info debug log]]))
+   [stbd-app.util      :refer [get-dispatch-fn]]
+   #_[taoensso.timbre    :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -46,8 +46,7 @@
 (defnc SelectProject
   "This calls change-project-fn to have the parent change current-project and others.
     - current-proj    : a map containing :project/id and :project/name.
-    - proj-infos      : a vector of all projects, includes current-proj.
-    - change-proj-fn : a function, typically (always?) core/change-project."
+    - proj-infos      : a vector of all projects, includes current-proj."
   [{:keys [current-proj proj-infos]}]
   (when current-proj
       (let [proj-infos+ (order-projects current-proj proj-infos)]
@@ -61,7 +60,7 @@
                       :onChange (fn [_e v]
                                   (let [proj-str (j/get-in v [:props :value])
                                         proj (some #(when (= proj-str (:menu-text %)) %) proj-infos+)]
-                                    (@ws/change-proj-fn proj)))}
+                                    ((get-dispatch-fn :load-proj) proj)))}
               (for [p (map :menu-text proj-infos+)]
                 ($ MenuItem {:key p :value p} p)))))))
 

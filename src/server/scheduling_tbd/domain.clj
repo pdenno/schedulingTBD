@@ -1,12 +1,11 @@
 (ns scheduling-tbd.domain
   "Scheduling domain prompts."
   (:require
+   [clojure.core.unify            :as uni]
    [clojure.string                :as str]
-   [promesa.core                  :as p]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
    [scheduling-tbd.sutil          :as sutil :refer [find-fact yes-no-unknown str2msg-vec]]
-   [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
@@ -58,14 +57,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    {:role "user"      :content "[We produce clothes for firefighting. It is fun to do. Our most significant scheduling challenge is about deciding how many workers to assign to each product.]"}
    {:role "assistant" :content "{:objective \"Our most significant scheduling challenge is about deciding how many workers to assign to each product.\" :probability 0.9}"}])
 
-;;; ["artifactual-project scheduling", "artifactual-fixed process scheduling", "service scheduling"]
-(def base-scheduling-type
-  "This provides probabilities for three kinds of scheduling which we assume are disjoint, therefore the probabilities sum to 1.0"
-  [{:role "system"    :content "You are a helpful assistant."}
-   {:role "user"      :content "Classify the text in square brackets according to the probability of how well it describes each of three classes of scheduling problems.
- The classes are assumed to be disjoint so the sum of the three probabilties should be 1.0. The three categories are expressed as Clojure keywords; they are:
-      :project-scheduling - scheduling of work that resembles a unique project where tasks are..."}])
-
 ;;; ToDo: Not sure that "disjoint and covering...therefore" is logically correct here!
 (def service-vs-artifact-partial
   "This provides probabilities for whether the scheduling concerns a service vs artifact. We assume those two classes are disjoint and covering."
@@ -94,7 +85,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   [{:role "system"    :content (format "Pretend you manage %s. You have good knowledge of the business's processes and supply chain." manage-what)}
    {:role "user"      :content "In no more than 5 sentences, describe your principal scheduling problem."}])
 
-(defn project-name
+(defn project-name-llm-query
   "Wrap the user-text in square brackets and send it to an LLM to suggest a project name.
    Returns a string consisting of just a few words."
   [user-text]
@@ -124,30 +115,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
      :service?      (-> (conj service-vs-artifact-partial user-text)
                         (query-llm {:model-class :gpt-4}))}))
 
-(def user-problems
-  {:snack-food "The primary challenge in our scheduling process involves effectively coordinating all the steps in our supply chain, starting from raw material procurement to the final delivery of our snack foods to grocery chains.
- We aim to maintain an optimal inventory level which involves proper timing of production runs to minimize stockouts and excess storage costs.
- Seasonal fluctuations in demand, delays from suppliers, equipment breakdowns, and transportation delays pose consistent scheduling problems.
- Additionally, the scheduling process needs to account for shelf-life of our products to prevent wastage.
- Lastly, integrating all the processes within the firm and communicating the schedule effectively to all the stakeholders is a significant problem.",
-
-   :paving "The principal scheduling problem faced is coordinating the availability of our clients, skilled work crew, and the delivery of material supplies.
- Unpredictable weather conditions often lead to sudden schedule changes.
- Also, delays in supply chain due to various reasons can significantly affect the timeline of the project.
- Balancing multiple projects simultaneously without over-committing our resources is also a challenge.
- Lastly, unanticipated repairs and maintenance of our paving equipment affects our work schedule.",
-
-   :injection-molds "The principal scheduling problem in running an injection mold job shop is coordinating the different job orders in a manner that optimizes our machine utilization and minimizes production time without leading to bottlenecks.
- We must effectively manage the flow of materials from suppliers, ensuring that they're available exactly when needed to avoid delays.
- It's also crucial to ensure our labor force is appropriately assigned to different tasks in the shop to maximize efficiency.
- Lastly, unexpected maintenance or breakdowns of machinery can throw our schedule off and present a major challenge.
- Central to all this is the need for high precision and quality in molds, which can potentially impact scheduling if reworks or corrections are required due to errors.",
-
-   :brewery "As the manager of a craft brewery, the principal scheduling problem is coordinating the production process to maintain a consistent supply of diverse beers without overproduction or storage issues.
- This spans from the initial scheduling of raw materials procurement, to the fermenting process which can take weeks, and finally to the bottling and distribution procedures.
- Additionally, managing seasonal demand fluctuations and accommodating special edition or experimental brews without disrupting the core product line adds complexity.
- Timely maintenance of brewing equipment and quality check is also crucial to the schedule.
- Lastly, ensuring synergies with marketing timelines and release dates is necessary to avoid any mismatch between supply and market launch."})
 
 ;;; ToDo: I've seen :snack-food going from {:service 0.5, :artifact 0.5}, {:service 0.0, :artifact 1.0}. I suppose delivering to a supply-chain partner....
 #_(defn test-service-vs-artifact
@@ -293,13 +260,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
       (query-llm {:model-class :gpt-3.5})
       yes-no-unknown))
 
-(defn prelim-analysis
+;;; ToDo: This was written before I decided that domain.clj ought to require db and use it. Refactor this and its caller, !initial-question ?
+(defn project-name-analysis
   "Analyze the response to the initial question, adding to the init-state vector."
-  [response init-state {:keys [client-id] :as opts}]
+  [response init-state]
   (log/info "prelim-analysis: init-state =" init-state "response =" response)
   (let [[_ pid] (sutil/find-fact '(proj-id ?x) init-state)
         proj-state (if (= pid :START-A-NEW-PROJECT)
-                     (let [proj-name (as-> (project-name response) ?s
+                     (let [proj-name (as-> (project-name-llm-query response) ?s
                                        (str/trim ?s)
                                        (str/split ?s #"\s+")
                                        (map str/capitalize ?s)
@@ -313,8 +281,118 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                      init-state)]
     (if (= :yes (text-cites-raw-material-challenge? response))
         (conj proj-state (list 'cites-raw-material-challenge (-> pid name symbol)))
-      proj-state)))
+        proj-state)))
 
+;;; ----------------------- parallel expert preliminary analysis  ---------------------------------------------------------
+(defn ask-about-process-on-thread!
+  "Ask the surrogate to describe production processes. We don't care what is returned, we just
+   are developing context to do some downstream preliminary analysis.
+   We put these into the conversation under surrogate."
+  [aid tid]
+  (let [msg "Please briefly describe your production processes?"]
+    {:query msg
+     :answer (llm/query-on-thread :aid aid :tid tid :query-text msg)}))
+
+(defn product-vs-service
+  "Return a vector of ground predicates (so far just either [(provides-product ?x)] or [(provides-service ?x)],
+   depending on whether the project describes respectively work to provide a product or work to provide a service."
+  [aid tid]
+  (let [query (str "Would you characterize your company's work as primarily providing a product or a service?\n" ; ToDo: "firm's work" in all of these not good?
+                   "Respond respectively with either the single word PRODUCT or SERVICE.")
+        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
+        preds (cond (re-matches #".*(?i)PRODUCT.*" answer) '[(provides-product ?x)]
+                    (re-matches #".*(?i)SERVICE.*" answer) '[(provides-service ?x)]
+                    :else                                  '[(fails-query product-vs-service ?x)])]
+    {:query query :answer answer :preds preds}))
+
+;;; ToDo: Maybe what I really want is to split scheduling vs some notion of constraint satisfaction (which would include project management and cyclical scheduling)
+;;;       But for the time meaning, it was this that came to mind.
+(defn production-mode
+  "Return a vector of ground predicates (so far just either [(is-product ?x)] or [(is-service ?x)],
+   depending on whether the project describes respectively work to provide a product or work to provide a service."
+  [aid tid]
+  (let [query (str "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\n"
+                   "In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\n"
+                   "In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\n"
+                   "ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\n"
+                   "For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\n"
+                   "it is relying on you to determine how to best accommodate the engine and arrange the seats.\n"
+                   "Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\n"
+                   "Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n")
+        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
+        preds (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" answer)        '[(production-mode ?x make-to-stock)]
+                    (re-matches #".*(?i)MAKE-TO-ORDER.*" answer)        '[(production-mode ?x make-to-order)]
+                    (re-matches #".*(?i)ENGINEER-TO-ORDER.*" answer)    '[(production-mode ?x engineer-to-order)]
+                    :else                                               '[(fails-query production-mode ?x)])]
+    {:query query :answer answer :preds preds}))
+
+(defn facility-vs-site
+  "Return a vector of ground predicates (so far just either [(is-product ?x)] or [(is-service ?x)],
+   depending on whether the project describes respectively work to provide a product or work to provide a service."
+  [aid tid]
+  (let [query (str "Some work, for example factory work, must be performed in a specially designed facility.\n"
+                   "Other work, like cutting down a tree, can only be performed at a location designated by the customer.\n"
+                   "Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\n"
+                   "Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.")
+        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
+        preds (cond (re-matches #".*(?i)OUR-FACILITY.*" answer)  '[(has-production-facility ?x)]
+                    (re-matches #".*(?i)CUSTOMER-SITE.*" answer) '[(performed-at-customer-site ?x)]
+                    :else                                        '[(fails-query facility-vs-site ?x)])]
+    {:query query :answer answer :preds preds}))
+
+(defn flow-vs-job
+  "Return a vector of ground predicates (so far just either [(is-flow-shop ?x)] or [(is-job-shop ?x)] or [])
+   depending on whether the project describes respectively work to provide a product or work to provide a service.
+   Note that this question is only applied where (provides-product ?x) (scheduling-problem ?x) (has-production-facility ?x)."
+  [aid tid]
+  (let [query (str "A flow-shop is a production system designed so that all jobs follows the same sequence of steps through production resources.\n"
+                   "A job-shop is a production system where each job might follow its own route, depending on its unique requirements.\n"
+                   "Is the process you described more like a flow-shop or a job-shop?\n"
+                   "Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.")
+        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
+        preds (cond (re-matches #".*(?i)FLOW-SHOP.*" answer) '[(flow-shop ?x)]
+                    (re-matches #".*(?i)JOB-SHOP.*" answer)  '[(job-shop ?x)]
+                    :else                                    '[(fails-query flow-vs-job ?x)])]
+    {:query query :answer answer :preds preds}))
+
+;;; ToDo: Define attributes in DB and test starting a parallel expert.
+(defn parallel-expert-prelim-analysis
+  "Do preliminary characterization of the scheduling problem including:
+      - product vs. service
+      - production facility vs. customer site,
+      - scheduling vs. project management, and
+      - flow-shop vs. job-shop   (of course, this one only for product/production facility/scheduling).
+   If the project is a surrogate expert, this work is done in the surrogate thread,
+   otherwise a new surrogate (called a 'parallel expert') is started and its
+   Assistant ID and Thread ID are stored. (This part not done yet.)
+   Return a vector of new propositions."
+  ([pid] (parallel-expert-prelim-analysis pid true))
+  ([pid write?]
+   (when-not (find-fact '(surrogate ?proj) (db/get-planning-state pid)) ; ToDo: Complete for human expert.
+     (throw (ex-info "Parallel expert not yet implemented." {})))
+   (let [proj-sym (-> pid name symbol)
+         proj-bind {'?x proj-sym}
+         aid (db/get-assistant-id pid)
+         tid (db/get-thread-id pid)
+         new-props (atom [])
+         {:keys [query answer]} (ask-about-process-on-thread! aid tid)] ; This one asks a question that sets up context.
+     (if (string? answer)
+       (do (when write?
+             (db/add-msg pid :system query)
+             (db/add-msg pid :surrogate answer))
+           (doseq [f [product-vs-service production-mode facility-vs-site]]
+             (let [{:keys [query answer preds]} (f aid tid)]
+               (swap! new-props into (map #(uni/subst % proj-bind) preds))
+               (when write?
+                 (db/add-msg pid :system query)
+                 (db/add-msg pid :surrogate answer))))
+           (when (and (find-fact '(provides-product ?x) @new-props)
+                      (find-fact '(has-production-facility ?x) @new-props))
+             (swap! new-props into (->> (flow-vs-job aid tid) :preds (map #(uni/subst % proj-bind)))))
+           @new-props)
+       [(list 'fails-query 'process-description proj-sym)]))))
+
+;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 (defn yes-no-process-steps
   "Return state addition for analyzing a Y/N user response about process steps."
   [_response]

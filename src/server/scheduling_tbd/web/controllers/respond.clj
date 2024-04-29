@@ -39,7 +39,7 @@
     (let [proj-infos (mapv resolve-proj-info (db/list-projects))
           current (or (db/default-project) new-proj-entry) ; ToDo: Client could tell you what its current project is.
           others (filterv #(not= % current) proj-infos)]
-      (log/info "Call to list-projects")
+      ;(log/info "Call to list-projects")
       (http/ok
        (cond-> {:current-project current}
          (not-empty others) (assoc :others others))))))

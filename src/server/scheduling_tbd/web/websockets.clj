@@ -42,7 +42,7 @@
 (defn close-ws-channels [client-id]
   (when (contains? @socket-channels client-id)
     (let [{:keys [in out err]} (get @socket-channels client-id)]
-      (log/info "Closing websocket channels for inactive client" client-id (now))
+      ;(log/info "Closing websocket channels for inactive client" client-id (now))
       ;; Set exit? and send something so go loop will be jogged and see it.
       (swap! socket-channels #(assoc-in % [client-id :exit?] true))
       (go (>! in (str {:dispatch-key :stop}))) ; I don't see this (in diagnostics), though if you call inject-stop manually, you'll see it.
@@ -61,7 +61,7 @@
   "Close the channel and forget the promises associated with the client.
    This is typically from a client unmount."
   [client-id]
-  (log/info client-id "closes its websocket.")
+  ;(log/info client-id "closes its websocket.")
   (close-ws-channels client-id)
   (clear-promises! client-id))
 
@@ -108,7 +108,7 @@
     (go
       (loop []
         (when-let [msg (<! err)]
-          (log/error "Client reports" (type msg) ": client-id =" client-id)
+          (log/warn "Client reports" (type msg) ": client-id =" client-id)
           (forget-client client-id)
           (when-not exit? (recur)))))
     (log/error "error-listener: Cannot find client-id" client-id)))
@@ -152,7 +152,7 @@
       ;; I think there is still value in looking for inactive sockets and closing them, but I probably should implement
       ;; alive? because the client will have to make another websocke request otherwise, and it doesn't seem to notice
       ;; that the sever isn't listening to it!
-      (log/info "Exiting dispatching loop:" client-id))))
+      #_(log/info "Exiting dispatching loop:" client-id))))
 
 (defn establish-websocket-handler
   "Handler for http:/ws request. Returns nothing interesting.
@@ -162,7 +162,7 @@
    In that case, the old channel will eventually get destroyed by close-inactive-channels.
    Returns a map with value for key :ring.websocket/listener."
   [request]
-  (log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
+  ;(log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
   (close-inactive-channels) ; ToDo: This takes time. Fix it.
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]

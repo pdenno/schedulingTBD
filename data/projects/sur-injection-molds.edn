@@ -1,0 +1,56 @@
+[
+#:project{:id :sur-injection-molds,
+          :messages
+          [#:message{:content
+                     [#:msg-text{:string
+                                 "Describe your most significant scheduling problem in a few sentences"}
+                      #:msg-text{:string "."}],
+                     :from :system,
+                     :id 1,
+                     :time #inst "2024-04-27T16:18:53.437-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "Our most significant scheduling problem revolves around aligning our production capacity with the fluctuating demand for different types of injection molds we manufacture. The lead times for materials procurement and the actual production process vary substantially depending on the complexity and size of the molds. Additionally, we have a limited capacity in terms of machinery and skilled labor which can lead to bottlenecks. Managing these variables to ensure on-time delivery while maximizing our production efficiency and reducing idle times is a complex challenge that we face on a regular basis."}],
+                     :from :surrogate,
+                     :id 2,
+                     :time #inst "2024-04-27T16:18:53.454-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "Great, we'll call your project SUR Injection Molds."}],
+                     :from :system,
+                     :id 3,
+                     :time #inst "2024-04-27T16:18:53.471-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product."}],
+                     :from :system,
+                     :id 4,
+                     :time #inst "2024-04-27T16:18:53.487-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 " Could you provide a few short sentences about your production processes?"}],
+                     :from :system,
+                     :id 5,
+                     :time #inst "2024-04-27T16:19:36.565-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "Our production process for injection molds starts with understanding the customer's requirements and translating that into a functional design. Once the design is approved, we move onto procuring the necessary materials, primarily high-grade metals. The bulk of the mold is then formed using CNC machining for precise cuts and shapes, followed by EDM for intricate details and geometries. Post machining, the mold undergoes polishing and finishing to achieve the required surface quality. If the mold consists of multiple components, they are assembled together. Before shipping, the mold is subjected to rigorous testing and quality control checks to ensure it meets the specified standards. This comprehensive process ensures our molds meet the high expectations of durability and precision our customers have come to expect."}],
+                     :from :surrogate,
+                     :id 6,
+                     :time #inst "2024-04-27T16:19:36.583-00:00"}],
+          :name "SUR Injection Molds",
+          :planning-problem
+          #:problem{:domain :process-interview,
+                    :goal-string
+                    "(characterize-process sur-injection-molds)",
+                    :state-string
+                    "#{(well-known-process sur-injection-molds) (proj-name \"SUR Injection Molds\") (ongoing-discussion sur-injection-molds) (have-process-steps sur-injection-molds) (cites-raw-material-challenge sur-injection-molds) (surrogate sur-injection-molds) (proj-id sur-injection-molds)}"},
+          :surrogate
+          #:surrogate{:assistant-id "asst_dQjwVu6h6x2VhER3xXvrd3J3",
+                      :id :sur-injection-molds,
+                      :subject-of-expertise "injection molds",
+                      :system-instruction
+                      "\n   You manage a company that makes injection molds.\n   You are an expert in the production of injection molds and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_m3upHkCMAU1ow9ET4I3sn8ou"}}
+
+]

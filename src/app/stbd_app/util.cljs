@@ -1,4 +1,6 @@
-(ns stbd-app.util)
+(ns stbd-app.util
+  (:require
+   [taoensso.timbre :as log  :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -14,3 +16,16 @@
 (def component-refs
   "Some components instances are named and their refs stored here."
   (atom  {}))
+
+(def dispatch-table
+  "A map from keys to functions used to call responses from clients."
+  (atom nil))
+
+(defn get-dispatch-fn [k] (-> @dispatch-table (get k)))
+
+(defn register-dispatch-fn
+  "Add a function to the websocket dispatch table."
+  [k func]
+  (assert (fn? func))
+  (swap! dispatch-table #(assoc % k func))
+  (log/info "Registered function for websocket:" k))
