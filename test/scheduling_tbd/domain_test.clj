@@ -30,6 +30,7 @@
   ;(alias 'llmt   'scheduling-tbd.llm-test)
   (alias 'op     'scheduling-tbd.operators)
   (alias 'opt    'scheduling-tbd.operators-test)
+  (alias 'plan   'scheduling-tbd.planner)
   (alias 'resp   'scheduling-tbd.web.controllers.respond)
   (alias 'spec   'scheduling-tbd.specs)
   (alias 'sutil  'scheduling-tbd.sutil)

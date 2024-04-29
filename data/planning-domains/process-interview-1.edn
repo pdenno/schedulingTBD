@@ -23,10 +23,9 @@
 
                 ;; ====== (not (ongoing-discussion ?proj)) ===============================
                 ;; (!initial-question ?proj)
-                {:operator/head (!initial-question ?proj)                    ;ToDo: Need a decision: For the time being, a-list is treated like ':operator/postconds'. It can be used to check
-                 :operator/preconds [(not (ongoing-discussion ?proj))]       ;      that the operator asserted some particular propositions. (I can see there being, for example,
-                 :operator/a-list [(ongoing-discussion ?proj)                ;      an or (well-known-process ?proj) (unknown-process ?proj)).
-                                   (well-known-process ?proj)]}
+                {:operator/head (!initial-question ?proj)
+                 :operator/preconds [(not (ongoing-discussion ?proj))]
+                 :operator/a-list [(ongoing-discussion ?proj)]}
 
                 ;; ====== (ongoing-discussion ?proj) ===============================
                 {:method/head (get-process-steps ?proj)

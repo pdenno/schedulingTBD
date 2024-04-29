@@ -315,14 +315,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                    "In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\n"
                    "In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\n"
                    "ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\n"
-                   "For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer specified the engines and seating capacity, it is relying on you to "
-                   "determine how to best accommodate the engine and arrange the seats.\n"
-                   "Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning and 3rd party logisistics.\n"
+                   "For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\n"
+                   "it is relying on you to determine how to best accommodate the engine and arrange the seats.\n"
+                   "Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\n"
                    "Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n")
         answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
         preds (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" answer)        '[(production-mode ?x make-to-stock)]
                     (re-matches #".*(?i)MAKE-TO-ORDER.*" answer)        '[(production-mode ?x make-to-order)]
-                    (re-matches #".*(?i)ENGINEER-TO-ORDER.*" answer)    '[(productoin-mode ?x engineer-to-order)]
+                    (re-matches #".*(?i)ENGINEER-TO-ORDER.*" answer)    '[(production-mode ?x engineer-to-order)]
                     :else                                               '[(fails-query production-mode ?x)])]
     {:query query :answer answer :preds preds}))
 
@@ -380,20 +380,17 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
        (do (when write?
              (db/add-msg pid :system query)
              (db/add-msg pid :surrogate answer))
-           (doseq [f [product-vs-service production-mode facility-vs-site #_flow-vs-job]] ; <=================================== START HERE.
+           (doseq [f [product-vs-service production-mode facility-vs-site]]
              (let [{:keys [query answer preds]} (f aid tid)]
                (swap! new-props into (map #(uni/subst % proj-bind) preds))
                (when write?
                  (db/add-msg pid :system query)
                  (db/add-msg pid :surrogate answer))))
+           (when (and (find-fact '(provides-product ?x) @new-props)
+                      (find-fact '(has-production-facility ?x) @new-props))
+             (swap! new-props into (->> (flow-vs-job aid tid) :preds (map #(uni/subst % proj-bind)))))
            @new-props)
        [(list 'fails-query 'process-description proj-sym)]))))
-
- #_(when-not (and (find-fact '(provides-product ?x) @new-props)
-                    (find-fact '(production-mode ?x) @new-props)
-                    (find-fact '(has-production-facility ?x) @new-props))
-       (swap! new-props into (flow-vs-job aid tid)))
-
 
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 (defn yes-no-process-steps

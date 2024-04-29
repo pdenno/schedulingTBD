@@ -24,7 +24,7 @@
 (defn register-db
   "Add a DB configuration."
   [k config]
-  (log/info "Registering DB" k "config =" config)
+  ;(log/info "Registering DB" k "config =" config)
   (swap! databases-atm #(assoc % k config)))
 
 (defn deregister-db
@@ -176,7 +176,9 @@
 (def planning-domains "An atom that associates a keyword key with a planning domain stucture (containing :domain/elems, :domain/problem)."
   (atom {}))
 
-(defn register-planning-domain [id domain] (swap! planning-domains #(assoc % id domain)))
+(defn register-planning-domain [id domain]
+  (log/info "Registering planning domain" id)
+  (swap! planning-domains #(assoc % id domain)))
 (defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
 (defn get-domain [id] (get @planning-domains id))
 

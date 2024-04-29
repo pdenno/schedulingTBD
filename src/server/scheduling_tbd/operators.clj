@@ -231,19 +231,15 @@
       (db/add-planning-state pid analysis-state)
       (log/info "DB and app actions on PID =" pid)
       (db/add-msg pid :system agent-msg-vec)  ; ToDo: I'm not catching the error when this is wrong!
-      (db/add-msg pid (if surrogate? :surrogate :human) (str2msg-vec response))
-      (db/add-msg pid :system (str2msg-vec (format "Great, we'll call your project %s." pname)))
+      (db/add-msg pid (if surrogate? :surrogate :human) response)
+      (db/add-msg pid :system (format "Great, we'll call your project %s." pname))
       (when cites-supply?
-        (let [msg-vec (str2msg-vec (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
-                                        "we'd like to put that aside for a minute and talk about the processes that make product."))]
-          (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg-vec msg-vec})
-          (db/add-msg pid :system msg-vec)))
-      (ws/send-to-chat {:promise? false
-                        :client-id client-id
-                        :dispatch-key :reload-proj
-                        :new-proj-map {:project/id pid :project/name pname}})
+        (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
+                       "we'd like to put that aside for a minute and talk about the processes that make product.")]
+          ;(ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg-vec (str2msg-vec msg)})
+          (db/add-msg pid :system msg)))
       ;; Complete preliminary analysis in a parallel agent that, in the case of a human expert, works independently.
-      (dom/parallel-expert-prelim-analysis pid))))
+      (db/add-planning-state pid (dom/parallel-expert-prelim-analysis pid)))))
 
 ;;; ----- :!yes-no-process-steps
 #_(def process-steps-prompt ;<============================================================================================================================================== Start here.

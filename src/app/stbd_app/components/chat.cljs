@@ -12,6 +12,7 @@
    ["@mui/material/Stack$default" :as Stack]
    ["react-chat-elements/dist/main"    :as rce]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
+   [stbd-app.util       :refer [register-dispatch-fn]]
    [stbd-app.ws         :as ws]
    [scheduling-tbd.util :as sutil :refer [timeout-info #_invalidate-timeout-info]]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
@@ -95,9 +96,9 @@
         resize-fns (make-resize-fns set-box-height)]
     (log/info "proj-info = " proj-info)
     ;; ------------- Talk through web socket, initiated below.
-    (hooks/use-effect :once ; set-tbd-text-fn is needed by ws/dispatch.
-      (reset! ws/set-tbd-text-fn set-tbd-text)
-      (reset! ws/set-sur-text-fn set-sur-text)) ; This one because surrogates programmatically do this.
+    (hooks/use-effect :once ; These are used outside the component scope.
+      (register-dispatch-fn :set-tbd-text set-tbd-text)
+      (register-dispatch-fn :set-sur-text set-sur-text))
     (hooks/use-effect [conv-map] ; Put the entire conversation into the chat.
       (set-msg-list (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js)))
     (hooks/use-effect [tbd-text]  ; Put TBD's (server's) message into the chat.

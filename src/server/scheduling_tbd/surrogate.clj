@@ -10,15 +10,18 @@
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log]))
 
+;;; ToDo: Fix this: "You manage a company that makes %s." The problem that some are services and we want to start well.
+;;; I think we could use an independent LLM call to guess whether "paving" or "general contracting" are services.
+;;; With that function we can choose between "makes" and "provides the services of"
 (defn system-instruction
   "This is the instruction that configures the role of the OpenAI assistant."
    [role]
   (format "
    You manage a company that makes %s.
-   You are an expert in the production of %s and manage your company's supply chains.
+   You are an expert in production and manage your company's supply chains.
    You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.
    Your answers typically are short, just a few sentences each.
-   If you don’t have information to answer my questions, you provide a plausible answer nonetheless." role role))
+   If you don’t have information to answer my questions, you provide a plausible answer nonetheless." role))
 
 
 #_(defn similar-surrogate?
@@ -43,11 +46,11 @@
    Otherwise create and store a project with the given expertise and the OpenAI assistant object.
    In either case, it returns the Openai assistant object ID associated with the pid.
      pid - the project ID (keyword) of a project with an established DB."
-  [pid pname]
-  (or (db/get-assistant-id pid nil)
-      (let [conn (connect-atm pid)
+  [pid pname force?]
+  (or (if force? nil (db/get-assistant-id pid nil))
+      (let [conn-atm (connect-atm pid)
             eid (db/project-exists? pid)
-            proj-info (resolve-db-id {:db/id eid} conn :keep-set #{:project/name})
+            proj-info (resolve-db-id {:db/id eid} conn-atm :keep-set #{:project/name})
             [_ _ expertise] (re-matches #"(SUR )?(.*)" (:project/name proj-info)) ; ToDo: Ugh!
             expertise (str/lower-case expertise)
             instructions (system-instruction expertise)
@@ -56,18 +59,18 @@
             thread (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}})
             prob (surrogate-init-problem pid pname)] ; Surrogates have just one thread.
         (log/info "Made assistant" aid "for instructions" instructions)
-        (d/transact conn {:tx-data [{:db/id (db/project-exists? pid)
-                                     :project/planning-problem prob
-                                     :project/surrogate {:surrogate/id pid
-                                                         :surrogate/subject-of-expertise expertise
-                                                         :surrogate/system-instruction instructions
-                                                         :surrogate/assistant-id aid
-                                                         :surrogate/thread-id (:id thread)}}]})
+        (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)
+                                         :project/planning-problem prob
+                                         :project/surrogate {:surrogate/id pid
+                                                             :surrogate/subject-of-expertise expertise
+                                                             :surrogate/system-instruction instructions
+                                                             :surrogate/assistant-id aid
+                                                             :surrogate/thread-id (:id thread)}}]})
         (db/get-assistant-id pid))))
 
-;;; (sur/start-surrogate {:product "plate glass" :client-id (ws/recent-client!)})
+;;; (sur/start-surrogate {:product "paving" :client-id (ws/recent-client!)})
 (defn start-surrogate
-  "Create or recover a surrogate and ask client to :reload-proj. :reload-proj will start the planner; not done here directly.
+  "Create or recover a surrogate and ask client to :load-proj. :load-proj will start the planner; not done here directly.
      product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
                Any of the :segment/name from the 'How it's Made' DB would work here.
   "
@@ -77,14 +80,13 @@
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})]
     (try
-      (ensure-surrogate pid pname)
-      (ws/send-to-chat {:dispatch-key :reload-proj :client-id client-id  :promise? nil
+      (ensure-surrogate pid pname force?)
+      (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
                         :new-proj-map {:project/name pname :project/id pid}})
       (catch Exception e
         (log/warn "Failed to start surrogate.")
         (log/error "Error starting surrogate:" e)))))
 
-;;; ToDo: Do I want this in the database?
 (defn surrogate-follow-up
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."
   [{:keys [client-id pid question] :as obj}]
@@ -96,8 +98,8 @@
                (log/info "SUR's answer:" answer)
                (when (string? answer)
                  (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec answer)))
-                 (db/add-msg pid :system (str2msg-vec question))
-                 (db/add-msg pid :surrogate (str2msg-vec answer))))
+                 (db/add-msg pid :system question)
+                 (db/add-msg pid :surrogate answer)))
              (catch Exception e
                (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
                (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec "We had a problem answering this questions.")))))))))
