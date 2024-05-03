@@ -4,6 +4,7 @@
   "description": "schedulingTBD",
   "main": "index.js",
   "dependencies": {
+    "@chatscope/chat-ui-kit-react": "^2.0.3",
     "@codemirror/autocomplete": "6.1.1",
     "@codemirror/commands": "6.1.0",
     "@codemirror/lang-markdown": "6.0.0",

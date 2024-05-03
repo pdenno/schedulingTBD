@@ -28,4 +28,4 @@
   [k func]
   (assert (fn? func))
   (swap! dispatch-table #(assoc % k func))
-  (log/info "Registered function for websocket:" k))
+  #_(log/info "Registered function for websocket:" k))

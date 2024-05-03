@@ -33,6 +33,6 @@
           #:problem{:domain :process-interview,
                     :goal-string "(characterize-process ?proj)",
                     :state-string
-                    "#{(ongoing-discussion craft-beer) (proj-id craft-beer) (system-model craft-beer flow) (well-known-process craft-beer) (have-process-steps craft-beer) (have-process-durs craft-beer)  (have-process-ordering craft-beer)}"}}
+                    "#{(well-known-process craft-beer) (ongoing-discussion craft-beer) (have-process-steps craft-beer) (proj-id craft-beer) (system-model craft-beer flow) (have-process-durs craft-beer) (have-process-ordering craft-beer)}"}}
 
 ]

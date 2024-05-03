@@ -27,8 +27,6 @@
 ;;; Examples of first path is craft beer. Example of second path is ice hockey sticks.
 ;;; Gray area?: music school lesson scheduling.
 
-;;;=================================================== Dynamic planner ===========================================================
-
 ;;; ToDo:
 ;;;   - Use a DB for managing stack/navigation???
 ;;;      cons: - literal structures, yuk
@@ -228,29 +226,9 @@
     (when response-to-user
       (ws/send-to-chat {:promise? false, :client-id client-id, :msg-vec response-to-user}))))
 
-;;;=================================================== End Dynamic planner =======================================================
-
-;;; ToDo: This isn't quite the whole story. What's missing is that there can be multiple binding sets
-;;;       owing to data about the same predicate used with different role values. I have something nice
-;;;       to deal with this in explainlib.
-(defn condition-satisfies?
-  "Return true if the positive condition argument unifies with any fact,
-   OR if the negative condition argument unifies with no fact.
-   Facts are always positive literals."
-  [condition facts]
-  (s/assert ::spec/proposition condition)
-  (if (s/valid? ::spec/negated-proposition condition)
-    (let [ncond (second condition)]
-      (not-any? #(uni/unify ncond %) facts))
-    (some #(uni/unify condition %) facts)))
-
-(defn ^:diag discussion-stopped?
-  "Return true if the state vector contains the discussion-stopped fact."
-  [state]
-  (some #(= 'discussion-stopped (first %)) state))
 
 ;;; -------------------------------------- Plan checking --------------------------------------------------------------------
-(defn check-domain-to-goals
+#_(defn check-domain-to-goals
   "Return nil if domain references the problem otherwise :error-domain-not-addressing-goal.
    This doesn't check whether the problem can be inferred by means of axioms."  ; ToDo: Fix this.
   [domain state-vec goal-vec]
@@ -267,7 +245,7 @@
     (when (some #(and (symbol? %) (= "?" (-> % name (subs 0 1)))) (rest g))
       (throw (ex-info "goal vector must be ground:" {:goal g})))))
 
-(defn check-triple
+#_(defn check-triple
   "Return a keyword naming an obvious error in the domain/problem/execute structure."
   [{:keys [domain problem _execute] :as pass-obj}]
   (let [state-vec (-> problem :problem/state-string edn/read-string vec)

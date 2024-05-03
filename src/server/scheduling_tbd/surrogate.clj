@@ -15,9 +15,8 @@
 ;;; With that function we can choose between "makes" and "provides the services of"
 (defn system-instruction
   "This is the instruction that configures the role of the OpenAI assistant."
-   [role]
-  (format "
-   You manage a company that makes %s.
+  [role]
+  (format "You manage a company that makes %s.
    You are an expert in production and manage your company's supply chains.
    You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.
    Your answers typically are short, just a few sentences each.

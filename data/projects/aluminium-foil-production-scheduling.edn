@@ -29,6 +29,6 @@
           #:problem{:domain :process-interview,
                     :goal-string "(characterize-process ?proj)",
                     :state-string
-                    "#{(ongoing-discussion foil) (proj-id foil) (system-model foil flow) (well-known-process foil)}"}}
+                    "#{(system-model foil flow) (ongoing-discussion foil) (proj-id foil) (have-process-steps foil) (well-known-process foil)}"}}
 
 ]

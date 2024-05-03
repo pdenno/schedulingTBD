@@ -7,50 +7,80 @@
                       #:msg-text{:string "."}],
                      :from :system,
                      :id 1,
-                     :time #inst "2024-04-27T19:08:04.313-00:00"}
+                     :time #inst "2024-04-29T21:33:32.602-00:00"}
            #:message{:content
                      [#:msg-text{:string
-                                 "Our most significant scheduling problem involves the coordination of raw material deliveries with our production schedule and the subsequent distribution of finished aluminium cans to our clients. The challenge lies in ensuring that raw materials, primarily aluminium, arrive in sync with our production cycles to maintain an efficient and continuous manufacturing process. Meanwhile, we must schedule the distribution of the finished cans in a way that aligns with our clients' demands, which often fluctuate seasonally. This necessitates a dynamic scheduling system that can adjust to variations in delivery times, production rates, and client orders, while minimizing storage costs and avoiding production delays."}],
+                                 "One of the most significant scheduling problems we encounter involves coordinating the production process across various stages to ensure a continuous, efficient flow of operations. We struggle with aligning the availability of raw materials, machine occupancy, maintenance schedules, and labor shifts to meet fluctuating demand without overproducing or underproducing. This becomes particularly challenging during peak periods when demand spikes, requiring precise forecasting and agile adjustments to the production schedule to avoid bottlenecks and maintain delivery timelines. Additionally, managing the logistics of supply chain disruptions further complicates the scheduling, necessitating a robust, flexible system to adapt to these changes swiftly."}],
                      :from :surrogate,
                      :id 2,
-                     :time #inst "2024-04-27T19:08:04.330-00:00"}
+                     :time #inst "2024-04-29T21:33:32.633-00:00"}
            #:message{:content
                      [#:msg-text{:string
                                  "Great, we'll call your project SUR Aluminium Cans."}],
                      :from :system,
                      :id 3,
-                     :time #inst "2024-04-27T19:08:04.345-00:00"}
+                     :time #inst "2024-04-29T21:33:32.663-00:00"}
            #:message{:content
                      [#:msg-text{:string
                                  "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product."}],
                      :from :system,
                      :id 4,
-                     :time #inst "2024-04-27T19:08:04.360-00:00"}
+                     :time #inst "2024-04-29T21:33:32.692-00:00"}
            #:message{:content
                      [#:msg-text{:string
-                                 " Could you provide a few short sentences about your production processes?"}],
+                                 "Please briefly describe your production processes?"}],
                      :from :system,
                      :id 5,
-                     :time #inst "2024-04-27T19:09:02.357-00:00"}
+                     :time #inst "2024-04-29T21:33:53.872-00:00"}
            #:message{:content
                      [#:msg-text{:string
-                                 "Our production process starts with receiving and storing raw aluminium, which is then prepared for manufacturing. In the preparation stage, the aluminium is cleaned and cut into sheets. These sheets are then fed into machines that form them into cans through a series of operations including drawing and ironing. After can forming, the cans undergo a rigorous quality control process to ensure they meet our standards. Once approved, the cans are packaged into larger containers for shipping. Finally, the packaged cans are prepared for distribution, which involves organizing and loading them onto trucks or other transportation methods for delivery to our clients."}],
+                                 "Our production process for aluminium cans involves several key stages:\n\n1. **Material Preparation**: Aluminium sheets are procured and prepared for processing. This involves cleaning and lubricating sheets for smooth handling.\n\n2. **Cupping and Drawing**: Sheets are punched into small discs and then formed into shallow cups. These cups are then drawn into can bodies through a series of stages that elongate and thin the walls.\n\n3. **Trimming**: The formed can bodies are trimmed to the desired height, ensuring uniformity and removing any irregularities.\n\n4. **Washing and Drying**: The trimmed cans are washed to remove any lubricants and residues from the forming process, then dried.\n\n5. **Internal Coating**: Cans are sprayed internally with a protective coating to prevent corrosion and preserve the contents' flavor and integrity.\n\n6. **Baking**: The coating is cured through baking, creating a protective layer inside the can.\n\n7. **Necking**: The can's diameter is reduced at one end to prepare for the end (lid) to be attached. This process may involve several stages to gradually shape the neck.\n\n8. **Flanging**: A flange is created around the necked area to allow the lid to be seamed onto the can.\n\n9. **Printing and Labelling**: Cans are printed with branding, nutritional information, and other labeling. This may involve sophisticated printing technologies for high-quality imagery.\n\n10. **End Attachment**: Lids are manufactured in a separate process, involving cutting, shaping, and coating. Lids are then attached to the cans using a seaming process to seal them.\n\n11. **Packing and Inspection**: Finished cans are inspected for quality, packed into larger containers (e.g., boxes, pallets), and prepared for distribution.\n\nEach stage is critical and requires precise scheduling and quality control to ensure the final product meets standards and customer requirements."}],
                      :from :surrogate,
                      :id 6,
-                     :time #inst "2024-04-27T19:09:02.375-00:00"}],
+                     :time #inst "2024-04-29T21:33:53.891-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE."}],
+                     :from :system,
+                     :id 7,
+                     :time #inst "2024-04-29T21:33:55.965-00:00"}
+           #:message{:content [#:msg-text{:string "PRODUCT"}],
+                     :from :surrogate,
+                     :id 8,
+                     :time #inst "2024-04-29T21:33:55.994-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n"}],
+                     :from :system,
+                     :id 9,
+                     :time #inst "2024-04-29T21:34:00.736-00:00"}
+           #:message{:content [#:msg-text{:string "MAKE-TO-STOCK"}],
+                     :from :surrogate,
+                     :id 10,
+                     :time #inst "2024-04-29T21:34:00.756-00:00"}
+           #:message{:content
+                     [#:msg-text{:string
+                                 "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE."}],
+                     :from :system,
+                     :id 11,
+                     :time #inst "2024-04-29T21:34:03.398-00:00"}
+           #:message{:content [#:msg-text{:string "OUR-FACILITY"}],
+                     :from :surrogate,
+                     :id 12,
+                     :time #inst "2024-04-29T21:34:03.452-00:00"}],
           :name "SUR Aluminium Cans",
           :planning-problem
           #:problem{:domain :process-interview,
                     :goal-string
                     "(characterize-process sur-aluminium-cans)",
                     :state-string
-                    "#{(surrogate sur-aluminium-cans) (proj-name \"SUR Aluminium Cans\") (well-known-process sur-aluminium-cans) (have-process-steps sur-aluminium-cans) (proj-id sur-aluminium-cans) (ongoing-discussion sur-aluminium-cans) (cites-raw-material-challenge sur-aluminium-cans)}"},
+                    "#{(surrogate sur-aluminium-cans) (production-mode sur-aluminium-cans make-to-stock) (proj-name \"SUR Aluminium Cans\") (proj-id sur-aluminium-cans) (flow-shop sur-aluminium-cans) (provides-product sur-aluminium-cans) (has-production-facility sur-aluminium-cans) (ongoing-discussion sur-aluminium-cans) (cites-raw-material-challenge sur-aluminium-cans)}"},
           :surrogate
-          #:surrogate{:assistant-id "asst_L0cT5POuNXTbPUvj5NIGVH1c",
+          #:surrogate{:assistant-id "asst_GYocPy727GONcKFr5zxnb8qE",
                       :id :sur-aluminium-cans,
                       :subject-of-expertise "aluminium cans",
                       :system-instruction
-                      "\n   You manage a company that makes aluminium cans.\n   You are an expert in the production of aluminium cans and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_FbI0ouk9vlMQ4eSQhzWQXtRd"}}
+                      "\n   You manage a company that makes aluminium cans. \n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_bAwwnvtwfyXdRXpyG6OfXnSE"}}
 
 ]

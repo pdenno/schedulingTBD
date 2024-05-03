@@ -10,7 +10,24 @@
    ["@mui/material/LinearProgress$default" :as LinearProgress]
    ["@mui/material/Link$default" :as Link]
    ["@mui/material/Stack$default" :as Stack]
-   ["react-chat-elements/dist/main"    :as rce]
+   ;["react-chat-elements/dist/main"    :as rce]
+
+
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Buttons/AttachmentButton$default"   :as AttachmentButton]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Buttons/SendButton$default"         :as SendButton]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default"              :as ChatContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/InputToolbox$default"               :as InputToolbox]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default"              :as MainContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default"                    :as Message]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default"      :as MessageHeader]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHtmlContent$default" :as MessageHtmlContent]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default"               :as MessageInput]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageTextContent$default" :as MessageTextContent]
+
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"     :as MessageList]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default" :as MessageSeparator]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"  :as TypingIndicator]
+
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.util       :refer [register-dispatch-fn]]
    [stbd-app.ws         :as ws]
@@ -75,8 +92,22 @@
                              []
                              msg-vec)))))
 
+(defn msg-vec2cs ; cs = ChatScope
+  [msg-vec msg-owner]
+  :nyi)
+
+
 (defn add-msg [msg-list msg]
   (-> msg-list js->clj (conj msg) clj->js))
+
+;;;   https://chatscope.io/storybook/react/?path=/docs/components-messagelist--docs
+(def ck-messages
+  #js [($ Message
+          {:key "1"
+           :model #js {:message "Hello my friend"
+                       :sentTime "just now"
+                       :sender   "Joe"}})])
+
 
 ;;; ========================= Component ===============================
 (defn make-resize-fns
@@ -109,7 +140,7 @@
       (when (not-empty sur-text)
         (let [new-msg (-> sur-text :msg-vec (msg-vec2rce :surrogate) clj->js)]
           (set-msg-list (add-msg msg-list new-msg)))))
-    (hooks/use-effect [user-text] ; Entered by user with arrow button. Send user-text to the server, and put it in the chat.
+    (hooks/use-effect [user-text] ; Entered by user with send button. Send user-text to the server, and put it in the chat.
        (when (not-empty user-text)
          (log/info "In user-text hook: user-text =" user-text)
          (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" user-text)
@@ -132,36 +163,61 @@
                       (do (set-progress 0) (js/window.clearInterval @progress-handle))
                       (set-progress (reset! progress-atm percent)))))
                 200)))
-      ;; ----------------- component UI structure.
-      ($ ShareUpDown
-         {:init-height chat-height
-          :share-fns resize-fns
-          :up
-          ($ Box {:sx ; This work!
-                  #js {:overflowY "auto"
-                       :display "flex"    ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
-                       :height box-height ; When set small enough, scroll bars appear.
-                       :flexDirection "column"
-                       :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
-             ($ rce/MessageList {:dataSource msg-list
-                                 ; :lockable true ; Does nothing.
-                                 :toBottomHeight "100%" ; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist I'd like it to scroll to the bottom.
-                                 :style #js {:alignItems "stretch" ; :style is helix for non-MUI things. I think(!)
-                                             :display "flex"}}))   ; "stretch" is just for horizontal??? ToDo: Everything here ignored?
-          :dn
-          ($ Stack {:direction "column"}
-                 ($ LinearProgress {:variant "determinate" :value progress})
-                 ($ Stack {:direction "row" :spacing "0px"}
-                    ($ rce/Input {:referance input-ref ; <==== Yes, rilly!
+    ;; ----------------- component UI structure.
+    ($ ShareUpDown
+       {:init-height chat-height
+        :share-fns resize-fns
+        :up ($ Box {:sx ; This work!
+                    #js {:overflowY "auto"
+                         :display "flex"    ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
+                         :height box-height ; When set small enough, scroll bars appear.
+                         :flexDirection "column"
+                         :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
+               ($ MainContainer
+                  ($ ChatContainer
+                     ($ MessageList
+                        {:typingIndicator ($ TypingIndicator "TBD is typing")
+                         :style #js {:height "500px"}}
+                        (into [($ MessageSeparator {:key "0"} "Friday, May 3, 2024" )]
+                              (for [k ["1" "2" "3" "4"]]
+                                ($ Message
+                                   {:key k
+                                    :model #js {:position "single" ; "single" "normal", "first" and "last"
+                                                :direction (if (#{"1","3"} k) "incoming" "outgoing")
+                                                :type "html"
+                                                :payload (str "Hello my friend.<br>"
+                                                              "We can make these any way<br>"
+                                                              "we want...........................................Very long!. <br>"
+                                                              "<a href=\"http://example.com/hello\">hello link</a>. The end.")
+                                                :sender   "Joe"}}
+                                   ($ MessageHeader {:sender "TBD, 1 min ago"})
+                                   #_($ MessageTextContent "Hello my friend.\n        We can make these any way\nwe want...........................................Very long!.")
+                                   #_($ MessageHtmlContent (str "Hello my friend.<br>"
+                                                              "We can make these any way<br>"
+                                                              "we want...........................................Very long!. <br>"
+                                                              #_"<a href=\"http://example.com/hello\">hello link</a>. The end.")))))))))
+
+        :dn ($ Stack {:direction "column"}
+               ($ LinearProgress {:variant "determinate" :value progress})
+               ($ Stack {:direction "row" :spacing "0px"}
+                  ($ MessageInput {;:ref (reset! diag input-ref)
+                                   :placeholder "Type message here...."
+                                   :onSend #(do (log/info "onSend:" %)
+                                                (set-user-text %))
+                                   :fancyScroll false
+                                        ;:autoFocus false ; ToDo: Needs investigation. I don't know what it does.
+                                        ;:value user-text ; If you put user-text here, you can't type much
+                                   :style #js {#_#_:height "200px" :width "90%"}}) ;:height by percentage doesn't do anything. "200px" won't scroll correctly.
+                  #_($ rce/Input {:referance input-ref ; <==== Yes, rilly!
                                   :value user-text
                                   :min-width "800px"
                                   :placeholder "Type here..."
                                   :multiline true})
-                    ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
+                  #_($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
                                                (when-let [text (not-empty (j/get iref :value))]
                                                  (let [tbd-injection? (re-matches #"\s*SUR\?:(.*)" text)]
                                                    (set-msg-list (add-msg msg-list (msg-vec2rce [{:msg-text/string text}]
                                                                                                 (if tbd-injection? :system :human)))))
-                                         (j/assoc! iref :value "")
-                                         (set-user-text text)))}
+                                                 (j/assoc! iref :value "")
+                                                 (set-user-text text)))}
                        ($ Send))))})))

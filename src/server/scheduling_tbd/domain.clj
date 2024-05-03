@@ -308,8 +308,8 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 ;;; ToDo: Maybe what I really want is to split scheduling vs some notion of constraint satisfaction (which would include project management and cyclical scheduling)
 ;;;       But for the time meaning, it was this that came to mind.
 (defn production-mode
-  "Return a vector of ground predicates (so far just either [(is-product ?x)] or [(is-service ?x)],
-   depending on whether the project describes respectively work to provide a product or work to provide a service."
+  "Return a vector of one predicates of the form (production-mode ?x <mode>) where <mode> is on of make-to-stock, make-to-order, or engineer-to-order.
+   depending on what the agent deems more relevant to their operations."
   [aid tid]
   (let [query (str "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\n"
                    "In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\n"
@@ -345,10 +345,10 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    depending on whether the project describes respectively work to provide a product or work to provide a service.
    Note that this question is only applied where (provides-product ?x) (scheduling-problem ?x) (has-production-facility ?x)."
   [aid tid]
-  (let [query (str "A flow-shop is a production system designed so that all jobs follows the same sequence of steps through production resources.\n"
-                   "A job-shop is a production system where each job might follow its own route, depending on its unique requirements.\n"
+  (let [query (str "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources.\n"
+                   "A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements.\n"
                    "Is the process you described more like a flow-shop or a job-shop?\n"
-                   "Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.")
+                   "Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.")
         answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
         preds (cond (re-matches #".*(?i)FLOW-SHOP.*" answer) '[(flow-shop ?x)]
                     (re-matches #".*(?i)JOB-SHOP.*" answer)  '[(job-shop ?x)]
@@ -386,9 +386,15 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                (when write?
                  (db/add-msg pid :system query)
                  (db/add-msg pid :surrogate answer))))
+           ;; The job-shop/flow-shop question is relevant only in situations shown.
            (when (and (find-fact '(provides-product ?x) @new-props)
                       (find-fact '(has-production-facility ?x) @new-props))
-             (swap! new-props into (->> (flow-vs-job aid tid) :preds (map #(uni/subst % proj-bind)))))
+             (let [{:keys [query answer preds]} (flow-vs-job aid tid)
+                   more-props (map #(uni/subst % proj-bind) preds)]
+             (swap! new-props into more-props)
+             (when write?
+               (db/add-msg pid :system query)
+               (db/add-msg pid :surrogate answer))))
            @new-props)
        [(list 'fails-query 'process-description proj-sym)]))))
 
