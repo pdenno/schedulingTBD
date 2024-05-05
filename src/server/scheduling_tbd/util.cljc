@@ -45,7 +45,7 @@
 #?(:clj
    (defn now [] (new java.util.Date))
    :cljs
-   (defn now [] (.getTime (js/Date.))))
+   (defn now [] (.now js/Date) #_(.getTime (js/Date.))))
 
 (defn start-clock
   "Set the timeout-info object and return the argument."

@@ -50,11 +50,11 @@
 (register-dispatch-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
 (register-dispatch-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
 (register-dispatch-fn :load-proj             (fn [{:keys [new-proj-map]}] ((get-dispatch-fn :core-load-proj) new-proj-map)))
-(register-dispatch-fn :tbd-says              (fn [{:keys [p-key] :as msg}]
+(register-dispatch-fn :tbd-says              (fn [{:keys [p-key msg]}]
                                                (when p-key (remember-promise p-key))
                                                (log/info "tbd-says msg:" msg)
                                                ((get-dispatch-fn :set-tbd-text) msg)))
-(register-dispatch-fn :sur-says              (fn [{:keys [p-key] :as msg}]
+(register-dispatch-fn :sur-says              (fn [{:keys [p-key msg]}]
                                                (when p-key (remember-promise p-key))
                                                (log/info "sur-says msg:" msg)
                                                ((get-dispatch-fn :set-sur-text) msg)))
@@ -74,8 +74,11 @@
     ;;(log/info "Ping attempt.")
     (send-msg {:dispatch-key :ping, :ping-id (swap! ping-id inc)})))
 
+(def error-info (atom nil))
+(def error-info-2 (atom nil))
+
 (defn connect! []
-  (reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid when we start using transit.
+  (reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid if/when we start using transit.
   (reset-state)
   (if-let [chan (js/WebSocket. (ws-url @client-id))]
     (do (log/info "Websocket Connected!" @client-id)
@@ -83,13 +86,19 @@
         (reset! reconnecting? false)
         (set! (.-onmessage chan)
               (fn [event]       ;; ToDo: Consider transit rather then edn/read-string.
-                (try (-> event .-data edn/read-string dispatch-msg)
-                     (catch :default e (log/warn "Error in reading from websocket:" e)))))
-        (set! (.-onerror chan) (fn [& arg] (log/error "Error on socket: arg=" arg))) ; ToDo: investigate why it gets these.
+                (try (let [data (.-data event)]
+                       (log/info "event data=" data)
+                       (when (not-empty data) (-> data edn/read-string dispatch-msg)))
+                     (catch :default e
+                       (reset! error-info {:event event :error e})
+                       (log/warn "Error in reading from websocket:" e)))))
+        (set! (.-onerror chan)
+              (fn [& arg]
+                (reset! error-info-2 {:event arg})
+                (log/error "Error on socket: arg=" arg))) ; ToDo: investigate why it gets these.
         ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
         (reset! ping-process (js/window.setInterval (fn [] (ping!)) 4000)))
     (throw (ex-info "Websocket Connection Failed:" {:client-id @client-id}))))
-
 
 (defn check-channel
   "This gets called by send-msg when (channel-ready?) is not true."

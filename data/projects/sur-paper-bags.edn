@@ -2,79 +2,84 @@
 #:project{:id :sur-paper-bags,
           :messages
           [#:message{:content
-                     [#:msg-text{:string
-                                 "Describe your most significant scheduling problem in a few sentences"}
-                      #:msg-text{:string "."}],
+                     "Describe your most significant scheduling problem in a few sentences.",
                      :from :system,
                      :id 1,
-                     :time #inst "2024-04-29T21:12:57.763-00:00"}
+                     :time #inst "2024-04-29T21:47:07.856-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Our most significant scheduling problem centers around efficiently managing machine and labor resources to meet fluctuating customer demands for paper bags. We often encounter challenges in anticipating the correct volume of production due to seasonality and sudden large orders, leading to either overproduction or not meeting delivery deadlines. Balancing the workload across different production lines to optimize throughput and minimize downtime, while also considering maintenance schedules and unexpected machine breakdowns, further complicates our scheduling efforts. This results in the need for a dynamic and adaptable scheduling system that can respond to these variables effectively."}],
+                     "Our most significant scheduling problem involves coordinating the production of various sizes of paper bags while also managing the supply chain for raw materials. We struggle to optimize machine usage and labor shifts to meet fluctuating customer demand. Additionally, issues with suppliers sometimes lead to raw material shortages, causing unplanned production stoppages. Balancing these factors to maintain efficiency and meet delivery deadlines is our main challenge.",
                      :from :surrogate,
                      :id 2,
-                     :time #inst "2024-04-29T21:12:57.794-00:00"}
+                     :time #inst "2024-04-29T21:47:07.876-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Great, we'll call your project SUR Paper Bags."}],
+                     "Great, we'll call your project SUR Paper Bags.",
                      :from :system,
                      :id 3,
-                     :time #inst "2024-04-29T21:12:57.819-00:00"}
+                     :time #inst "2024-04-29T21:47:07.896-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Please briefly describe your production processes?"}],
+                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
                      :from :system,
                      :id 4,
-                     :time #inst "2024-04-29T21:13:08.862-00:00"}
+                     :time #inst "2024-04-29T21:47:07.915-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Our paper bag manufacturing process consists of several key steps:\n\n1. **Raw Material Preparation**: We start by selecting and preparing the paper roll stock suitable for the type of bag being produced.\n\n2. **Printing**: Depending on the order, some bags require custom designs or branding, which are printed onto the paper roll.\n\n3. **Cutting and Folding**: The printed paper rolls are then cut to size and folded into the shape of a bag. This step might include the making of handles for certain types of bags.\n\n4. **Gluing or Stapling**: The sides of the bags are glued or stapled together to form the final shape.\n\n5. **Quality Control**: Each batch of bags undergoes a quality check to ensure they meet our standards and the requirements of the order.\n\n6. **Packing and Dispatch**: Approved bags are then packed and prepared for dispatch according to customer requirements.\n\nEach of these steps involves different machines and labor skills, and the process flow can vary slightly depending on the type of bag being produced and specific customer requirements.\n"}],
-                     :from :surrogate,
+                     "Please briefly describe your production processes?",
+                     :from :system,
                      :id 5,
-                     :time #inst "2024-04-29T21:13:08.890-00:00"}
+                     :time #inst "2024-04-29T21:47:18.605-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE."}],
-                     :from :system,
+                     "Our production process involves several key steps:\n\n1. **Raw Material Preparation**: Upon receiving raw paper rolls from suppliers, we check for quality and prepare the material for production.\n\n2. **Printing**: Some orders require customized printing. In this phase, we print designs or logos onto the paper as per the customer's specifications.\n\n3. **Cutting and Shaping**: The printed paper rolls are then cut into the appropriate sizes and shapes, depending on the type of bag being produced.\n\n4. **Gluing and Assembling**: Edges are glued, and the paper is folded into the shape of a bag. Handles are also attached in this phase if necessary.\n\n5. **Quality Check**: Completed bags undergo a quality inspection to ensure they meet our standards and the customer's specifications.\n\n6. **Packaging and Shipping**: Approved bags are then packaged and prepared for shipping to the customer.\n\nThe process varies slightly depending on the complexity and specific requirements of the order, such as the size of the bag, the type of paper used, and any additional features like special coatings or reinforcements.",
+                     :from :surrogate,
                      :id 6,
-                     :time #inst "2024-04-29T21:13:11.010-00:00"}
-           #:message{:content [#:msg-text{:string "PRODUCT"}],
-                     :from :surrogate,
+                     :time #inst "2024-04-29T21:47:18.623-00:00"}
+           #:message{:content
+                     "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE.",
+                     :from :system,
                      :id 7,
-                     :time #inst "2024-04-29T21:13:11.029-00:00"}
-           #:message{:content
-                     [#:msg-text{:string
-                                 "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n"}],
-                     :from :system,
+                     :time #inst "2024-04-29T21:47:20.765-00:00"}
+           #:message{:content "PRODUCT",
+                     :from :surrogate,
                      :id 8,
-                     :time #inst "2024-04-29T21:13:13.365-00:00"}
-           #:message{:content [#:msg-text{:string "MAKE-TO-ORDER"}],
-                     :from :surrogate,
-                     :id 9,
-                     :time #inst "2024-04-29T21:13:13.421-00:00"}
+                     :time #inst "2024-04-29T21:47:20.825-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE."}],
+                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n",
                      :from :system,
-                     :id 10,
-                     :time #inst "2024-04-29T21:13:16.955-00:00"}
-           #:message{:content [#:msg-text{:string "OUR-FACILITY"}],
+                     :id 9,
+                     :time #inst "2024-04-29T21:47:22.957-00:00"}
+           #:message{:content "MAKE-TO-ORDER",
                      :from :surrogate,
+                     :id 10,
+                     :time #inst "2024-04-29T21:47:23.007-00:00"}
+           #:message{:content
+                     "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                     :from :system,
                      :id 11,
-                     :time #inst "2024-04-29T21:13:16.971-00:00"}],
+                     :time #inst "2024-04-29T21:47:25.209-00:00"}
+           #:message{:content "OUR-FACILITY",
+                     :from :surrogate,
+                     :id 12,
+                     :time #inst "2024-04-29T21:47:25.232-00:00"}
+           #:message{:content
+                     "A flow-shop is a production system designed so that all jobs follows the same sequence of steps through production resources.\nA job-shop is a production system where each job might follow its own route, depending on its unique requirements.\nIs the process you described more like a flow-shop or a job-shop?\nRespond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                     :from :system,
+                     :id 13,
+                     :time #inst "2024-04-29T21:47:27.460-00:00"}
+           #:message{:content "FLOW-SHOP",
+                     :from :surrogate,
+                     :id 14,
+                     :time #inst "2024-04-29T21:47:27.520-00:00"}],
           :name "SUR Paper Bags",
           :planning-problem
           #:problem{:domain :process-interview,
                     :goal-string
                     "(characterize-process sur-paper-bags)",
                     :state-string
-                    "#{(ongoing-discussion sur-paper-bags) (flow-shop sur-paper-bags) (proj-name \"SUR Paper Bags\") (production-mode sur-paper-bags make-to-order) (provides-product sur-paper-bags) (has-production-facility sur-paper-bags) (proj-id sur-paper-bags) (surrogate sur-paper-bags)}"},
+                    "#{(ongoing-discussion sur-paper-bags) (flow-shop sur-paper-bags) (proj-name \"SUR Paper Bags\") (production-mode sur-paper-bags make-to-order) (cites-raw-material-challenge sur-paper-bags) (provides-product sur-paper-bags) (has-production-facility sur-paper-bags) (proj-id sur-paper-bags) (surrogate sur-paper-bags)}"},
           :surrogate
-          #:surrogate{:assistant-id "asst_DvBZDX6WaqvBqzVgWlg6RPTj",
+          #:surrogate{:assistant-id "asst_Xvvw0zmVhpPWp4aVO4hJxCXS",
                       :id :sur-paper-bags,
                       :subject-of-expertise "paper bags",
                       :system-instruction
                       "\n   You manage a company that makes paper bags. \n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_H7lDym3BTpqdvCLplj3cByPi"}}
+                      :thread-id "thread_g4sbTS51btE9AujnAkfYwjll"}}
 
 ]

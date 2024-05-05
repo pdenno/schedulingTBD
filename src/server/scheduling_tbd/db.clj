@@ -54,24 +54,12 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
         :doc "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, which aren't stored, some values can be skipped."}
    :message/content
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "msg-text and msg-link objects."}
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
 
-   ;; ---------------------- msg-link
-   :msg-link/text
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The text of describing a msg-link which is itself part of :message/content."}
-   :msg-link/uri
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-           :doc "The URI of a msg-link which is itself part of :message/content."}
-
-   ;; ---------------------- msg-text
-   :msg-text/string
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-           :doc "A text string as part of :message/content."}
    ;; ---------------------- problem (the planning problem and current state)
    :problem/domain
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
@@ -316,7 +304,7 @@
            :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))
 
 (def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
-  #{:project/messages :message/id :message/from :message/content :message/time :msg-text/string :msg-link/uri :msg-link/text})
+  #{:project/messages :message/id :message/from :message/content :message/time})
 
 (defn get-messages
   "For the argument project (pid) return messages sorted by their :message/id."
@@ -505,17 +493,15 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
-  [pid from str-or-msg-vec]
+  [pid from msg]
   (assert (#{:system :human :surrogate} from))
-  (let [msg-vec (cond (s/valid? ::spec/chat-msg-vec str-or-msg-vec) str-or-msg-vec
-                      (string? str-or-msg-vec)                      (sutil/str2msg-vec str-or-msg-vec)
-                      :else (throw (ex-info "Invalid msg to add-msg" {:msg str-or-msg-vec})))]
-    (log/info "add-msg: pid =" pid "str-or-msg-vec =" str-or-msg-vec)
-    (if-let [conn (connect-atm pid)]
-      (let [msg-id (inc (max-msg-id pid))]
-        (d/transact conn {:tx-data [{:db/id (project-exists? pid)
-                                     :project/messages #:message{:id msg-id :from from :time (now) :content msg-vec}}]}))
-      (throw (ex-info "Could not connect to DB." {:pid pid})))))
+  (assert (string? msg))
+  (log/info "add-msg: pid =" pid "msg =" msg)
+  (if-let [conn (connect-atm pid)]
+    (let [msg-id (inc (max-msg-id pid))]
+      (d/transact conn {:tx-data [{:db/id (project-exists? pid)
+                                   :project/messages #:message{:id msg-id :from from :time (now) :content msg}}]}))
+    (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn add-project
   "Add the argument project (a db-cfg map) to the system database."

@@ -6,7 +6,7 @@
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.llm       :as llm]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id str2msg-vec]]
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log]))
 
@@ -76,7 +76,7 @@
   [{:keys [product client-id]} & {:keys [force?] :or {force? true}}] ; ToDo: handle force?=false, See similar-surrogate?
   (log/info "======= Start a surrogate: product =" product "=======================")
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
-        pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
+        pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "Sur ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})]
     (try
       (ensure-surrogate pid pname force?)
@@ -96,12 +96,12 @@
         (try (when-let [answer (llm/query-on-thread :tid tid :aid aid :query-text question)]
                (log/info "SUR's answer:" answer)
                (when (string? answer)
-                 (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec answer)))
+                 (ws/send-to-chat (assoc chat-args :msg answer))
                  (db/add-msg pid :system question)
                  (db/add-msg pid :surrogate answer)))
              (catch Exception e
                (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
-               (ws/send-to-chat (assoc chat-args :msg-vec (str2msg-vec "We had a problem answering this questions.")))))))))
+               (ws/send-to-chat (assoc chat-args :msg "We had a problem answering this questions."))))))))
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []

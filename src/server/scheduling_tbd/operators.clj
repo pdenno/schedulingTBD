@@ -11,7 +11,7 @@
    [scheduling-tbd.domain :as dom]
    [scheduling-tbd.llm    :as llm]
    [scheduling-tbd.specs  :as spec]
-   [scheduling-tbd.sutil  :as sutil :refer [find-fact str2msg-vec error-for-chat]]
+   [scheduling-tbd.sutil  :as sutil :refer [find-fact error-for-chat]]
    [scheduling-tbd.web.websockets  :as ws]
    [taoensso.timbre       :as log]))
 
@@ -84,32 +84,6 @@
 
 (defmulti db-action #'db-action-dispatch)
 
-(defn reword-for-agent
-  "Return the msg-vec with :human-only or :surrogate-only annotated sections removed as appropriate.
-   Remove the annotations too!"
-  [msg-vec surrogate?]
-  (let [human? (not surrogate?)
-        result (reduce (fn [res elem]
-                         (cond (and (contains? elem :human-only)     surrogate?)        res
-                               (and (contains? elem :surrogate-only) human?)            res
-                               (contains? elem :human-only)                            (into res (:human-only elem))
-                               (contains? elem :surrogate-only)                        (into res (:surrogate-only elem))
-                               :else                                                   (conj res elem)))
-                       []
-                       msg-vec)]
-    (s/assert ::spec/chat-msg-vec result)))
-
-
-(defn msg-vec2text
-  "Used by the surrogate only, return the string resulting from concatenating the :msg-text/string."
-  [v]
-  (reduce (fn [s elem]
-            (if (contains? elem :msg-text/string)
-              (str s (:msg-text/string elem))
-              s))
-          ""
-          v))
-
 (defn run-operator!
   "Run the action associated with the operator, returning an updated state EXCEPT where fails."
   [state {:operator/keys [head a-list] :as _task} {:keys [inject-failures pid] :as opts}]
@@ -168,9 +142,9 @@
 (defn chat-pair
   "Run one query/response pair of chat elements with a human or a surrogate.
    Returns promise which will resolve to the original obj argument except:
-     1) :msg-vec is adapted from the input argument value for the agent type (human or surrogate)
+     1) :agent-msg is adapted from the input argument value for the agent type (human or surrogate)
      2) :response is added. Typically its value is a string."
-  [{:keys [pid state agent-msg-vec] :as obj}]
+  [{:keys [pid state agent-msg] :as obj}]
   (log/info "Chat pair: surrogate? =" (surrogate? state))
   (let [aid (db/get-assistant-id pid nil)
         tid (db/get-thread-id pid nil)
@@ -178,10 +152,10 @@
         prom (if (= :surrogate agent-type)
                (px/submit! (fn []
                              (try
-                               (llm/query-on-thread :tid tid :aid aid :query-text (msg-vec2text agent-msg-vec))   ; This can timeout.
+                               (llm/query-on-thread :tid tid :aid aid :query-text agent-msg)   ; This can timeout.
                                (catch Exception e {:error e}))))
                (ws/send-to-chat (-> obj
-                                    (assoc :msg-vec agent-msg-vec)
+                                    (assoc :msg agent-msg)
                                     (assoc :dispatch-key :tbd-says))))]                                             ; This cannot timeout.
     (log/info "prom =" prom)
     (p/await prom))); You can't put anything else here or a promise will be passed!
@@ -200,8 +174,11 @@
    {:msg-text/string "."}])
 
 (defoperator :!initial-question [{:keys [state] :as obj}]
-  (try (let [agent-msg-vec (reword-for-agent intro-prompt (surrogate? state))
-             obj (assoc obj :agent-msg-vec agent-msg-vec)
+  (try (let [agent-msg (if (surrogate? state)
+                         "Describe your most significant scheduling problem in a few sentences."
+                         (str "Describe your most significant scheduling problem in a few sentences or "
+                              "<a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>."))
+             obj (assoc obj :agent-msg agent-msg)
              response (chat-pair obj)]
          ;; Owing to weirdness of chat-pair p/await call this is done here.
          (cond (string? response)                   (-> obj
@@ -217,7 +194,7 @@
          {:result :failure :reason "processing response"})))
 
 ;;; (op/db-action (assoc op/example :client-id (ws/recent-client!)))
-(defaction :!initial-question [{:keys [state response client-id agent-msg-vec] :as _obj}]
+(defaction :!initial-question [{:keys [state response client-id agent-msg] :as _obj}]
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
   ;(reset! diag _obj)
   (let [surrogate? (surrogate? state)
@@ -230,13 +207,13 @@
           pid (keyword pid)]
       (db/add-planning-state pid analysis-state)
       (log/info "DB and app actions on PID =" pid)
-      (db/add-msg pid :system agent-msg-vec)  ; ToDo: I'm not catching the error when this is wrong!
+      (db/add-msg pid :system agent-msg)  ; ToDo: I'm not catching the error when this is wrong!
       (db/add-msg pid (if surrogate? :surrogate :human) response)
       (db/add-msg pid :system (format "Great, we'll call your project %s." pname))
       (when cites-supply?
         (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
                        "we'd like to put that aside for a minute and talk about the processes that make product.")]
-          ;(ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg-vec (str2msg-vec msg)})
+          ;(ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
           (db/add-msg pid :system msg)))
       ;; Complete preliminary analysis in a parallel agent that, in the case of a human expert, works independently.
       (db/add-planning-state pid (dom/parallel-expert-prelim-analysis pid)))))
@@ -247,9 +224,9 @@
     :surrogate-only (dom/process-steps-prompt)}])
 
 (defoperator :!yes-no-process-steps [obj]
-  (let [msg-vec (str2msg-vec "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)")
-        obj (assoc obj :agent-msg-vec msg-vec)
-        response (chat-pair (assoc obj :agent-msg-vec msg-vec))]
+  (let [msg "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
+        obj (assoc obj :agent-msg msg)
+        response (chat-pair (assoc obj :agent-msg msg))]
       (-> obj
           (assoc :response response)
           db-action)))
@@ -263,8 +240,8 @@
 ;;; ----- :!query-process-durs
 (defoperator :!query-process-durs [obj]
   (log/info "!query-process-durs: response =" obj)
-  (let [msg-vec (str2msg-vec "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)")
-        obj (assoc obj :agent-msg-vec msg-vec)
+  (let [msg "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)"
+        obj (assoc obj :agent-msg msg)
         response (chat-pair obj)]
     (-> obj
         (assoc :response response)
@@ -278,9 +255,9 @@
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-ordering [obj]
   (log/info "!yes-no-process-ordering: obj =" obj)
-  (let [msg-vec (str2msg-vec "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)")
-        obj (assoc obj :agent-msg-vec msg-vec)
-        response (chat-pair (assoc obj :agent-msg-vec msg-vec))]
+  (let [msg "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
+        obj (assoc obj :agent-msg msg)
+        response (chat-pair (assoc obj :agent-msg msg))]
     (-> obj
         (assoc :response response)
         db-action)))

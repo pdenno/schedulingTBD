@@ -5,7 +5,7 @@
    [clojure.string                :as str]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [find-fact yes-no-unknown str2msg-vec]]
+   [scheduling-tbd.sutil          :as sutil :refer [find-fact yes-no-unknown]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))

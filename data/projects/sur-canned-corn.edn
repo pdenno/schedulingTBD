@@ -2,27 +2,22 @@
 #:project{:id :sur-canned-corn,
           :messages
           [#:message{:content
-                     [#:msg-text{:string
-                                 "Describe your most significant scheduling problem in a few sentences"}
-                      #:msg-text{:string "."}],
+                     "Describe your most significant scheduling problem in a few sentences.",
                      :from :system,
                      :id 1,
                      :time #inst "2024-04-24T19:49:53.577-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Our most significant scheduling problem involves coordinating the raw corn supply with the production line schedules for canning while also aligning with the delivery schedules for our clients. The raw corn must be processed shortly after harvest to preserve freshness, but fluctuating harvest times and quantities make it challenging to align with our predetermined production schedules. Additionally, ensuring the finished goods are delivered on time to our clients, who have varying delivery schedules, adds another layer of complexity. Balancing these aspects to minimize waste, reduce storage costs, and meet client demands efficiently is our main scheduling challenge."}],
+                     "Our most significant scheduling problem involves coordinating the raw corn supply with the production line schedules for canning while also aligning with the delivery schedules for our clients. The raw corn must be processed shortly after harvest to preserve freshness, but fluctuating harvest times and quantities make it challenging to align with our predetermined production schedules. Additionally, ensuring the finished goods are delivered on time to our clients, who have varying delivery schedules, adds another layer of complexity. Balancing these aspects to minimize waste, reduce storage costs, and meet client demands efficiently is our main scheduling challenge.",
                      :from :surrogate,
                      :id 2,
                      :time #inst "2024-04-24T19:49:53.597-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Great, we'll call your project SUR Canned Corn."}],
+                     "Great, we'll call your project SUR Canned Corn.",
                      :from :system,
                      :id 3,
                      :time #inst "2024-04-24T19:49:53.617-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about processes."}],
+                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about processes.",
                      :from :system,
                      :id 4,
                      :time #inst "2024-04-24T19:49:53.636-00:00"}],

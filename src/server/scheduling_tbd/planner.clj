@@ -215,7 +215,7 @@
                                                  (log/error err)
                                                  (-> partials rest vec)
                                                  (ws/send-to-chat {:promise? false, :client-id client-id,
-                                                                   :msg-vec (error-for-chat "We had a continuable problem in this conversation:\n" err)}))
+                                                                   :msg (error-for-chat "We had a continuable problem in this conversation:\n" err)}))
                                              partials)]
                               (recur partials
                                      (inc cnt))))))
@@ -224,7 +224,7 @@
                            :stopped (error-for-chat "We stopped intentionally after 5 interactions.")
                            :failure (error-for-chat (str "We stopped owing to " (:reason result))) nil)]
     (when response-to-user
-      (ws/send-to-chat {:promise? false, :client-id client-id, :msg-vec response-to-user}))))
+      (ws/send-to-chat {:promise? false, :client-id client-id, :msg response-to-user}))))
 
 
 ;;; -------------------------------------- Plan checking --------------------------------------------------------------------

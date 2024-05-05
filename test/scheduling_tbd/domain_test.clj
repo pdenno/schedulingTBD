@@ -1,11 +1,12 @@
 (ns scheduling-tbd.domain-test
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
-   [clojure.pprint        :refer [cl-format]]
+   [clojure.pprint        :refer [cl-format pprint]]
    [clojure.string        :as str]
    [clojure.test          :refer [deftest is testing]]
    [promesa.core          :as p]
    [scheduling-tbd.domain :as domain]
+   [scheduling-tbd.db    :as db]
    [scheduling-tbd.llm    :as llm :refer [query-llm]]
    [taoensso.timbre          :as log]))
 
@@ -29,7 +30,7 @@
   (alias 'llm    'scheduling-tbd.llm)
   ;(alias 'llmt   'scheduling-tbd.llm-test)
   (alias 'op     'scheduling-tbd.operators)
-  (alias 'opt    'scheduling-tbd.operators-test)
+;  (alias 'opt    'scheduling-tbd.operators-test)
   (alias 'plan   'scheduling-tbd.planner)
   (alias 'resp   'scheduling-tbd.web.controllers.respond)
   (alias 'spec   'scheduling-tbd.specs)
@@ -100,7 +101,7 @@
                                              :content (format (str "The following paragraph describes an activity that either provides a service or produces a product.\n"
                                                                    "Reply with respectively with the single word 'service' or 'product' depending on which most closely describes the paragraph.\n\n %s")
                                                               (get domain-problems k))}]]
-                                (llm/query-llm dialog {:model-class :gpt-4 #_:gpt-3.5}))))
+                                (query-llm dialog {:model-class :gpt-4 #_:gpt-3.5}))))
                      {}
                      (keys answer-key)))))))
 
@@ -129,7 +130,7 @@
                                                                    "Respond with either 'Our facility.' if, like factory work, it is done in a place other than where the customer will use it,"
                                                                    "or 'Customer site.' if it concerns work that will be performed at a place the customer designates.\n\n %s")
                                                               (get domain-problems k))}]]
-                                (llm/query-llm dialog {:model-class :gpt-4 #_gpt-3.5}))))
+                                (query-llm dialog {:model-class :gpt-4 #_gpt-3.5}))))
                      {}
                      (keys answer-key)))))))
 
@@ -171,7 +172,7 @@
                                             {:role "assistant" :content "You are describing a 'scheduling' situation."}
                                             {:role "user" :content "WRONG! The answer must be just the string 'scheduling'."}
                                             {:role "user" :content (get domain-problems k)}]]
-                                (llm/query-llm dialog {:model-class :gpt-4}))))
+                                (query-llm dialog {:model-class :gpt-4}))))
                       {}
                       (keys answer-key))))))))
 
@@ -207,7 +208,7 @@
                                             {:role "assistant" :content "You are describing a 'scheduling' situation."}
                                             {:role "user" :content "WRONG! The answer must be just the string 'scheduling'."}
                                             {:role "user" :content (get domain-problems k)}]]
-                                (llm/query-llm dialog {:model-class :gpt-4}))))
+                                (query-llm dialog {:model-class :gpt-4}))))
                       {}
                       (keys answer-key))))))))
 
@@ -253,7 +254,7 @@
                                                                            "Respond with either 'FIXED' if, like a flow shop in operations research, the order of production operations is apt to be identical for all product types,\n"
                                                                            "or 'VARIABLE' if, like a job shop in operations reasearch, the order of production operations is apt to vary depending on what is being produced.\n\n\n%s")
                                                                       (get production-processes k))}]]
-                                        (llm/query-llm dialog {:model-class :gpt-4 #_gpt-3.5}))))
+                                        (query-llm dialog {:model-class :gpt-4 #_gpt-3.5}))))
                              {}
                              (keys answer-key))))))))
 
@@ -265,4 +266,18 @@
 
   ;; This one is interesting; in some sense better than GPT-4. It sometimes returns two sentences.
   (let [res (-> (query-llm proj-objective-prompt {:model-class :gpt-3.5 :raw-text? false}) (p/await))]
-     (is (= #{:objective :probability} (-> res keys set)))))
+    (is (= #{:objective :probability} (-> res keys set)))))
+
+(defn msg-vec2html
+  [msg]
+  (if (some #(contains? % :msg-link/text) (:message/content msg))
+    (assoc msg :message/content "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.")
+    (assoc msg :message/content (apply str (map #(:msg-text/string %) (:message/content msg))))))
+
+(defn migrate-project
+  "Translate :message/content to html."
+  [pid]
+  (let [new-proj (-> (db/get-project pid)
+                     (update :project/messages (fn [msgs] (-> (reduce (fn [res msg] (conj res (msg-vec2html msg))) [] msgs) vec))))
+        proj-string (with-out-str (pprint new-proj))]
+    (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string))))

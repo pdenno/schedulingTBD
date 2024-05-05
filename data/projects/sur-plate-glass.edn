@@ -2,69 +2,59 @@
 #:project{:id :sur-plate-glass,
           :messages
           [#:message{:content
-                     [#:msg-text{:string
-                                 "Describe your most significant scheduling problem in a few sentences"}
-                      #:msg-text{:string "."}],
+                     "Describe your most significant scheduling problem in a few sentences.",
                      :from :system,
                      :id 1,
                      :time #inst "2024-04-29T21:20:38.523-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Our most significant scheduling problem involves coordinating the production of plate glass with varying thicknesses and sizes, tailored to different client orders, while optimizing the usage of raw materials and minimizing production downtime. Additionally, we face challenges in aligning our production schedules with the delivery schedules of raw materials and with the delivery deadlines of finished products to our clients, considering the cleaning and maintenance time required for our equipment between different production runs."}],
+                     "Our most significant scheduling problem involves coordinating the production of plate glass with varying thicknesses and sizes, tailored to different client orders, while optimizing the usage of raw materials and minimizing production downtime. Additionally, we face challenges in aligning our production schedules with the delivery schedules of raw materials and with the delivery deadlines of finished products to our clients, considering the cleaning and maintenance time required for our equipment between different production runs.",
                      :from :surrogate,
                      :id 2,
                      :time #inst "2024-04-29T21:20:38.556-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Great, we'll call your project SUR Plate Glass."}],
+                     "Great, we'll call your project SUR Plate Glass.",
                      :from :system,
                      :id 3,
                      :time #inst "2024-04-29T21:20:38.585-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product."}],
+                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
                      :from :system,
                      :id 4,
                      :time #inst "2024-04-29T21:20:38.613-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Please briefly describe your production processes?"}],
+                     "Please briefly describe your production processes?",
                      :from :system,
                      :id 5,
                      :time #inst "2024-04-29T21:20:47.282-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Our production process for plate glass begins with mixing raw materials, primarily silica sand, soda ash, and limestone. The mixture is then melted in a furnace at extremely high temperatures to form molten glass. This molten glass is then floated on a bed of molten tin in a float bath, creating a continuous ribbon of glass with uniform thickness. The glass ribbon is cooled gradually in a lehr (annealing oven) to relieve internal stresses. After cooling, the glass is cut to the desired sizes according to client orders. Finally, the cut glass undergoes quality checks and is packed for shipping. Maintenance and cleaning of the equipment, especially the float bath and the furnace, are critical and scheduled regularly to ensure quality and safety."}],
+                     "Our production process for plate glass begins with mixing raw materials, primarily silica sand, soda ash, and limestone. The mixture is then melted in a furnace at extremely high temperatures to form molten glass. This molten glass is then floated on a bed of molten tin in a float bath, creating a continuous ribbon of glass with uniform thickness. The glass ribbon is cooled gradually in a lehr (annealing oven) to relieve internal stresses. After cooling, the glass is cut to the desired sizes according to client orders. Finally, the cut glass undergoes quality checks and is packed for shipping. Maintenance and cleaning of the equipment, especially the float bath and the furnace, are critical and scheduled regularly to ensure quality and safety.",
                      :from :surrogate,
                      :id 6,
                      :time #inst "2024-04-29T21:20:47.310-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE."}],
+                     "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE.",
                      :from :system,
                      :id 7,
                      :time #inst "2024-04-29T21:20:50.902-00:00"}
-           #:message{:content [#:msg-text{:string "PRODUCT"}],
+           #:message{:content "PRODUCT",
                      :from :surrogate,
                      :id 8,
                      :time #inst "2024-04-29T21:20:50.932-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n"}],
+                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n",
                      :from :system,
                      :id 9,
                      :time #inst "2024-04-29T21:20:53.100-00:00"}
-           #:message{:content [#:msg-text{:string "MAKE-TO-ORDER"}],
+           #:message{:content "MAKE-TO-ORDER",
                      :from :surrogate,
                      :id 10,
                      :time #inst "2024-04-29T21:20:53.117-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE."}],
+                     "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
                      :from :system,
                      :id 11,
                      :time #inst "2024-04-29T21:20:56.837-00:00"}
-           #:message{:content [#:msg-text{:string "OUR-FACILITY"}],
+           #:message{:content "OUR-FACILITY",
                      :from :surrogate,
                      :id 12,
                      :time #inst "2024-04-29T21:20:56.853-00:00"}],
