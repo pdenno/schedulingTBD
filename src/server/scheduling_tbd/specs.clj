@@ -38,20 +38,6 @@
 (s/def ::domain-problem  (s/keys :req [:problem/domain] :req-un[::goal ::state]))
 
 ;;; ------ These concern out-bound on ws/send-to-chat. -------------------
-(s/def :msg-text/string string?)
-(s/def :msg-link/uri string?)
-(s/def :msg-link/text string?)
-(s/def ::msg-text-elem (s/keys :req [:msg-text/string]))
-(s/def ::msg-link-elem (s/keys :req [:msg-link/uri :msg-link/text]))
-
-(s/def ::chat-msg-vec (s/or
-                       :something (s/and vector?
-                                         #(every? (fn [elem]
-                                                    (or (s/valid? ::msg-text-elem elem)
-                                                        (s/valid? ::msg-link-elem elem)))
-                                                  %))
-                       :nothing nil?))
-
 ;;; ToDo: I need to be able to push an update to the conversation!
 (defn outbound-dispatch-key? [x] (#{:run-long             ; diagnostic
                                     :clear-promise-keys   ; Server tells you to forget a promise.
@@ -63,4 +49,5 @@
                                     :tbd-says} x))
 (s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
 (s/def ::dispatch-key outbound-dispatch-key?)
-(s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key] :opt-un [::chat-msg-vec]))
+(s/def ::msg (s/and string? #(not-empty %)))
+(s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key ::msg]))

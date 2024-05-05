@@ -1,5 +1,5 @@
 [
-#:system{:default-project-id :craft-beer-brewery-scheduling, :name "SYSTEM"}
+#:system{:default-project-id :sur-fountain-pens, :name "SYSTEM"}
 
 #:project{:dir "/opt/scheduling/projects/craft-beer-brewery-scheduling",
           :id :craft-beer-brewery-scheduling,
@@ -44,5 +44,10 @@
 #:project{:dir "/opt/scheduling/projects/sur-injection-molds"
           :id :sur-injection-molds
           :name "Sur Injection Molds"}
+
+#:project{:dir "/opt/scheduling/projects/sur-fountain-pens"
+          :id :sur-fountain-pens
+          :name "Sur Fountain Penss"}
+
 
 ]

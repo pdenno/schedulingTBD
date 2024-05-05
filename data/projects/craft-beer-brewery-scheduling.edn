@@ -6,25 +6,17 @@
           :id :craft-beer-brewery-scheduling,
           :messages
           [#:message{:content
-                     [#:msg-text{:string
-                                 "Describe your scheduling problem in a few sentences or "}
-                      #:msg-link{:text
-                                 "learn more about how this works",
-                                 :uri
-                                 "http://localhost:3300/learn-more"}
-                      #:msg-text{:string "."}],
+                     "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.",
                      :from :system,
                      :id 0,
                      :time #inst "2023-11-11T10:12:49.625-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan."}],
+                     "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan.",
                      :from :human,
                      :id 1,
                      :time #inst "2023-11-11T10:12:49.648-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Great! We'll call your project 'craft-beer-brewery-scheduling'."}],
+                     "Great! We'll call your project 'craft-beer-brewery-scheduling'.",
                      :from :system,
                      :id 2,
                      :time #inst "2023-11-11T10:12:49.671-00:00"}],
@@ -33,6 +25,6 @@
           #:problem{:domain :process-interview,
                     :goal-string "(characterize-process ?proj)",
                     :state-string
-                    "#{(ongoing-discussion craft-beer) (proj-id craft-beer) (system-model craft-beer flow) (well-known-process craft-beer) (have-process-steps craft-beer) (have-process-durs craft-beer)  (have-process-ordering craft-beer)}"}}
+                    "#{(well-known-process craft-beer) (ongoing-discussion craft-beer) (have-process-steps craft-beer) (proj-id craft-beer) (system-model craft-beer flow) (have-process-durs craft-beer) (have-process-ordering craft-beer)}"}}
 
 ]

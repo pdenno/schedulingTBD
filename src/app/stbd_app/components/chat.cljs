@@ -1,82 +1,78 @@
 (ns stbd-app.components.chat
-  "This is used pop up a model indicating the URL at which the example can be retrieved."
+   "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
-   [applied-science.js-interop :as j]
+   ;;[applied-science.js-interop :as j]
+   [clojure.spec.alpha :as s]
    [helix.core                 :refer [defnc $]]
    [helix.hooks                :as hooks]
-   ["@mui/icons-material/Send$default" :as Send]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default"           :as ChatContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default"           :as MainContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default"                 :as Message]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default"   :as MessageHeader]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default"            :as MessageInput]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"             :as MessageList]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default"        :as MessageSeparator]
    ["@mui/material/Box$default" :as Box]
-   ["@mui/material/IconButton$default" :as IconButton]
-   ["@mui/material/LinearProgress$default" :as LinearProgress]
-   ["@mui/material/Link$default" :as Link]
    ["@mui/material/Stack$default" :as Stack]
-   ["react-chat-elements/dist/main"    :as rce]
+   ;;["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
+   [scheduling-tbd.util :refer [now]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.util       :refer [register-dispatch-fn]]
    [stbd-app.ws         :as ws]
-   [scheduling-tbd.util :as sutil :refer [timeout-info #_invalidate-timeout-info]]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
-;;; -------------------- This stuff maybe for later (its from RADmapper) ---------------------------
-(def progress-handle
-  "The thing that can be called by js/window.clearInterval to stop incrementing progress under js/window.setInterval."
-  (atom nil))
+;;; ----------------------------- formatting ChatScope messages --------------------------------------
+(def today "A string like 'Sat May 04 2024'" (-> (js/Date. (.now js/Date)) str (subs 0 15)))
 
-(def progress-atm "Percent allowed duration for eval-cell. 100% is a timeout." (atom 0))
+(defn inst2date "A string like 'Sat May 04 2024 12:33:14'" [inst] (-> (js/Date. inst) str (subs 0 25)))
 
-(defn compute-progress
-  "Use either progress-atm or timeout-info to return a percent done."
-  []
-  (let [now (.getTime (js/Date.))
-        info @timeout-info
-        timeout-at (:timeout-at info)
-        res (if (:valid? info)
-              (if (> now timeout-at)
-                100
-                (int (* 100.0  (- 1.0 (double (/ (- timeout-at now) (:max-millis info)))))))
-              (+ @progress-atm 2))]
-    res))
+(defn dyn-msg-date
+  "Return a string 'just now', '2 minutes ago' of if it was yesterday a string '[Day Mon dd year]'."
+  [instant]
+  (reset! diag instant)
+  (let [msg-num (inst-ms instant)
+        now-num (now)
+        diff (- now-num msg-num)]
+    (cond (< 60000  diff) "just now"
+          (> 60000  diff 120000)   "1 minute ago"
+          (> 120001 diff 3600000)  (str (quot diff 60000) " minutes ago")
+          :else (-> (inst2date instant) (subs 0 15)))))
 
+(defn prepend-surrogate-expert
+  "If the message is from surrogate expert, prepend the role."
+  [txt role]
+  (if (= role :surrogate)
+    (str "<b>Surrogate Expert</b><br/> " txt)
+    txt))
 
-;;; ------------------------- active stuff ------------------------------------
-(def item-keys "Atom for a unique :key of some UI object." (atom 0))
+(def key-atm (atom 0))
+(defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
 
-(defn make-link
-  "Create a MUI link. (Works for react-chat-elements too.)
-   Example usage: (make-link 'https://en.wikipedia.org/wiki/%22Hello,_World!%22_program' 'Hello, world!'})"
-  [href text]
-  ($ Link {:key (swap! item-keys inc)
-           :href href}
-     text))
-
-(def msg-style {:system    {:name "TBD"              :color "Red"   :position "left"}
-                :human     {:name "You"              :color "Green" :position "right"}
-                :surrogate {:name "Surrogate expert" :color "Green" :position "right"}})
-
-;;; ToDo: Remove this and it usages?
-(def msg-index "This might be a waste of time. WS won't' print the same message twice in a row."  (atom 0))
-
-(defn msg-vec2rce
-  "Rewrite the conversation DB-style messages to objects acceptable to the RCE component.
-   Does not do clj->js on it, however."
-  [msg-vec msg-owner]
-  (let [{:keys [name color position]} (get msg-style msg-owner)]
-    (-> {:type "text"}
-        (assoc :id (swap! msg-index inc))
-        (assoc :title name)
-        (assoc :titleColor color)
-        (assoc :position position)
-        (assoc :text (reduce (fn [res elem]
-                               (if (contains? elem :msg-link/uri)
-                                 (conj res (make-link (:msg-link/uri elem) (:msg-link/text elem)))
-                                 (conj res (:msg-text/string elem))))
-                             []
-                             msg-vec)))))
-
-(defn add-msg [msg-list msg]
-  (-> msg-list js->clj (conj msg) clj->js))
+(defn msgs2cs ; cs = ChatScope, https://chatscope.io/
+  "Create ChatScope structures (Message, MessageHeader, MessageSeparator, etc.) for a collection of messages."
+  [msgs]
+  (let [new-date (atom today)]
+    (reduce (fn [r msg]
+              (let [{:message/keys [content from time] :or {time (now)}} msg
+                    content (prepend-surrogate-expert content from)
+                    msg-date (-> time inst2date (subs 0 15))]
+                (as-> r ?r
+                  (if (= @new-date msg-date)
+                    ?r
+                    (do (reset! new-date msg-date)
+                        (conj ?r ($ MessageSeparator {:key (new-key)} msg-date))))
+                  (conj ?r ($ Message
+                              {:key (new-key)
+                               :model #js {:position "single" ; "single" "normal", "first" and "last"
+                                           :direction (if (= :system from) "incoming" "outgoing")
+                                           :type "html"
+                                           :payload content}}
+                              ;; ToDo Use dyn-msg-date here (currently broken).
+                              ($ MessageHeader {:sender (str "TBD, " (inst2date time))})))))) ;  They only appear for TBD, which is probably good!
+            []
+            msgs)))
 
 ;;; ========================= Component ===============================
 (defn make-resize-fns
@@ -85,31 +81,27 @@
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
 (defnc Chat [{:keys [chat-height conv-map proj-info]}]
-  (let [[msg-list set-msg-list]         (hooks/use-state (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js))
-        [progress set-progress]         (hooks/use-state 0)
-        [progressing? _set-progressing] (hooks/use-state false)
+  (let [[msg-list set-msg-list]         (hooks/use-state (-> conv-map :conv msgs2cs))
         [user-text     set-user-text]   (hooks/use-state "")                         ; Something the user said, plain text.
         [sur-text      set-sur-text]    (hooks/use-state "")                         ; Something said by a surrogate, different path of execution than user-text.
-        [tbd-text set-tbd-text]         (hooks/use-state "")                         ; Something the system said, a dispatch-obj with :msg-vec.
+        [tbd-text set-tbd-text]         (hooks/use-state "")                         ; Something the system said, a dispatch-obj with :msg.
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
-        input-ref                       (hooks/use-ref nil)
         resize-fns (make-resize-fns set-box-height)]
-    (log/info "proj-info = " proj-info)
     ;; ------------- Talk through web socket, initiated below.
     (hooks/use-effect :once ; These are used outside the component scope.
       (register-dispatch-fn :set-tbd-text set-tbd-text)
       (register-dispatch-fn :set-sur-text set-sur-text))
     (hooks/use-effect [conv-map] ; Put the entire conversation into the chat.
-      (set-msg-list (->> conv-map :conv (mapv #(msg-vec2rce (:message/content %) (:message/from %))) clj->js)))
+      (set-msg-list (-> conv-map :conv msgs2cs)))
     (hooks/use-effect [tbd-text]  ; Put TBD's (server's) message into the chat.
       (when (not-empty tbd-text)
-        (let [new-msg (-> tbd-text :msg-vec (msg-vec2rce :system) clj->js)]
-          (set-msg-list (add-msg msg-list new-msg)))))
+        (let [new-msg (msgs2cs [{:message/content tbd-text :message/from :system}])]
+          (set-msg-list (into msg-list new-msg)))))
     (hooks/use-effect [sur-text]  ; Put TBD's (server's) message into the chat.
       (when (not-empty sur-text)
-        (let [new-msg (-> sur-text :msg-vec (msg-vec2rce :surrogate) clj->js)]
-          (set-msg-list (add-msg msg-list new-msg)))))
-    (hooks/use-effect [user-text] ; Entered by user with arrow button. Send user-text to the server, and put it in the chat.
+        (let [new-msg (msgs2cs [{:message/content sur-text :message/from :surrogate}])]
+          (set-msg-list (into msg-list new-msg)))))
+    (hooks/use-effect [user-text] ; Entered by user with send button. Send user-text to the server, and put it in the chat.
        (when (not-empty user-text)
          (log/info "In user-text hook: user-text =" user-text)
          (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" user-text)
@@ -119,49 +111,34 @@
                           surrogate?     {:dispatch-key :start-surrogate :product product}
                           sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:project/id proj-info) :question q}
                           :else          {:dispatch-key :domain-expert-says :msg-text user-text :promise-keys @ws/pending-promise-keys})]
+           ;; ToDo: Human-injected questions, though some of them are stored, don't store the human-injected annotation.
+           ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.
+           (set-msg-list (into msg-list (msgs2cs [{:message/content (str "<b>[Human-injected question]</b><br/>"(or question q))
+                                                   :message/from :system}])))
            (log/info "Before ws/send-msg: msg =" msg)
            (ws/send-msg msg))))
-      ;; -------------- progress stuff (currentl not hooked up)
-    (hooks/use-effect [progressing?] ; This shows a progress bar while waiting for server response.
-       (reset! progress-atm 0)
-       (reset! progress-handle
-               (js/window.setInterval
-                (fn []
-                  (let [percent (compute-progress)]
-                    (if (or (>= progress 100) (not progressing?))
-                      (do (set-progress 0) (js/window.clearInterval @progress-handle))
-                      (set-progress (reset! progress-atm percent)))))
-                200)))
-      ;; ----------------- component UI structure.
-      ($ ShareUpDown
-         {:init-height chat-height
-          :share-fns resize-fns
-          :up
-          ($ Box {:sx ; This work!
-                  #js {:overflowY "auto"
-                       :display "flex"    ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
-                       :height box-height ; When set small enough, scroll bars appear.
-                       :flexDirection "column"
-                       :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
-             ($ rce/MessageList {:dataSource msg-list
-                                 ; :lockable true ; Does nothing.
-                                 :toBottomHeight "100%" ; https://detaysoft.github.io/docs-react-chat-elements/docs/messagelist I'd like it to scroll to the bottom.
-                                 :style #js {:alignItems "stretch" ; :style is helix for non-MUI things. I think(!)
-                                             :display "flex"}}))   ; "stretch" is just for horizontal??? ToDo: Everything here ignored?
-          :dn
-          ($ Stack {:direction "column"}
-                 ($ LinearProgress {:variant "determinate" :value progress})
-                 ($ Stack {:direction "row" :spacing "0px"}
-                    ($ rce/Input {:referance input-ref ; <==== Yes, rilly!
-                                  :value user-text
-                                  :min-width "800px"
-                                  :placeholder "Type here..."
-                                  :multiline true})
-                    ($ IconButton {:onClick #(when-let [iref (j/get input-ref :current)]
-                                               (when-let [text (not-empty (j/get iref :value))]
-                                                 (let [tbd-injection? (re-matches #"\s*SUR\?:(.*)" text)]
-                                                   (set-msg-list (add-msg msg-list (msg-vec2rce [{:msg-text/string text}]
-                                                                                                (if tbd-injection? :system :human)))))
-                                         (j/assoc! iref :value "")
-                                         (set-user-text text)))}
-                       ($ Send))))})))
+    ;; ----------------- component UI structure.
+    ($ ShareUpDown
+       {:init-height chat-height
+        :share-fns resize-fns
+        :up ($ Box {:sx ; This work!
+                    #js {:overflowY "auto"
+                         :display "flex"    ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
+                         :height box-height ; When set small enough, scroll bars appear.
+                         :flexDirection "column"
+                         :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
+               ;; https://github.com/chatscope/use-chat-example/blob/main/src/components/Chat.tsx (See expecially :onChange and :onSend.)
+               ($ MainContainer
+                  ($ ChatContainer
+                     ($ MessageList
+                        {#_#_:typingIndicator ($ TypingIndicator "TBD is typing") ; ToDo: insert this when it is useful.
+                         :style #js {:height "500px"}}
+                        msg-list))))
+        :dn ($ Stack {:direction "row" :spacing "0px"}
+               ($ MessageInput {:placeholder "Type message here...."
+                                :onSend #(do (log/info "onSend:" %)
+                                             (set-user-text %))
+                                :fancyScroll false
+                                ;;:autoFocus false ; ToDo: Needs investigation. I don't know what it does.
+                                ;; It sets height to whatever you'd like with px, but doesn't expand scroll bars. It doesn't respond to :height <percent> either.
+                                :style #js {#_#_:height "200px" :width "90%"}}))})))

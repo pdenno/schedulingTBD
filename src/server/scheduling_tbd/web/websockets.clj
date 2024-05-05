@@ -42,7 +42,7 @@
 (defn close-ws-channels [client-id]
   (when (contains? @socket-channels client-id)
     (let [{:keys [in out err]} (get @socket-channels client-id)]
-      ;(log/info "Closing websocket channels for inactive client" client-id (now))
+      (log/info "Closing websocket channels for inactive client" client-id (now))
       ;; Set exit? and send something so go loop will be jogged and see it.
       (swap! socket-channels #(assoc-in % [client-id :exit?] true))
       (go (>! in (str {:dispatch-key :stop}))) ; I don't see this (in diagnostics), though if you call inject-stop manually, you'll see it.
@@ -57,11 +57,15 @@
 
 (declare clear-promises! clear-keys select-promise)
 
+(def ping-dates  "Indexed by client-id, value is last time it pinged. Possibly only useful for diagnostics"
+  (atom {}))
+
 (defn forget-client
   "Close the channel and forget the promises associated with the client.
    This is typically from a client unmount."
   [client-id]
-  ;(log/info client-id "closes its websocket.")
+  (log/info client-id "closes its websocket.")
+  (swap! ping-dates #(dissoc % client-id))
   (close-ws-channels client-id)
   (clear-promises! client-id))
 
@@ -70,18 +74,15 @@
   [{:keys [client-id]}]
   (forget-client client-id))
 
-(def ping-dates  "Indexed by client-id, value is last time it pinged. Possibly only useful for diagnostics"
-  (atom {}))
-
 (defn ping-confirm
   "Create a ping confirmation for use in middle of a round-trip."
   [{:keys [client-id]}] ; also ping-id
-  ;(log/info "confirming ping.")
+  ;;(log/info "confirming ping.")
   (swap! ping-dates #(assoc % client-id (now)))
   ;; Returnin a confirm here doesn't change the situation for ws keep-alive, so we don't bother.
   ;; When it is useful to debugging the client, return it instead of nil (which isn't sent, of course).
-  #_{:dispatch-key :ping-confirm}
-  nil)
+  {:dispatch-key :ping-confirm}
+  #_nil)
 
 (defn ^:diag recent-client!
   "Return the client-id of the client that pinged most recently.
@@ -152,7 +153,7 @@
       ;; I think there is still value in looking for inactive sockets and closing them, but I probably should implement
       ;; alive? because the client will have to make another websocke request otherwise, and it doesn't seem to notice
       ;; that the sever isn't listening to it!
-      #_(log/info "Exiting dispatching loop:" client-id))))
+      (log/info "Exiting dispatching loop:" client-id))))
 
 (defn establish-websocket-handler
   "Handler for http:/ws request. Returns nothing interesting.
@@ -162,8 +163,8 @@
    In that case, the old channel will eventually get destroyed by close-inactive-channels.
    Returns a map with value for key :ring.websocket/listener."
   [request]
-  ;(log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
-  (close-inactive-channels) ; ToDo: This takes time. Fix it.
+  (log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
+  (future (close-inactive-channels))
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]
       (error-listener client-id)   ; This and next are go loops,
@@ -262,9 +263,9 @@
 (defn send-to-chat
   "Send the argument message-vec to the current project (or some other destination if a client-id is provided.
    Return a promise that is resolved when the domain-expert responds to the message, by whatever means (http or ws).
-     msg-vec is is a vector of ::spec/msg-text-elem and :spec/msg-link-elem. See specs.cljs."
-  [{:keys [client-id dispatch-key msg-vec] :or {dispatch-key :tbd-says} :as content}]
-  (s/assert ::spec/chat-msg-vec msg-vec)
+     msg is a string."
+  [{:keys [client-id dispatch-key msg] :or {dispatch-key :tbd-says} :as content}]
+  (assert (and (string? msg) (not-empty msg)))
   (let [promise? (if (contains? content :promise?) (:promise? content) (use-promise? dispatch-key))
         content (cond-> content ; Just so that we can uses s/assert below!
                   (not (contains? content :dispatch-key))  (assoc :dispatch-key :tbd-says))]

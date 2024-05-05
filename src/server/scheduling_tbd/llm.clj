@@ -9,7 +9,8 @@
   (:require
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
-   [scheduling-tbd.sutil         :refer [api-credentials llm-provider]]
+   [scheduling-tbd.sutil         :refer [api-credentials llm-provider markdown2html]]
+   [scheduling-tbd.util          :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
    [clojure.pprint               :refer [cl-format]]
@@ -61,17 +62,22 @@
   "User can ask anything outside of session by starting the text with 'LLM:.
    This is a blocking call since the caller is a websocket thread and it responds with ws/send-to-chat."
   [{:keys [client-id question]}]
+  (assert (string? client-id))
+  (assert (string? question))
   (log/info "llm-directly:" question)
   (let [chat-args {:client-id client-id :dispatch-key :tbd-says :promise? false}]
     (try
-      (let [res (query-llm [{:role "system"    :content "You are a helpful assistant."}
-                            {:role "user"      :content question}])]
+      (let [res (-> (query-llm [{:role "system"    :content "You are a helpful assistant."}
+                                {:role "user"      :content question}])
+                    markdown2html)]
         (if (nil? res)
           (throw (ex-info "Timeout or other exception." {}))
-          (ws/send-to-chat (assoc chat-args :msg-vec [{:msg-text/string res}]))))
+          (ws/send-to-chat (-> chat-args
+                               (assoc :msg res)
+                               (assoc :time (now))))))
       (catch Exception e
         (log/error "Failure in llm-directly:" e)
-        (ws/send-to-chat (assoc chat-args :msg-vec [{:msg-text/string "There was a problem answering that."}]))))))
+        (ws/send-to-chat (assoc chat-args :msg "There was a problem answering that."))))))
 
 ;;; ------------------------------- naming variables --------------------------------------
 (def good-var-partial
@@ -216,7 +222,7 @@
         (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text})),
 
               (and (= "completed" (:status r))
-                   (not-empty response))              response,
+                   (not-empty response))              (markdown2html response),
 
               (and (= "completed" (:status r))
                    (empty? response))                 (throw (ex-info "query-on-thread empty response:" {:status (:status r)})),

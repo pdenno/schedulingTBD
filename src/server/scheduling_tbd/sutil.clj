@@ -2,6 +2,7 @@
   "Server utilities."
   (:require
    [clojure.core.unify      :as uni]
+   [clojure.string          :as str]
    [datahike.api            :as d]
    [datahike.pull-api       :as dp]
    [taoensso.timbre         :as log]))
@@ -182,23 +183,18 @@
 (defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
 (defn get-domain [id] (get @planning-domains id))
 
-(defn str2msg-vec
-  [s]
-  (assert (string? s))
-  [{:msg-text/string s}])
-
 (defn error-for-chat
-  "Create a msg-vec to explain in the chat the error we experienced."
+  "Create a string to explain in the chat the error we experienced."
   ([s] (error-for-chat s nil))
   ([s err]
    (if (instance? Throwable err)
      (let [m (Throwable->map err)]
        (if-let [msg (-> m :via first :message)]
          (if-let [data (:data m)]
-           (into (str2msg-vec (str s ": " msg))  (str2msg-vec (str "\ndata:" data)))
-           (str2msg-vec (str s ": " msg)))
-         (str2msg-vec s)))
-     (str2msg-vec s))))
+           (str ": " msg  "\ndata:" data)
+           (str s ": " msg))
+         s))
+     s)))
 
 (defn yes-no-unknown
   "Return :yes :no or :unknown based on lexical analysis of the argument answer text."
@@ -206,3 +202,16 @@
   (cond (or (= s "yes") (= s "Yes") (= s "Yes.") (re-matches #"(?i)\s*yes\s*" s)) :yes
         (or (= s "no")  (= s "No")  (= s "No.")  (re-matches #"(?i)\s*no\s*"  s)) :no
         :else :unknown))
+
+(defn markdown2html
+  "Do heuristic light modification to the argument text to make it more like HTML.
+   Specifically:
+     - Change: **bold** to <b>bold</b>.
+   This is mostly for use with OpenAI tools, which give bold some things with markdown."
+  [s]
+  (let [lines (for [line (str/split-lines s)]
+                (let [[success pre bold post] (re-matches #"(.*)\*\*([\w\d:]+)\*\*(.*)" line)] ; ToDo: I can't put \- in the bold stuff.
+                  (if success
+                    (str pre "<b>" bold "</b>" post)
+                    s)))]
+    (apply str lines)))

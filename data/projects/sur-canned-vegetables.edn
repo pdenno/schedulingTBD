@@ -2,37 +2,84 @@
 #:project{:id :sur-canned-vegetables,
           :messages
           [#:message{:content
-                     [#:msg-text{:string "Describe your most significant scheduling problem in a few sentences"} #:msg-text{:string "."}],
+                     "Describe your most significant scheduling problem in a few sentences.",
                      :from :system,
                      :id 1,
-                     :time #inst "2024-04-25T23:38:41.004-00:00"}
+                     :time #inst "2024-04-30T22:42:23.021-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Our most significant scheduling problem involves coordinating the harvesting, transportation, and processing phases of our canned vegetable production. The challenge arises from the variability in harvest times due to weather conditions, the availability of transportation, and the capacity constraints of our processing facilities. We need a scheduling system that can dynamically adjust to these fluctuating factors to ensure a continuous supply of products without overburdening any part of our supply chain. This system must also account for the shelf life of different vegetables to prioritize processing based on perishability."}],
+                     "Our most significant scheduling problem involves the coordination of sourcing raw materials, aligning production processes, and managing labor shifts to ensure we meet market demands efficiently. We face challenges in predicting the exact quantities of raw materials needed and their arrival times, leading to either shortages or excesses. Additionally, aligning the production process timing with the availability of these materials and labor shifts—while minimizing downtime and maximizing output—poses a complex scheduling puzzle. This becomes especially difficult during peak seasons when demand spikes, requiring a dynamic and adaptable scheduling system.",
                      :from :surrogate,
                      :id 2,
-                     :time #inst "2024-04-25T23:38:41.024-00:00"}
-           #:message{:content [#:msg-text{:string "Great, we'll call your project SUR Canned Vegetables."}],
+                     :time #inst "2024-04-30T22:42:23.041-00:00"}
+           #:message{:content
+                     "Great, we'll call your project SUR Canned Vegetables.",
                      :from :system,
                      :id 3,
-                     :time #inst "2024-04-25T23:38:41.048-00:00"}
+                     :time #inst "2024-04-30T22:42:23.062-00:00"}
            #:message{:content
-                     [#:msg-text{:string
-                                 "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product."}],
+                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
                      :from :system,
                      :id 4,
-                     :time #inst "2024-04-25T23:38:41.074-00:00"}],
+                     :time #inst "2024-04-30T22:42:23.082-00:00"}
+           #:message{:content
+                     "Please briefly describe your production processes?",
+                     :from :system,
+                     :id 5,
+                     :time #inst "2024-04-30T22:42:33.762-00:00"}
+           #:message{:content
+                     "Our production processes involve several key steps:\n\n1. **Raw Material Reception**: We receive raw vegetables from suppliers, which are then inspected for quality upon arrival.\n2. **Cleaning and Sorting**: After inspection, the vegetables are washed and sorted based on quality and size.\n3. **Preparation**: Depending on the vegetable, this step might include peeling, slicing, or dicing.\n4. **Blanching**: Vegetables are briefly cooked in boiling water or steam to inactivate enzymes, preserve color, nutrients, and flavor.\n5. **Filling**: The prepared vegetables are then filled into cans along with water, brine, or sauce.\n6. **Sealing**: Cans are sealed to prevent contamination and preserve the contents.\n7. **Sterilization**: The sealed cans go through a sterilization process in pressure cookers or retorts to kill any remaining bacteria and extend shelf life.\n8. **Cooling and Drying**: After sterilization, the cans are cooled and dried to prevent corrosion.\n9. **Labeling and Packaging**: Finally, the cans are labeled with product information and packaged for distribution.\n\nThis process involves a complex interaction between various departments and resources, requiring careful scheduling to ensure efficiency and product quality.",
+                     :from :surrogate,
+                     :id 6,
+                     :time #inst "2024-04-30T22:42:33.783-00:00"}
+           #:message{:content
+                     "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE.",
+                     :from :system,
+                     :id 7,
+                     :time #inst "2024-04-30T22:42:36.085-00:00"}
+           #:message{:content "PRODUCT",
+                     :from :surrogate,
+                     :id 8,
+                     :time #inst "2024-04-30T22:42:36.109-00:00"}
+           #:message{:content
+                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n",
+                     :from :system,
+                     :id 9,
+                     :time #inst "2024-04-30T22:42:38.370-00:00"}
+           #:message{:content "MAKE-TO-STOCK",
+                     :from :surrogate,
+                     :id 10,
+                     :time #inst "2024-04-30T22:42:38.388-00:00"}
+           #:message{:content
+                     "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                     :from :system,
+                     :id 11,
+                     :time #inst "2024-04-30T22:42:40.977-00:00"}
+           #:message{:content "OUR-FACILITY",
+                     :from :surrogate,
+                     :id 12,
+                     :time #inst "2024-04-30T22:42:40.997-00:00"}
+           #:message{:content
+                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources.\nA JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements.\nIs the process you described more like a flow-shop or a job-shop?\nRespond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                     :from :system,
+                     :id 13,
+                     :time #inst "2024-04-30T22:42:44.869-00:00"}
+           #:message{:content "FLOW-SHOP",
+                     :from :surrogate,
+                     :id 14,
+                     :time #inst "2024-04-30T22:42:44.892-00:00"}],
           :name "SUR Canned Vegetables",
           :planning-problem
           #:problem{:domain :process-interview,
-                    :goal-string "(characterize-process sur-canned-vegetables)",
+                    :goal-string
+                    "(characterize-process sur-canned-vegetables)",
                     :state-string
-                    "#{(cites-raw-material-challenge sur-canned-vegetables) (well-known-process sur-canned-vegetables) (proj-id sur-canned-vegetables) (ongoing-discussion sur-canned-vegetables) (surrogate sur-canned-vegetables) (have-process-steps sur-canned-vegetables) (proj-name \"SUR Canned Vegetables\")}"},
+                    "#{(cites-raw-material-challenge sur-canned-vegetables) (provides-product sur-canned-vegetables) (proj-id sur-canned-vegetables) (flow-shop sur-canned-vegetables) (has-production-facility sur-canned-vegetables) (ongoing-discussion sur-canned-vegetables) (surrogate sur-canned-vegetables) (production-mode sur-canned-vegetables make-to-stock) (proj-name \"SUR Canned Vegetables\")}"},
           :surrogate
-          #:surrogate{:assistant-id "asst_0TglI0PmJ9ADXmED6AdoH0Kt",
+          #:surrogate{:assistant-id "asst_z5xN8ANeBJQ1BOggCflZJxif",
                       :id :sur-canned-vegetables,
                       :subject-of-expertise "canned vegetables",
                       :system-instruction
-                      "\n   You manage a company that makes canned vegetables.\n   You are an expert in the production of canned vegetables and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_MdHV2xkVOk5a4bm2WrWgF49t"}}
+                      "You manage a company that makes canned vegetables.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_bp3uFfimBAGcld7wmgortFPU"}}
+
 ]

@@ -60,7 +60,7 @@
                       :onChange (fn [_e v]
                                   (let [proj-str (j/get-in v [:props :value])
                                         proj (some #(when (= proj-str (:menu-text %)) %) proj-infos+)]
-                                    ((get-dispatch-fn :load-proj) proj)))}
+                                    ((get-dispatch-fn :core-load-proj) proj)))}
               (for [p (map :menu-text proj-infos+)]
                 ($ MenuItem {:key p :value p} p)))))))
 

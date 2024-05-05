@@ -12,7 +12,7 @@
    ["@mui/material/Typography$default" :as Typography]
    [promesa.core :as p]
    ["react-dom/client"          :as react-dom]
-   [scheduling-tbd.util         :as sutil]
+   [scheduling-tbd.util         :refer [config-log]]
    [stbd-app.components.chat    :as chat]
    [stbd-app.components.editor  :as editor :refer [Editor]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
@@ -24,10 +24,6 @@
 
 (def ^:diag diag (atom {}))
 
-(def progress-handle
-  "The thing that can be called by js/window.clearInterval to stop incrementing progress under js/window.setInterval."
-  (atom nil))
-(def progress-atm "Percent allowed duration for eval-cell. 100% is a timeout." (atom 0))
 
 ;;; ToDo: So many problems with this. (Does ANY of it work?).
 ;;; Example of using style in helix (a gist): https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
@@ -72,7 +68,7 @@
                       (catch js/Error e {:failure (str "Error: " (.-message e))}))]
       result)))
 
-(j/defn eval-cell
+#_(j/defn eval-cell
   "Run <whatever process> on the string retrieved from the editor's state.
    Apply the result to the argument function on-result, which was is the set-result function set up by hooks/use-state.
    Similarly, on-progress is the progress bar completion value set up by hooks/use-state [progress set-progress].
@@ -85,25 +81,8 @@
     (str ?res)
     #_(run-code ?res)
     (-> ?res
-        (p/then #(-> % str on-result-fn)) ; for side-effect
-        (p/catch (fn [e]
-                   (js/window.clearInterval @progress-handle)
-                   (log/info "Error in eval-cell")
-                   (-> e str on-result-fn)))
-        (p/finally (fn [_]
-                     (progress-bool-fn false)
-                     (log/info "clear handler")
-                     (js/window.clearInterval @progress-handle)))))
+        (p/then #(-> % str on-result-fn)))) ; for side-effect
   nil)
-
-;;; ---------- Codemirror stuff from RADmapper; not used yet -------------------
-(defn add-result-action
-  "Return the keymap updated with the partial for :on-result, I think!" ;<===
-  [{:keys [on-result progress-bool]}]
-  (.of view/keymap
-       (j/lit
-        [{:key "Mod-Enter"
-          :run (partial eval-cell on-result progress-bool)}])))
 
 (def top-share-fns
   "These, for convenience, keep track of what methods need be called on resizing."
@@ -112,13 +91,6 @@
                   :on-resize-dn    (partial editor/resize "result")
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")
                   :on-stop-drag-dn (partial editor/resize-finish "result")}})
-
-;;; ToDo: Needs work.
-(defn compute-progress
-  "Use either progress-atm or timeout-info to return a percent done."
-  []
-  (let [#_#_now (.getTime (js/Date.))]
-    (+ @progress-atm 2)))
 
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
@@ -216,7 +188,7 @@
 
 ;;; --------------- https://code.thheller.com/blog/shadow-cljs/2019/08/25/hot-reload-in-clojurescript.html ----------------------
 (defn ^{:after-load true, :dev/after-load true} start []
-  (sutil/config-log :info)
+  (config-log :info)
   (log/info "Logging level for the client:"
             (->> log/*config*
                  :min-level

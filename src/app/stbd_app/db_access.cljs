@@ -38,6 +38,8 @@
                                                     {:status status :status-text status-text})))})
     prom))
 
+;;; This is like :core-load-proj except that it doesn't do (ws/send-msg {:dispatch-key :resume-conversation...}).
+;;; It is used when, for example, you start a surrogate.
 (register-dispatch-fn
  :request-conversation
  (fn [obj] (let [prom (get-conversation (:pid obj))]
