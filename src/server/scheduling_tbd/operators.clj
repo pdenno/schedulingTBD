@@ -113,7 +113,6 @@
    Returns the new state."
   [old-state task bindings]
   (assert (every? #(s/valid? ::spec/positive-proposition %) old-state))
-  (reset! diag [old-state task bindings])
   (let [a-list (mapv #(uni/subst % bindings) (:operator/a-list task))
         d-list (mapv #(uni/subst % bindings) (:operator/d-list task))]
     (cond-> old-state
@@ -196,7 +195,7 @@
 ;;; (op/db-action (assoc op/example :client-id (ws/recent-client!)))
 (defaction :!initial-question [{:keys [state response client-id agent-msg] :as _obj}]
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
-  ;(reset! diag _obj)
+  (reset! diag _obj)
   (let [surrogate? (surrogate? state)
         analysis-state (dom/project-name-analysis response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
     (when-not surrogate? (make-human-project analysis-state))

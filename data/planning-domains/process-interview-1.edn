@@ -30,10 +30,10 @@
                 ;; ====== (ongoing-discussion ?proj) ===============================
                 {:method/head (get-process-steps ?proj)
                  :method/rhsides [{:method/case-name "well-known"
-                                   :method/preconds [(well-known-process ?proj)]
+                                   :method/preconds [(flow-shop ?proj)]
                                    :method/task-list [(!yes-no-process-steps ?proj)]}
-                                  {:method/case-name "not-well-known"
-                                   :method/preconds [(not (well-known-process ?proj))]
+                                  #_{:method/case-name "not-well-known"
+                                   :method/preconds [(flow-shop ?proj) (not (well-known-process ?proj))]
                                    :method/task-list [(!query-process-steps ?proj)]}]}
 
                 ;; (!yes-no-process-steps ?proj)

@@ -21,11 +21,10 @@
   "A map from keys to functions used to call responses from clients."
   (atom nil))
 
-(defn get-dispatch-fn [k] (-> @dispatch-table (get k)))
+(defn lookup-fn [k] (-> @dispatch-table (get k)))
 
-(defn register-dispatch-fn
+(defn register-fn
   "Add a function to the websocket dispatch table."
   [k func]
-  (assert (fn? func))
   (swap! dispatch-table #(assoc % k func))
   #_(log/info "Registered function for websocket:" k))

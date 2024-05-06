@@ -379,10 +379,11 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
      (if (string? answer)
        (do (when write?
              (db/add-msg pid :system query)
-             (db/add-msg pid :surrogate answer))
+             (db/add-msg pid :surrogate answer :process-description))
            (doseq [f [product-vs-service production-mode facility-vs-site]]
              (let [{:keys [query answer preds]} (f aid tid)]
                (swap! new-props into (map #(uni/subst % proj-bind) preds))
+               (Thread/sleep 1000) ; ToDo: I'm guessing here. There might be problems in polling OpenAI to quickly???
                (when write?
                  (db/add-msg pid :system query)
                  (db/add-msg pid :surrogate answer))))

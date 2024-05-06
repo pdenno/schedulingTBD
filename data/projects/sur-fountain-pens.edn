@@ -79,7 +79,44 @@
                      "Yes, we do produce fountain pen bodies made out of metal, including materials like stainless steel, brass, and sometimes precious metals for higher-end models. This involves precise machining and finishing to achieve the desired quality and aesthetics.",
                      :from :surrogate,
                      :id 17,
-                     :time #inst "2024-04-30T15:50:32.588-00:00"}],
+                     :time #inst "2024-04-30T15:50:32.588-00:00"}
+           #:message{:content " Do you make ball point pens?",
+                     :from :system,
+                     :id 18,
+                     :time #inst "2024-05-05T00:07:31.682-00:00"}
+           #:message{:content
+                     "No, we exclusively manufacture fountain pens. Our expertise and production processes are tailored specifically to the creation of high-quality fountain pens.",
+                     :from :surrogate,
+                     :id 19,
+                     :time #inst "2024-05-05T00:07:31.704-00:00"}
+           #:message{:content " Do you every buy nibs from suppliers?",
+                     :from :system,
+                     :id 20,
+                     :time #inst "2024-05-05T00:11:25.593-00:00"}
+           #:message{:content
+                     "Yes, for certain models and to supplement our range, we do buy nibs from suppliers. This allows us to offer a wider variety of nib options and styles to our customers, ensuring quality and diversity in our product line.",
+                     :from :surrogate,
+                     :id 21,
+                     :time #inst "2024-05-05T00:11:25.619-00:00"}
+           #:message{:content
+                     " Are you ever afraid the market for your products might dry up?",
+                     :from :system,
+                     :id 22,
+                     :time #inst "2024-05-05T00:14:20.580-00:00"}
+           #:message{:content
+                     "Yes, market dynamics are a concern. The fountain pen market is niche, with fluctuations in demand influenced by trends, digital technology adoption, and consumer preferences. We continuously monitor the market and adapt our strategies—such as product innovation, marketing, and exploring new markets—to ensure sustainability and growth despite potential shifts in demand.",
+                     :from :surrogate,
+                     :id 23,
+                     :time #inst "2024-05-05T00:14:20.650-00:00"}
+           #:message{:content " Do you do any injection molding?",
+                     :from :system,
+                     :id 24,
+                     :time #inst "2024-05-06T16:37:56.410-00:00"}
+           #:message{:content
+                     "No, our production processes do not involve injection molding. Our focus is primarily on machining, assembly, and finishing techniques suitable for fountain pens, which typically don't require the injection molding process.",
+                     :from :surrogate,
+                     :id 25,
+                     :time #inst "2024-05-06T16:37:56.431-00:00"}],
           :name "SUR Fountain Pens",
           :planning-problem
           #:problem{:domain :process-interview,

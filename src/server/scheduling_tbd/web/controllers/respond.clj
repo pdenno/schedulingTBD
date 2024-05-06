@@ -1,12 +1,9 @@
 (ns scheduling-tbd.web.controllers.respond
   (:require
    [clojure.walk             :as walk :refer [keywordize-keys]]
-   [promesa.core             :as p]
    [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
-   [scheduling-tbd.planner   :as plan]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
-   [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log])
   (:import
    [java.util Date]))

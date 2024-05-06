@@ -8,7 +8,7 @@
    ["@mui/material/Select$default"      :as Select]
    ;;["@mui/material/styles"              :as styles :refer [createTheme themeOptions ThemeProvider]] ; WIP
    [helix.core         :as helix :refer [defnc $]]
-   [stbd-app.util      :refer [get-dispatch-fn]]
+   [stbd-app.util      :refer [lookup-fn]]
    #_[taoensso.timbre    :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
@@ -60,7 +60,7 @@
                       :onChange (fn [_e v]
                                   (let [proj-str (j/get-in v [:props :value])
                                         proj (some #(when (= proj-str (:menu-text %)) %) proj-infos+)]
-                                    ((get-dispatch-fn :core-load-proj) proj)))}
+                                    ((lookup-fn :core-load-proj) proj)))}
               (for [p (map :menu-text proj-infos+)]
                 ($ MenuItem {:key p :value p} p)))))))
 

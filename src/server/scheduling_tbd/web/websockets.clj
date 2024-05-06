@@ -45,7 +45,7 @@
       (log/info "Closing websocket channels for inactive client" client-id (now))
       ;; Set exit? and send something so go loop will be jogged and see it.
       (swap! socket-channels #(assoc-in % [client-id :exit?] true))
-      (go (>! in (str {:dispatch-key :stop}))) ; I don't see this (in diagnostics), though if you call inject-stop manually, you'll see it.
+      ;;(go (>! in (str {:dispatch-key :stop}))) ; <===================================================== ToDo: Needs investigation.
       ;; Keep delay high to be sure :stop is seen. (p/submit! is probably helpful here; promises are executed async an out of order.
       (-> (p/delay 3000)
           (p/then (fn [_]
@@ -140,6 +140,7 @@
       (loop []
         (when-let [msg (<! in)] ; Listen for messages.
           (let [msg (edn/read-string msg)]
+            (when-not (= :ping (:dispatch-key msg)) (log/info "Received message:"  msg))
             (if (= :stop (:dispatch-key msg))
               (swap! socket-channels #(assoc-in % [client-id :exit?] true))
               (let [prom (px/submit! (fn [] (dispatch msg)))]
@@ -261,22 +262,22 @@
   (#{:tbd-says} dispatch-key))
 
 (defn send-to-chat
-  "Send the argument message-vec to the current project (or some other destination if a client-id is provided.
-   Return a promise that is resolved when the domain-expert responds to the message, by whatever means (http or ws).
-     msg is a string."
-  [{:keys [client-id dispatch-key msg] :or {dispatch-key :tbd-says} :as content}]
-  (assert (and (string? msg) (not-empty msg)))
+  "Send the argument structure to the client.
+   If :promise?=true, return a promise that is resolved when the domain-expert responds to the message.
+   The only key of the argument map that is required is :client-id. :dispatch-key defaults to :tbd-says.
+   :promise? defaults to true only when the dispatch key is :tbd-says."
+  [{:keys [client-id dispatch-key] :or {dispatch-key :tbd-says} :as content}]
   (let [promise? (if (contains? content :promise?) (:promise? content) (use-promise? dispatch-key))
         content (cond-> content ; Just so that we can uses s/assert below!
                   (not (contains? content :dispatch-key))  (assoc :dispatch-key :tbd-says))]
     (s/assert ::spec/chat-msg-obj content)
-    (log/info "send-to-chat: content =" content)
     (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
     (if-let [out (->> client-id (get @socket-channels) :out)]
       (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
             msg-obj (cond-> content
                       p-key               (assoc :p-key p-key)
                       true                (assoc :timestamp (now)))]
+        (log/info "send-to-chat: msg-obj =" msg-obj)
         (go (>! out (str msg-obj)))
         prom)
       (log/error "Could not find out async channel for client" client-id))))
@@ -295,7 +296,8 @@
 (defn client-confirms-alive
   "Because the ws go loop can drop, we use this as part of reconnecting."
   [{:keys [client-id]}]
-  (swap! socket-channels #(assoc-in % [client-id :alive] true)))
+  (swap! socket-channels #(assoc-in % [client-id :alive] true))
+  nil)
 
 (defn init-dispatch-table!
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets.
