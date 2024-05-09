@@ -47,15 +47,18 @@
    To eliminate confusion and need for back pointers, each project has its own db."
   {
    ;; ---------------------- message
+   :message/content
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "msg-text and msg-link objects."}
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
    :message/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
         :doc "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, which aren't stored, some values can be skipped."}
-   :message/content
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "msg-text and msg-link objects."}
+   :message/tags
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "Optional keywords used to classify the message."}
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
@@ -307,7 +310,7 @@
   #{:project/messages :message/id :message/from :message/content :message/time})
 
 (defn get-messages
-  "For the argument project (pid) return messages sorted by their :message/id."
+  "For the argument project (pid) return a vector of messages sorted by their :message/id."
   [pid]
   (when-let [eid (project-exists? pid)]
     (->> (resolve-db-id {:db/id eid}
@@ -493,14 +496,15 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
-  [pid from msg]
+  [pid from msg & tags]
   (assert (#{:system :human :surrogate} from))
   (assert (string? msg))
-  (log/info "add-msg: pid =" pid "msg =" msg)
+  ;(log/info "add-msg: pid =" pid "msg =" msg)
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid))]
       (d/transact conn {:tx-data [{:db/id (project-exists? pid)
-                                   :project/messages #:message{:id msg-id :from from :time (now) :content msg}}]}))
+                                   :project/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
+                                                       (not-empty tags) (assoc :message/tags (vec tags)))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn add-project

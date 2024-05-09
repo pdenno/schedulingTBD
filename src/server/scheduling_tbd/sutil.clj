@@ -210,8 +210,13 @@
    This is mostly for use with OpenAI tools, which give bold some things with markdown."
   [s]
   (let [lines (for [line (str/split-lines s)]
-                (let [[success pre bold post] (re-matches #"(.*)\*\*([\w\d:]+)\*\*(.*)" line)] ; ToDo: I can't put \- in the bold stuff.
+                (let [[success pre bold post] (re-matches #"(.*)\*\*(.+)\*\*(.*)" line)] ; ToDo: I can't put \- in the bold stuff.
                   (if success
-                    (str pre "<b>" bold "</b>" post)
-                    s)))]
-    (apply str lines)))
+                    (str pre "<b>" bold "</b>" post "\n")
+                    (str line "\n")))) ; ToDo: interpose!
+        last (last lines)
+        others (butlast lines)]
+    (str (apply str others)
+         (subs last 0 (dec (count last))))))
+
+(defn string2sym [s] (-> s str/lower-case (str/replace #"\s+" "-") symbol))

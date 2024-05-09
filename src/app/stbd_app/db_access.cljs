@@ -3,7 +3,7 @@
   (:require
    [ajax.core        :refer [GET]]
    [promesa.core    :as p]
-   [stbd-app.util   :refer [register-dispatch-fn get-dispatch-fn]]
+   [stbd-app.util   :refer [register-fn lookup-fn]]
    [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
@@ -40,9 +40,9 @@
 
 ;;; This is like :core-load-proj except that it doesn't do (ws/send-msg {:dispatch-key :resume-conversation...}).
 ;;; It is used when, for example, you start a surrogate.
-(register-dispatch-fn
+(register-fn
  :request-conversation
  (fn [obj] (let [prom (get-conversation (:pid obj))]
              (-> prom
-                 (p/then (fn [resp] ((get-dispatch-fn :set-conversation) resp) resp))
-                 (p/then (fn [resp] ((get-dispatch-fn :set-code) (:code resp)) resp))))))
+                 (p/then (fn [resp] ((lookup-fn :set-conversation) resp) resp))
+                 (p/then (fn [resp] ((lookup-fn :set-code) (:code resp)) resp))))))

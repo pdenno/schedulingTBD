@@ -3,7 +3,7 @@
   (:require
    [clojure.edn     :as edn]
    [promesa.core    :as p]
-   [stbd-app.util   :as util :refer [dispatch-table get-dispatch-fn register-dispatch-fn]]
+   [stbd-app.util   :as util :refer [dispatch-table lookup-fn register-fn]]
    [taoensso.timbre :as log  :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
@@ -46,25 +46,25 @@
 (defn recv-msg-type? [k] (contains? @dispatch-table k))
 
 ;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, and maybe other places.
-(register-dispatch-fn :clear-promise-keys    (fn [obj] (-> obj :promis-keys clear-promise-keys!)))
-(register-dispatch-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
-(register-dispatch-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
-(register-dispatch-fn :load-proj             (fn [{:keys [new-proj-map]}] ((get-dispatch-fn :core-load-proj) new-proj-map)))
-(register-dispatch-fn :tbd-says              (fn [{:keys [p-key msg]}]
+(register-fn :clear-promise-keys    (fn [obj] (-> obj :promis-keys clear-promise-keys!)))
+(register-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
+(register-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
+(register-fn :load-proj             (fn [{:keys [new-proj-map]}] ((lookup-fn :core-load-proj) new-proj-map)))
+(register-fn :tbd-says              (fn [{:keys [p-key msg]}]
                                                (when p-key (remember-promise p-key))
                                                (log/info "tbd-says msg:" msg)
-                                               ((get-dispatch-fn :set-tbd-text) msg)))
-(register-dispatch-fn :sur-says              (fn [{:keys [p-key msg]}]
+                                               ((lookup-fn :set-tbd-text) msg)))
+(register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                                (when p-key (remember-promise p-key))
                                                (log/info "sur-says msg:" msg)
-                                               ((get-dispatch-fn :set-sur-text) msg)))
+                                               ((lookup-fn :set-sur-text) msg)))
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
   [{:keys [dispatch-key] :as msg}]
   (if-not (recv-msg-type? dispatch-key)
     (log/error "Invalid message type from server:" msg)
-    ((get-dispatch-fn dispatch-key) msg)))
+    ((lookup-fn dispatch-key) msg)))
 
 (def ping-id (atom 0))
 (defn ping!
@@ -87,7 +87,6 @@
         (set! (.-onmessage chan)
               (fn [event]       ;; ToDo: Consider transit rather then edn/read-string.
                 (try (let [data (.-data event)]
-                       (log/info "event data=" data)
                        (when (not-empty data) (-> data edn/read-string dispatch-msg)))
                      (catch :default e
                        (reset! error-info {:event event :error e})
@@ -120,7 +119,7 @@
   [prom]
   (log/info "Call to reconnect!")
   (when-not @reconnecting?
-    (log/info "Starting interval functions.")
+    ;(log/info "Starting interval functions.")
     (when-let [proc @check-process] (js/window.clearInterval proc))
     (reset! check-process (js/window.setInterval (fn [] (check-channel prom)) 1000))
     (reset! reconnecting? true)))

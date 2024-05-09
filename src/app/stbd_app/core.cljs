@@ -18,7 +18,7 @@
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.db-access :as dba]
-   [stbd-app.util   :as util :refer [register-dispatch-fn]]
+   [stbd-app.util   :as util :refer [register-fn lookup-fn]]
    [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
@@ -104,19 +104,20 @@
     (hooks/use-effect :once
       (log/info "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
-      (register-dispatch-fn :set-conversation set-conversation)
-      (register-dispatch-fn :set-code set-code)
-      (register-dispatch-fn :core-load-proj
+      (register-fn :set-conversation set-conversation)
+      (register-fn :set-code set-code)
+      (register-fn :core-load-proj ; This is called by project.cljs when you change projects, and also below.
               (fn [p] ; This is a map with two keys: :project/id :project/name (a proj-info element).
-                (when-not (= p proj)                                 ; In that case, it will have updated the conversation, with the "Great,...".
-                (set-proj p)
-                (set-conversation {:conv [] :conf-for proj})
-                (-> p
-                    :project/id
-                    dba/get-conversation
-                    (p/then (fn [resp] (set-conversation resp) resp))
-                    (p/then (fn [resp] (set-code (:code resp)) resp))
-                    (p/then (fn [_] (ws/send-msg {:dispatch-key :resume-conversation :project-id (:project/id p)})))))))
+                ;(when-not (= p proj) ;; ToDo: May not want to check this? Reload? SUR: of same text?
+                  (set-proj p)
+                  (set-conversation {:conv [] :conf-for proj})
+                  (-> p
+                      :project/id
+                      dba/get-conversation
+                      (p/then (fn [resp] (set-conversation resp) resp))
+                      (p/then (fn [resp] (set-code (:code resp)) resp))
+                      (p/then (fn [_] (ws/send-msg {:dispatch-key :resume-conversation :project-id (:project/id p)}))))))
+      ;; Display the default current-project (a contrivance for development)
       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
           (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
                        (set-proj (:current-project %))
@@ -125,7 +126,11 @@
                            :project/id
                            dba/get-conversation
                            (p/then (fn [resp] (set-conversation resp) resp))
-                           (p/then (fn [resp] (set-code (:code resp) resp))))))))
+                           (p/then (fn [resp] (set-code (:code resp) resp)))))))
+
+      #_(-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
+          (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
+                       (lookup-fn :core-load-proj) (:current-project %)))))
       ($ Stack {:direction "column" :height useful-height}
          ($ Typography
             {:variant "h4"
@@ -208,6 +213,7 @@
   (log/info "STOP")
   (when-let [proc @ws/ping-process]  (js/window.clearInterval proc)) ; clear old ping-process, if any.
   (when-let [proc @ws/check-process] (js/window.clearInterval proc))
+  (when-let [proc @chat/update-msg-dates-process] (js/window.clearInterval proc))
   (when (ws/channel-ready?)
     (log/info "Telling server to close channel for client-id = " @ws/client-id)
     (ws/send-msg {:dispatch-key :close-channel}) ; The client-id is appended by send-message!.

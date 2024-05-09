@@ -6,6 +6,9 @@
 ;;; What I learned (I think!):
 ;;;  - It is an error (:bad-input) to have a fact that unifies with the head of an axiom! Try this with craft beer and (process-defined craft-beer).
 
+;;; After updating this:
+;;; (sutil/register-planning-domain :process-interview (-> "data/planning-domains/process-interview-1.edn" slurp edn/read-string))
+
 {:domain/id :process-interview
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
  :domain/elems [{:method/head (characterize-process ?proj)
@@ -30,15 +33,15 @@
                 ;; ====== (ongoing-discussion ?proj) ===============================
                 {:method/head (get-process-steps ?proj)
                  :method/rhsides [{:method/case-name "well-known"
-                                   :method/preconds [(well-known-process ?proj)]
+                                   :method/preconds [(flow-shop ?proj)]
                                    :method/task-list [(!yes-no-process-steps ?proj)]}
-                                  {:method/case-name "not-well-known"
-                                   :method/preconds [(not (well-known-process ?proj))]
-                                   :method/task-list [(!query-process-steps ?proj)]}]}
+                                  #_{:method/case-name "not-well-known"
+                                     :method/preconds [(flow-shop ?proj) (not (well-known-process ?proj))]
+                                     :method/task-list [(!query-process-steps ?proj)]}]}
 
                 ;; (!yes-no-process-steps ?proj)
                 {:operator/head (!yes-no-process-steps ?proj)
-                 :operator/preconds [(proj-id ?proj) (well-known-process ?proj)]
+                 :operator/preconds [(proj-id ?proj)]
                  :operator/a-list [(have-process-steps ?proj)]} ; We've arranged so that if you already have all the a-list facts, it runs a no-op.
 
                 ;; (!query-process-steps ?proj)

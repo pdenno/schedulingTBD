@@ -3,11 +3,9 @@
   (:require
    [clojure.core.unify        :as uni]
    [clojure.edn               :as edn]
-   [clojure.spec.alpha        :as s]
    [mount.core                :as mount :refer [defstate]]
    [scheduling-tbd.db         :as db]
    [scheduling-tbd.operators  :as op]
-   [scheduling-tbd.specs      :as spec]
    [scheduling-tbd.sutil      :as sutil :refer [error-for-chat register-planning-domain find-fact]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre           :as log]))
@@ -172,7 +170,10 @@
                                (-> partials rest vec)) ; No way forward from this navigation. The partial can be removed.
 
           ;; Execute the operator. If it succeeds, update state, new-tasks, and plan.
-          (operator? task)   (try (op/run-operator! (db/get-planning-state pid) task opts) ; ToDo: Assumes only run-operator can throw.
+          (operator? task)   (try (op/run-operator!
+                                   (if (= pid :START-A-NEW-PROJECT) '[(proj-id START-A-NEW-PROJECT)] (db/get-planning-state pid))
+                                   task
+                                   opts) ; ToDo: Assumes only run-operator can throw.
                                   (let [new-state (op/operator-update-state (db/get-planning-state pid) task bindings)
                                         op-head (-> task :operator/head (uni/subst bindings))
                                         new-partial (-> part
@@ -191,6 +192,9 @@
                                                                               (-> % rest vec)))] ; drop this task; add the steps
                                (into [new-partial] (rest partials))))))
 
+(defn stop-here [data]
+  (reset! diag data))
+
 ;;; (plan/plan9 project-id :process-interview-1 client-id {:start-facts (db/get-state project-id)}))
 (defn ^:diag plan9
   "A dynamic HTN planner.
@@ -205,8 +209,9 @@
                  (log/info "partial = " (first partials))
                  (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
                        s-tasks (satisfying-tasks task elems (-> partials first :state))]
+                   (when (empty? s-tasks) (stop-here {:task task :elems elems :state (-> partials first :state)}))
                    (cond
-                     (empty? partials)                         {:result :failure :reason :no-successful-plans}
+                     (empty? partials)                         {:result :failure :reason :end-of-interview} ; ToDo: this was :no-successful-plans.
                      (-> partials first :new-tasks empty?)     {:result :success :plan-info (first partials)}
                      (> cnt 5)                                 {:result :stopped :partials partials}
                      :else  (let [partials (update-planning partials s-tasks opts)
@@ -254,13 +259,18 @@
     ;(check-goals-are-ground goal-vec) ; This is something for after translation, thus don't other with it.
     pass-obj))
 
+;;; (plan/resume-conversation {:project-id :START-A-NEW-PROJECT :client-id (ws/recent-client!)})
 (defn resume-conversation
   "Start the interview loop. :resume-conversation is a dispatch key from client.
    This is called even for where PID is :START-A-NEW-PROJECT."
   [{:keys [project-id client-id]}]
-  (let [{:keys [state goal]} (db/get-problem project-id)]
-    (log/info "----- resume conversation: planning-state = " state)
-    (plan9 :process-interview state goal {:client-id client-id :pid project-id})))
+  (if (= project-id :START-A-NEW-PROJECT)
+    (let [state '[(proj-id START-A-NEW-PROJECT)]
+          goal '(characterize-process START-A-NEW-PROJECT)] ; <=========================================== ?pid or START-A-NEW-PROJECT
+      (plan9 :process-interview state goal {:client-id client-id :pid project-id}))
+    (let [{:keys [state goal]} (db/get-problem project-id)]
+      (log/info "======== resume conversation: planning-state = " state)
+      (plan9 :process-interview state goal {:client-id client-id :pid project-id}))))
 
 (defn init-planner!
   []

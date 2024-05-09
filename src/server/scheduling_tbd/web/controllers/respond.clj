@@ -1,18 +1,16 @@
 (ns scheduling-tbd.web.controllers.respond
   (:require
    [clojure.walk             :as walk :refer [keywordize-keys]]
-   [promesa.core             :as p]
    [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
-   [scheduling-tbd.planner   :as plan]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
-   [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre          :as log])
   (:import
    [java.util Date]))
 
 (def ^:diag diag (atom {}))
 
+;;; (resp/get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."

@@ -10,12 +10,11 @@
    [scheduling-tbd.llm    :as llm :refer [query-llm]]
    [taoensso.timbre          :as log]))
 
-
-
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
   (alias 'uni    'clojure.core.unify)
+  (alias 'edn    'clojure.edn)
   (alias 'str    'clojure.string)
   (alias 'd      'datahike.api)
   (alias 'dp     'datahike.pull-api)
@@ -281,3 +280,21 @@
                      (update :project/messages (fn [msgs] (-> (reduce (fn [res msg] (conj res (msg-vec2html msg))) [] msgs) vec))))
         proj-string (with-out-str (pprint new-proj))]
     (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string))))
+
+
+(def beer-steps
+"Our production process involves several key steps:
+
+1. Mashing: Mixing milled grains (usually malted barley) with water and heating the mixture. This step extracts sugars from the grains, creating a sugary liquid known as \"wort.\"
+
+2. Boiling: The wort is boiled, and hops are added for flavor, aroma, and bitterness. This step also sterilizes the wort.
+
+3. Cooling: After boiling, the wort is rapidly cooled down to a temperature suitable for fermentation.
+
+4. Fermentation: The cooled wort is transferred to fermentation tanks, where yeast is added. The yeast ferments the sugars in the wort, producing alcohol and carbon dioxide. This can take from a few days to several weeks, depending on the beer type.
+
+5. Conditioning: After fermentation, the beer is conditioned to develop its full flavor profile. This can happen in the same tank or by transferring the beer to a new tank.
+
+6. Packaging: The final step is packaging the beer into cans, bottles, or kegs for distribution.
+
+Each of these steps requires specific time intervals and conditions (e.g., temperature) to ensure the production of high-quality beer.")
