@@ -2,10 +2,11 @@
   "Scheduling domain prompts."
   (:require
    [clojure.core.unify            :as uni]
+   [clojure.edn                   :as edn]
    [clojure.string                :as str]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [find-fact yes-no-unknown]]
+   [scheduling-tbd.sutil          :as sutil :refer [find-fact yes-no-unknown string2sym]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
@@ -311,14 +312,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Return a vector of one predicates of the form (production-mode ?x <mode>) where <mode> is on of make-to-stock, make-to-order, or engineer-to-order.
    depending on what the agent deems more relevant to their operations."
   [aid tid]
-  (let [query (str "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\n"
-                   "In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\n"
-                   "In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\n"
-                   "ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\n"
-                   "For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\n"
-                   "it is relying on you to determine how to best accommodate the engine and arrange the seats.\n"
-                   "Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\n"
-                   "Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n")
+  (let [query (str "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. "
+                   "In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. "
+                   "In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. "
+                   "ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. "
+                   "For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, "
+                   "it is relying on you to determine how to best accommodate the engine and arrange the seats. "
+                   "Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. "
+                   "Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ")
         answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
         preds (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" answer)        '[(production-mode ?x make-to-stock)]
                     (re-matches #".*(?i)MAKE-TO-ORDER.*" answer)        '[(production-mode ?x make-to-order)]
@@ -330,9 +331,9 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Return a vector of ground predicates (so far just either [(is-product ?x)] or [(is-service ?x)],
    depending on whether the project describes respectively work to provide a product or work to provide a service."
   [aid tid]
-  (let [query (str "Some work, for example factory work, must be performed in a specially designed facility.\n"
-                   "Other work, like cutting down a tree, can only be performed at a location designated by the customer.\n"
-                   "Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\n"
+  (let [query (str "Some work, for example factory work, must be performed in a specially designed facility. "
+                   "Other work, like cutting down a tree, can only be performed at a location designated by the customer. "
+                   "Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? "
                    "Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.")
         answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
         preds (cond (re-matches #".*(?i)OUR-FACILITY.*" answer)  '[(has-production-facility ?x)]
@@ -345,9 +346,9 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    depending on whether the project describes respectively work to provide a product or work to provide a service.
    Note that this question is only applied where (provides-product ?x) (scheduling-problem ?x) (has-production-facility ?x)."
   [aid tid]
-  (let [query (str "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources.\n"
-                   "A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements.\n"
-                   "Is the process you described more like a flow-shop or a job-shop?\n"
+  (let [query (str "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. "
+                   "A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. "
+                   "Is the process you described more like a flow-shop or a job-shop? "
                    "Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.")
         answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
         preds (cond (re-matches #".*(?i)FLOW-SHOP.*" answer) '[(flow-shop ?x)]
@@ -402,8 +403,19 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 (defn yes-no-process-steps
   "Return state addition for analyzing a Y/N user response about process steps."
-  [_response]
-  [])
+  [{:keys [response pid agent-query] :as _obj}]
+  (let [pid-sym (-> pid name symbol)
+        steps (->> (for [line (str/split-lines response)]
+                     (let [[success step-num proc-name] (re-matches #"^\s*(\d+)\.?\s+(\w+).*" line)]
+                       (if success
+                         (list 'process-step pid-sym (edn/read-string step-num) (string2sym proc-name))
+                         (if (re-matches #"^\s*$" line)
+                           nil
+                           (list 'fails-process-step line)))))
+                   (filterv identity))]
+    (db/add-msg pid :system agent-query :process-steps :query)
+    (db/add-msg pid :surrogate response :process-steps :response)
+    steps))
 
 (defn query-process-durs
   "Return state addition for analyzing a query to user about process durations."

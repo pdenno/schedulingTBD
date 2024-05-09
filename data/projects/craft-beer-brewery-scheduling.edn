@@ -2,7 +2,7 @@
 #:project{:code
           " int : nProducts = 5;\n set of int: Product = 1..nProducts;\n set of int: Day = -36..365;\n enum Task = {mill, ferment, bright};\n array [Product, Task] of int: taskDuration = [|1, 20, 20 |   % processing times for\n                                                1, 20, 20 |   % various beers, perhaps\n                                                1, 30, 11 |   % from a screenshot of a\n                                                1, 21, 11 |   % of spreadsheet the\n                                                1, 18, 19 |]; % user provided.\n\n array [Product] of Day: neededDate = [50, 80, 130, 140, 150];\n\n % We assume a task uses one major resource; resources are synonymous with tasks.\n array [Product, Task] of var Day: taskStarts; % 'var' means it is a decision variable.\n array [Product, Task] of var Day: taskEnds;\n\n % We'll use this below to ensure a resource can only be used by one product at a time.\n array [Task, Day] of var Product: busyWith;\n\n % The first two Product are already in the fermentation tank and bright tank respectively.\n constraint taskStarts[1,mill] = -35;   % Product 1 is therefore in the bright tank...\n constraint taskStarts[2,mill] = -5;    % ...and out before this one moves there.\n\n % Next task must start right after previous task ends. No place to put WIP.\n constraint forall (p in Product) (taskEnds[p, mill   ] + 1 == taskStarts[p, ferment]);\n constraint forall (p in Product) (taskEnds[p, ferment] + 1 == taskStarts[p, bright]);\n\n % A task ends taskDuration days after it starts.\n constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n % A resource(task) can only be used with one product at a time.\n constraint forall (t in Task, p in Product, d in Day where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])\n                    (busyWith[t,d] == p);\n\n % Aim to have it done when it is needed.\n solve minimize sum (p in Product) (abs(neededDate[p] - taskEnds[p,bright]));",
           :desc
-          "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan.",
+          "We are a medium-sized craft beer brewery. We produce about 110,000 barrels/year. We run several products simultaneously and simply would like to be able to have the beer bottled and ready to ship as near as possible to the dates defined in our sales plan.",
           :id :craft-beer-brewery-scheduling,
           :messages
           [#:message{:content
@@ -11,7 +11,7 @@
                      :id 0,
                      :time #inst "2023-11-11T10:12:49.625-00:00"}
            #:message{:content
-                     "We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.\n   We run several products simultaneously and simply would like to be able to have the beer bottled and ready\n   to ship as near as possible to the dates defined in our sales plan.",
+                     "We are a medium-sized craft beer brewery. We produce about 110,000 barrels/year. We run several products simultaneously and simply would like to be able to have the beer bottled and ready to ship as near as possible to the dates defined in our sales plan.",
                      :from :human,
                      :id 1,
                      :time #inst "2023-11-11T10:12:49.648-00:00"}

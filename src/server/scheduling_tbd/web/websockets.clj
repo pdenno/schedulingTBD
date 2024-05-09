@@ -25,7 +25,10 @@
   (let [chans {:in  (async/chan)
                :out (async/chan)
                :err (async/chan)
-               :alive? true       ; Set to false by alive?, then an ack sets it back to true...or close this channel.
+               ;; alive? is occassionally set to false by close-inactive-channels, e.g. when connection to new clients is made.
+               ;; close-inactive-channels then wait for an ack (:confirm-alive) which sets it back to true
+               ;; ...or if no timely response, closes the channel.
+               :alive? true
                :exit? false}]     ; Used to exit from go loops. Important!
     (swap! socket-channels  #(assoc % id chans))
     chans))
@@ -91,13 +94,13 @@
   (->> @ping-dates seq (sort-by second) reverse first first))
 
 (defn close-inactive-channels
-  "Close channels that don't respond to :alive?."
+  "Close channels that don't respond to :alive? with an :alive-confirm."
   []
   (let [clients (keys @socket-channels)]
     (doseq [client-id clients]
       (swap! socket-channels #(assoc-in % [client-id :alive?] false))
       (send-to-chat {:client-id client-id :dispatch-key :alive?}))
-    (Thread/sleep 2000) ; 2 seconds to respond.
+    (Thread/sleep 300000) ; 5 minutes to respond.
     (doseq [client-id clients]
       (when-not (get-in @socket-channels [client-id :alive?])
         (forget-client client-id)))))
@@ -282,9 +285,10 @@
         prom)
       (log/error "Could not find out async channel for client" client-id))))
 
-(def dispatch-table
-  "A map from keys to functions used to call responses from clients."
-  (atom nil))
+;;; A map from keys to functions used to call responses from clients.
+;;; This is defonce so that it doesn't get blown away when websockets.clj is reloaded.
+;;; Other namespaces update it (with register-ws-dispatch).
+(defonce dispatch-table (atom nil))
 
 (defn register-ws-dispatch
   "Add a function to the websocket dispatch table."
@@ -296,6 +300,7 @@
 (defn client-confirms-alive
   "Because the ws go loop can drop, we use this as part of reconnecting."
   [{:keys [client-id]}]
+  (log/info "client confirms alive:" client-id)
   (swap! socket-channels #(assoc-in % [client-id :alive] true))
   nil)
 

@@ -5,72 +5,82 @@
                      "Describe your most significant scheduling problem in a few sentences.",
                      :from :system,
                      :id 1,
-                     :time #inst "2024-04-29T21:20:38.523-00:00"}
+                     :time #inst "2024-05-09T20:26:15.533-00:00"}
            #:message{:content
-                     "Our most significant scheduling problem involves coordinating the production of plate glass with varying thicknesses and sizes, tailored to different client orders, while optimizing the usage of raw materials and minimizing production downtime. Additionally, we face challenges in aligning our production schedules with the delivery schedules of raw materials and with the delivery deadlines of finished products to our clients, considering the cleaning and maintenance time required for our equipment between different production runs.",
+                     "Our most significant scheduling problem revolves around balancing the production schedule of our plate glass manufacturing process with fluctuating demand, supply chain variability, and maintenance requirements for our machinery. We often face challenges in adjusting the production lines to accommodate changing customer orders in terms of specifications (like size, thickness, and type of glass) and delivery timelines. The variability in raw material availability and the need to optimize machine downtime for maintenance without impacting order fulfilment timelines further complicate our scheduling efforts. This balancing act is critical to maximizing efficiency and minimizing waste, while still meeting strict customer deadlines.",
                      :from :surrogate,
                      :id 2,
-                     :time #inst "2024-04-29T21:20:38.556-00:00"}
+                     :time #inst "2024-05-09T20:26:15.558-00:00"}
            #:message{:content
-                     "Great, we'll call your project SUR Plate Glass.",
+                     "Great, we'll call your project Sur Plate Glass.",
                      :from :system,
                      :id 3,
-                     :time #inst "2024-04-29T21:20:38.585-00:00"}
+                     :time #inst "2024-05-09T20:26:15.584-00:00"}
            #:message{:content
                      "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
                      :from :system,
                      :id 4,
-                     :time #inst "2024-04-29T21:20:38.613-00:00"}
+                     :time #inst "2024-05-09T20:26:15.610-00:00"}
            #:message{:content
                      "Please briefly describe your production processes?",
                      :from :system,
                      :id 5,
-                     :time #inst "2024-04-29T21:20:47.282-00:00"}
+                     :time #inst "2024-05-09T20:26:27.558-00:00"}
            #:message{:content
-                     "Our production process for plate glass begins with mixing raw materials, primarily silica sand, soda ash, and limestone. The mixture is then melted in a furnace at extremely high temperatures to form molten glass. This molten glass is then floated on a bed of molten tin in a float bath, creating a continuous ribbon of glass with uniform thickness. The glass ribbon is cooled gradually in a lehr (annealing oven) to relieve internal stresses. After cooling, the glass is cut to the desired sizes according to client orders. Finally, the cut glass undergoes quality checks and is packed for shipping. Maintenance and cleaning of the equipment, especially the float bath and the furnace, are critical and scheduled regularly to ensure quality and safety.",
+                     "Our plate glass production process involves several key steps:\n\n1. <b>Batching</b>: Raw materials (silica sand, soda ash, limestone, and cullet) are carefully measured and mixed. This mixture is then melted in a furnace.\n\n2. <b>Melting</b>: The batch is melted in a furnace at temperatures around 1700°C to form molten glass. This process can take several hours.\n\n3. <b>Floating</b>: The molten glass is then poured onto a bath of molten tin in a float chamber. Here, the glass spreads out and forms a flat surface. The thickness of the glass is controlled by the speed at which the glass ribbon is pulled from the chamber.\n\n4. <b>Annealing (Cooling)</b>: After forming, the glass ribbon moves through an annealing lehr, where it is gradually cooled. This controlled cooling process relieves internal stresses.\n\n5. <b>Inspection and Cutting</b>: The glass is then inspected for quality. Once approved, it is cut into panels as per the order specifications.\n\n6. <b>Packaging</b>: Finally, the glass panels are packed and prepared for shipping to customers.\n\nThroughout this process, quality control is a critical component, ensuring the final product meets our high standards and customer specifications. Efficiency and scheduling are crucial to manage due to the continuous flow and high energy costs associated with production.",
                      :from :surrogate,
                      :id 6,
-                     :time #inst "2024-04-29T21:20:47.310-00:00"}
+                     :tags [:process-description],
+                     :time #inst "2024-05-09T20:26:27.626-00:00"}
            #:message{:content
                      "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE.",
                      :from :system,
                      :id 7,
-                     :time #inst "2024-04-29T21:20:50.902-00:00"}
+                     :time #inst "2024-05-09T20:26:30.642-00:00"}
            #:message{:content "PRODUCT",
                      :from :surrogate,
                      :id 8,
-                     :time #inst "2024-04-29T21:20:50.932-00:00"}
+                     :time #inst "2024-05-09T20:26:30.667-00:00"}
            #:message{:content
-                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n",
+                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
                      :from :system,
                      :id 9,
-                     :time #inst "2024-04-29T21:20:53.100-00:00"}
+                     :time #inst "2024-05-09T20:26:35.274-00:00"}
            #:message{:content "MAKE-TO-ORDER",
                      :from :surrogate,
                      :id 10,
-                     :time #inst "2024-04-29T21:20:53.117-00:00"}
+                     :time #inst "2024-05-09T20:26:35.294-00:00"}
            #:message{:content
-                     "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
                      :from :system,
                      :id 11,
-                     :time #inst "2024-04-29T21:20:56.837-00:00"}
+                     :time #inst "2024-05-09T20:26:38.342-00:00"}
            #:message{:content "OUR-FACILITY",
                      :from :surrogate,
                      :id 12,
-                     :time #inst "2024-04-29T21:20:56.853-00:00"}],
-          :name "SUR Plate Glass",
+                     :time #inst "2024-05-09T20:26:38.407-00:00"}
+           #:message{:content
+                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                     :from :system,
+                     :id 13,
+                     :time #inst "2024-05-09T20:26:40.684-00:00"}
+           #:message{:content "FLOW-SHOP",
+                     :from :surrogate,
+                     :id 14,
+                     :time #inst "2024-05-09T20:26:40.707-00:00"}],
+          :name "Sur Plate Glass",
           :planning-problem
           #:problem{:domain :process-interview,
                     :goal-string
                     "(characterize-process sur-plate-glass)",
                     :state-string
-                    "#{(ongoing-discussion sur-plate-glass) (production-mode sur-plate-glass make-to-order) (has-production-facility sur-plate-glass) (proj-name \"SUR Plate Glass\") (cites-raw-material-challenge sur-plate-glass) (proj-id sur-plate-glass) (surrogate sur-plate-glass) (provides-product sur-plate-glass) (flow-shop sur-plate-glass)}"},
+                    "#{(ongoing-discussion sur-plate-glass) (production-mode sur-plate-glass make-to-order) (has-production-facility sur-plate-glass) (cites-raw-material-challenge sur-plate-glass) (proj-id sur-plate-glass) (surrogate sur-plate-glass) (provides-product sur-plate-glass) (proj-name \"Sur Plate Glass\") (flow-shop sur-plate-glass)}"},
           :surrogate
-          #:surrogate{:assistant-id "asst_DfFL7Wn1tjwaAg2UtUgIzo8W",
+          #:surrogate{:assistant-id "asst_oiJUD18fR0MmDOs9h1hf72hN",
                       :id :sur-plate-glass,
-                      :subject-of-expertise "plate glass",
+                      :subject-of-expertise "sur plate glass",
                       :system-instruction
-                      "\n   You manage a company that makes plate glass. \n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_ON7baMxZRrc0zZbmev5zAUpO"}}
+                      "You manage a company that makes sur plate glass.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_rbOzEH51nkCIUglgdAvQtLB9"}}
 
 ]

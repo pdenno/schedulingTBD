@@ -3,11 +3,9 @@
   (:require
    [clojure.core.unify        :as uni]
    [clojure.edn               :as edn]
-   [clojure.spec.alpha        :as s]
    [mount.core                :as mount :refer [defstate]]
    [scheduling-tbd.db         :as db]
    [scheduling-tbd.operators  :as op]
-   [scheduling-tbd.specs      :as spec]
    [scheduling-tbd.sutil      :as sutil :refer [error-for-chat register-planning-domain find-fact]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre           :as log]))
@@ -194,6 +192,9 @@
                                                                               (-> % rest vec)))] ; drop this task; add the steps
                                (into [new-partial] (rest partials))))))
 
+(defn stop-here [data]
+  (reset! diag data))
+
 ;;; (plan/plan9 project-id :process-interview-1 client-id {:start-facts (db/get-state project-id)}))
 (defn ^:diag plan9
   "A dynamic HTN planner.
@@ -208,6 +209,7 @@
                  (log/info "partial = " (first partials))
                  (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
                        s-tasks (satisfying-tasks task elems (-> partials first :state))]
+                   (when (empty? s-tasks) (stop-here {:task task :elems elems :state (-> partials first :state)}))
                    (cond
                      (empty? partials)                         {:result :failure :reason :end-of-interview} ; ToDo: this was :no-successful-plans.
                      (-> partials first :new-tasks empty?)     {:result :success :plan-info (first partials)}

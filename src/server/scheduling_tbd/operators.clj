@@ -141,9 +141,9 @@
 (defn chat-pair
   "Run one query/response pair of chat elements with a human or a surrogate.
    Returns promise which will resolve to the original obj argument except:
-     1) :agent-msg is adapted from the input argument value for the agent type (human or surrogate)
+     1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
      2) :response is added. Typically its value is a string."
-  [{:keys [pid state agent-msg] :as obj}]
+  [{:keys [pid state agent-query] :as obj}]
   (log/info "Chat pair: surrogate? =" (surrogate? state))
   (let [aid (db/get-assistant-id pid nil)
         tid (db/get-thread-id pid nil)
@@ -151,10 +151,10 @@
         prom (if (= :surrogate agent-type)
                (px/submit! (fn []
                              (try
-                               (llm/query-on-thread :tid tid :aid aid :query-text agent-msg)   ; This can timeout.
+                               (llm/query-on-thread :tid tid :aid aid :query-text agent-query)   ; This can timeout.
                                (catch Exception e {:error e}))))
                (ws/send-to-chat (-> obj
-                                    (assoc :msg agent-msg)
+                                    (assoc :msg agent-query)
                                     (assoc :dispatch-key :tbd-says))))]                                             ; This cannot timeout.
     (log/info "prom =" prom)
     (p/await prom))); You can't put anything else here or a promise will be passed!
@@ -173,11 +173,11 @@
    {:msg-text/string "."}])
 
 (defoperator :!initial-question [{:keys [state] :as obj}]
-  (try (let [agent-msg (if (surrogate? state)
+  (try (let [agent-query (if (surrogate? state)
                          "Describe your most significant scheduling problem in a few sentences."
                          (str "Describe your most significant scheduling problem in a few sentences or "
                               "<a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>."))
-             obj (assoc obj :agent-msg agent-msg)
+             obj (assoc obj :agent-query agent-query)
              response (chat-pair obj)]
          ;; Owing to weirdness of chat-pair p/await call this is done here.
          (cond (string? response)                   (-> obj
@@ -193,9 +193,8 @@
          {:result :failure :reason "processing response"})))
 
 ;;; (op/db-action (assoc op/example :client-id (ws/recent-client!)))
-(defaction :!initial-question [{:keys [state response client-id agent-msg] :as _obj}]
+(defaction :!initial-question [{:keys [state response client-id agent-query] :as _obj}]
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
-  (reset! diag _obj)
   (let [surrogate? (surrogate? state)
         analysis-state (dom/project-name-analysis response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
     (when-not surrogate? (make-human-project analysis-state))
@@ -206,7 +205,7 @@
           pid (keyword pid)]
       (db/add-planning-state pid analysis-state)
       (log/info "DB and app actions on PID =" pid)
-      (db/add-msg pid :system agent-msg)  ; ToDo: I'm not catching the error when this is wrong!
+      (db/add-msg pid :system agent-query)  ; ToDo: I'm not catching the error when this is wrong!
       (db/add-msg pid (if surrogate? :surrogate :human) response)
       (db/add-msg pid :system (format "Great, we'll call your project %s." pname))
       (when cites-supply?
@@ -218,29 +217,31 @@
       (db/add-planning-state pid (dom/parallel-expert-prelim-analysis pid)))))
 
 ;;; ----- :!yes-no-process-steps
-#_(def process-steps-prompt ;<============================================================================================================================================== Start here.
-  [{:human-only [#:msg-text{:string "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"}]
-    :surrogate-only (dom/process-steps-prompt)}])
+(defoperator :!yes-no-process-steps [{:keys [state] :as obj}]
+  (let [agent-query (if (surrogate? state)
+                      (str "Please list the process steps of your process, one per line in the order they are executed to produce a product, "
+                           "so it looks like this:\n"
+                           "1. (the first step)\n"
+                           "2. (the second step)\n...")
+                      "Select the process steps from the list on the right that are typically part of your processes. \n (When done hit \"Submit\".)")
+        obj (assoc obj :agent-query agent-query)
+        response (chat-pair obj)]
+    (-> obj
+        (assoc :response response)
+        db-action)))
 
-(defoperator :!yes-no-process-steps [obj]
-  (let [msg "Select the process steps from the list that are typically part of your processes. \n (When done hit \"Submit\".)"
-        obj (assoc obj :agent-msg msg)
-        response (chat-pair (assoc obj :agent-msg msg))]
-      (-> obj
-          (assoc :response response)
-          db-action)))
-
-(defaction :!yes-no-process-steps [{:keys [pid response] :as _obj}]
+(defaction :!yes-no-process-steps [{:keys [pid response] :as obj}]
   ;; Nothing to do here but update state from a-list.
+  (reset! diag obj)
   (log/info "!yes-no-process-steps (action): response =" response)
-  (let [more-state (dom/yes-no-process-steps response)]
+  (let [more-state (dom/yes-no-process-steps obj)]
     (db/add-planning-state pid more-state)))
 
 ;;; ----- :!query-process-durs
 (defoperator :!query-process-durs [obj]
   (log/info "!query-process-durs: response =" obj)
   (let [msg "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)"
-        obj (assoc obj :agent-msg msg)
+        obj (assoc obj :agent-query msg)
         response (chat-pair obj)]
     (-> obj
         (assoc :response response)
@@ -255,8 +256,8 @@
 (defoperator :!yes-no-process-ordering [obj]
   (log/info "!yes-no-process-ordering: obj =" obj)
   (let [msg "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
-        obj (assoc obj :agent-msg msg)
-        response (chat-pair (assoc obj :agent-msg msg))]
+        obj (assoc obj :agent-query msg)
+        response (chat-pair (assoc obj :agent-query msg))]
     (-> obj
         (assoc :response response)
         db-action)))

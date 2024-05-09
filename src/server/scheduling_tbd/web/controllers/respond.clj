@@ -10,6 +10,7 @@
 
 (def ^:diag diag (atom {}))
 
+;;; (resp/get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."

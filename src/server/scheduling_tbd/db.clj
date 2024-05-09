@@ -310,7 +310,7 @@
   #{:project/messages :message/id :message/from :message/content :message/time})
 
 (defn get-messages
-  "For the argument project (pid) return messages sorted by their :message/id."
+  "For the argument project (pid) return a vector of messages sorted by their :message/id."
   [pid]
   (when-let [eid (project-exists? pid)]
     (->> (resolve-db-id {:db/id eid}

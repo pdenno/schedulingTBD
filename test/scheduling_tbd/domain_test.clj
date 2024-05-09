@@ -10,12 +10,11 @@
    [scheduling-tbd.llm    :as llm :refer [query-llm]]
    [taoensso.timbre          :as log]))
 
-
-
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
   (alias 'uni    'clojure.core.unify)
+  (alias 'edn    'clojure.edn)
   (alias 'str    'clojure.string)
   (alias 'd      'datahike.api)
   (alias 'dp     'datahike.pull-api)

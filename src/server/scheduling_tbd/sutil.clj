@@ -218,3 +218,5 @@
         others (butlast lines)]
     (str (apply str others)
          (subs last 0 (dec (count last))))))
+
+(defn string2sym [s] (-> s str/lower-case (str/replace #"\s+" "-") symbol))
