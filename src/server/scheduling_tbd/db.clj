@@ -340,6 +340,17 @@
            @(connect-atm pid) pid)
       ""))
 
+;;; ToDo: For the time being, code is replaced as a whole.
+;;;       For purposes of backtracking more capability might be useful.
+(defn put-code
+  "Save the argument MiniZinc code to the project's database.
+   The code is written as a whole; editing happens elsewhere."
+  [pid code-text]
+  (assert (string? code-text))
+  (let [conn (connect-atm pid)
+        eid (project-exists? pid)]
+    (d/transact conn {:tx-data [[:db/add eid :project/code code-text]]})))
+
 (defn get-planning-state
   "Return the planning state vector (a collection of ground propositions) for the argument project, or [] if none."
   [pid]
