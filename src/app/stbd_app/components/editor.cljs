@@ -1,20 +1,19 @@
 (ns stbd-app.components.editor
   (:require
-   [stbd-app.rm-mode.parser :as parser]
-   [stbd-app.rm-mode.state :as state]
    ["@codemirror/language" :refer [foldGutter syntaxHighlighting defaultHighlightStyle]]
    ["@codemirror/commands" :refer [history #_historyKeymap emacsStyleKeymap]]
    ["@codemirror/view" :as view :refer [EditorView  #_lineNumbers]]
    ["@codemirror/state" :refer [EditorState Compartment ChangeSet Transaction]]
    [applied-science.js-interop :as j]
-   ;["@mui/system/sizing" :as sizing] ; ToDo: Investigate
-   [stbd-app.util :as util]
-   [stbd-app.components.share :as share]
    [helix.core :as helix :refer [defnc $]]
    [helix.hooks :as hooks]
    [helix.dom :as d]
-   ;["react" :as react]
-   #_[taoensso.timbre :as log :refer-macros [info debug log]]))
+   ;["@mui/system/sizing" :as sizing] ; ToDo: Investigate
+   [stbd-app.components.share :as share]
+   [stbd-app.rm-mode.parser :as parser]
+   [stbd-app.rm-mode.state :as state]
+   [stbd-app.util          :as util :refer [register-fn]]
+   [taoensso.timbre :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -63,18 +62,27 @@
       (.of view/keymap parser/complete-keymap)
       (.of view/keymap emacsStyleKeymap #_historyKeymap)])
 
-(defn set-editor-text [editor-name text]
-  (when-let [^EditorView view (get-in @util/component-refs [editor-name :view])]
+(defn set-editor-text [text]
+  (when-let [^EditorView view (get-in @util/component-refs ["code-editor" :view])]
     (let [^EditorState state (j/get view :state)
           ^ChangeSpec  change (j/lit {:from 0 :to (j/get-in state [:doc :length]) :insert text})]
       (.dispatch view (j/lit {:changes change})))))
 
 (defn get-editor-text
   "Return the string content of the data editor."
-  [editor-name]
-  (if-let [s (j/get-in (get-in @util/component-refs [editor-name :view]) [:state :doc])]
+  []
+  (if-let [s (j/get-in (get-in @util/component-refs ["code-editor" :view]) [:state :doc])]
     (.toString s)
     ""))
+
+;;; ToDo: This assumes that the server knows the code
+(defn update-code
+  "Update the code as specified in the arguments."
+  [{:keys [text]}]
+  (log/info "update-code: text =" text)
+  (set-editor-text text))
+
+(register-fn :update-code update-code)
 
 (defn resize
   "Set dimension of the EditorView for share."
@@ -107,6 +115,6 @@
           (reset! view-dom (j/get view :dom))
           (swap! util/component-refs #(assoc % name {:ref parent :view view})))))
     (hooks/use-effect [text]
-      (set-editor-text name text))
+      (set-editor-text text))
     (d/div {:ref ed-ref :id name} ; style works but looks ugly because it wraps editor tightly.
       @view-dom)))

@@ -129,6 +129,7 @@
 (defn refresh-client
   "Send a message to the client to reload the conversation. Typically done with surrogate."
   [client-id pid]
+  (assert (string? client-id))
   (ws/send-to-chat {:promise? false
                     :client-id client-id
                     :dispatch-key :request-conversation
@@ -163,6 +164,7 @@
       :bindings  - is a map of variable bindings,
       :task      - is information from the operator or method RHS satisfying RHS the preconditions."
   [partials s-tasks {:keys [pid client-id] :as opts}]
+  (assert (string? client-id))
   (let [part (first partials)
         {:keys [task bindings]} (first s-tasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
     (cond (empty? s-tasks)   (do
@@ -202,6 +204,7 @@
    Initialize the stack to a partial from a problem definition.
    Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
   [domain-id state goal & {:keys [client-id] :as opts}]  ; opts typically includes :pid.
+  (assert (string? client-id))
   (let [elems   (-> (sutil/get-domain domain-id) :domain/elems)
         result (loop [partials [{:plan [] :new-tasks [goal] :state state}]
                       cnt 1]
@@ -259,14 +262,15 @@
     ;(check-goals-are-ground goal-vec) ; This is something for after translation, thus don't other with it.
     pass-obj))
 
-;;; (plan/resume-conversation {:project-id :START-A-NEW-PROJECT :client-id (ws/recent-client!)})
+;;; (plan/resume-conversation {:project-id :sur-craft-beer :client-id (ws/recent-client!)})
 (defn resume-conversation
   "Start the interview loop. :resume-conversation is a dispatch key from client.
    This is called even for where PID is :START-A-NEW-PROJECT."
   [{:keys [project-id client-id]}]
+  (assert (string? client-id))
   (if (= project-id :START-A-NEW-PROJECT)
     (let [state '[(proj-id START-A-NEW-PROJECT)]
-          goal '(characterize-process START-A-NEW-PROJECT)] ; <=========================================== ?pid or START-A-NEW-PROJECT
+          goal '(characterize-process START-A-NEW-PROJECT)] ; <======== ?pid or START-A-NEW-PROJECT
       (plan9 :process-interview state goal {:client-id client-id :pid project-id}))
     (let [{:keys [state goal]} (db/get-problem project-id)]
       (log/info "======== resume conversation: planning-state = " state)

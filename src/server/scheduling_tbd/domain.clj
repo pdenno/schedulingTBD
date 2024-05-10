@@ -3,6 +3,7 @@
   (:require
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
+   [clojure.pprint                :refer [cl-format]]
    [clojure.string                :as str]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
@@ -290,7 +291,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    are developing context to do some downstream preliminary analysis.
    We put these into the conversation under surrogate."
   [aid tid]
-  (let [msg "Please briefly describe your production processes?"]
+  (let [msg "Please briefly describe your production processes."]
     {:query msg
      :answer (llm/query-on-thread :aid aid :tid tid :query-text msg)}))
 
@@ -400,6 +401,12 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
            @new-props)
        [(list 'fails-query 'process-description proj-sym)]))))
 
+(defn mzn-process-steps
+  "Use state information to write a string enumerating process steps."
+  [state]
+  (let [procs (->> state (filter #(uni/unify % '(process-step ?pid ?num ?proc))) (sort-by #(nth % 2)) (mapv #(nth % 3)))]
+    (cl-format nil "enum Task = {~{~a~^, ~}};" procs)))
+
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 (defn yes-no-process-steps
   "Return state addition for analyzing a Y/N user response about process steps."
@@ -414,8 +421,8 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                            (list 'fails-process-step line)))))
                    (filterv identity))]
     (db/add-msg pid :system agent-query :process-steps :query)
-    (db/add-msg pid :surrogate response :process-steps :response)
-    steps))
+    (db/add-msg pid :surrogate response :process-steps :response) ; <=================
+    (conj steps (list 'have-process-steps pid-sym))))
 
 (defn query-process-durs
   "Return state addition for analyzing a query to user about process durations."
