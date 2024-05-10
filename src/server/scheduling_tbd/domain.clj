@@ -299,7 +299,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Return a vector of ground predicates (so far just either [(provides-product ?x)] or [(provides-service ?x)],
    depending on whether the project describes respectively work to provide a product or work to provide a service."
   [aid tid]
-  (let [query (str "Would you characterize your company's work as primarily providing a product or a service?\n" ; ToDo: "firm's work" in all of these not good?
+  (let [query (str "Would you characterize your company's work as primarily providing a product or a service? " ; ToDo: "firm's work" in all of these not good?
                    "Respond respectively with either the single word PRODUCT or SERVICE.")
         answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
         preds (cond (re-matches #".*(?i)PRODUCT.*" answer) '[(provides-product ?x)]

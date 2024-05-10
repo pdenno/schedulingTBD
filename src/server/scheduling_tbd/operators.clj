@@ -230,15 +230,26 @@
         (assoc :response response)
         db-action)))
 
+(def minizinc-enum-announce
+  (str "Okay, we now know enough to get started on a MiniZinc solution.\n"
+       "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>.\n"
+       "The 'enum values' name the steps of your process in the order they are executed for each product."))
+
 (defaction :!yes-no-process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
   (reset! diag obj)
   (log/info "!yes-no-process-steps (action): response =" response)
-  (let [more-state (dom/yes-no-process-steps obj)]
+  (let [more-state (dom/yes-no-process-steps obj)
+        new-code (dom/mzn-process-steps more-state)]
     (db/add-planning-state pid more-state)
+    (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
+    (db/put-code pid new-code)
+    ;; ToDo: This should really be just for humans.
     (ws/send-to-chat {:client-id client-id
-                      :dispatch-key :update-code
-                      :text (dom/mzn-process-steps more-state)})
+                      :dispatch-key :tbd-says
+                      :promise? false
+                      :msg minizinc-enum-announce})
+    (db/add-msg pid :system minizinc-enum-announce :info-to-user :minizinc)
     more-state))
 
 ;;; ----- :!query-process-durs
