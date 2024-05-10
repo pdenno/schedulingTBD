@@ -34,7 +34,7 @@
 ;;; in Step (1) ws/send-msg is used for humans, whereas llm/query-on-thread is used for surrogates.
 ;;; For the most part, we look at the state vector and use the function (surogate? state) to vary the behavior.
 
-(def debugging? (atom true))
+(def debugging? (atom false))
 (def ^:diag diag (atom nil))
 (defonce operator-method? (atom #{})) ; "A set of operator symbols, one for each method defined by defoperator."
 
@@ -219,7 +219,7 @@
 ;;; ----- :!yes-no-process-steps
 (defoperator :!yes-no-process-steps [{:keys [state] :as obj}]
   (let [agent-query (if (surrogate? state)
-                      (str "Please list the process steps of your process, one per line in the order they are executed to produce a product, "
+                      (str "Please list the steps of your process, one per line in the order they are executed to produce a product, "
                            "so it looks like this:\n"
                            "1. (the first step)\n"
                            "2. (the second step)\n...")
@@ -230,12 +230,16 @@
         (assoc :response response)
         db-action)))
 
-(defaction :!yes-no-process-steps [{:keys [pid response] :as obj}]
+(defaction :!yes-no-process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
   (reset! diag obj)
   (log/info "!yes-no-process-steps (action): response =" response)
   (let [more-state (dom/yes-no-process-steps obj)]
-    (db/add-planning-state pid more-state)))
+    (db/add-planning-state pid more-state)
+    (ws/send-to-chat {:client-id client-id
+                      :dispatch-key :update-code
+                      :text (dom/mzn-process-steps more-state)})
+    more-state))
 
 ;;; ----- :!query-process-durs
 (defoperator :!query-process-durs [obj]

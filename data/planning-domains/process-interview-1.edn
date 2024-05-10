@@ -14,13 +14,14 @@
  :domain/elems [{:method/head (characterize-process ?proj)
                  :method/rhsides [{:method/case-name "from-scratch"
                                    :method/preconds [(proj-id ?proj) (not (ongoing-discussion ?proj))] ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
-                                   :method/task-list [(!initial-question ?proj)]}
+                                   :method/task-list [(!initial-question ?proj)
+                                                      (discuss-process-detail ?proj)]}
 
                                   {:method/case-name "ongoing-discussion"
                                    :method/preconds [(ongoing-discussion ?proj)   ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
                                                      (proj-id ?proj)
                                                      (not (process-defined ?proj))]
-                                   :method/task-list [(get-process-steps ?proj)
+                                   :method/task-list [(discuss-process-detail ?proj)
                                                       (!query-process-durs ?proj)
                                                       (!yes-no-process-ordering ?proj)]}]}
 
@@ -31,7 +32,7 @@
                  :operator/a-list [(ongoing-discussion ?proj)]}
 
                 ;; ====== (ongoing-discussion ?proj) ===============================
-                {:method/head (get-process-steps ?proj)
+                {:method/head (discuss-process-detail ?proj)
                  :method/rhsides [{:method/case-name "well-known"
                                    :method/preconds [(flow-shop ?proj)]
                                    :method/task-list [(!yes-no-process-steps ?proj)]}
@@ -56,11 +57,11 @@
 
                 ;; (!yes-no-process-ordering ?proj)
                 {:operator/head (!yes-no-process-ordering ?proj)
-                 :operator/preconds [(well-known-process ?proj) (system-model ?proj flow)]
+                 :operator/preconds [#_(well-known-process ?proj) (system-model ?proj flow)]
                  :operator/a-list [(have-process-ordering ?proj)]}
 
                 ;; (!query-process-ordering ?proj)
-                {:operator/head (!query-process-ordering ?proj)
+                #_{:operator/head (!query-process-ordering ?proj)
                  :operator/preconds [(not (well-known-process ?proj)) (system-model ?proj flow)]
                  :operator/a-list [(have-process-ordering ?proj)]}
 

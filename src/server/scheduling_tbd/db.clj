@@ -348,7 +348,7 @@
                             [_ :project/planning-problem ?pp]
                             [?pp :problem/state-string ?s]]
                           @(connect-atm pid) pid)]
-    (edn/read-string state-str)
+    (->> state-str edn/read-string (sort-by first) vec)
     []))
 
 (defn put-planning-state

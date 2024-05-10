@@ -46,7 +46,9 @@
                                     :request-conversation ; Like :load-proj but don't do a resume-conversation.
                                     :ping-confirm         ; Server confirms your ping.
                                     :sur-says
-                                    :tbd-says} x))
+                                    :tbd-says
+                                    :update-code} x))
+
 (s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
 (s/def ::dispatch-key outbound-dispatch-key?)
 (s/def ::msg (s/and string? #(not-empty %)))
