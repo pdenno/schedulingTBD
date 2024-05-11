@@ -106,17 +106,16 @@
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
       (register-fn :set-conversation set-conversation)
       (register-fn :set-code set-code)
-      (register-fn :core-load-proj ; This is called by project.cljs when you change projects, and also below.
-              (fn [p] ; This is a map with two keys: :project/id :project/name (a proj-info element).
-                ;(when-not (= p proj) ;; ToDo: May not want to check this? Reload? SUR: of same text?
-                  (set-proj p)
-                  (set-conversation {:conv [] :conf-for proj})
-                  (-> p
-                      :project/id
-                      dba/get-conversation
-                      (p/then (fn [resp] (set-conversation resp) resp))
-                      (p/then (fn [resp] (set-code (:code resp)) resp))
-                      (p/then (fn [_] (ws/send-msg {:dispatch-key :resume-conversation :project-id (:project/id p)}))))))
+      (register-fn :core-load-proj ; This is called by project.cljs when you change projects.
+              (fn [p] ; p is a map with two keys: :project/id :project/name (a proj-info element).
+                (set-proj p)
+                (set-conversation {:conv [] :conf-for proj})
+                (-> p
+                    :project/id
+                    dba/get-conversation
+                    (p/then (fn [resp] (set-conversation resp) resp))
+                    (p/then (fn [resp] (set-code (:code resp)) resp))
+                    (p/then (fn [_] (ws/send-msg {:dispatch-key :resume-conversation :project-id (:project/id p)}))))))
       ;; Display the default current-project (a contrivance for development)
       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
           (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))

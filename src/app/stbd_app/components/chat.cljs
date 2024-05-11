@@ -29,8 +29,6 @@
 
 (defn inst2date "A string like 'Sat May 04 2024 12:33:14'" [inst] (-> (js/Date. inst) str (subs 0 25)))
 
-;;; ToDo: Could use (js/Date.parse "May 4, 2024 00:00:00 EDT") for example to get the date at start of day.
-;;;       Also haven't done hours!
 (defn dyn-msg-date
   "Return a string 'just now', '2 minutes ago' etc. for the argument Instant relative to now."
   [instant]
@@ -86,8 +84,8 @@
 
 (defnc Chat [{:keys [chat-height conv-map proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state (:conv conv-map))
-        [user-text     set-user-text]   (hooks/use-state "")                         ; Something the user said, plain text.
-        [sur-text      set-sur-text]    (hooks/use-state "")                         ; Something said by a surrogate, different path of execution than user-text.
+        [user-text set-user-text]       (hooks/use-state "")                         ; Something the user said, plain text.
+        [sur-text set-sur-text]         (hooks/use-state "")                         ; Something said by a surrogate, different path of execution than user-text.
         [tbd-text set-tbd-text]         (hooks/use-state "")                         ; Something the system said, a dispatch-obj with :msg.
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
@@ -96,9 +94,10 @@
     (hooks/use-effect :once ; These are used outside the component scope.
       (register-fn :set-tbd-text set-tbd-text)
       (register-fn :set-sur-text set-sur-text)
-      (register-fn :get-msg-list  (fn [] @msgs-atm))  ; These two used for update of message time
-      (register-fn :set-cs-msg-list set-cs-msg-list)  ; These two used for update of message time
+      (register-fn :get-msg-list  (fn [] @msgs-atm))  ; These two used to update message time.
+      (register-fn :set-cs-msg-list set-cs-msg-list)  ; These two used to update message time.
       (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-list)) 60000)))
+    ;; These are interrelated. For example, ((lookup-fn :set-sur-text) "foo") --> set-msg-list --> set-cs-msg-list --> UI update.
     (hooks/use-effect [conv-map]
       (-> conv-map :conv set-msg-list))
     (hooks/use-effect [msg-list]
@@ -112,7 +111,6 @@
         (set-msg-list (conj msg-list {:message/content sur-text :message/from :surrogate}))))
     (hooks/use-effect [user-text] ; Entered by user with send button. Send user-text to the server, and put it in the chat.
        (when (not-empty user-text)
-         (log/info "In user-text hook: user-text =" user-text)
          (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" user-text)
                [surrogate? product] (re-matches #"\s*SUR:(.*)" user-text)
                [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" user-text)

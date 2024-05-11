@@ -1,11 +1,3 @@
-;;; This is a proj-format structure. See shop.clj.
-;;; This example is being used to explore the idea that we can use state information to prune the domain outside of SHOP.
-;;; Thus instead of (stop-plan) all over the place, we place editing information into the domain that is used to prune off
-;;; parts of the domain that aren't relevant given state.
-
-;;; What I learned (I think!):
-;;;  - It is an error (:bad-input) to have a fact that unifies with the head of an axiom! Try this with craft beer and (process-defined craft-beer).
-
 ;;; After updating this:
 ;;; (sutil/register-planning-domain :process-interview (-> "data/planning-domains/process-interview-1.edn" slurp edn/read-string))
 
@@ -21,9 +13,7 @@
                                    :method/preconds [(ongoing-discussion ?proj)   ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
                                                      (proj-id ?proj)
                                                      (not (process-defined ?proj))]
-                                   :method/task-list [(discuss-process-detail ?proj)
-                                                      (!query-process-durs ?proj)
-                                                      (!yes-no-process-ordering ?proj)]}]}
+                                   :method/task-list [(discuss-process-detail ?proj)]}]}
 
                 ;; ====== (not (ongoing-discussion ?proj)) ===============================
                 ;; (!initial-question ?proj)
@@ -35,7 +25,8 @@
                 {:method/head (discuss-process-detail ?proj)
                  :method/rhsides [{:method/case-name "well-known"
                                    :method/preconds [(flow-shop ?proj)]
-                                   :method/task-list [(!yes-no-process-steps ?proj)]}
+                                   :method/task-list [(!yes-no-process-steps ?proj)
+                                                      (!query-process-durs ?proj)]}
                                   #_{:method/case-name "not-well-known"
                                      :method/preconds [(flow-shop ?proj) (not (well-known-process ?proj))]
                                      :method/task-list [(!query-process-steps ?proj)]}]}
@@ -47,22 +38,22 @@
 
                 ;; (!query-process-steps ?proj)
                 {:operator/head (!query-process-steps ?proj)
-                 :operator/preconds [(proj-id ?proj) (system-model ?proj flow)]
+                 :operator/preconds [(proj-id ?proj) (flow-shop ?proj)]
                  :operator/a-list [(have-process-steps ?proj)]}
 
                 ;; (!query-process-durs ?proj)
                 {:operator/head (!query-process-durs ?proj)
-                 :operator/preconds [(system-model ?proj flow)]
+                 :operator/preconds [(flow-shop ?proj)]
                  :operator/a-list [(have-process-durs ?proj)]}
 
                 ;; (!yes-no-process-ordering ?proj)
                 {:operator/head (!yes-no-process-ordering ?proj)
-                 :operator/preconds [#_(well-known-process ?proj) (system-model ?proj flow)]
+                 :operator/preconds [#_(well-known-process ?proj) (flow-shop ?proj)]
                  :operator/a-list [(have-process-ordering ?proj)]}
 
                 ;; (!query-process-ordering ?proj)
                 #_{:operator/head (!query-process-ordering ?proj)
-                 :operator/preconds [(not (well-known-process ?proj)) (system-model ?proj flow)]
+                 :operator/preconds [(not (well-known-process ?proj)) (flow-shop ?proj)]
                  :operator/a-list [(have-process-ordering ?proj)]}
 
                 ;; (:- (process-defined ?proj)  ; ToDo: Maybe wait until shop disappears, but would like to use process-defined in filtering.

@@ -507,16 +507,17 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
-  [pid from msg & tags]
-  (assert (#{:system :human :surrogate} from))
-  (assert (string? msg))
-  ;(log/info "add-msg: pid =" pid "msg =" msg)
-  (if-let [conn (connect-atm pid)]
-    (let [msg-id (inc (max-msg-id pid))]
-      (d/transact conn {:tx-data [{:db/id (project-exists? pid)
-                                   :project/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
-                                                       (not-empty tags) (assoc :message/tags (vec tags)))}]}))
-    (throw (ex-info "Could not connect to DB." {:pid pid}))))
+  ([pid from msg] (add-msg pid from msg []))
+  ([pid from msg tags]
+   (assert (#{:system :human :surrogate} from))
+   (assert (string? msg))
+   ;;(log/info "add-msg: pid =" pid "msg =" msg)
+   (if-let [conn (connect-atm pid)]
+     (let [msg-id (inc (max-msg-id pid))]
+       (d/transact conn {:tx-data [{:db/id (project-exists? pid)
+                                    :project/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
+                                                        (not-empty tags) (assoc :message/tags tags))}]}))
+     (throw (ex-info "Could not connect to DB." {:pid pid})))))
 
 (defn add-project
   "Add the argument project (a db-cfg map) to the system database."
