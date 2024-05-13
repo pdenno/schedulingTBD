@@ -8,8 +8,9 @@ Specifically, we are using this code to explore joint formulation of scheduling 
 The idea of implementations such as our MiniZinc effort is to probe the research question
 *"Can we effectively engage a person possessing little background in model formulation in a 'conversation' where we jointly formulate a model important to their work?"*
 Consequently, the code (Clojure and ClojureScript) provides a web app to host conversations about scheduling work, and when schedulingTBD is ready to go, it can be used to produce MiniZinc to schedule the user's work.
+
 As of this writing, we are mid-way through the work of interviewing to undertand a user's production processes (assuming they are doing manufacturing).
-Thus we are far enough to posit a few lines of MiniZinc formulation for the problem discussed with the user.
+Thus we are far enough along to posit a few lines of MiniZinc towards formulation of a solution for the problem discussed with the user.
 Our focus is currently on interviewing "surrogate humans" that are AI agents simulating expertise in a manufacturing domain.
 We plan to test hundreds of such surrogates before enabling similar functionality for human production experts.
 
