@@ -109,6 +109,8 @@
                                     []
                                     (:method/rhsides task))))
 
+;;; You will need to walk stop-here to pick the one you want, but having done that, do this:
+;;; (plan/satisfying-tasks (:task @plan/diag) (:elems @plan/diag) (:state @plan/diag))
 (defn satisfying-tasks
   "Return edited task patterns for operators and methods matching given, task (a positive literal), patterns, and state."
   [task patterns state]
@@ -197,7 +199,7 @@
 (defn stop-here [data]
   (reset! diag data))
 
-;;; (plan/plan9 project-id :process-interview-1 client-id {:start-facts (db/get-state project-id)}))
+;;; (plan/plan9 project-id :process-interview-1 client-id {:start-facts (db/get-state project-id)})
 (defn ^:diag plan9
   "A dynamic HTN planner.
    Operates on a stack (vector) of 'partials' (partial plans, described in the docstring of update-planning).
@@ -221,9 +223,11 @@
                                   partials (if-let [err (-> partials first :error)]
                                              (do (log/warn "***Plan fails owing to s-tasks" s-tasks)
                                                  (log/error err)
+                                                 (reset! diag {:err err :partials partials :s-tasks s-tasks :opts opts})
+                                                 (throw (ex-info "In dev quit here" {:err err :partials partials :s-tasks s-tasks :opts opts}))
                                                  (-> partials rest vec)
                                                  (ws/send-to-chat {:promise? false, :client-id client-id,
-                                                                   :msg (error-for-chat "We had a continuable problem in this conversation:\n" err)}))
+                                                                   :msg (error-for-chat "We had a problem in this conversation:\n" err)}))
                                              partials)]
                               (recur partials
                                      (inc cnt))))))
@@ -231,7 +235,9 @@
                            :success (error-for-chat "That's all the conversation we do right now.")
                            :stopped (error-for-chat "We stopped intentionally after 5 interactions.")
                            :failure (error-for-chat (str "We stopped owing to " (:reason result))) nil)]
+    ;; ToDo: Even this isn't sufficent at times!
     (when response-to-user
+      (Thread/sleep 1000) ; Wait to allow any request-converation/refresh-client to complete.
       (ws/send-to-chat {:promise? false, :client-id client-id, :msg response-to-user}))))
 
 

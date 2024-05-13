@@ -51,13 +51,13 @@
 (register-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
 (register-fn :load-proj             (fn [{:keys [new-proj-map]}] ((lookup-fn :core-load-proj) new-proj-map)))
 (register-fn :tbd-says              (fn [{:keys [p-key msg]}]
-                                               (when p-key (remember-promise p-key))
-                                               (log/info "tbd-says msg:" msg)
-                                               ((lookup-fn :set-tbd-text) msg)))
+                                      (when p-key (remember-promise p-key))
+                                      (log/info "tbd-says msg:" msg)
+                                      ((lookup-fn :set-tbd-text) msg)))
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
-                                               (when p-key (remember-promise p-key))
-                                               (log/info "sur-says msg:" msg)
-                                               ((lookup-fn :set-sur-text) msg)))
+                                      (when p-key (remember-promise p-key))
+                                      (log/info "sur-says msg:" msg)
+                                      ((lookup-fn :set-sur-text) msg)))
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
@@ -150,6 +150,6 @@
           (let [prom (p/deferred)]
             (reconnect! prom)
             (-> prom
-                (p/then (fn [_] (log/info "After wait state is" (.-readyState @channel))))
+                (p/then (fn [_] (log/info "After wait, state is" (.-readyState @channel))))
                 (p/then (fn [_] (.send @channel (str msg-obj)))))))
         (throw (ex-info "Couldn't send message; no channel." {:msg-obj msg-obj}))))))

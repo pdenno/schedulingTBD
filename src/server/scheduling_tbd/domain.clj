@@ -1,13 +1,16 @@
 (ns scheduling-tbd.domain
-  "Scheduling domain prompts."
+  "Scheduling domain prompts and analysis
+     - analyze: Function names that begin with 'analyze' study user/surrogate response and produce planning propositions.
+     - mzn: Function names that begin with 'mzn' use planning state to modify MiniZinc code."
   (:require
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
    [clojure.pprint                :refer [cl-format]]
    [clojure.string                :as str]
+   [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [find-fact yes-no-unknown string2sym]]
+   [scheduling-tbd.sutil          :as sutil :refer [connect-atm find-fact yes-no-unknown string2sym]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
@@ -91,150 +94,11 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Wrap the user-text in square brackets and send it to an LLM to suggest a project name.
    Returns a string consisting of just a few words."
   [user-text]
-  (reset! diag user-text)
   (as-> (conj project-name-partial
               {:role "user" :content (str "[ " user-text " ]")}) ?r
     (query-llm ?r {:model-class :gpt-4 :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
     (:project-name ?r)
     (if (string? ?r) ?r (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text})))))
-
-#_(defn pretend-you-manage-interview [what-you-manage & desc]
-  (let [high-level-desc (or (first desc)
-                            (-> what-you-manage
-                                pretend-you-manage-prompt
-                                (query-llm {:model-class :gpt-4 :raw-text? true})))
-        user-text {:role "user" :content (format "[%s]" high-level-desc)}
-        project-name (-> (conj project-name-partial user-text)
-                         (query-llm {:model-class :gpt-3.5})
-                         :summary
-                         (str/replace #"\s+" "-"))]
-    {:high-level    high-level-desc
-     :activity-name (-> (re-matches #"(.*)\s+scheduling" project-name) (nth 1))
-     :project-name  project-name
-     :objective     (-> (conj project-objective-partial user-text)
-                        (query-llm {:model-class :gpt-4})
-                        :objective)
-     :service?      (-> (conj service-vs-artifact-partial user-text)
-                        (query-llm {:model-class :gpt-4}))}))
-
-
-;;; ToDo: I've seen :snack-food going from {:service 0.5, :artifact 0.5}, {:service 0.0, :artifact 1.0}. I suppose delivering to a supply-chain partner....
-#_(defn test-service-vs-artifact
-  []
-  (reduce-kv (fn [m k v]
-               (try
-                 (let [user-text {:role "user" :content (format "[%s]" v)}]
-                   (assoc m k (-> (conj service-vs-artifact-partial user-text) (query-llm {:model-class :gpt-4}))))
-                 (catch Throwable e
-                   (assoc m k (format "Failed: %s" e)))))
-             {}
-             user-problems))
-
-;(reduce-kv (fn [m k v] (assoc m k (test-service-vs-artifact k))) {} user-problems)
-
-;;; (pretend-you-manage-interview "a company that sells snack foods to grocery chains")
-#_{:high-level
-     "The primary challenge in our scheduling process involves effectively coordinating all the steps in our supply chain, starting from raw material procurement to the final delivery of our snack foods to grocery chains.
-      We aim to maintain an optimal inventory level which involves proper timing of production runs to minimize stockouts and excess storage costs.
-      Seasonal fluctuations in demand, delays from suppliers, equipment breakdowns, and transportation delays pose consistent scheduling problems.
-      Additionally, the scheduling process needs to account for shelf-life of our products to prevent wastage.
-      Lastly, integrating all the processes within the firm and communicating the schedule effectively to all the stakeholders is a significant problem.",
-   :project-name "supply chain scheduling",
-   :objective "We aim to maintain an optimal inventory level which involves proper timing of production runs to minimize stockouts and excess storage costs."}
-
-;;; Thoughts:
-;;;   - That's a great description. Thank you GPT-4!
-;;;   - To set inventory levels, we will need to get a handle on demand AND supply fluctuation and what level of stockouts they are willing to tolerate. We need to see some demand data.
-;;;     There are a few common methods for calculating the level of inventory they need to maintain, some handle seasonality. We'd drop one of these into the MiniZinc and talk about it.
-;;;   - We need to see current inventory levels too.
-;;;   - There is a tradeoff between stockouts and storage cost. What they are talking about as storage cost is probably most about shelf-life,
-;;;     though we should ask whether sometimes finding sufficient room in the warehouse is a problem.
-;;;   - We'd work backwards from demand, associating products with production lines.
-;;;   - It isn't clear whether we are solving a problem for a single facility or not. We'd need to ask about that, and if multiple facilities, what runs where, what can run where, etc.
-
-;;; (pretend-you-manage-interview "a contracting company for paving")
-#_ {:high-level
-      "The principal scheduling problem faced is coordinating the availability of our clients, skilled work crew, and the delivery of material supplies.
-       Unpredictable weather conditions often lead to sudden schedule changes.
-       Also, delays in supply chain due to various reasons can significantly affect the timeline of the project.
-       Balancing multiple projects simultaneously without over-committing our resources is also a challenge.
-       Lastly, unanticipated repairs and maintenance of our paving equipment affects our work schedule.",
-    :project-name "construction project scheduling",
-    :objective "The principal scheduling problem faced is coordinating the availability of our clients, skilled work crew, and the delivery of material supplies."}
-
-;;; Thoughts:
-;;;   - This is project scheduling. I'll extend these examples with a request to classify, based just on the title, pick one of
-;;;     ["project scheduling", "fixed process scheduling", "service scheduling"].
-;;;     (next iteration of this exercise).
-;;;   - The sentence "Also, delays in supply chain due to various reasons can significantly affect the timeline of the project." seemed dubious to me.
-;;;    If the text makes vague mention of supply chain like this, we'd have to seek an elaboration.
-;;;    So offline I asked: "Enumerate the specific supply chain issues expressed in the following text (in double quotes): [the :high-level text above]"
-;;;    Result: "Based on the text provided, the specific supply chain issues faced in this scenario are:
-;;;
-;;;         1. Coordinating the availability of clients, skilled work crew, and material supplies.
-;;;         2. Unpredictable weather conditions leading to sudden schedule changes.
-;;;         3. Delays in supply chain affecting the timeline of the project.
-;;;         4. Balancing multiple projects simultaneously without over-committing resources.
-;;;         5. Unanticipated repairs and maintenance of paving equipment affecting the work schedule."
-;;;   - Generally these would make good constraints, but
-;;;            * "clients" in (1) is a problem
-;;;            * (3) just restates the question.
-;;;     Next iteration I'll ask for the supply chain issues of every problem.
-;;;   - I think project scheduling users ultimately want a Gantt that is reflective of the constraints on resource utilization.
-;;;     They want to be able to update the schedules every day with progress or lack thereof.
-;;;     I've done something like that before with Jupyter notebooks integrated with Mzn. But, of course, we'll focus on just getting the basic problem done in Mzn first.
-
-;;; (pretend-you-manage-interview "a job shop that makes injection molds")
-#_{:high-level
-   "The principal scheduling problem in running an injection mold job shop is coordinating the different job orders in a manner that optimizes our machine utilization and minimizes production time without leading to bottlenecks.
-    We must effectively manage the flow of materials from suppliers, ensuring that they're available exactly when needed to avoid delays.
-    It's also crucial to ensure our labor force is appropriately assigned to different tasks in the shop to maximize efficiency.
-    Lastly, unexpected maintenance or breakdowns of machinery can throw our schedule off and present a major challenge.
-    Central to all this is the need for high precision and quality in molds, which can potentially impact scheduling if reworks or corrections are required due to errors.",
-   :project-name "injection mold job shop scheduling", ; Note to self: GPT-3.5 can't count. I asked for 3 words or less.
-   :objective  "The principal scheduling problem in running an injection mold job shop is coordinating the different job orders in a manner that optimizes our machine utilization and minimizes production time without leading to bottlenecks."}
-
-;;; Thoughts:
-;;;    - The remark about high precision is useless, a red herring. Also "flow of materials from suppliers" isn't such a problem here. This one doesn't reflect reality too well.
-;;;      Compared to what we got for snack foods and paving, this doesn't seem very realistic to me.
-;;;    - Any time the user talks about resource utilization we need to ask if there is a consistent bottleneck resource.
-;;;      If there is, typically a model that schedules that resource works best.
-;;;      All the tasks leading up to the bottleneck can be "back scheduled" so that they start with sufficient time to be ready for the bottleneck resource when it is their turn.
-;;;    - Here we'd want to know the scope of what is scheduled. Do they have mold designs? Designs implicitly define process plans.
-;;;      I think deeper classification of "project scheduling" would help here. The title has "job shop scheduling" that gets us pretty far, generally speaking
-
-
-;;; (pretend-you-manage-interview "a craft brewery")
-#_{:high-level
-   "As the manager of a craft brewery, the principal scheduling problem is coordinating the production process to maintain a consistent supply of diverse beers without overproduction or storage issues.
-    This spans from the initial scheduling of raw materials procurement, to the fermenting process which can take weeks, and finally to the bottling and distribution procedures.
-    Additionally, managing seasonal demand fluctuations and accommodating special edition or experimental brews without disrupting the core product line adds complexity.
-    Timely maintenance of brewing equipment and quality check is also crucial to the schedule.
-    Lastly, ensuring synergies with marketing timelines and release dates is necessary to avoid any mismatch between supply and market launch.",
-   :project-name "craft brewery production scheduling",
-   :objective "the principal scheduling problem is coordinating the production process to maintain a consistent supply of diverse beers without overproduction or storage issues."}
-
-;;; Thoughts:
-;;;    - Unlike GPT-3.5-turbo, GPT-4 can count and I think 5 sentences is a good start. We might ask real users for 3-6 sentences.
-;;;    - A few us visited Flying Dog Brewery (when it was in Frederick) a while back. This seems to capture what they were saying pretty well!
-;;;    - Similar to what I said about "deeper classification" above, I think deeper on "fixed process scheduling" would help here.
-;;;      This is batch manufacturing without a place to put WIP. That makes it something like synchronous line discrete scheduling, but the products all follow the same path.
-;;;    - Whenever the problem classifies as "fixed process scheduling" we'll ask (either the LLM or the human) what the steps are. In the next iteration, I'll ask the LLM.
-
-;;; ------------------- Continuing...
-
-;;; Frequently, users (in the real world as well as the test data) will allude to inventory challenges.
-;;; There are two principal types: raw material and finished goods stockout.
-;;; Two things we'll need to do to help these people are:
-;;;   (1) Obviously don't schedule a task that quite likely won't have materials needed to carry it out, and
-;;;   (2) Offer to analyze their inventory management processes.
-;;; (1) is something we'll do soon, (2) quite a bit later. But the important point at the introduction is to steer the conversation away from the inventory problem.
-;;; We should try to characterize (mechanistically) the manufacturing problem first if at all possible.
-;;; Generally speaking, finished goods stock outs take things in different directions (e.g. demand forecasting) than raw materials.
-
-;;; ToDo:
-;;;   (1) Write the finished good version of the following, which handles raw-material shortages.
-;;;   (2) Get these into responses in the conversation.
 
 (def raw-material-challenge-partial
   [{:role "system"    :content "You are a helpful assistant."}
@@ -261,29 +125,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
             {:role "user" :content (format "[%s]" text)})
       (query-llm {:model-class :gpt-3.5})
       yes-no-unknown))
-
-;;; ToDo: This was written before I decided that domain.clj ought to require db and use it. Refactor this and its caller, !initial-question ?
-(defn project-name-analysis
-  "Analyze the response to the initial question, adding to the init-state vector."
-  [response init-state]
-  (log/info "prelim-analysis: init-state =" init-state "response =" response)
-  (let [[_ pid] (sutil/find-fact '(proj-id ?x) init-state)
-        proj-state (if (= pid :START-A-NEW-PROJECT)
-                     (let [proj-name (as-> (project-name-llm-query response) ?s
-                                       (str/trim ?s)
-                                       (str/split ?s #"\s+")
-                                       (map str/capitalize ?s)
-                                       (interpose " " ?s)
-                                       (apply str ?s))
-                           proj-id (as-> proj-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (symbol ?s))]
-                       (into (filterv #(not= % '(proj-id START-A-NEW-PROJECT)) init-state)
-                             `[(~'proj-id ~proj-id)
-                               (~'proj-name ~proj-name)]))
-                     ;; Otherwise, it is a surrogate; proj-id and proj-name are already known.
-                     init-state)]
-    (if (= :yes (text-cites-raw-material-challenge? response))
-        (conj proj-state (list 'cites-raw-material-challenge (-> pid name symbol)))
-        proj-state)))
 
 ;;; ----------------------- parallel expert preliminary analysis  ---------------------------------------------------------
 (defn ask-about-process-on-thread!
@@ -359,7 +200,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 
 ;;; ToDo: Define attributes in DB and test starting a parallel expert.
 (defn parallel-expert-prelim-analysis
-  "Do preliminary characterization of the scheduling problem including:
+  "Query surogate for preliminary characterization of the scheduling problem including:
       - product vs. service
       - production facility vs. customer site,
       - scheduling vs. project management, and
@@ -381,14 +222,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
      (if (string? answer)
        (do (when write?
              (db/add-msg pid :system query)
-             (db/add-msg pid :surrogate answer :process-description))
+             (db/add-msg pid :surrogate answer [:process-description]))
            (doseq [f [product-vs-service production-mode facility-vs-site]]
              (let [{:keys [query answer preds]} (f aid tid)]
                (swap! new-props into (map #(uni/subst % proj-bind) preds))
                (Thread/sleep 1000) ; ToDo: I'm guessing here. There might be problems in polling OpenAI to quickly???
                (when write?
-                 (db/add-msg pid :system query)
-                 (db/add-msg pid :surrogate answer))))
+                 (db/add-msg pid :system query [:query])
+                 (db/add-msg pid :surrogate answer [:response]))))
            ;; The job-shop/flow-shop question is relevant only in situations shown.
            (when (and (find-fact '(provides-product ?x) @new-props)
                       (find-fact '(has-production-facility ?x) @new-props))
@@ -407,10 +248,34 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   (let [procs (->> state (filter #(uni/unify % '(process-step ?pid ?num ?proc))) (sort-by #(nth % 2)) (mapv #(nth % 3)))]
     (cl-format nil "enum Task = {~{~a~^, ~}};" procs)))
 
-;;; --------------------------------------- unimplemented (from the plan) -----------------------------
-(defn yes-no-process-steps
+;;; -------------------------------- response analysis  -----------------------------------------------
+;;; ToDo: This was written before I decided that domain.clj ought to require db and use it. Refactor this and its caller, !initial-question ?
+(defn analyze-intro-response
+  "Analyze the response to the initial question, adding to the init-state vector."
+  [response init-state]
+  (log/info "prelim-analysis: init-state =" init-state "response =" response)
+  (let [[_ pid] (sutil/find-fact '(proj-id ?x) init-state)
+        proj-state (if (= pid :START-A-NEW-PROJECT)
+                     (let [proj-name (as-> (project-name-llm-query response) ?s
+                                       (str/trim ?s)
+                                       (str/split ?s #"\s+")
+                                       (map str/capitalize ?s)
+                                       (interpose " " ?s)
+                                       (apply str ?s))
+                           proj-id (as-> proj-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (symbol ?s))]
+                       (into (filterv #(not= % '(proj-id START-A-NEW-PROJECT)) init-state)
+                             `[(~'proj-id ~proj-id)
+                               (~'proj-name ~proj-name)]))
+                     ;; Otherwise, it is a surrogate; proj-id and proj-name are already known.
+                     init-state)]
+    (if (= :yes (text-cites-raw-material-challenge? response))
+        (conj proj-state (list 'cites-raw-material-challenge (-> pid name symbol)))
+        proj-state)))
+
+;;; ToDo: The process-step propositions are used to create a MZn enum. Otherwise not needed; they are going to be in the DB.
+(defn analyze-process-steps-response
   "Return state addition for analyzing a Y/N user response about process steps."
-  [{:keys [response pid agent-query] :as _obj}]
+  [{:keys [response pid] :as _obj}]
   (let [pid-sym (-> pid name symbol)
         steps (->> (for [line (str/split-lines response)]
                      (let [[success step-num proc-name] (re-matches #"^\s*(\d+)\.?\s+(\w+).*" line)]
@@ -420,16 +285,105 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                            nil
                            (list 'fails-process-step line)))))
                    (filterv identity))]
-    (db/add-msg pid :system agent-query :process-steps :query)
-    (db/add-msg pid :surrogate response :process-steps :response) ; <=================
     (conj steps (list 'have-process-steps pid-sym))))
 
-(defn query-process-durs
-  "Return state addition for analyzing a query to user about process durations."
-  [_response]
-  [])
+(defn extreme-dur-span?
+  "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more."
+  [pid process-id]
+  (let [units (atom #{})]
+    (letfn [(get-units [obj]
+              (cond (map? obj)    (doseq [[k v] (seq obj)]
+                                     (when (= k :quantity/units) (swap! units conj v))
+                                     (get-units v))
+                    (vector? obj) (doseq [v obj] (get-units v))))]
+      (-> (db/get-process pid process-id) get-units)
+      (let [units @units]
+        (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
+              (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-(defn yes-no-process-ordering
+;;; ToDo: If this prove unreliable, consider using an LLM. I anticipate using this function only with surrogates.
+(defn parse-duration
+  "Do whatever it takes to understand a string that supposed to have a duration in it.
+   Return a map with properties describing a quantity of time.
+   The properties may include :dur :dur-low :dur-high :conditions and :error"
+  [s]
+  (let [minutes? (when (re-matches #".*minute.*" s) :minutes)
+        hours?   (when (re-matches #".*hour.*" s) :hours)
+        days?    (when (re-matches #".*day.*" s) :days)
+        weeks?   (when (re-matches #".*week.*" s) :weeks)
+        months?  (when (re-matches #".*month.*" s) :months)
+        units (filter identity [minutes? hours? days? weeks? months?])
+        complex? (> (count units) 1)
+        units (first units)
+        [_ range-low range-high] (re-matches #".*(\d+)\-(\d+).*" s)
+        [_ qty] (re-matches #".*(\d+).*" s)
+        qty (or qty (cond (re-matches #".*\s*several\s+.*" s) :several
+                          (re-matches #".*\s*many\s+.*" s) :many
+                          (re-matches #".*\s*a few\s+.*" s) :a-few))]
+    ;; ToDo: "between...and ... ??? Or just forget it???
+    (if complex?
+      (when-let [[low high] (str/split s #"\s+to\s+")]
+        {:quantity-range/low  (parse-duration low)
+         :quantity-range/high (parse-duration high)})
+      (cond-> (cond (not qty) {:error s}
+                    range-low {}
+                    :else     {:quantity/value-string (str qty) :quantity/units units})
+        range-low  (assoc :quantity-range/low {:quantity/value-string range-low  :quantity/units units})
+        range-high (assoc :quantity-range/high {:quantity/value-string range-high :quantity/units units})))))
+
+(defn put-process-sequence!
+  "Write project/process-sequence to the project's database.
+   The 'infos' argument is a vector of maps such as produced by analyze-process-durs-response."
+  [infos pid response]
+  (let [p-names (mapv #(-> (sutil/string2sym (str (name pid) "--" (:process %))) keyword) infos)
+        objs (reduce (fn [res ix]
+                       (let [{:keys [duration]} (nth infos ix)]
+                         (conj res (cond-> {:process/id (nth p-names ix)}
+                                     duration (assoc :process/duration duration)
+                                     (> ix 0) (assoc :process/pre-processes [(nth p-names (dec ix))])))))
+                     []
+                     (-> p-names count range))
+        full-obj {:process/id pid
+                  :process/desc response
+                  :process/sub-processes objs}
+        conn (connect-atm pid)
+        eid (db/project-exists? pid)]
+    (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
+
+
+(defn analyze-process-durs-response
+  "Used predominantly with surrogates, study the response to a query about process durations,
+   writing findings to the project database and returning state propositions."
+  [{:keys [response pid] :as _obj}]
+  (let [failures (atom [])
+        proj-sym (-> pid name symbol)
+        lines (str/split-lines response)
+        processes (mapv #(let [[line process-order _ process] (re-matches #"^(\d+)(\.)?([^\(]+).*" %)]
+                           (if line
+                             {:line line
+                              :order (edn/read-string process-order)
+                              :process (str/trim process)}
+                             {:failure %}))
+                        lines)
+        infos (->> processes
+                   (map (fn [{:keys [line failure] :as obj}]
+                          (if line
+                            (if-let[[_ dur-str] (re-matches #"^\s*\d+[^\(]+(.+)" line)] ; I'm keeping the parentheses for now.
+                              (assoc obj :dur-str dur-str)
+                              (do (swap! failures #(into % (list 'fails-duration-parse line))) nil))
+                            (do (swap! failures #(into % (list 'fails-duration-parse failure))) nil))))
+                   (filter identity)
+                   (mapv #(assoc % :duration (parse-duration (:dur-str %)))))]
+    (put-process-sequence! infos pid response)
+    (let [extreme-span? (extreme-dur-span? pid pid)]
+      ;;(log/info "extreme-span? =" extreme-span?)
+      (cond-> [(list 'have-process-durs proj-sym)]
+        true              (into @failures)
+        extreme-span?    (conj `(~'extreme-duration-span ~proj-sym ~@(map #(-> % name symbol) extreme-span?)))))))
+
+;;; --------------------------------------- unimplemented (from the plan) -----------------------------
+
+(defn analyze-process-ordering-response
   "Return state addition for analyzing a Y/N user response about process ordering."
   [_response]
   [])

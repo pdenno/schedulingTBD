@@ -11,7 +11,7 @@
    [scheduling-tbd.domain :as dom]
    [scheduling-tbd.llm    :as llm]
    [scheduling-tbd.specs  :as spec]
-   [scheduling-tbd.sutil  :as sutil :refer [find-fact error-for-chat]]
+   [scheduling-tbd.sutil  :as sutil :refer [find-fact]]
    [scheduling-tbd.web.websockets  :as ws]
    [taoensso.timbre       :as log]))
 
@@ -138,7 +138,7 @@
         state))
     (throw (ex-info "Couldn't find PID in human project." {:state state}))))
 
-(defn chat-pair
+(defn chat-pair-aux
   "Run one query/response pair of chat elements with a human or a surrogate.
    Returns promise which will resolve to the original obj argument except:
      1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
@@ -156,8 +156,20 @@
                (ws/send-to-chat (-> obj
                                     (assoc :msg agent-query)
                                     (assoc :dispatch-key :tbd-says))))]                                             ; This cannot timeout.
-    (log/info "prom =" prom)
     (p/await prom))); You can't put anything else here or a promise will be passed!
+
+(defn chat-pair
+  "Call to run the chat and put the query and response into the project's database.
+   Returns the argument object with :response set to some text."
+  ([obj] (chat-pair obj []))
+  ([{:keys [pid state agent-query] :as obj} msg-keys]
+   (let [response-text (chat-pair-aux obj)]
+     (if (string? response-text)
+       (let [user-role (if (surrogate? state) :surrogate :human)]
+         (db/add-msg pid :system agent-query (conj msg-keys :query))
+         (db/add-msg pid user-role response-text (conj msg-keys :response))
+         (assoc obj :response response-text))
+       (throw (ex-info "Unknown response from operator" {:response response-text}))))))
 
 ;;;=================================================== Operators ======================================
 ;;; Operator db-actions update state in the db (db/add-plannin-state) and return nil.
@@ -173,30 +185,17 @@
    {:msg-text/string "."}])
 
 (defoperator :!initial-question [{:keys [state] :as obj}]
-  (try (let [agent-query (if (surrogate? state)
-                         "Describe your most significant scheduling problem in a few sentences."
-                         (str "Describe your most significant scheduling problem in a few sentences or "
-                              "<a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>."))
-             obj (assoc obj :agent-query agent-query)
-             response (chat-pair obj)]
-         ;; Owing to weirdness of chat-pair p/await call this is done here.
-         (cond (string? response)                   (-> obj
-                                                        (assoc :response response)
-                                                        db-action) ; Continue
-               (and (map? response)
-                    (contains? response :error))        response    ; Error
-
-               :else (throw (ex-info "Unknown response from !initial-question (operator)"
-                                     {:response response}))))
-       (catch Exception e
-         (log/error "!initial-question error:" e)
-         {:result :failure :reason "processing response"})))
+  (let [agent-query (if (surrogate? state)
+                      "Describe your most significant scheduling problem in a few sentences."
+                      (str "Describe your most significant scheduling problem in a few sentences or "
+                           "<a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>."))]
+    (-> obj (assoc :agent-query agent-query) (chat-pair [:initial-question]) db-action)))
 
 ;;; (op/db-action (assoc op/example :client-id (ws/recent-client!)))
 (defaction :!initial-question [{:keys [state response client-id agent-query] :as _obj}]
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
   (let [surrogate? (surrogate? state)
-        analysis-state (dom/project-name-analysis response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
+        analysis-state (dom/analyze-intro-response response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
     (when-not surrogate? (make-human-project analysis-state))
     ;;--------  Now human/surrogate can be treated nearly identically ---------
     (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
@@ -204,10 +203,7 @@
           cites-supply? (find-fact '(cites-raw-material-challenge ?x) analysis-state)
           pid (keyword pid)]
       (db/add-planning-state pid analysis-state)
-      (log/info "DB and app actions on PID =" pid)
-      (db/add-msg pid :system agent-query)  ; ToDo: I'm not catching the error when this is wrong!
-      (db/add-msg pid (if surrogate? :surrogate :human) response)
-      (db/add-msg pid :system (format "Great, we'll call your project %s." pname))
+      (db/add-msg pid :system (format "Great, we'll call your project %s." pname) [:informative])
       (when cites-supply?
         (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
                        "we'd like to put that aside for a minute and talk about the processes that make product.")]
@@ -216,31 +212,26 @@
       ;; Complete preliminary analysis in a parallel agent that, in the case of a human expert, works independently.
       (db/add-planning-state pid (dom/parallel-expert-prelim-analysis pid)))))
 
-;;; ----- :!yes-no-process-steps
+;;; ----- :!yes-no-process-steps ---------------------------------------------------------------------------------------------------------------------
 (defoperator :!yes-no-process-steps [{:keys [state] :as obj}]
   (let [agent-query (if (surrogate? state)
                       (str "Please list the steps of your process, one per line in the order they are executed to produce a product, "
                            "so it looks like this:\n"
                            "1. (the first step)\n"
-                           "2. (the second step)\n...")
-                      "Select the process steps from the list on the right that are typically part of your processes. \n (When done hit \"Submit\".)")
-        obj (assoc obj :agent-query agent-query)
-        response (chat-pair obj)]
-    (-> obj
-        (assoc :response response)
-        db-action)))
-
-(def minizinc-enum-announce
-  (str "Okay, we now know enough to get started on a MiniZinc solution.\n"
-       "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>.\n"
-       "The 'enum values' name the steps of your process in the order they are executed for each product."))
+                           "2. (the second step)...\n")
+                      "Select the process steps from the list on the right that are typically part of your processes. \n (When done hit \"Submit\".)")]
+    (-> obj (assoc :agent-query agent-query) (chat-pair [:process-steps]) db-action)))
 
 (defaction :!yes-no-process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
   (reset! diag obj)
   (log/info "!yes-no-process-steps (action): response =" response)
-  (let [more-state (dom/yes-no-process-steps obj)
-        new-code (dom/mzn-process-steps more-state)]
+  (let [more-state (dom/analyze-process-steps-response obj)
+        new-code (dom/mzn-process-steps more-state)
+        minizinc-enum-announce
+        (str "Okay, we now know enough to get started on a MiniZinc solution.\n"
+             "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>.\n"
+             "The 'enum values' name the steps of your process in the order they are executed for each product.")]
     (db/add-planning-state pid more-state)
     (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
     (db/put-code pid new-code)
@@ -249,35 +240,24 @@
                       :dispatch-key :tbd-says
                       :promise? false
                       :msg minizinc-enum-announce})
-    (db/add-msg pid :system minizinc-enum-announce :info-to-user :minizinc)
+    (db/add-msg pid :system minizinc-enum-announce [:info-to-user :minizinc])
     more-state))
 
-;;; ----- :!query-process-durs
-(defoperator :!query-process-durs [obj]
-  (log/info "!query-process-durs: response =" obj)
-  (let [msg "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)"
-        obj (assoc obj :agent-query msg)
-        response (chat-pair obj)]
-    (-> obj
-        (assoc :response response)
-        db-action)))
+;;; ----- :!query-process-durs ---------------------------------------------------------------------------------------------------------------------
+(defoperator :!query-process-durs [{:keys [state] :as obj}]
+  (let [agent-query (if (surrogate? state)
+                      (format (str "I suppose processing times for each of the steps you just mentioned might vary from product to product. "
+                                   "But generally speaking, how long does each step take? "
+                                   "Please produce a list just like the one you did for process steps (one process per line), but add to it the typical processing time "
+                                   "so it looks like this:\n"
+                                   "1. %s (some amount of time)\n"
+                                   "2. %s (some amount of time)\n...")
+                              (-> (find-fact '(process-step ?proj 1 ?process) state) (nth 3))
+                              (-> (find-fact '(process-step ?proj 2 ?process) state) (nth 3)))
+                      "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)")]
+    (-> obj (assoc :agent-query agent-query) (chat-pair [:process-durs]) db-action)))
 
 (defaction :!query-process-durs [{:keys [response pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
-  (let [more-state (dom/query-process-durs response)]
+  (let [more-state (dom/analyze-process-durs-response obj)]
     (db/add-planning-state pid more-state)))
-
-;;; ----- :!yes-no-process-steps
-(defoperator :!yes-no-process-ordering [obj]
-  (log/info "!yes-no-process-ordering: obj =" obj)
-  (let [msg "If the processes listed are not in the correct order, please reorder them. \n (When done hit \"Submit\".)"
-        obj (assoc obj :agent-query msg)
-        response (chat-pair (assoc obj :agent-query msg))]
-    (-> obj
-        (assoc :response response)
-        db-action)))
-
-(defaction :!yes-no-process-ordering [{:keys [response pid] :as obj}]
-  (log/info "!yes-no-process-ordering (action): response =" response "obj =" obj)
-    (let [more-state (dom/yes-no-process-ordering response)]
-      (db/add-planning-state pid more-state)))

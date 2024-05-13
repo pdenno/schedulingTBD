@@ -19,8 +19,8 @@
           itext (format sur/system-instruction expertise) ; Not used here, I just want to print it.
           aid (sur/ensure-surrogate pid (str "SUR " expertise))
           tid (db/get-thread-id pid nil)
-          qtext (op/reword-for-agent op/intro-prompt :surrogate)
-          prom (px/submit! (fn [] (llm/query-on-thread :tid tid :aid aid :query-text (op/msg-vec2text qtext))))
+          qtext "Describe your most significant scheduling problem in a few sentences."
+          prom (px/submit! (fn [] (llm/query-on-thread :tid tid :aid aid :query-text qtext)))
           res (p/await prom)]
     (log/info "itext =" itext)
     (log/info "qtext =" qtext)
