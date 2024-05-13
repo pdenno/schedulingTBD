@@ -11,11 +11,11 @@ Consequently, the code (Clojure and ClojureScript) provides a web app to host co
 
 As of this writing, we are mid-way through the work of interviewing to undertand a user's production processes (assuming they are doing manufacturing).
 Thus we are far enough along to posit a few lines of MiniZinc towards formulation of a solution for the problem discussed with the user.
-Our focus is currently on interviewing "surrogate humans" that are AI agents simulating expertise in a manufacturing domain.
+Our focus is currently on interviewing "surrogate humans", AI agents simulating expertise in a manufacturing domain.
 We plan to test hundreds of such surrogates before enabling similar functionality for human production experts.
 
 The software is being developed as part of the NIST project [Human/AI Teaming for Manufacturing Digital Twins](https://www.nist.gov/programs-projects/humanmachine-teaming-manufacturing-digital-twins).
-Feel free to contact us if this work interest you!
+Feel free to contact us if this work interests you!
 
 ## Building/Running (development mode)
 
