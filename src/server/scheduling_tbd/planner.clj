@@ -223,9 +223,11 @@
                                   partials (if-let [err (-> partials first :error)]
                                              (do (log/warn "***Plan fails owing to s-tasks" s-tasks)
                                                  (log/error err)
+                                                 (reset! diag {:err err :partials partials :s-tasks s-tasks :opts opts})
+                                                 (throw (ex-info "In dev quit here" {:err err :partials partials :s-tasks s-tasks :opts opts}))
                                                  (-> partials rest vec)
                                                  (ws/send-to-chat {:promise? false, :client-id client-id,
-                                                                   :msg (error-for-chat "We had a continuable problem in this conversation:\n" err)}))
+                                                                   :msg (error-for-chat "We had a problem in this conversation:\n" err)}))
                                              partials)]
                               (recur partials
                                      (inc cnt))))))

@@ -46,6 +46,11 @@
   "Defines schema for a project plus metadata :mm/info.
    To eliminate confusion and need for back pointers, each project has its own db."
   {
+   ;; ---------------------- duration
+   :duration/value
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "a reference to map describing a quantity of time."}
+
    ;; ---------------------- message
    :message/content
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
@@ -55,13 +60,25 @@
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
    :message/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
-        :doc "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, which aren't stored, some values can be skipped."}
+        :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, "
+                  "which aren't stored, some values can be skipped.")}
    :message/tags
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "Optional keywords used to classify the message."}
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
+
+   ;; ---------------------- objective (about a scheduling objective)
+   :objective/code
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "MiniZinc expressing the scheduling object."}
+   :objective/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "a keyword naming something to be accomplished."}
+   :objective/text
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
+        :doc "strings expressing the scheduling objective."}
 
    ;; ---------------------- problem (the planning problem and current state)
    :problem/domain
@@ -73,6 +90,53 @@
    :problem/state-string
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "A string that can be edn/read-string into a set of predicates"}
+
+   ;; ---------------------- process (about production process types)
+   :process/desc
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a description of this this process; perhaps stated in an interview."}
+   :process/duration
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "a reference to a duration (dur) object; typically an estimate"}
+   :process/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc (str "A string, perhaps from an interview uniquely identifying the process."
+                  "The top-level production process will have a process-type/id = :project/id.")}
+   :process/pre-processes
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "a process/id identifying a process that must occur before this task "}
+   :process/resource
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "a keyword naming a resource (type or instance) used in this task"}
+   :process/sub-processes
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "process objects that occur within the scope of this project object"}
+   :process/uri
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
+        :doc "a URI pointing to information about this process type (e.g. in an ontology)."}
+
+   ;; ---------------------- process-instance (about actual process that have occurred or will occur).
+   :process-instance/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "a keyword naming the task; unique to the project."}
+   :process-instance/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a name for conversation about this task; unique to the project."}
+   :process-instance/desc
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "a description of this this task; unique to the project."}
+   :process-instance/pre-task
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "a task/name identifying a task that must occur before this task "}
+   :process-instance/resource-inst
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "a keyword naming a :res-t/id or :res-i/id (type or instance) used in this task"}
+   :process-instance/start
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
+        :doc "a instant object indicating when the process started."}
+   :process-instance/end
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
+        :doc "a instant object indicating when the process ended."}
 
    ;; ---------------------- project
    :project/code
@@ -94,9 +158,15 @@
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
+   :project/objective
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "a reference to the scheduling objective of the project."}
    :project/planning-problem
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "an object with keys :problem/domain, :problem/goal-string, and :problem/state-string at least."}
+   :project/processes
+      #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "the project's process objects; everything about processes."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
@@ -104,38 +174,48 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if domain expertise is provided by an artificial agent."}
 
-   ;; ---------------------- summary
-   :summary/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "the value 'SUMMARY'. This is used to keep information about the state of the conversation."}
-   :summary/interview-state
+   ;; ---------------------- quantity (an amount of something)
+   :quantity/value-string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string on which edn/read-string can be applied to produce a number or term like :several."}
+   :quantity/units
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a keyword (enum val from some set; ns=interview-state) indicating the current disposition of the interview."}
+        :doc "a keyword identifying the units of measure, :weeks, :months, :meters, etc."}
+
+   ;; ---------------------- quantity-range (a map with two properties low and high, the values of which are quantities.
+   :quantity-range/low
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "a quantity value expressing the low end of a range of values."}
+
+   :quantity-range/high
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "a quantity value expressing the high end of a range of values."}
+
    ;; ---------------------- resource type
-   :res-t/id
+   :resource-type/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the task type; unique to the project."}
-   :res-t/name
+        :doc "a keyword naming the resource type; unique to the project."}
+   :resource-type/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this task; unique to the project."}
-   :res-t/desc
+        :doc "a name for conversation about this resource; unique to the project."}
+   :resource-type/desc
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this this task; unique to the project."}
-   :res-t/uri
+        :doc "a description of this this resource; unique to the project."}
+   :resource-type/uri
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a URI pointing to information about this type (e.g. in an ontology)."}
 
    ;; ---------------------- resource instance
-   :res-i/id
+   :resource/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the task; unique to the project."}
-   :res-i/name
+        :doc "a keyword naming the resource; unique to the project."}
+   :resource/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this task"}
-   :res-i/desc
+        :doc "a name for conversation about this resource"}
+   :resource/desc
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this this task"}
-   :res-i/uri
+        :doc "a description of this resource"}
+   :resource/uri
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
 
@@ -160,61 +240,7 @@
 
    :surrogate/assistant-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "Stringified EDN for what OpenAI (or similar) returns when an assistant is created."}
-
-   ;; ---------------------- task instance
-   :task-i/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the task; unique to the project."}
-   :task-i/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this task; unique to the project."}
-   :task-i/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a description of this this task; unique to the project."}
-   :task-i/pre-task
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a task/name identifying a task that must occur before this task "}
-   :task-i/resource-inst
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a keyword naming a :res-t/id or :res-i/id (type or instance) used in this task"}
-   :task-i/duration-est
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to a duration (dur) object"}
-   :task-i/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
-
-      ;; ---------------------- task type (Of course these are not planner tasks!)
-   :task-t/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the task; unique to the project."}
-   :task-t/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this task; unique to the project."}
-   :task-t/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this this task; unique to the project."}
-   :task-t/pre-task
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a task/name identifying a task that must occur before this task "}
-   :task-t/resource-type
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "a keyword naming a resource (type or instance) used in this task"}
-   :task-t/duration-est
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to a duration (dur) object"}
-   :task-t/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
-
-   ;; ---------------------- work
-   :work/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming something to be accomplished."}
-   :work/objective-sentence
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The sentence from user description best describing the scheduling objective."}})
+        :doc "Stringified EDN for what OpenAI (or similar) returns when an assistant is created."}})
 
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
@@ -379,6 +405,19 @@
   (log/info "add-planning-state: more-state = " more-state)
   (put-planning-state pid (into (get-planning-state pid) more-state)))
 
+(defn get-process
+  "Return the process structure for the argument pid and process-id."
+  [pid proc-id]
+  (assert (keyword? pid))
+  (assert (keyword? proc-id))
+  (let [conn (connect-atm pid)
+        eid (d/q '[:find ?eid .
+                   :in $ ?proc-id
+                   :where [?eid :process/id ?proc-id]]
+                 @conn
+                 proc-id)]
+    (resolve-db-id {:db/id eid} conn)))
+
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
   [id & {:keys [target-dir] :or {target-dir "data/projects/"}}]
@@ -509,6 +548,7 @@
   "Create a message object and add it to the database with :project/id = id."
   ([pid from msg] (add-msg pid from msg []))
   ([pid from msg tags]
+   (reset! diag [pid from msg tags])
    (assert (#{:system :human :surrogate} from))
    (assert (string? msg))
    ;;(log/info "add-msg: pid =" pid "msg =" msg)

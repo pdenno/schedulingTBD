@@ -7,9 +7,10 @@
    [clojure.edn                   :as edn]
    [clojure.pprint                :refer [cl-format]]
    [clojure.string                :as str]
+   [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [find-fact yes-no-unknown string2sym]]
+   [scheduling-tbd.sutil          :as sutil :refer [connect-atm find-fact yes-no-unknown string2sym]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
@@ -93,7 +94,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Wrap the user-text in square brackets and send it to an LLM to suggest a project name.
    Returns a string consisting of just a few words."
   [user-text]
-  (reset! diag user-text)
   (as-> (conj project-name-partial
               {:role "user" :content (str "[ " user-text " ]")}) ?r
     (query-llm ?r {:model-class :gpt-4 :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
@@ -272,6 +272,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (conj proj-state (list 'cites-raw-material-challenge (-> pid name symbol)))
         proj-state)))
 
+;;; ToDo: The process-step propositions are used to create a MZn enum. Otherwise not needed; they are going to be in the DB.
 (defn analyze-process-steps-response
   "Return state addition for analyzing a Y/N user response about process steps."
   [{:keys [response pid] :as _obj}]
@@ -286,6 +287,19 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                    (filterv identity))]
     (conj steps (list 'have-process-steps pid-sym))))
 
+(defn extreme-dur-span?
+  "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more."
+  [pid process-id]
+  (let [units (atom #{})]
+    (letfn [(get-units [obj]
+              (cond (map? obj)    (doseq [[k v] (seq obj)]
+                                     (when (= k :quantity/units) (swap! units conj v))
+                                     (get-units v))
+                    (vector? obj) (doseq [v obj] (get-units v))))]
+      (-> (db/get-process pid process-id) get-units)
+      (let [units @units]
+        (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
+              (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
 ;;; ToDo: If this prove unreliable, consider using an LLM. I anticipate using this function only with surrogates.
 (defn parse-duration
@@ -301,34 +315,71 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         units (filter identity [minutes? hours? days? weeks? months?])
         complex? (> (count units) 1)
         units (first units)
-        [success? range-low range-high] (re-matches #".*(\d+)\-(\d+).*" s)
-        range-low (when success? (edn/read-string range-low))
-        range-high (when success? (edn/read-string range-high))
+        [_ range-low range-high] (re-matches #".*(\d+)\-(\d+).*" s)
         [_ qty] (re-matches #".*(\d+).*" s)
         qty (or qty (cond (re-matches #".*\s*several\s+.*" s) :several
                           (re-matches #".*\s*many\s+.*" s) :many
                           (re-matches #".*\s*a few\s+.*" s) :a-few))]
     ;; ToDo: "between...and ... ??? Or just forget it???
     (if complex?
-      (let [[low high] (str/split s #"\s+to\s+")]
-        {:dur-low  (-> (parse-duration low) :dur)
-         :dur-high (-> (parse-duration high) :dur)})
-      (cond-> {}
-        range-low (assoc :dur-low {:qty range-low :units units})
-        range-high (assoc :dur-high {:qty range-high :units units})
-        (not qty)  (assoc :error s)
-        (not range-low) (assoc :dur {:qty (if (keyword? qty) qty (edn/read-string qty))
-                                     :units units})))))
+      (when-let [[low high] (str/split s #"\s+to\s+")]
+        {:quantity-range/low  (parse-duration low)
+         :quantity-range/high (parse-duration high)})
+      (cond-> (cond (not qty) {:error s}
+                    range-low {}
+                    :else     {:quantity/value-string (str qty) :quantity/units units})
+        range-low  (assoc :quantity-range/low {:quantity/value-string range-low  :quantity/units units})
+        range-high (assoc :quantity-range/high {:quantity/value-string range-high :quantity/units units})))))
+
+(defn put-process-sequence!
+  "Write project/process-sequence to the project's database.
+   The 'infos' argument is a vector of maps such as produced by analyze-process-durs-response."
+  [infos pid response]
+  (let [p-names (mapv #(-> (sutil/string2sym (str (name pid) "--" (:process %))) keyword) infos)
+        objs (reduce (fn [res ix]
+                       (let [{:keys [duration]} (nth infos ix)]
+                         (conj res (cond-> {:process/id (nth p-names ix)}
+                                     duration (assoc :process/duration duration)
+                                     (> ix 0) (assoc :process/pre-processes [(nth p-names (dec ix))])))))
+                     []
+                     (-> p-names count range))
+        full-obj {:process/id pid
+                  :process/desc response
+                  :process/sub-processes objs}
+        conn (connect-atm pid)
+        eid (db/project-exists? pid)]
+    (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
+
 
 (defn analyze-process-durs-response
-  "Return state addition for analyzing a query to user about process durations."
+  "Used predominantly with surrogates, study the response to a query about process durations,
+   writing findings to the project database and returning state propositions."
   [{:keys [response pid] :as _obj}]
-  (let [lines (str/split-lines response)]
-    (->> lines
-         (map (fn [s]
-                (let [[success? dur-str] (re-matches #"^\s*\d+[^\(]+(.+)" s)] ; I'm keeping the parentheses for now.
-                  (if success? dur-str "Expected value in parentheses."))))
-         (mapv parse-duration))))
+  (let [failures (atom [])
+        proj-sym (-> pid name symbol)
+        lines (str/split-lines response)
+        processes (mapv #(let [[line process-order _ process] (re-matches #"^(\d+)(\.)?([^\(]+).*" %)]
+                           (if line
+                             {:line line
+                              :order (edn/read-string process-order)
+                              :process (str/trim process)}
+                             {:failure %}))
+                        lines)
+        infos (->> processes
+                   (map (fn [{:keys [line failure] :as obj}]
+                          (if line
+                            (if-let[[_ dur-str] (re-matches #"^\s*\d+[^\(]+(.+)" line)] ; I'm keeping the parentheses for now.
+                              (assoc obj :dur-str dur-str)
+                              (do (swap! failures #(into % (list 'fails-duration-parse line))) nil))
+                            (do (swap! failures #(into % (list 'fails-duration-parse failure))) nil))))
+                   (filter identity)
+                   (mapv #(assoc % :duration (parse-duration (:dur-str %)))))]
+    (put-process-sequence! infos pid response)
+    (let [extreme-span? (extreme-dur-span? pid pid)]
+      ;;(log/info "extreme-span? =" extreme-span?)
+      (cond-> [(list 'have-process-durs proj-sym)]
+        true              (into @failures)
+        extreme-span?    (conj `(~'extreme-duration-span ~proj-sym ~@(map #(-> % name symbol) extreme-span?)))))))
 
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 

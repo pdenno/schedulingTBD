@@ -318,6 +318,7 @@
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]
   (when-not (= :ping dispatch-key)  (log/info "dispatch: Received msg:" msg))
+  (when-not (= :ping dispatch-key)  (reset! diag msg))
   (let [res (cond (= dispatch-key :stop)                        nil ; What needs to be done has already been done.
                   (contains? @dispatch-table dispatch-key)      ((get @dispatch-table dispatch-key) msg)
                   :else                                         (log/error "No dispatch function for " msg))]

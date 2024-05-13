@@ -156,7 +156,6 @@
                (ws/send-to-chat (-> obj
                                     (assoc :msg agent-query)
                                     (assoc :dispatch-key :tbd-says))))]                                             ; This cannot timeout.
-    (log/info "prom =" prom)
     (p/await prom))); You can't put anything else here or a promise will be passed!
 
 (defn chat-pair
@@ -204,7 +203,7 @@
           cites-supply? (find-fact '(cites-raw-material-challenge ?x) analysis-state)
           pid (keyword pid)]
       (db/add-planning-state pid analysis-state)
-      (db/add-msg pid :system (format "Great, we'll call your project %s." pname) :informative)
+      (db/add-msg pid :system (format "Great, we'll call your project %s." pname) [:informative])
       (when cites-supply?
         (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
                        "we'd like to put that aside for a minute and talk about the processes that make product.")]
@@ -245,7 +244,6 @@
     more-state))
 
 ;;; ----- :!query-process-durs ---------------------------------------------------------------------------------------------------------------------
-
 (defoperator :!query-process-durs [{:keys [state] :as obj}]
   (let [agent-query (if (surrogate? state)
                       (format (str "I suppose processing times for each of the steps you just mentioned might vary from product to product. "
@@ -262,4 +260,4 @@
 (defaction :!query-process-durs [{:keys [response pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
   (let [more-state (dom/analyze-process-durs-response obj)]
-    #_(db/add-planning-state pid more-state)))
+    (db/add-planning-state pid more-state)))
