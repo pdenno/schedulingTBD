@@ -2,38 +2,32 @@
 
 ## Introduction
 
-SchedulingTBD is exploratory software for writing systems that enable joint (human/AI) formulation of analytical models in an implemented domain specific language (DSL).
-Currently, we are using this code to explore joint formulation of scheduling problems with [MiniZinc](https://www.minizinc.org/) as the DSL.
+SchedulingTBD is exploratory software to study systems that enable joint (human/AI) formulation of analytical models in a given domain specific language (DSL).
+
+Specifically, we are using this code to explore joint formulation of scheduling problems with [MiniZinc](https://www.minizinc.org/) as the DSL.
 The idea of implementations such as our MiniZinc effort is to probe the research question
 *"Can we effectively engage a person possessing little background in model formulation in a 'conversation' where we jointly formulate a model important to their work?"*
 Consequently, the code (Clojure and ClojureScript) provides a web app to host conversations about scheduling work, and when schedulingTBD is ready to go, it can be used to produce MiniZinc to schedule the user's work.
+As of this writing, we are mid-way through the work of interviewing to undertand a user's production processes (assuming they are doing manufacturing).
+Thus we are far enough to posit a few lines of MiniZinc formulation for the problem discussed with the user.
+Our focus is currently on interviewing "surrogate humans" that are AI agents simulating expertise in a manufacturing domain.
+We plan to test hundreds of such surrogates before enabling similar functionality for human production experts.
 
-As of this writing, September 2023, we are just getting start with this idea.
-It is part of a NIST project, ”Human/Machine Teaming for Manufacturing Digital Twins.”
-I think we want the web app to provide tools to author and capture results from teaming sessions.
-The authoring capabilities provided to experts in use of the analytical tool (and its DSL) would include
-(a) authoring few-shot prompts to large language models (LLMs) to analyze the user’s contribution to the conversation, and
-(b) authoring plan steps to an AI planner that directs the conversation.
-
-Currently the tool does little more than get things started.
-(See the screenshot below.)
-I think we might [SHOP3](https://github.com/shop-planner/shop3)
-(and updated version of University of Maryland's Simple Hierarchical Ordered Planner (SHOP)) in
-an on-line partially observable Markov descision process (on-line POMDP).
-But we'll start by generating test cases running mostly static interviews.
+The software is being developed as part of the NIST project [Human/AI Teaming for Manufacturing Digital Twins](https://www.nist.gov/programs-projects/humanmachine-teaming-manufacturing-digital-twins).
+Feel free to contact us if this work interest you!
 
 ## Building/Running (development mode)
 
 ## Set up an environment variable to find the databases
   * In your .bashrc define the following: `export SCHEDULING_TBD_DB=/opt/scheduling`
-  * Note that we've only tried Linux and Macs, and judging by what I see in the data files (e.g. data/system.edn) the code will only 
-    handle this particular configuration and just the linux and Mac platforms. There's a ToDo for the developers.
+  * Note that we've only tried Linux and Macs, and judging by what I see in the data files (e.g. data/system.edn) the code will only
+	handle this particular configuration and just the linux and Mac platforms. There's a ToDo for the developers.
 
 ### The server
   * Install install a Java JDK and [Clojure](https://clojure.org/).
   * Start a server REPL by starting Clojure in your editor from anywhere in the repository and running `(start)` in the `user` namespace.
   * If you are starting from scratch, you'll need to create the system and projects databases. The files for these are data/system-db.edn and the edn files in data/projects.
- 
+
  ```
 (in-ns 'scheduling-tbd.db)
 (recreate-system-db!)
