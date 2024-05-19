@@ -7,6 +7,7 @@
    [promesa.core          :as p]
    [scheduling-tbd.domain :as domain]
    [scheduling-tbd.db    :as db]
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm]]
    [scheduling-tbd.llm    :as llm :refer [query-llm]]
    [taoensso.timbre          :as log]))
 
@@ -27,13 +28,14 @@
   ;(alias 'domt    'scheduling-tbd.domain-test)
   (alias 'how    'scheduling-tbd.how-made)
   (alias 'llm    'scheduling-tbd.llm)
+  (alias 'llmt    'scheduling-tbd.llm-test)
   ;(alias 'llmt   'scheduling-tbd.llm-test)
   (alias 'op     'scheduling-tbd.operators)
 ;  (alias 'opt    'scheduling-tbd.operators-test)
   (alias 'plan   'scheduling-tbd.planner)
   (alias 'resp   'scheduling-tbd.web.controllers.respond)
   (alias 'spec   'scheduling-tbd.specs)
-  (alias 'sutil  'scheduling-tbd.sutil)
+; (alias 'sutil  'scheduling-tbd.sutil)
   (alias 'sur    'scheduling-tbd.surrogate)
   ;(alias 'surt   'scheduling-tbd.surrogate-test)
   (alias 'util   'scheduling-tbd.util)

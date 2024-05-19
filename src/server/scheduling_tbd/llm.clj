@@ -9,7 +9,8 @@
   (:require
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
-   [scheduling-tbd.sutil         :refer [api-credentials llm-provider markdown2html]]
+   [datahike.api                 :as d]
+   [scheduling-tbd.sutil         :refer [api-credentials llm-provider markdown2html connect-atm]]
    [scheduling-tbd.util          :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
@@ -145,7 +146,7 @@
   (select-llm-models-openai)
   (select-llm-models-azure))
 
-;;;------------------------------------- assistants ----------------------------------------------------
+;;;------------------------------------- assistants and threads  -------------------------------------------
 (s/def ::name string?)
 (s/def ::instructions string?)
 (s/def ::assistant-args (s/keys :req-un [::name ::instructions]))
@@ -232,6 +233,19 @@
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
+(defn ^:diag list-thread-messages
+  "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
+  ([tid] (list-thread-messages tid 20))
+  ([tid limit]
+   (->> (openai/list-messages {:thread-id tid :limit limit} (api-credentials llm-provider))
+        :data
+        (map #(dissoc % :file_ids :run_id :assistant_id :thread_id :id :metadata :object :annotations))
+        (map #(assoc % :text (-> % :content first :text :value)))
+        (map #(dissoc % :content))
+        (sort-by :created_at)
+        (map  (fn [m] (update m :created_at #(str (java.util.Date. (* 1000 %))))))
+        (mapv (fn [m] (update m :role keyword))))))
+
 (defn ^:diag get-assistant-openai
   "Retrieve the assistant object from OpenAI using its ID, a string you can
    find on the list-assistants, or while logged into the OpenAI website."
@@ -266,6 +280,118 @@
 (defn ^:diag throw-it
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
+
+;;;------------------- Agent ---------------
+(defn recreate-agent!
+  "Create a clj-agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
+   Store what is needed to identify it in system DB."
+  [id instruction training-data]
+  (let [assist (make-assistant :name (name id) :instructions instruction :metadata {:usage :clj-agent})
+        aid    (:id assist)
+        thread (make-thread {:assistant-id aid
+                             :metadata {:usage :clj-agent}
+                             :messages training-data})
+        tid    (:id thread)
+        conn   (connect-atm :system)
+        eid    (d/q '[:find ?eid .
+                      :where [?eid :system/name "SYSTEM"]]
+                    @(connect-atm :system))]
+    (d/transact conn {:tx-data [{:db/id eid
+                                 :system/agents {:clj-agent/id id
+                                                 :clj-agent/assistant-id aid
+                                                 :clj-agent/thread-id tid}}]})))
+
+(def clj-agent
+  "Instructions and training for :clj-agent to help it get started."
+  {:id :clj-agent
+   :instruction
+   (str "You are a helpful assistant that interprets our requests and output results as a vector of Clojure maps. "
+        "Your response must be directly readable by the Clojure function 'read-string' to a vector of Clojure maps. "
+        "We will use UPPER-CASE to identify the names of map keys you should use.")
+   :training
+   [{:role "user"
+     :content (str "Extract  ID and CONTENT:\n"
+                   "1. apples\n2. oranges\n3. bananas")}
+    {:role "assistant"
+     :content "[{:ID 1 :CONTENT \"apples\"}, {:ID 2 :CONTENT \"oranges\"}, {:ID 3 :CONTENT: \"bananas\"}]"}
+    {:role "user"
+     :content (str "Extract ID, CONTENT and QUANTITY:\n"
+                   "1. apples - 3 dozen \n2. oranges - 1 bag \n3. bananas - one small bunch")}
+    {:role "assistant"
+     :content (str "[{:ID 1 :CONTENT \"apples\" :QUANTITY \"3 dozen\"}, "
+                   "{:ID 2 :CONTENT \"oranges\" :QUANTITY \"1 bag\" }, "
+                   "{:ID 3 :CONTENT \"bananas\" :QUANTITY \"one small bunch\"}]")}
+    {:role "user"
+     :content (str "Extract ID, CONTENT and QUANTITY:\n"
+                   "1. apples - 3 dozen \n2. oranges - 1 bag \n3. bananas - one small bunch")}
+    {:role "assistant"
+     :content (str "[{:ID 1 :CONTENT \"apples\" :QUANTITY 3}, "
+                   "{:ID 2 :CONTENT \"oranges\" :QUANTITY 1}, "
+                   "{:ID 3 :CONTENT \"bananas\" :QUANTITY 1}]")}
+    {:role "user"
+     :content "WRONG! Don't throw away information. You lost the units of measure (dozens, bags, and small bunch)."}]})
+
+;;; ToDo: I go back and forth on whether this should be :text-function-agent, which only does those four types below
+;;;       (and in which case the
+(def text-function-agent
+  {:id :text-function-agent
+   :instruction
+   (str "You are a helpful assistant that interprets our requests and output results as a vector of Clojure maps. "
+        "Your response must be directly readable by the Clojure function 'read-string' to a vector of Clojure maps. "
+        "The maps you will produce contain two keys :SENTENCE and :TYPE \n"
+        "For each sentence in the input, :SENTENCE is the sentence. \n"
+        "For each sentence in the input, :TYPE is a Clojure keyword classifying the sentence as described by the request.")
+   :training
+   [{:role "user"
+     :content (str ":TYPE indicates the type of these sentence. :TYPE may be one of the four Clojure keywords:\n"
+                   "   :declarative -- the sentence makes a statement,\n"
+                   "   :iterrogative -- the sentence asks a question,\n"
+                   "   :imperative -- the sentence, tells someone to do something, or\n"
+                   "   :exclamatory -- the sentence expresses surprise, anger, pain etc.:\n\n"
+                   "I am a student. Are you a student? Welcome the new student. There are so many students here!")}
+    {:role "assistant"
+     :content (str "[{:SENTENCE \"I am a student.\" :TYPE :declarative}, "
+                   "{:SENTENCE \"Are you a student?\" :TYPE :interrogative}, "
+                   "{:SENTENCE \"Welcome the new student.\" :TYPE :imperative}, "
+                   "{:SENTENCE \"There are so many students here!\" :TYPE :exclamatory}]")}]})
+
+#_(def theory-bridging-agent
+  {:id :theory-bridging-agent
+   :instruction
+   (str "You are a helpful assistant that interprets our requests and output results as a vector of Clojure maps. "
+        "Your response must be directly readable by the Clojure function 'read-string' to a vector of Clojure maps. "
+        "The maps you will produce contain two keys :SENTENCE and :TYPE \n"
+        "For each sentence in the input, :SENTENCE is the sentence. \n"
+        "For each sentence in the input, :TYPE is a Clojure vector of two keywords, both ...")})
+
+(defn ^:diag recreate-system-agents!
+  []
+  (doseq [{:keys [id instruction training]} [clj-agent text-function-agent]]
+    (recreate-agent! id instruction training)))
+
+(defn query-agent
+  "Make a query to the Clojure agent."
+  [agent-id query]
+  (assert (#{:clj-agent :text-function-agent} agent-id))
+  (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
+                                     :keys aid tid
+                                     :in $ ?agent-id
+                                     :where
+                                     [?e :clj-agent/id ?agent-id]
+                                     [?e :clj-agent/assistant-id ?aid]
+                                     [?e :clj-agent/thread-id ?tid]]
+                                   @(connect-atm :system)
+                                   agent-id)
+                              first)
+        result (-> (query-on-thread {:aid aid :tid tid :query-text query})
+                   (str/replace #"\s+" " "))
+        [success? useful] (re-matches #"```clojure(.*)```" result)
+        result (if success? useful result)]
+    (try (->> (edn/read-string result)
+              (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
+         (catch Exception _e
+           (log/error "query-clojure-agent failed:" result)
+           nil))))
 
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []

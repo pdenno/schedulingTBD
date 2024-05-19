@@ -38,9 +38,15 @@
     (cond (< diff 60000) "just now"
           (<= 60000  diff 120000)   "1 minute ago"
           (<= 120001 diff 3600000)  (str (quot diff 60000) " minutes ago")
-          (<= 3600000 diff 72000000) "1 hour ago"
+          (<= 3600000 diff 7200000) "1 hour ago"
           (< start-of-day-millis msg-epoch-millis) (str (quot diff 3600000) " hours ago")
           :else (-> (inst2date instant) (subs 0 15)))))
+
+(defn msg-with-title
+  [content from]
+  (cond (= from :surrogate)            (str "<b>Surrogate Expert</b><br/> " content)
+        (= from :developer-injected)   (str "<b>Developer Injected Question</b><br/>" content)
+        :else                          content))
 
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
@@ -51,7 +57,7 @@
   (let [new-date (atom today)]
     (reduce (fn [r msg]
               (let [{:message/keys [content from time] :or {time (js/Date. (now))}} msg
-                    content (if (= from :surrogate) (str "<b>Surrogate Expert</b><br/> " content) content)
+                    content (msg-with-title content from)
                     msg-date (-> time inst2date (subs 0 15))]
                 (as-> r ?r
                   (if (= @new-date msg-date)
@@ -61,7 +67,7 @@
                   (conj ?r ($ Message
                               {:key (new-key)
                                :model #js {:position "single" ; "single" "normal", "first" and "last"
-                                           :direction (if (= :system from) "incoming" "outgoing")
+                                           :direction (if (#{:system :developer-injected} from) "incoming" "outgoing") ; From perspective of user.
                                            :type "html"
                                            :payload content}}
                               ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))})))))) ;  They only appear for Interviewer, which is probably good!

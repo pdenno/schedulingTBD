@@ -351,6 +351,64 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
     (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
 
 
+;;;  1. Material Preparation - 2 days
+;;;  2. Component Machining - 5 days
+;;;  3. Assembly - 3 days
+;;;  4. Quality Control (QC) - 1 day
+;;;  5. Packaging - 1 day
+;;;  6. Shipping - Varies (not included in processing time)
+;;;
+;;;  1. Milling (1-2 hours)
+;;;  2. Mashing (1-2 hours)
+;;;  3. Lautering (1-2 hours)
+;;;  4. Boiling (1 hour)
+;;;  5. Cooling (1-2 hours)
+;;;  6. Fermentation (1-3 weeks)
+;;;  7. Conditioning (1-4 weeks)
+;;;  8. Packaging (2-4 hours)
+
+(defn string-to-table
+  [s]
+  (query-llm [{:role "system"
+               :content "You are a helpful assistant."}
+              {:role "user"
+               :content (format
+                         (str "Each line below consists of a SEQUENCE-NUMBER a PROCESS and a AMOUNT-OF-TIME with additional annotation. "
+                              "Create a list of JSON objects {\"SEQUENCE-NUMBER\" : ..., \"PROCESS\" : ..., \"AMOUNT-OF-TIME\"}, one object for each line.\n\n%s")
+                         s)}]))
+
+(defn string-to-table
+  [s]
+  (let [result
+        (query-llm [{:role "system"
+                     :content "You output unadorned Clojure code directly readable by Clojure's read-string function as one Clojure vector."}
+                    {:role "user"
+                     :content (str "Each line below consists of a SEQUENCE-NUMBER, a PROCESS, and an AMOUNT-OF-TIME. "
+                                    "Create a Clojure vector of Clojure maps, one map for each line. The maps should look like this:  "
+                                    "{:SEQUENCE-NUMBER ..., :PROCESS ..., :AMOUNT-OF-TIME ...} where ... is replaced by the data.\n\n")}
+                    {:role "user"
+                     :content "1. Manufacturing (1-2 days)\n 2. Packing (1 hour)\n"}
+                    {:role "assistant"
+                     :content (str "[{:SEQUENCE-NUMBER 1 :PROCESS \"Manufacturing\" :AMOUNT-OF-TIME \"1-2 days\"},"
+                                   " {:SEQUENCE-NUMBER 2 :PROCESS \"Packing\" :AMOUNT-OF-TIME \"1 hour.\"},")}
+                    {:role "user"
+                     :content "1. Making (1-2 days)\n 2. Wrapping (1 hour)\n"}
+                    {:role "assistant"
+                     :content (str "```clojure\n [{:SEQUENCE-NUMBER 1 :PROCESS \"Making\" :AMOUNT-OF-TIME \"1-2 days\"},"
+                                   " {:SEQUENCE-NUMBER 2 :PROCESS \"Wrapping\" :AMOUNT-OF-TIME \"1 hour.\"}]```")}
+                    {:role "user"
+                     :content "WRONG! You wrapped it in ```clojure ...```. That is not readable by clojure read-string. It is not unadorned."}
+                    {:role "user"
+                     :content s}])]
+    (reset! diag result)
+    (try (->> (edn/read-string result)
+              (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
+         (catch Throwable _ nil))))
+
+
+
+
+
 (defn analyze-process-durs-response
   "Used predominantly with surrogates, study the response to a query about process durations,
    writing findings to the project database and returning state propositions."
@@ -368,7 +426,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         infos (->> processes
                    (map (fn [{:keys [line failure] :as obj}]
                           (if line
-                            (if-let[[_ dur-str] (re-matches #"^\s*\d+[^\(]+(.+)" line)] ; I'm keeping the parentheses for now.
+                            (if-let[[_ dur-str] (re-matches #"^\s*\d+[^\(]+(\(.+\))" line)] ; I'm keeping the parentheses for now.
                               (assoc obj :dur-str dur-str)
                               (do (swap! failures #(into % (list 'fails-duration-parse line))) nil))
                             (do (swap! failures #(into % (list 'fails-duration-parse failure))) nil))))

@@ -1,15 +1,26 @@
 [
-#:system{:default-project-id :sur-craft-beer, :name "SYSTEM"}
+#:system{:agents
+         [#:clj-agent{:assistant-id "asst_SesDmMuB5v3oFaGhjF8dASkg",
+                      :id :text-function-agent,
+                      :thread-id "thread_JoNzrfxZkM11DKKCyKfsk21B"}
+          #:clj-agent{:assistant-id "asst_zzzVzQ4k7rAmBg4nCHXZWp7U",
+                      :id :clj-agent,
+                      :thread-id "thread_8JjPwlNIbpAnph0rUB1LYusm"}],
+         :default-project-id :sur-fountain-pens,
+         :name "SYSTEM"}
 
-#:project{:dir "/opt/scheduling/projects/craft-beer-brewery-scheduling",
+#:project{:dir
+          "/opt/scheduling/projects/craft-beer-brewery-scheduling",
           :id :craft-beer-brewery-scheduling,
           :name "Craft Beer Brewery Scheduling"}
 
-#:project{:dir "/opt/scheduling/projects/snowboards-production-scheduling",
+#:project{:dir
+          "/opt/scheduling/projects/snowboards-production-scheduling",
           :id :snowboards-production-scheduling,
           :name "Snowboards Production Scheduling"}
 
-#:project{:dir "/opt/scheduling/projects/aluminium-foil-production-scheduling",
+#:project{:dir
+          "/opt/scheduling/projects/aluminium-foil-production-scheduling",
           :id :aluminium-foil-production-scheduling,
           :name "Aluminium Foil Production Scheduling"}
 
@@ -22,31 +33,32 @@
           :name "Sur Canned Vegetables"}
 
 #:project{:dir "/opt/scheduling/projects/sur-aluminium-cans",
-          :id :sur-aluminium-cans
+          :id :sur-aluminium-cans,
           :name "Sur Aluminium Cans"}
 
-#:project{:dir "/opt/scheduling/projects/sur-remanufactured-alternators"
-          :id :sur-remanufactured-alternators
+#:project{:dir
+          "/opt/scheduling/projects/sur-remanufactured-alternators",
+          :id :sur-remanufactured-alternators,
           :name "Sur Remanufactured Alternators"}
 
-#:project{:dir "/opt/scheduling/projects/sur-ice-hockey-sticks"
-          :id :sur-ice-hockey-sticks
+#:project{:dir "/opt/scheduling/projects/sur-ice-hockey-sticks",
+          :id :sur-ice-hockey-sticks,
           :name "Sur Ice Hockey Sticks"}
 
-#:project{:dir "/opt/scheduling/projects/sur-craft-beer"
-          :id :sur-craft-beer
+#:project{:dir "/opt/scheduling/projects/sur-craft-beer",
+          :id :sur-craft-beer,
           :name "Sur Craft Beer"}
 
 #:project{:dir "/opt/scheduling/projects/sur-plate-glass",
-          :id :sur-plate-glass
+          :id :sur-plate-glass,
           :name "Sur Plate Glass"}
 
-#:project{:dir "/opt/scheduling/projects/sur-injection-molds"
-          :id :sur-injection-molds
+#:project{:dir "/opt/scheduling/projects/sur-injection-molds",
+          :id :sur-injection-molds,
           :name "Sur Injection Molds"}
 
-#:project{:dir "/opt/scheduling/projects/sur-fountain-pens"
-          :id :sur-fountain-pens
+#:project{:dir "/opt/scheduling/projects/sur-fountain-pens",
+          :id :sur-fountain-pens,
           :name "Sur Fountain Pens"}
 
 ]

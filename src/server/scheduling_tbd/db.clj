@@ -22,7 +22,18 @@
   "Defines content that manages project DBs and their analysis including:
      - The project's name and db directory
      - Planning domains, methods, operators, and axioms"
-  {;; ---------------------- project
+  {;; ---------------------- clj-agent
+   :clj-agent/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "A unique ID for each cl-agent to ensure only one of each type is available the possible values are #{:clj-agent ."}
+   :clj-agent/assistant-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant id (a string) associated with this surrogate."}
+   :clj-agent/thread-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
+
+   ;; ---------------------- project
    :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
         :doc "a string naming a subdirectory containing a project."}
@@ -39,9 +50,12 @@
         :doc "a keyword providing a project-id clients get when starting up."}
    :system/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
-        :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}})
+        :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
+   :system/agents
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}})
 
-
+;;;========================================================== Project DBs ==========================================
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
    To eliminate confusion and need for back pointers, each project has its own db."
@@ -219,28 +233,25 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
 
-      ;; ---------------------- surrogate
-   :surrogate/id ; Could this and :surrogate/thread be combined?
+   ;; ---------------------- surrogate
+   :surrogate/assistant-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant id(a string) associated with this surrogate."}
+   :surrogate/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A string that uniquely identifies this surrogate, for example, 'craft beer-1'."}
-
+        :doc "A project-oriented string that uniquely identifies this surrogate, for example, 'craft beer-1'."}
    :surrogate/subject-of-expertise
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The short string identifying what this surrogate is good at minus the verb, which is in the system instruction.
               For example, this might just be 'craft beer'."}
-
-   :surrogate/thread-id ; Could this and :surrogate/id be combined?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant thread associated with this project."}
-
    :surrogate/system-instruction
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The complete instruction provided in configuring an OpenAI (or similar) assistant.
               Typically this substitutes the subject-of-expertise into a template string."}
-
-   :surrogate/assistant-id
+   :surrogate/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "Stringified EDN for what OpenAI (or similar) returns when an assistant is created."}})
+        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread that this surrogate uses."}})
+
 
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
@@ -549,7 +560,7 @@
   ([pid from msg] (add-msg pid from msg []))
   ([pid from msg tags]
    (reset! diag [pid from msg tags])
-   (assert (#{:system :human :surrogate} from))
+   (assert (#{:system :human :surrogate :developer-injected} from))
    (assert (string? msg))
    ;;(log/info "add-msg: pid =" pid "msg =" msg)
    (if-let [conn (connect-atm pid)]
@@ -566,7 +577,6 @@
                {:tx-data [{:project/id id
                            :project/name proj-name
                            :project/dir dir}]})))
-
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
