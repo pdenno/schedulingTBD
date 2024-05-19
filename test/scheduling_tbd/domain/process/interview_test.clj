@@ -5,7 +5,7 @@
    [clojure.string        :as str]
    [clojure.test          :refer [deftest is testing]]
    [promesa.core          :as p]
-   [scheduling-tbd.domain :as domain]
+   [scheduling-tbd.domain.process.interview :as inv]
    [scheduling-tbd.db    :as db]
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm]]
    [scheduling-tbd.llm    :as llm :refer [query-llm]]
@@ -29,7 +29,7 @@
   (alias 'llm    'scheduling-tbd.llm)
   (alias 'llmt    'scheduling-tbd.llm-test)
   ;(alias 'llmt   'scheduling-tbd.llm-test)
-  (alias 'op     'scheduling-tbd.domain.process.operators)
+  (alias 'op     'scheduling-tbd.operators)
 ;  (alias 'opt    'scheduling-tbd.operators-test)
   (alias 'plan   'scheduling-tbd.planner)
   (alias 'resp   'scheduling-tbd.web.controllers.respond)
@@ -45,7 +45,7 @@
 
 
 (def proj-objective-prompt
-  (conj domain/project-objective-partial
+  (conj inv/project-objective-partial
         {:role "user"
          :content "[We bake cookies and sell them through grocery chains. Our challenge is to supply fresh cookies and never stock-out.
  We want a schedule that will ensure we meet demand and have the ingredients we need.]"}))

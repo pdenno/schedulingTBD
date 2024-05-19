@@ -3,12 +3,12 @@
    [clojure.string        :as str]
    [clojure.test          :refer [deftest is testing]]
    [promesa.core          :as p]
-   [scheduling-tbd.domain :as domain]
+   [scheduling-tbd.domain.process.interview :as inv]
    [scheduling-tbd.llm    :as llm :refer [query-llm query-agent]]
    [taoensso.timbre       :as log]))
 
 (def proj-summary-msgs
-  (conj domain/project-name-partial ; This asks for 3 or less words; that requirement will often be ignored by gpt-3.5-turbo.
+  (conj inv/project-name-partial ; This asks for 3 or less words; that requirement will often be ignored by gpt-3.5-turbo.
                        {:role "user"
                         :content
                         "[We are a medium-sized craft beer brewery. We produce about 100,000 barrels/year.
