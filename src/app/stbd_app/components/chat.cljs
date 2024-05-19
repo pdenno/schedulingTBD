@@ -44,7 +44,7 @@
 
 (defn msg-with-title
   [content from]
-  (cond (= from :surrogate)            (str "<b>Surrogate Expert</b><br/> " content)
+  (cond (= from :surrogate)            (str "<b>Surrogate Expert</b><br/>" content)
         (= from :developer-injected)   (str "<b>Developer Injected Question</b><br/>" content)
         :else                          content))
 

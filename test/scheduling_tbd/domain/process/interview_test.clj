@@ -1,4 +1,4 @@
-(ns scheduling-tbd.domain-test
+(ns scheduling-tbd.domain.process.interview-test
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
    [clojure.pprint        :refer [cl-format pprint]]
@@ -24,13 +24,12 @@
   (alias 'px     'promesa.exec)
   (alias 'core   'scheduling-tbd.core)
   (alias 'db     'scheduling-tbd.db)
-  (alias 'dom    'scheduling-tbd.domain)
-  ;(alias 'domt    'scheduling-tbd.domain-test)
+  (alias 'inv    'scheduling-tbd.domain.process.interview)
   (alias 'how    'scheduling-tbd.how-made)
   (alias 'llm    'scheduling-tbd.llm)
   (alias 'llmt    'scheduling-tbd.llm-test)
   ;(alias 'llmt   'scheduling-tbd.llm-test)
-  (alias 'op     'scheduling-tbd.operators)
+  (alias 'op     'scheduling-tbd.domain.process.operators)
 ;  (alias 'opt    'scheduling-tbd.operators-test)
   (alias 'plan   'scheduling-tbd.planner)
   (alias 'resp   'scheduling-tbd.web.controllers.respond)

@@ -1,4 +1,4 @@
-(ns scheduling-tbd.domain
+(ns scheduling-tbd.domain.process.interview
   "Scheduling domain prompts and analysis
      - analyze: Function names that begin with 'analyze' study user/surrogate response and produce planning propositions.
      - mzn: Function names that begin with 'mzn' use planning state to modify MiniZinc code."
@@ -6,6 +6,7 @@
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
    [clojure.pprint                :refer [cl-format]]
+   [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
    [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
@@ -301,7 +302,13 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-;;; ToDo: If this prove unreliable, consider using an LLM. I anticipate using this function only with surrogates.
+(s/def :quantity/value-string string?)
+(s/def :quantity/units keyword?)
+(s/def :quantity-range/low  (s/keys :req [:quantity/value-string :quantity/units]))
+(s/def :quantity-range/high (s/keys :req [:quantity/value-string :quantity/units]))
+(s/def ::duration-info (s/or :quantity-val    (s/keys :req [:quantity/value-string :quantity/units])
+                             :quantity-range  (s/keys :req [:quantity-range/low :quantity-range/high])))
+
 (defn parse-duration
   "Do whatever it takes to understand a string that supposed to have a duration in it.
    Return a map with properties describing a quantity of time.
@@ -319,7 +326,9 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         [_ qty] (re-matches #".*(\d+).*" s)
         qty (or qty (cond (re-matches #".*\s*several\s+.*" s) :several
                           (re-matches #".*\s*many\s+.*" s) :many
-                          (re-matches #".*\s*a few\s+.*" s) :a-few))]
+                          (re-matches #".*\s*a few\s+.*" s) :a-few
+                          :else (let [[success? val] (re-matches #".*\s+(\w+)\s+.*" s)]
+                                  (when success? (-> val str/lower-case keyword)))))]
     ;; ToDo: "between...and ... ??? Or just forget it???
     (if complex?
       (when-let [[low high] (str/split s #"\s+to\s+")]
@@ -330,6 +339,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                     :else     {:quantity/value-string (str qty) :quantity/units units})
         range-low  (assoc :quantity-range/low {:quantity/value-string range-low  :quantity/units units})
         range-high (assoc :quantity-range/high {:quantity/value-string range-high :quantity/units units})))))
+
+;;; ToDo: This will need to do more than just send the result to process duration.
+(defn llm-durations
+  "Create ::duration-info objects by using :clj-agent to interpret the response."
+  [response]
+  (let [result (llm/query-agent :clj-agent (str  "Extract ID PROCESS and DURATION:\n" response))]
+    (reset! diag result)
+    (throw (ex-info "NYI" {:result result}))))
 
 (defn put-process-sequence!
   "Write project/process-sequence to the project's database.
@@ -350,64 +367,11 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         eid (db/project-exists? pid)]
     (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
 
-
-;;;  1. Material Preparation - 2 days
-;;;  2. Component Machining - 5 days
-;;;  3. Assembly - 3 days
-;;;  4. Quality Control (QC) - 1 day
-;;;  5. Packaging - 1 day
-;;;  6. Shipping - Varies (not included in processing time)
-;;;
-;;;  1. Milling (1-2 hours)
-;;;  2. Mashing (1-2 hours)
-;;;  3. Lautering (1-2 hours)
-;;;  4. Boiling (1 hour)
-;;;  5. Cooling (1-2 hours)
-;;;  6. Fermentation (1-3 weeks)
-;;;  7. Conditioning (1-4 weeks)
-;;;  8. Packaging (2-4 hours)
-
-(defn string-to-table
-  [s]
-  (query-llm [{:role "system"
-               :content "You are a helpful assistant."}
-              {:role "user"
-               :content (format
-                         (str "Each line below consists of a SEQUENCE-NUMBER a PROCESS and a AMOUNT-OF-TIME with additional annotation. "
-                              "Create a list of JSON objects {\"SEQUENCE-NUMBER\" : ..., \"PROCESS\" : ..., \"AMOUNT-OF-TIME\"}, one object for each line.\n\n%s")
-                         s)}]))
-
-(defn string-to-table
-  [s]
-  (let [result
-        (query-llm [{:role "system"
-                     :content "You output unadorned Clojure code directly readable by Clojure's read-string function as one Clojure vector."}
-                    {:role "user"
-                     :content (str "Each line below consists of a SEQUENCE-NUMBER, a PROCESS, and an AMOUNT-OF-TIME. "
-                                    "Create a Clojure vector of Clojure maps, one map for each line. The maps should look like this:  "
-                                    "{:SEQUENCE-NUMBER ..., :PROCESS ..., :AMOUNT-OF-TIME ...} where ... is replaced by the data.\n\n")}
-                    {:role "user"
-                     :content "1. Manufacturing (1-2 days)\n 2. Packing (1 hour)\n"}
-                    {:role "assistant"
-                     :content (str "[{:SEQUENCE-NUMBER 1 :PROCESS \"Manufacturing\" :AMOUNT-OF-TIME \"1-2 days\"},"
-                                   " {:SEQUENCE-NUMBER 2 :PROCESS \"Packing\" :AMOUNT-OF-TIME \"1 hour.\"},")}
-                    {:role "user"
-                     :content "1. Making (1-2 days)\n 2. Wrapping (1 hour)\n"}
-                    {:role "assistant"
-                     :content (str "```clojure\n [{:SEQUENCE-NUMBER 1 :PROCESS \"Making\" :AMOUNT-OF-TIME \"1-2 days\"},"
-                                   " {:SEQUENCE-NUMBER 2 :PROCESS \"Wrapping\" :AMOUNT-OF-TIME \"1 hour.\"}]```")}
-                    {:role "user"
-                     :content "WRONG! You wrapped it in ```clojure ...```. That is not readable by clojure read-string. It is not unadorned."}
-                    {:role "user"
-                     :content s}])]
-    (reset! diag result)
-    (try (->> (edn/read-string result)
-              (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
-         (catch Throwable _ nil))))
-
-
-
-
+(defn valid-infos?
+  "Return true if the duration infos have valid duration information."
+  [infos cnt]
+  (and (== cnt (count infos))
+       (every? #(s/valid? ::duration-info %) infos)))
 
 (defn analyze-process-durs-response
   "Used predominantly with surrogates, study the response to a query about process durations,
@@ -416,6 +380,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   (let [failures (atom [])
         proj-sym (-> pid name symbol)
         lines (str/split-lines response)
+        cnt (count lines)
         processes (mapv #(let [[line process-order _ process] (re-matches #"^(\d+)(\.)?([^\(]+).*" %)]
                            (if line
                              {:line line
@@ -426,12 +391,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         infos (->> processes
                    (map (fn [{:keys [line failure] :as obj}]
                           (if line
-                            (if-let[[_ dur-str] (re-matches #"^\s*\d+[^\(]+(\(.+\))" line)] ; I'm keeping the parentheses for now.
+                            (if-let[[_ dur-str] (or (str/split line #" - ") (str/split line #" \(" line))] ; <====================== Later: need to use variable to avoid long process names. Also uniquify.
                               (assoc obj :dur-str dur-str)
                               (do (swap! failures #(into % (list 'fails-duration-parse line))) nil))
                             (do (swap! failures #(into % (list 'fails-duration-parse failure))) nil))))
                    (filter identity)
-                   (mapv #(assoc % :duration (parse-duration (:dur-str %)))))]
+                   (mapv #(assoc % :duration (parse-duration (:dur-str %)))))
+        zippy (log/info "infos = " infos)
+        infos (if (valid-infos? infos cnt) infos (llm-durations response))]
     (put-process-sequence! infos pid response)
     (let [extreme-span? (extreme-dur-span? pid pid)]
       ;;(log/info "extreme-span? =" extreme-span?)

@@ -34,36 +34,44 @@
                (-> res :project-name (str/split #"\s+") count (<= 4)))))))
 
 (deftest agents
-  (testing "Testing the :clj-agent and :text-analysis-agent."
-    (is (= [{:num 1, :process "Milling", :duration "1-2 hours"}
-            {:num 2, :process "Mashing", :duration "1-2 hours"}
-            {:num 3, :process "Lautering", :duration "1-2 hours"}
-            {:num 4, :process "Boiling", :duration "1 hour"}
-            {:num 5, :process "Cooling", :duration "1-2 hours"}
-            {:num 6, :process "Fermentation", :duration "1-3 weeks"}
-            {:num 7, :process "Conditioning", :duration "1-4 weeks"}
-            {:num 8, :process "Packaging", :duration "2-4 hours"}]
-           (query-agent :clj-agent
-                        (str "Extract NUM, PROCESS, and DURATION:\n"
-                             "1. Milling (1-2 hours)\n"
-                             "2. Mashing (1-2 hours)\n"
-                             "3. Lautering (1-2 hours)\n"
-                             "4. Boiling (1 hour)\n"
-                             "5. Cooling (1-2 hours)\n"
-                             "6. Fermentation (1-3 weeks)\n"
-                             "7. Conditioning (1-4 weeks)\n"
-                             "8. Packaging (2-4 hours)"))))
-    (is (= [{:id 1, :process "Material Preparation", :duration "2 days"}
-            {:id 2, :process "Component Machining", :duration "5 days"}
-            {:id 3, :process "Assembly", :duration "3 days"}
-            {:id 4, :process "Quality Control (QC)", :duration "1 day"}
-            {:id 5, :process "Packaging", :duration "1 day"}
-            {:id 6, :process "Shipping", :duration "Varies"}]
-           (llm/query-agent :clj-agent
-                          (str "Extract ID PROCESS and DURATION:\n"
-                               "1. Material Preparation - 2 days\n"
-                               "2. Component Machining - 5 days\n"
-                               "3. Assembly - 3 days\n"
-                               "4. Quality Control (QC) - 1 day\n"
-                               "5. Packaging - 1 day\n"
-                               "6. Shipping - Varies (not included in processing time)"))))))
+  (testing "Testing agents"
+    (testing "Testing the :clj-agent"
+      (is (= [{:num 1, :process "Milling", :duration "1-2 hours"}
+              {:num 2, :process "Mashing", :duration "1-2 hours"}
+              {:num 3, :process "Lautering", :duration "1-2 hours"}
+              {:num 4, :process "Boiling", :duration "1 hour"}
+              {:num 5, :process "Cooling", :duration "1-2 hours"}
+              {:num 6, :process "Fermentation", :duration "1-3 weeks"}
+              {:num 7, :process "Conditioning", :duration "1-4 weeks"}
+              {:num 8, :process "Packaging", :duration "2-4 hours"}]
+             (query-agent :clj-agent
+                          (str "Extract NUM, PROCESS, and DURATION:\n"
+                               "1. Milling (1-2 hours)\n"
+                               "2. Mashing (1-2 hours)\n"
+                               "3. Lautering (1-2 hours)\n"
+                               "4. Boiling (1 hour)\n"
+                               "5. Cooling (1-2 hours)\n"
+                               "6. Fermentation (1-3 weeks)\n"
+                               "7. Conditioning (1-4 weeks)\n"
+                               "8. Packaging (2-4 hours)"))))
+      (is (= [{:id 1, :process "Material Preparation", :duration "2 days"}
+              {:id 2, :process "Component Machining", :duration "5 days"}
+              {:id 3, :process "Assembly", :duration "3 days"}
+              {:id 4, :process "Quality Control (QC)", :duration "1 day"}
+              {:id 5, :process "Packaging", :duration "1 day"}
+              {:id 6, :process "Shipping", :duration "Varies"}]
+             (llm/query-agent :clj-agent
+                              (str "Extract ID PROCESS and DURATION:\n"
+                                   "1. Material Preparation - 2 days\n"
+                                   "2. Component Machining - 5 days\n"
+                                   "3. Assembly - 3 days\n"
+                                   "4. Quality Control (QC) - 1 day\n"
+                                   "5. Packaging - 1 day\n"
+                                   "6. Shipping - Varies")))))
+    (testing "The text-function-agent."
+      (is (= [{:sentence "You are so silly!" :type :exclamatory}
+              {:sentence "I like you." :type :declarative}
+              {:sentence "Do you like me?" :type :interrogative}
+              {:sentence "Don't step in that puddle." :type :imperative}]
+             (llm/query-agent :text-function-agent
+                              "You are so silly! I like you. Do you like me? Don't step in that puddle."))))))

@@ -13,7 +13,7 @@
    [mount.core              :as mount :refer [defstate]]
    [promesa.core            :as p]
    [scheduling-tbd.db       :as proj-db]
-   [scheduling-tbd.domain   :as dom]
+   [scheduling-tbd.domain.process.interview   :as inv]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm db-cfg-map]]
    [taoensso.timbre :as log]))
@@ -212,7 +212,7 @@
   [seg-name]
   (if (segment-exists? seg-name)
     (if-let [challenge (-> (str "a company that makes " seg-name)
-                             dom/pretend-you-manage-prompt
+                             inv/pretend-you-manage-prompt
                              (llm/query-llm {:model-class :gpt-4})
                              (p/await))]
       (do (log/info "Intro Response: " challenge)
