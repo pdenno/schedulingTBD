@@ -2,29 +2,27 @@
 
 ## Introduction
 
-SchedulingTBD is exploratory software to study human/AI teaming in cognitive work.
-The cognitive work we focus on is formulation of analytical models in a given domain-specific language (DSL).
+SchedulingTBD is exploratory software to study human/AI teaming in long-running (months) cognitive work.
+The cognitive work we focus on is the formulation and refinement of analytical models in a domain-specific language (DSL), [MiniZinc](https://www.minizinc.org/).
+Our goal is to determine best practices in how persons having no prior experience with the DSL might learn the language to solve problems important to their work.
+This DSL-based teaming model brings to focus the challenges of designing DSLs fit for this purpose, problem solving, constructionist learning, and scientific explanation.
 
-Specifically, we are using this software to explore joint (human/AI) formulation of solutions to scheduling problems with [MiniZinc](https://www.minizinc.org/) as the DSL.
-The idea of implementations such as our MiniZinc effort is to probe the research question
-*"Can we effectively engage a person possessing little background in model formulation in a 'conversation' where we jointly formulate a model important to their work?"*
-Consequently, the code (Clojure and ClojureScript) provides a web app to host conversations about the user's scheduling problem.
-When schedulingTBD is ready to go, the conversation will be sufficient to produce a solution that MiniZinc solvers can execute to perform the scheduling the user seeks.
-
-As of this writing, we are mid-way through the work of interviewing to undertand a user's production processes (assuming they are doing manufacturing).
-Thus we are far enough along to posit a few lines of MiniZinc towards formulation of a solution for the problem discussed with the user.
-Our focus is currently on interviewing "surrogate humans", AI agents simulating expertise in a manufacturing domain.
-We plan to test hundreds of such surrogates before enabling similar functionality for human production experts.
+In the software, we engage the user in chat-based conversation implemented with Large Language Models (LLMs) and a multi-agent architecture.
+As of this writing, we are mid-way through the work of implementing interviewing agents to understand the goals of users.
+We are far enough along to posit a few lines of MiniZinc towards formulation of a solution. We expect to be able to formulate entire solutions to some problems soon.
+Currently we are testing the interviewing process with surrogate human users, LLM-based agents simulating expertise in a manufacturing domain.
+We plan to test hundreds of such domain expert surrogates before enabling similar functionality for human experts.
 
 The software is being developed as part of the NIST project [Human/AI Teaming for Manufacturing Digital Twins](https://www.nist.gov/programs-projects/humanmachine-teaming-manufacturing-digital-twins).
 Feel free to contact us if this work interests you!
 
 ## Building/Running (development mode)
+   These instructions have not been throroughly tested and are likely not complete. If you try have problems, write an issue or email us (see the NIST project page above).
 
-## Set up an environment variable to find the databases
-  * In your .bashrc define the following: `export SCHEDULING_TBD_DB=/opt/scheduling`
-  * Note that we've only tried Linux and Macs, and judging by what I see in the data files (e.g. data/system.edn) the code will only
-	handle this particular configuration and just the linux and Mac platforms. There's a ToDo for the developers.
+### Set up environment variables
+  * Thus far, the work has only been tested with OpenAI LLMs and on Linux and Macs.
+  * In your .bashrc file `export OPENAI_API_KEY=sk-...`
+  * Similarly, define the following: `export SCHEDULING_TBD_DB=/opt/scheduling` (or wherever you intend to store databases for the project).
 
 ### The server
   * Install install a Java JDK and [Clojure](https://clojure.org/).
@@ -44,10 +42,4 @@ Feel free to contact us if this work interests you!
   *	As the output from [shadow-cljs](https://github.com/thheller/shadow-cljs) suggests, you can connect your editor to the running CLJS REPL at port 7002.
 	A client needs to load successfully in order to use the CLJS REPL, otherwise you are likely to get a message `No available JS runtime` when you try to evaluate anything.
 
-## ToDo
-  - Explore planning with SHOP3.
-  - Reference code for parsing MiniZinc and executing MiniZinc constraints [here](https://github.com/pdenno/minizinc-parser).
-  - Support dynamic planning.
-  - Support a UI for authoring rules and prompts.
-
-![alt text](https://github.com/pdenno/schedulingTBD/blob/main/doc/SchedulingTBD-early.png?raw=true)
+![alt text](https://github.com/pdenno/schedulingTBD/blob/main/doc/stbd-screenshot-2024-05-20.png?raw=true)
