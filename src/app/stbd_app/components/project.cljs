@@ -34,11 +34,10 @@
   [current proj-infos]
   (let [current (assoc current :menu-text (menu-text current)) ; Awkward assoc. Necessary!
         proj-infos (mapv #(assoc % :menu-text (menu-text %)) proj-infos)
-        others (->> proj-infos (remove #(= current %)) (sort-by :project/name))
-        res (cond->> others
-              (not= current new-proj-entry) (into [current new-proj-entry])
-              (=    current new-proj-entry) (into [new-proj-entry]))]
-    res))
+        others (->> proj-infos (remove #(= current %)) (sort-by :project/name))]
+    (if (= current new-proj-entry)
+      (into [new-proj-entry] others)
+      (into [current new-proj-entry] others))))
 
 ;;; current-project and content of the others vector are keywords.
 ;;; As a rule, we keep data as it is maintained in the DB until we need a string for React.

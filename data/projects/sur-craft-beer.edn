@@ -109,7 +109,7 @@
                      :id 19,
                      :tags [:process-durs :response],
                      :time #inst "2024-05-13T20:24:20.296-00:00"}],
-          :name "Sur Craft Beer",
+          :name "SUR Craft Beer",
           :planning-problem
           #:problem{:domain :process-interview,
                     :goal-string

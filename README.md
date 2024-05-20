@@ -2,12 +2,14 @@
 
 ## Introduction
 
-SchedulingTBD is exploratory software to study systems that enable joint (human/AI) formulation of analytical models in a given domain specific language (DSL).
+SchedulingTBD is exploratory software to study human/AI teaming in cognitive work.
+The cognitive work we focus on is formulation of analytical models in a given domain-specific language (DSL).
 
-Specifically, we are using this code to explore joint formulation of scheduling problems with [MiniZinc](https://www.minizinc.org/) as the DSL.
+Specifically, we are using this software to explore joint (human/AI) formulation of solutions to scheduling problems with [MiniZinc](https://www.minizinc.org/) as the DSL.
 The idea of implementations such as our MiniZinc effort is to probe the research question
 *"Can we effectively engage a person possessing little background in model formulation in a 'conversation' where we jointly formulate a model important to their work?"*
-Consequently, the code (Clojure and ClojureScript) provides a web app to host conversations about scheduling work, and when schedulingTBD is ready to go, it can be used to produce MiniZinc to schedule the user's work.
+Consequently, the code (Clojure and ClojureScript) provides a web app to host conversations about the user's scheduling problem.
+When schedulingTBD is ready to go, the conversation will be sufficient to produce a solution that MiniZinc solvers can execute to perform the scheduling the user seeks.
 
 As of this writing, we are mid-way through the work of interviewing to undertand a user's production processes (assuming they are doing manufacturing).
 Thus we are far enough along to posit a few lines of MiniZinc towards formulation of a solution for the problem discussed with the user.

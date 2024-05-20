@@ -68,7 +68,7 @@
                      :from :surrogate,
                      :id 14,
                      :time #inst "2024-05-09T20:26:40.707-00:00"}],
-          :name "Sur Plate Glass",
+          :name "SUR Plate Glass",
           :planning-problem
           #:problem{:domain :process-interview,
                     :goal-string

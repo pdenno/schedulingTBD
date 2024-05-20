@@ -9,7 +9,8 @@
   (:require
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
-   [scheduling-tbd.sutil         :refer [api-credentials llm-provider markdown2html]]
+   [datahike.api                 :as d]
+   [scheduling-tbd.sutil         :refer [api-credentials llm-provider markdown2html connect-atm]]
    [scheduling-tbd.util          :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
    [camel-snake-kebab.core       :as csk]
@@ -28,7 +29,7 @@
 (def preferred-llms
   "These names (keywords) are the models we use, and the models we've been using lately."
   {:openai {:gpt-3.5     "gpt-3.5-turbo-0125"
-            :gpt-4       "gpt-4-0125-preview"
+            :gpt-4       "gpt-4-turbo-2024-04-09" ; "gpt-4o" "gpt-4o-2024-05-13" "gpt-4-0125-preview"
             :davinci     "davinci-002"}
    :azure  {:gpt-3.5     "gpt-3.5-turbo-0125"}})
 
@@ -117,9 +118,11 @@
           capitalize?                 (str/capitalize))
         (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
 
+(defn list-openai-models [] (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse))
+
 (defn select-llm-models-openai
   []
-  (let [models (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse)]
+  (let [models (list-openai-models)]
     (swap! llms-used
            (fn [atm] (assoc atm :openai
                             (reduce (fn [res k]
@@ -145,7 +148,7 @@
   (select-llm-models-openai)
   (select-llm-models-azure))
 
-;;;------------------------------------- assistants ----------------------------------------------------
+;;;------------------------------------- assistants and threads  -------------------------------------------
 (s/def ::name string?)
 (s/def ::instructions string?)
 (s/def ::assistant-args (s/keys :req-un [::name ::instructions]))
@@ -153,7 +156,7 @@
   "Create an assistant with the given parameters. Provide a map like with following keys:
      :name - a string, no default.
      :instructions - a string, the systems instructions; defaults to 'You are a helpful assistant.',
-     :model - a string; defaults to 'gpt-4-1106-preview',
+     :model - a string; defaults to whatever is the chosen 'gpt-4',
      :tools - a vector containing maps; defaults to [{:type 'code_interpreter'}]."
   [& {:keys [name model-class instructions tools metadata]
       :or {model-class :gpt-4
@@ -199,7 +202,7 @@
     aid      - assistant ID (the OpenAI notion)
     tid      - thread ID (ttheOpenAI notion)
     role     - #{'user' 'assistant'},
-    msg-text - a string.
+    query-text - a string.
    Returns text but uses promesa internally to deal with errors."
   [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 60 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   (log/info "query-on-thread: query-text =" query-text)
@@ -231,6 +234,19 @@
               (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)})),
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
+
+(defn ^:diag list-thread-messages
+  "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
+  ([tid] (list-thread-messages tid 20))
+  ([tid limit]
+   (->> (openai/list-messages {:thread-id tid :limit limit} (api-credentials llm-provider))
+        :data
+        (map #(dissoc % :file_ids :run_id :assistant_id :thread_id :id :metadata :object :annotations))
+        (map #(assoc % :text (-> % :content first :text :value)))
+        (map #(dissoc % :content))
+        (sort-by :created_at)
+        (map  (fn [m] (update m :created_at #(str (java.util.Date. (* 1000 %))))))
+        (mapv (fn [m] (update m :role keyword))))))
 
 (defn ^:diag get-assistant-openai
   "Retrieve the assistant object from OpenAI using its ID, a string you can
@@ -266,6 +282,92 @@
 (defn ^:diag throw-it
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
+
+;;; ToDo: So far, I haven't seen any advantage in using agents for this. I suppose there might be advantage were
+;;;       there follow-up questions, but how would that work? Everything so far is around vector of maps.
+;;;       Solution?: See if you can factor the problem down into parts for which the planner can be used.
+;;;       Would be good do have the functions of the operators of the planner embedded...some how..
+;;;------------------- Agent ---------------
+(defn ^:diag recreate-agent!
+  "Create a agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
+   Store what is needed to identify it in system DB."
+  [{:keys [id instruction training-data]}]
+  (let [assist (make-assistant :name (name id) :instructions instruction :metadata {:usage :agent})
+        aid    (:id assist)
+        thread (make-thread {:assistant-id aid
+                             :metadata {:usage :agent}
+                             :messages training-data})
+        tid    (:id thread)
+        conn   (connect-atm :system)
+        eid    (d/q '[:find ?eid .
+                      :where [?eid :system/name "SYSTEM"]]
+                    @(connect-atm :system))]
+    (d/transact conn {:tx-data [{:db/id eid
+                                 :system/agents {:agent/id id
+                                                 :agent/assistant-id aid
+                                                 :agent/thread-id tid}}]})))
+
+;;; ToDo: I go back and forth on whether this should be :text-function-agent, which only does those four types below
+;;;       (and in which case the
+(def text-function-agent
+  {:id :text-function-agent
+   :instruction
+   (str "You are a helpful assistant that interprets our requests and output results as a vector of Clojure maps. "
+        "Your response must be directly readable by the Clojure function 'read-string' to a vector of Clojure maps. "
+        "The maps you will produce contain two keys :SENTENCE and :TYPE \n"
+        "For each sentence in the input, the value of :SENTENCE is the sentence. \n"
+        "For each sentence in the input, the falue of :TYPE may be one of the four Clojure keywords, "
+        "the choice depending on how you interpret the sentence:\n"
+                   "   :declarative -- the sentence makes a statement,\n"
+                   "   :iterrogative -- the sentence asks a question,\n"
+                   "   :imperative -- the sentence, tells someone to do something, or\n"
+                   "   :exclamatory -- the sentence expresses surprise, anger, pain etc.:\n")
+   :training
+   [{:role "user"
+     :content "I am a student. Are you a student? Welcome the new student. There are so many students here!"}
+    {:role "assistant"
+     :content (str "[{:SENTENCE \"I am a student.\" :TYPE :declarative}, "
+                   "{:SENTENCE \"Are you a student?\" :TYPE :interrogative}, "
+                   "{:SENTENCE \"Welcome the new student.\" :TYPE :imperative}, "
+                   "{:SENTENCE \"There are so many students here!\" :TYPE :exclamatory}]")}]})
+
+#_(def theory-bridging-agent
+  {:id :theory-bridging-agent
+   :instruction
+   (str "You are a helpful assistant that interprets our requests and output results as a vector of Clojure maps. "
+        "Your response must be directly readable by the Clojure function 'read-string' to a vector of Clojure maps. "
+        "The maps you will produce contain two keys :SENTENCE and :TYPE \n"
+        "For each sentence in the input, :SENTENCE is the sentence. \n"
+        "For each sentence in the input, :TYPE is a Clojure vector of two keywords, both ...")})
+
+#_(defn ^:diag recreate-system-agents!
+  []
+  (doseq [{:keys [id instruction training]} [process-agent text-function-agent]]
+    (recreate-agent! id instruction training)))
+
+(defn query-agent
+  "Make a query to the Clojure agent."
+  [agent-id query]
+  (assert (#{:process-agent :text-function-agent} agent-id))
+  (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
+                                     :keys aid tid
+                                     :in $ ?agent-id
+                                     :where
+                                     [?e :agent/id ?agent-id]
+                                     [?e :agent/assistant-id ?aid]
+                                     [?e :agent/thread-id ?tid]]
+                                   @(connect-atm :system)
+                                   agent-id)
+                              first)
+        result (-> (query-on-thread {:aid aid :tid tid :query-text query})
+                   (str/replace #"\s+" " "))
+        #_#_[success? useful] (re-matches #"```clojure(.*)```" result)
+        #_#_result (if success? useful result)]
+    (try (->> (edn/read-string result)
+              (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
+         (catch Exception _e
+           (log/error "query-agent failed:" result)
+           nil))))
 
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []

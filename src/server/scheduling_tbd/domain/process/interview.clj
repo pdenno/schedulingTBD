@@ -1,4 +1,4 @@
-(ns scheduling-tbd.domain
+(ns scheduling-tbd.domain.process.interview
   "Scheduling domain prompts and analysis
      - analyze: Function names that begin with 'analyze' study user/surrogate response and produce planning propositions.
      - mzn: Function names that begin with 'mzn' use planning state to modify MiniZinc code."
@@ -6,6 +6,7 @@
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
    [clojure.pprint                :refer [cl-format]]
+   [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
    [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
@@ -301,7 +302,13 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-;;; ToDo: If this prove unreliable, consider using an LLM. I anticipate using this function only with surrogates.
+(s/def :quantity/value-string string?)
+(s/def :quantity/units keyword?)
+(s/def :quantity-range/low  (s/keys :req [:quantity/value-string :quantity/units]))
+(s/def :quantity-range/high (s/keys :req [:quantity/value-string :quantity/units]))
+(s/def ::duration-info (s/or :quantity-val    (s/keys :req [:quantity/value-string :quantity/units])
+                             :quantity-range  (s/keys :req [:quantity-range/low :quantity-range/high])))
+
 (defn parse-duration
   "Do whatever it takes to understand a string that supposed to have a duration in it.
    Return a map with properties describing a quantity of time.
@@ -319,7 +326,9 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         [_ qty] (re-matches #".*(\d+).*" s)
         qty (or qty (cond (re-matches #".*\s*several\s+.*" s) :several
                           (re-matches #".*\s*many\s+.*" s) :many
-                          (re-matches #".*\s*a few\s+.*" s) :a-few))]
+                          (re-matches #".*\s*a few\s+.*" s) :a-few
+                          :else (let [[success? val] (re-matches #".*\s+(\w+)\s+.*" s)]
+                                  (when success? (-> val str/lower-case keyword)))))]
     ;; ToDo: "between...and ... ??? Or just forget it???
     (if complex?
       (when-let [[low high] (str/split s #"\s+to\s+")]
@@ -330,6 +339,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                     :else     {:quantity/value-string (str qty) :quantity/units units})
         range-low  (assoc :quantity-range/low {:quantity/value-string range-low  :quantity/units units})
         range-high (assoc :quantity-range/high {:quantity/value-string range-high :quantity/units units})))))
+
+;;; ToDo: This will need to do more than just send the result to process duration.
+(defn llm-durations
+  "Create ::duration-info objects by using :clj-agent to interpret the response."
+  [response]
+  (let [result (llm/query-agent :clj-agent (str  "Extract ID PROCESS and DURATION:\n" response))]
+    (reset! diag result)
+    (throw (ex-info "NYI" {:result result}))))
 
 (defn put-process-sequence!
   "Write project/process-sequence to the project's database.
@@ -350,6 +367,11 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         eid (db/project-exists? pid)]
     (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
 
+(defn valid-infos?
+  "Return true if the duration infos have valid duration information."
+  [infos cnt]
+  (and (== cnt (count infos))
+       (every? #(s/valid? ::duration-info %) infos)))
 
 (defn analyze-process-durs-response
   "Used predominantly with surrogates, study the response to a query about process durations,
@@ -358,6 +380,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   (let [failures (atom [])
         proj-sym (-> pid name symbol)
         lines (str/split-lines response)
+        cnt (count lines)
         processes (mapv #(let [[line process-order _ process] (re-matches #"^(\d+)(\.)?([^\(]+).*" %)]
                            (if line
                              {:line line
@@ -368,12 +391,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         infos (->> processes
                    (map (fn [{:keys [line failure] :as obj}]
                           (if line
-                            (if-let[[_ dur-str] (re-matches #"^\s*\d+[^\(]+(.+)" line)] ; I'm keeping the parentheses for now.
+                            (if-let[[_ dur-str] (or (str/split line #" - ") (str/split line #" \(" line))] ; <====================== Later: need to use variable to avoid long process names. Also uniquify.
                               (assoc obj :dur-str dur-str)
                               (do (swap! failures #(into % (list 'fails-duration-parse line))) nil))
                             (do (swap! failures #(into % (list 'fails-duration-parse failure))) nil))))
                    (filter identity)
-                   (mapv #(assoc % :duration (parse-duration (:dur-str %)))))]
+                   (mapv #(assoc % :duration (parse-duration (:dur-str %)))))
+        zippy (log/info "infos = " infos)
+        infos (if (valid-infos? infos cnt) infos (llm-durations response))]
     (put-process-sequence! infos pid response)
     (let [extreme-span? (extreme-dur-span? pid pid)]
       ;;(log/info "extreme-span? =" extreme-span?)
@@ -381,6 +406,51 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         true              (into @failures)
         extreme-span?    (conj `(~'extreme-duration-span ~proj-sym ~@(map #(-> % name symbol) extreme-span?)))))))
 
+
+;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
+(def process-agent
+  "Instructions and training for :process-agent to help it get started."
+  {:id :process-agent
+   :instruction (slurp "data/instructions/process-agent.txt")})
+
+(defn remove-preamble
+  "The LLM might put text and markup around the answer, return the answer without this crap."
+  [response]
+  (let [response (str/replace response #"\s" " ")
+        m1 (re-matches #"^[^`]+```clojure([^`]+)(```)?" response)
+        m2 (or m1 (re-matches #"^```clojure([^`]+)(```)?" response))]
+    (cond m1  (nth m1 1)
+          m2  (nth m2 1)
+          :else response)))
+
+(s/def :rev-1/PROCESS string?)
+(s/def :rev-1/PROCESS-STEP number?)
+(s/def :rev-1/DURATION string?)
+(s/def ::rev-1-map (s/keys :req-un [:rev-1/PROCESS-STEP :rev-1/PROCESS :rev-1/DURATION]))
+(s/def ::rev-1 (fn [m] (every? #(s/valid? ::rev-1-map %) m)))
+
+(defn post-process
+  [response step]
+  (log/info "response = " response)
+  (case step
+    :rev-1 (try (let [response (remove-preamble response)
+                       result (edn/read-string response)]
+                   (if (s/valid? ::rev-1 result)
+                     result
+                     (log/warn "Invalid step-1 result" result)))
+                 (catch Exception _e
+                   (log/warn "Unreadable response:" response)))))
+
+;;; (inv/run-process-agent-steps data2)
+(defn run-process-agent-steps
+  "Run the steps of the process agent, checking work after each step."
+  [response]
+  (let [{:keys [aid tid]} (db/get-agent :process-agent)
+        step-1 (llm/query-on-thread
+                {:aid aid :tid tid :role "user"
+                 :query-text  (str "Perform REV-1 on the following user input:\n\n" response)})
+        step-1 (post-process step-1 :rev-1)]
+    step-1))
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 
 (defn analyze-process-ordering-response

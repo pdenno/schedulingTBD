@@ -76,7 +76,7 @@
   [{:keys [product client-id]} & {:keys [force?] :or {force? true}}] ; ToDo: handle force?=false, See similar-surrogate?
   (log/info "======= Start a surrogate: product =" product "=======================")
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
-        pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "Sur ") (apply str ?s))
+        pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})]
     (try
       (ensure-surrogate pid pname force?)
@@ -102,6 +102,16 @@
              (catch Exception e
                (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
                (ws/send-to-chat (assoc chat-args :msg "We had a problem answering this questions."))))))))
+
+(defn get-surrogate-messages-openai
+  [pid]
+  (when-let [tid (d/q '[:find ?tid .
+                        :where
+                        [_ :project/surrogate ?sur]
+                        [?sur  :surrogate/thread-id ?tid]]
+                      @(sutil/connect-atm pid))]
+    (llm/list-thread-messages tid 100)))
+
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []

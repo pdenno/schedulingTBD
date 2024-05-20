@@ -1,12 +1,13 @@
-(ns scheduling-tbd.domain-test
+(ns scheduling-tbd.domain.process.interview-test
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
    [clojure.pprint        :refer [cl-format pprint]]
    [clojure.string        :as str]
    [clojure.test          :refer [deftest is testing]]
    [promesa.core          :as p]
-   [scheduling-tbd.domain :as domain]
+   [scheduling-tbd.domain.process.interview :as inv]
    [scheduling-tbd.db    :as db]
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm]]
    [scheduling-tbd.llm    :as llm :refer [query-llm]]
    [taoensso.timbre          :as log]))
 
@@ -23,17 +24,17 @@
   (alias 'px     'promesa.exec)
   (alias 'core   'scheduling-tbd.core)
   (alias 'db     'scheduling-tbd.db)
-  (alias 'dom    'scheduling-tbd.domain)
-  ;(alias 'domt    'scheduling-tbd.domain-test)
+  (alias 'inv    'scheduling-tbd.domain.process.interview)
   (alias 'how    'scheduling-tbd.how-made)
   (alias 'llm    'scheduling-tbd.llm)
+  (alias 'llmt    'scheduling-tbd.llm-test)
   ;(alias 'llmt   'scheduling-tbd.llm-test)
   (alias 'op     'scheduling-tbd.operators)
 ;  (alias 'opt    'scheduling-tbd.operators-test)
   (alias 'plan   'scheduling-tbd.planner)
   (alias 'resp   'scheduling-tbd.web.controllers.respond)
   (alias 'spec   'scheduling-tbd.specs)
-  (alias 'sutil  'scheduling-tbd.sutil)
+; (alias 'sutil  'scheduling-tbd.sutil)
   (alias 'sur    'scheduling-tbd.surrogate)
   ;(alias 'surt   'scheduling-tbd.surrogate-test)
   (alias 'util   'scheduling-tbd.util)
@@ -44,7 +45,7 @@
 
 
 (def proj-objective-prompt
-  (conj domain/project-objective-partial
+  (conj inv/project-objective-partial
         {:role "user"
          :content "[We bake cookies and sell them through grocery chains. Our challenge is to supply fresh cookies and never stock-out.
  We want a schedule that will ensure we meet demand and have the ingredients we need.]"}))

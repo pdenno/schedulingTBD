@@ -1,0 +1,66 @@
+You are a helpful assistant. You read user data and output an interpretation of it as a vector of Clojure maps conforming to requirements expressed below.
+The requirements are decomposed into named 'revisions', (REV-1, REV-2..., REV-n) and we may ask you just to apply some subsequence of the revision (REV-1....REV-i) i <= n.
+(We might want to check your work between revisions.)
+As a general rule, never throw away information; instead, break up strings and put the parts under the designated Clojure map keys.
+The data we are working with concerns manufacturing processes. Here is typical input to REV-1:
+
+1. Obtain Raw Materials - 1 day to 3 months
+2. Material Preparation - 2 days
+3. Component Machining - 5 days
+4. Assembly - 3 days
+5. Quality Control (QC) - 1 hour (but could go longer)
+6. Packaging - 1 day
+7. Shipping - Varies depending on where it is going
+
+In REV-1 you separate each line of text into three parts: process step, process and duration and create a Clojure map of this information.
+The keys you should use in the map are :PROCESS-STEP :PROCESS and :DURATION (upper-case Clojure keys).
+Specifically, the value of map key :PROCESS-STEP is the number starting the string.
+The value of map key :PROCESS is a string describing the process step.
+The value of map key :DURATION is a string of the remaining information in the line, typically describing the duration:
+
+The REV-1 output that you should produce from this is a follows:
+
+[{:PROCESS-STEP 1 :PROCESS "Obtain Raw Materials" :DURATION "1 day to 3 months"},
+ {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION "2 days"},
+ {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION "5 days"},
+ {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION "3 days"},
+ {:PROCESS-STEP 5 :PROCESS "Quality Control (QC)" :DURATION "1 day (but could go longer)"},
+ {:PROCESS-STEP 6 :PROCESS "Packaging" :DURATION "1 hour"},
+ {:PROCESS-STEP 7 :PROCESS "Shipping" :DURATION "Varies depending on where it is going"}]
+
+In REV-2 we isolate commentary that sometimes shows up in the :DURATION field because the user didn't know how to answer the question about duration.
+For example, the text in :PROCESS-STEP 7, "Varies depending on where it is going" is such commentary.
+Copy this string to a new map key :COMMENT, and assign a single word that best summarizes what is intended in :DURATION.
+In the case of :PROCESS-STEP 7 above, "varies" would be a good choice. Below we transform REV-1 by REV-2:
+
+[{:PROCESS-STEP 1 :PROCESS "Obtain Raw Materials" :DURATION "1 day to 3 months"},
+ {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION "2 days"},
+ {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION "5 days"},
+ {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION "3 days"},
+ {:PROCESS-STEP 5 :PROCESS "Quality Control (QC)" :DURATION "1 hour" :COMMENT "(but could go longer)"},
+ {:PROCESS-STEP 6 :PROCESS "Packaging" :DURATION "1 day"},
+ {:PROCESS-STEP 7 :PROCESS "Shipping" :DURATION "varies" :COMMENT "Varies depending on where it is going"}]
+
+In REV-3 we focus on the :DURATION field. As the REV-2 output above suggests, there are at least three ways duration is being expressed:
+  (1) as a simple amount and units of measure, like "2 days",
+  (2) as a range of simple amounts and units of measure like "1 day to 3 months", and
+  (3) as a single word you chose when the user didn't quite answer the question, like when you chose "varies" in the REV-2 example.
+
+When, like (1), the string is a simple amount and units of measure, you should replace the string with a map having the keys :AMOUNT-STRING and :UNITS,
+where :AMOUNT-STRING is a string and :UNITS is a Clojure keyword. For exmple, if :duration is "3 hours" replace it with {:AMOUNT-STRING "3", :UNITS :hours}.
+
+When, like (2), the string in :duration is a range of durations, you should replace the string with a map of two keys, :quantity-high, and :quantity-low,
+where the values at these keys are maps with :AMOUNT-STRING and :UNITS like in (1). For example, if the string in :duration is "1 day to 3 months",
+you should replace :duration withthe map {:quantity-low {:AMOUNT-STRING "1", :UNITS :days} :quantity-high {:AMOUNT-STRING "3" :UNITS :months}}:
+
+When, like (3) the string in :duration is not a quantity at all, but rather a word you selected in Step-2, like "varies", then just leave the :duration field alone:
+
+Here is REV-2 output transformed through REV-3:
+
+[{:PROCESS-STEP 1 :PROCESS "Obtain Raw Materials" :DURATION {:quantity-low {:AMOUNT-STRING "1" :UNITS :days} :quantity-high {:AMOUNT-STRING "3" :UNITS :months}}},
+ {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION {:AMOUNT-STRING "2" :UNITS :days}},
+ {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION  {:AMOUNT-STRING "5" :UNITS :days}},
+ {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION {:AMOUNT-STRING "3" :UNITS :days}},
+ {:PROCESS-STEP 5 :PROCESS "Quality Control (QC)" :DURATION {:AMOUNT-STRING "1" :UNITS :hours} :COMMENT "(but could go longer)"},
+ {:PROCESS-STEP 6 :PROCESS "Packaging" :DURATION {:AMOUNT-STRING "1" :UNITS :days}},
+ {:PROCESS-STEP 7 :PROCESS "Shipping" :DURATION "varies" :COMMENT "Varies depending on where it is going"}]

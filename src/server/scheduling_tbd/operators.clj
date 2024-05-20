@@ -8,7 +8,7 @@
    [promesa.core          :as p]
    [promesa.exec          :as px]
    [scheduling-tbd.db     :as db]
-   [scheduling-tbd.domain :as dom]
+   [scheduling-tbd.domain.process.interview :as inv]
    [scheduling-tbd.llm    :as llm]
    [scheduling-tbd.specs  :as spec]
    [scheduling-tbd.sutil  :as sutil :refer [find-fact]]
@@ -126,7 +126,7 @@
 
 (defn make-human-project
   "Surrogate already has a project db, but human doesn't. This creates the db and returns and returns state (possibly updated).
-   This is called after dom/prelim-analysis, which looks at the human response to define a proj-name predicate."
+   This is called after inv/prelim-analysis, which looks at the human response to define a proj-name predicate."
   [state]
   (log/info "Human project: state =" state)
   (if-let [[_ pname] (find-fact '(proj-name ?x) state)]
@@ -195,7 +195,7 @@
 (defaction :!initial-question [{:keys [state response client-id agent-query] :as _obj}]
   (log/info "*******db-action (!initial-question): response =" response "state =" state)
   (let [surrogate? (surrogate? state)
-        analysis-state (dom/analyze-intro-response response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
+        analysis-state (inv/analyze-intro-response response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
     (when-not surrogate? (make-human-project analysis-state))
     ;;--------  Now human/surrogate can be treated nearly identically ---------
     (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
@@ -210,7 +210,7 @@
           ;(ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
           (db/add-msg pid :system msg)))
       ;; Complete preliminary analysis in a parallel agent that, in the case of a human expert, works independently.
-      (db/add-planning-state pid (dom/parallel-expert-prelim-analysis pid)))))
+      (db/add-planning-state pid (inv/parallel-expert-prelim-analysis pid)))))
 
 ;;; ----- :!yes-no-process-steps ---------------------------------------------------------------------------------------------------------------------
 (defoperator :!yes-no-process-steps [{:keys [state] :as obj}]
@@ -226,8 +226,8 @@
   ;; Nothing to do here but update state from a-list.
   (reset! diag obj)
   (log/info "!yes-no-process-steps (action): response =" response)
-  (let [more-state (dom/analyze-process-steps-response obj)
-        new-code (dom/mzn-process-steps more-state)
+  (let [more-state (inv/analyze-process-steps-response obj)
+        new-code (inv/mzn-process-steps more-state)
         minizinc-enum-announce
         (str "Okay, we now know enough to get started on a MiniZinc solution.\n"
              "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>.\n"
@@ -248,10 +248,10 @@
   (let [agent-query (if (surrogate? state)
                       (format (str "I suppose processing times for each of the steps you just mentioned might vary from product to product. "
                                    "But generally speaking, how long does each step take? "
-                                   "Please produce a list just like the one you did for process steps (one process per line), but add to it the typical processing time "
+                                   "Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time "
                                    "so it looks like this:\n"
                                    "1. %s (some amount of time)\n"
-                                   "2. %s (some amount of time)\n...")
+                                   "2. %s (some amount of time)...")
                               (-> (find-fact '(process-step ?proj 1 ?process) state) (nth 3))
                               (-> (find-fact '(process-step ?proj 2 ?process) state) (nth 3)))
                       "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)")]
@@ -259,5 +259,5 @@
 
 (defaction :!query-process-durs [{:keys [response pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
-  (let [more-state (dom/analyze-process-durs-response obj)]
+  (let [more-state (inv/analyze-process-durs-response obj)]
     (db/add-planning-state pid more-state)))
