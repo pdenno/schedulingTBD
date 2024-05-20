@@ -22,7 +22,7 @@ The software is being developed as part of the NIST project [Human/AI Teaming fo
 Feel free to contact us if this work interests you!
 
 ## Building/Running (development mode)
-   These instructions have not been throroughly tested and are likely not complete. If you try have problems, write an issue or email us (see the NIST project page above).
+   These instructions have not been thoroughly tested and are likely not complete. If you have problems, write an issue or email us (see the NIST project page above).
 
 ### Set up environment variables
   * Thus far, the work has only been tested with OpenAI LLMs and on Linux and Macs.
