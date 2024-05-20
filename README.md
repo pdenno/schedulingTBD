@@ -3,12 +3,16 @@
 ## Introduction
 
 SchedulingTBD is exploratory software to study human/AI teaming in long-running (months) cognitive work.
-The cognitive work we focus on is the formulation and refinement of analytical models in a domain-specific language (DSL), [MiniZinc](https://www.minizinc.org/).
-Our goal is to determine best practices in how persons having no prior experience with the DSL might learn the language to solve problems important to their work.
-This DSL-based teaming model brings to focus the challenges of designing DSLs fit for this purpose, problem solving, constructionist learning, and scientific explanation.
+The cognitive work we focus on is the joint (human and AI) formulation and refinement of analytical models in a domain-specific language (DSL), [MiniZinc](https://www.minizinc.org/).
+Our research goal is to determine best practices in the design of systems that use a DSL unfamiliar to a user in joint work to solve problems important to the user.
+This DSL-based teaming model brings to focus the challenges of 
+(1) designing DSLs fit to this purpose, 
+(2) problem solving in technical environments,
+(3) constructionist learning, and 
+(4) scientific explanation.
 
 In the software, we engage the user in chat-based conversation implemented with Large Language Models (LLMs) and a multi-agent architecture.
-As of this writing, we are mid-way through the work of implementing interviewing agents to understand the goals of users.
+As of this writing, we are implementing interviewing agents to understand the goals of users and introduce the DSL technology.
 We are far enough along to posit a few lines of MiniZinc towards formulation of a solution. We expect to be able to formulate entire solutions to some problems soon.
 Currently we are testing the interviewing process with surrogate human users, LLM-based agents simulating expertise in a manufacturing domain.
 We plan to test hundreds of such domain expert surrogates before enabling similar functionality for human experts.
