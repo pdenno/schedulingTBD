@@ -1,11 +1,11 @@
 [
 #:system{:agents
-         [#:clj-agent{:assistant-id "asst_pwM8VtkPitilYgnpTiSmCxS5",
-                      :id :text-function-agent,
-                      :thread-id "thread_YmjqNM3oL1YYAsGJC29yOChE"}
-          #:clj-agent{:assistant-id "asst_lJhcSSTbJG0hTAow5bfalMiC",
-                      :id :clj-agent,
-                      :thread-id "thread_q3t8o9hzQbPwTNhVJQuRxEk4"}],
+         [#:agent{:assistant-id "asst_pwM8VtkPitilYgnpTiSmCxS5",
+                  :id :text-function-agent,
+                  :thread-id "thread_YmjqNM3oL1YYAsGJC29yOChE"}
+          #:agent{:assistant-id "asst_vuuOkyb4dbt6tby7hbEPE4N9",
+                  :id :process-agent,
+                  :thread-id "thread_1hSxebCMsTVlrYXyzGCcq4K9"}],
          :default-project-id :sur-fountain-pens,
          :name "SYSTEM"}
 

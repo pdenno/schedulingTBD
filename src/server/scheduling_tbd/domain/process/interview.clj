@@ -406,6 +406,51 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         true              (into @failures)
         extreme-span?    (conj `(~'extreme-duration-span ~proj-sym ~@(map #(-> % name symbol) extreme-span?)))))))
 
+
+;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
+(def process-agent
+  "Instructions and training for :process-agent to help it get started."
+  {:id :process-agent
+   :instruction (slurp "data/instructions/process-agent.txt")})
+
+(defn remove-preamble
+  "The LLM might put text and markup around the answer, return the answer without this crap."
+  [response]
+  (let [response (str/replace response #"\s" " ")
+        m1 (re-matches #"^[^`]+```clojure([^`]+)(```)?" response)
+        m2 (or m1 (re-matches #"^```clojure([^`]+)(```)?" response))]
+    (cond m1  (nth m1 1)
+          m2  (nth m2 1)
+          :else response)))
+
+(s/def :rev-1/PROCESS string?)
+(s/def :rev-1/PROCESS-STEP number?)
+(s/def :rev-1/DURATION string?)
+(s/def ::rev-1-map (s/keys :req-un [:rev-1/PROCESS-STEP :rev-1/PROCESS :rev-1/DURATION]))
+(s/def ::rev-1 (fn [m] (every? #(s/valid? ::rev-1-map %) m)))
+
+(defn post-process
+  [response step]
+  (log/info "response = " response)
+  (case step
+    :rev-1 (try (let [response (remove-preamble response)
+                       result (edn/read-string response)]
+                   (if (s/valid? ::rev-1 result)
+                     result
+                     (log/warn "Invalid step-1 result" result)))
+                 (catch Exception _e
+                   (log/warn "Unreadable response:" response)))))
+
+;;; (inv/run-process-agent-steps data2)
+(defn run-process-agent-steps
+  "Run the steps of the process agent, checking work after each step."
+  [response]
+  (let [{:keys [aid tid]} (db/get-agent :process-agent)
+        step-1 (llm/query-on-thread
+                {:aid aid :tid tid :role "user"
+                 :query-text  (str "Perform REV-1 on the following user input:\n\n" response)})
+        step-1 (post-process step-1 :rev-1)]
+    step-1))
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 
 (defn analyze-process-ordering-response

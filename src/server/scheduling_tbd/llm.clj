@@ -29,7 +29,7 @@
 (def preferred-llms
   "These names (keywords) are the models we use, and the models we've been using lately."
   {:openai {:gpt-3.5     "gpt-3.5-turbo-0125"
-            :gpt-4       "gpt-4-0125-preview"
+            :gpt-4       "gpt-4-turbo-2024-04-09" ; "gpt-4o" "gpt-4o-2024-05-13" "gpt-4-0125-preview"
             :davinci     "davinci-002"}
    :azure  {:gpt-3.5     "gpt-3.5-turbo-0125"}})
 
@@ -118,9 +118,11 @@
           capitalize?                 (str/capitalize))
         (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
 
+(defn list-openai-models [] (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse))
+
 (defn select-llm-models-openai
   []
-  (let [models (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse)]
+  (let [models (list-openai-models)]
     (swap! llms-used
            (fn [atm] (assoc atm :openai
                             (reduce (fn [res k]
@@ -154,7 +156,7 @@
   "Create an assistant with the given parameters. Provide a map like with following keys:
      :name - a string, no default.
      :instructions - a string, the systems instructions; defaults to 'You are a helpful assistant.',
-     :model - a string; defaults to 'gpt-4-1106-preview',
+     :model - a string; defaults to whatever is the chosen 'gpt-4',
      :tools - a vector containing maps; defaults to [{:type 'code_interpreter'}]."
   [& {:keys [name model-class instructions tools metadata]
       :or {model-class :gpt-4
@@ -200,7 +202,7 @@
     aid      - assistant ID (the OpenAI notion)
     tid      - thread ID (ttheOpenAI notion)
     role     - #{'user' 'assistant'},
-    msg-text - a string.
+    query-text - a string.
    Returns text but uses promesa internally to deal with errors."
   [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 60 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   (log/info "query-on-thread: query-text =" query-text)
@@ -286,14 +288,14 @@
 ;;;       Solution?: See if you can factor the problem down into parts for which the planner can be used.
 ;;;       Would be good do have the functions of the operators of the planner embedded...some how..
 ;;;------------------- Agent ---------------
-(defn recreate-agent!
-  "Create a clj-agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
+(defn ^:diag recreate-agent!
+  "Create a agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
    Store what is needed to identify it in system DB."
-  [id instruction training-data]
-  (let [assist (make-assistant :name (name id) :instructions instruction :metadata {:usage :clj-agent})
+  [{:keys [id instruction training-data]}]
+  (let [assist (make-assistant :name (name id) :instructions instruction :metadata {:usage :agent})
         aid    (:id assist)
         thread (make-thread {:assistant-id aid
-                             :metadata {:usage :clj-agent}
+                             :metadata {:usage :agent}
                              :messages training-data})
         tid    (:id thread)
         conn   (connect-atm :system)
@@ -301,39 +303,9 @@
                       :where [?eid :system/name "SYSTEM"]]
                     @(connect-atm :system))]
     (d/transact conn {:tx-data [{:db/id eid
-                                 :system/agents {:clj-agent/id id
-                                                 :clj-agent/assistant-id aid
-                                                 :clj-agent/thread-id tid}}]})))
-
-(def clj-agent
-  "Instructions and training for :clj-agent to help it get started."
-  {:id :clj-agent
-   :instruction
-   (str "You are a helpful assistant that interprets our requests and output results as a vector of Clojure maps. "
-        "Your response must be directly readable by the Clojure function 'read-string' to a vector of Clojure maps. "
-        "We will use UPPER-CASE to identify the names of map keys you should use.")
-   :training
-   [{:role "user"
-     :content (str "Extract  ID and CONTENT:\n"
-                   "1. apples\n2. oranges\n3. bananas")}
-    {:role "assistant"
-     :content "[{:ID 1 :CONTENT \"apples\"}, {:ID 2 :CONTENT \"oranges\"}, {:ID 3 :CONTENT: \"bananas\"}]"}
-    {:role "user"
-     :content (str "Extract ID, CONTENT and QUANTITY:\n"
-                   "1. apples - 3 dozen \n2. oranges - 1 bag \n3. bananas - one small bunch")}
-    {:role "assistant"
-     :content (str "[{:ID 1 :CONTENT \"apples\" :QUANTITY \"3 dozen\"}, "
-                   "{:ID 2 :CONTENT \"oranges\" :QUANTITY \"1 bag\" }, "
-                   "{:ID 3 :CONTENT \"bananas\" :QUANTITY \"one small bunch\"}]")}
-    {:role "user"
-     :content (str "Extract ID, CONTENT and QUANTITY:\n"
-                   "1. apples - 3 dozen \n2. oranges - 1 bag \n3. bananas - one small bunch")}
-    {:role "assistant"
-     :content (str "[{:ID 1 :CONTENT \"apples\" :QUANTITY 3}, "
-                   "{:ID 2 :CONTENT \"oranges\" :QUANTITY 1}, "
-                   "{:ID 3 :CONTENT \"bananas\" :QUANTITY 1}]")}
-    {:role "user"
-     :content "WRONG! Don't throw away information. You lost the units of measure (dozens, bags, and small bunch)."}]})
+                                 :system/agents {:agent/id id
+                                                 :agent/assistant-id aid
+                                                 :agent/thread-id tid}}]})))
 
 ;;; ToDo: I go back and forth on whether this should be :text-function-agent, which only does those four types below
 ;;;       (and in which case the
@@ -368,33 +340,33 @@
         "For each sentence in the input, :SENTENCE is the sentence. \n"
         "For each sentence in the input, :TYPE is a Clojure vector of two keywords, both ...")})
 
-(defn ^:diag recreate-system-agents!
+#_(defn ^:diag recreate-system-agents!
   []
-  (doseq [{:keys [id instruction training]} [clj-agent text-function-agent]]
+  (doseq [{:keys [id instruction training]} [process-agent text-function-agent]]
     (recreate-agent! id instruction training)))
 
 (defn query-agent
   "Make a query to the Clojure agent."
   [agent-id query]
-  (assert (#{:clj-agent :text-function-agent} agent-id))
+  (assert (#{:process-agent :text-function-agent} agent-id))
   (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
                                      :keys aid tid
                                      :in $ ?agent-id
                                      :where
-                                     [?e :clj-agent/id ?agent-id]
-                                     [?e :clj-agent/assistant-id ?aid]
-                                     [?e :clj-agent/thread-id ?tid]]
+                                     [?e :agent/id ?agent-id]
+                                     [?e :agent/assistant-id ?aid]
+                                     [?e :agent/thread-id ?tid]]
                                    @(connect-atm :system)
                                    agent-id)
                               first)
         result (-> (query-on-thread {:aid aid :tid tid :query-text query})
                    (str/replace #"\s+" " "))
-        [success? useful] (re-matches #"```clojure(.*)```" result)
-        result (if success? useful result)]
+        #_#_[success? useful] (re-matches #"```clojure(.*)```" result)
+        #_#_result (if success? useful result)]
     (try (->> (edn/read-string result)
               (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
          (catch Exception _e
-           (log/error "query-clojure-agent failed:" result)
+           (log/error "query-agent failed:" result)
            nil))))
 
 ;;;------------------- Starting and stopping ---------------

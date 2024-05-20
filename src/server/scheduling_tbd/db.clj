@@ -22,14 +22,14 @@
   "Defines content that manages project DBs and their analysis including:
      - The project's name and db directory
      - Planning domains, methods, operators, and axioms"
-  {;; ---------------------- clj-agent
-   :clj-agent/id
+  {;; ---------------------- agent
+   :agent/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A unique ID for each cl-agent to ensure only one of each type is available the possible values are #{:clj-agent ."}
-   :clj-agent/assistant-id
+        :doc "A unique ID for each agent to ensure only one of each type is available."}
+   :agent/assistant-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant id (a string) associated with this surrogate."}
-   :clj-agent/thread-id
+   :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
 
@@ -621,6 +621,20 @@
           (sutil/deregister-db pid)
           nil)))
     (log/warn "Delete-project: Project not found:" pid)))
+
+(defn get-agent
+  "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)."
+  [agent-id]
+  (assert (#{:process-agent} agent-id))
+  (-> (d/q '[:find ?aid ?tid
+             :keys aid tid
+             :in $ ?agent-id
+             :where
+             [?e :agent/id ?agent-id]
+             [?e :agent/assistant-id ?aid]
+             [?e :agent/thread-id ?tid]]
+           @(connect-atm :system) agent-id)
+      first))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs
