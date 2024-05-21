@@ -413,15 +413,10 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   {:id :process-agent
    :instruction (slurp "data/instructions/process-agent.txt")})
 
-(defn remove-preamble
-  "The LLM might put text and markup around the answer, return the answer without this crap."
-  [response]
-  (let [response (str/replace response #"\s" " ")
-        m1 (re-matches #"^[^`]+```clojure([^`]+)(```)?" response)
-        m2 (or m1 (re-matches #"^```clojure([^`]+)(```)?" response))]
-    (cond m1  (nth m1 1)
-          m2  (nth m2 1)
-          :else response)))
+(def table-agent
+  {:id :table-agent
+   :instruction (slurp "data/instructions/table-agent.txt")})
+
 
 (s/def :rev-1/PROCESS string?)
 (s/def :rev-1/PROCESS-STEP number?)
@@ -433,6 +428,28 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (s/def ::rev-4 (fn [m] (every? #(map? %) m)))
 (s/def ::rev-5 (fn [m] (every? #(map? %) m)))
 
+(defn remove-preamble
+  "The LLM might put text and markup around the answer, return the answer without this crap."
+  [response]
+  (let [response (str/replace response #"\s" " ")]
+    (if (re-matches #".*```clojure" response)
+      (let [pos (str/index-of response "```clojure")
+            response (subs response (+ pos 10))
+            pos (str/index-of response "```")]
+        (subs response 0 pos))
+      response)))
+
+;;; I'll keep this around for a while because post-processing of OpenAI might prove
+#_(defn remove-preamble
+  "The LLM might put text and markup around the answer, return the answer without this crap."
+  [response]
+  (let [response (str/replace response #"\s" " ")
+        m1 (re-matches #"^[^`]+```clojure([^`]+)(```)?" response)
+        m2 (or m1 (re-matches #"^```clojure([^`]+)(```)?" response))]
+    (cond m1  (nth m1 1)
+          m2  (nth m2 1)
+          :else response)))
+
 (defn post-process
   [response rev]
   (try
@@ -443,7 +460,8 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (reset! diag result)
         (log/warn "Invalid step-1 result" result)))
     (catch Exception _e
-      (log/warn "Unreadable response:" response))))
+      (reset! diag response)
+      (log/error "Unreadable response:" response))))
 
 ;;; (inv/run-process-agent-steps data2)
 (defn run-process-agent-steps
@@ -457,7 +475,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                       {:aid aid :tid tid :role "user"
                        :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
           (reset! past-rev (post-process result rev))
-          (log/info "*************** past-rev =" @past-rev))))
+          (log/info "***************" rev "="  @past-rev))))
     @past-rev))
 
 (defn check-instructions
@@ -466,8 +484,33 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   (let [{:keys [aid tid]} (db/get-agent :process-agent)]
     (llm/query-on-thread
      {:aid aid :tid tid :role "user"
-      :query-text (str "I provided instructions to perform a number of transformation we call 'REVs' "
+      :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
                        "REV-1, REV-2, etc. What are the REVs that you know about?")})))
+
+
+(defn test-table-agent
+  "It might be the case that the system instructions were too long. This asks what it knows about."
+  [table]
+  (let [{:keys [aid tid]} (db/get-agent :table-agent)]
+    (llm/query-on-thread
+     {:aid aid :tid tid :role "user"
+      :query-text (str "Perform Task-1 on this table: "table)})))
+
+
+(def test-1
+  (str "Part number | Part description | Price\n"
+       "2335 | Widget | $1.12\n"
+       "2995 | FoBar | $1.82\n"))
+
+(def test-2
+  (str "This is from a supplier that does make-to-order manufacturing, we want to get the key that corresponds to a job in their factory.\n\n"
+       "Customer ID | Order date | Qty | Part description | Part number | Preferred customer?  "
+       "sx33 | 2024-05-11 | 17 | turbo assembly | tur-1353fd | No  "
+       "al33 | 2024-05-21 | 1 | Alternator | alt-j334j | yes  "))
+
+
+
+
 
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 

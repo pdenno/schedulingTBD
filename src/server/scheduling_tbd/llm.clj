@@ -205,7 +205,7 @@
     query-text - a string.
    Returns text but uses promesa internally to deal with errors."
   [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 60 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
-  (log/info "query-on-thread: query-text =" query-text)
+  ;(log/info "query-on-thread: query-text =" query-text)
   (assert (#{"user" "assistant"} role))
   (assert (string? query-text))
   (assert (not-empty query-text))
@@ -291,12 +291,11 @@
 (defn ^:diag recreate-agent!
   "Create a agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
    Store what is needed to identify it in system DB."
-  [{:keys [id instruction training-data]}]
+  [{:keys [id instruction]}]
   (let [assist (make-assistant :name (name id) :instructions instruction :metadata {:usage :agent})
         aid    (:id assist)
         thread (make-thread {:assistant-id aid
-                             :metadata {:usage :agent}
-                             :messages training-data})
+                             :metadata {:usage :agent}})
         tid    (:id thread)
         conn   (connect-atm :system)
         eid    (d/q '[:find ?eid .

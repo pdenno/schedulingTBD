@@ -625,7 +625,7 @@
 (defn get-agent
   "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)."
   [agent-id]
-  (assert (#{:process-agent} agent-id))
+  (assert (#{:process-agent :table-agent} agent-id))
   (-> (d/q '[:find ?aid ?tid
              :keys aid tid
              :in $ ?agent-id
