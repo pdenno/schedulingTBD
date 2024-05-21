@@ -11,6 +11,22 @@
    [scheduling-tbd.llm    :as llm :refer [query-llm]]
    [taoensso.timbre          :as log]))
 
+;;; (ns-unalias (find-ns 'scheduling-tbd.domain.process.interview-test) 'inv)
+;;; (ns-unmap  'scheduling-tbd.domain.process.interview-test 'inv)
+
+(defn huh?
+  []
+  (ns-unalias (find-ns 'scheduling-tbd.domain.process.interview-test) 'db)
+  (ns-unalias (find-ns 'scheduling-tbd.domain.process.interview-test) 'sutil)
+  (ns-unalias (find-ns 'scheduling-tbd.domain.process.interview-test) 'llm)
+  (ns-unalias (find-ns 'scheduling-tbd.domain.process.interview-test) 'log)
+  (ns-unmap  'scheduling-tbd.domain.process.interview-test 'inv)
+  (ns-unmap  'scheduling-tbd.domain.process.interview-test 'db)
+  (ns-unmap  'scheduling-tbd.domain.process.interview-test 'sutil)
+  (ns-unmap  'scheduling-tbd.domain.process.interview-test 'llm)
+  (ns-unmap  'scheduling-tbd.domain.process.interview-test 'log))
+
+
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
@@ -22,12 +38,11 @@
   (alias 'mount  'mount.core)
   (alias 'p      'promesa.core)
   (alias 'px     'promesa.exec)
-  (alias 'core   'scheduling-tbd.core)
-  (alias 'db     'scheduling-tbd.db)
+  ;(alias 'core   'scheduling-tbd.core)
   (alias 'inv    'scheduling-tbd.domain.process.interview)
+  (alias 'db     'scheduling-tbd.db)
   (alias 'how    'scheduling-tbd.how-made)
   (alias 'llm    'scheduling-tbd.llm)
-  (alias 'llmt    'scheduling-tbd.llm-test)
   ;(alias 'llmt   'scheduling-tbd.llm-test)
   (alias 'op     'scheduling-tbd.operators)
 ;  (alias 'opt    'scheduling-tbd.operators-test)

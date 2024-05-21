@@ -428,29 +428,47 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (s/def :rev-1/DURATION string?)
 (s/def ::rev-1-map (s/keys :req-un [:rev-1/PROCESS-STEP :rev-1/PROCESS :rev-1/DURATION]))
 (s/def ::rev-1 (fn [m] (every? #(s/valid? ::rev-1-map %) m)))
+(s/def ::rev-2 (fn [m] (every? #(map? %) m)))
+(s/def ::rev-3 (fn [m] (every? #(map? %) m)))
+(s/def ::rev-4 (fn [m] (every? #(map? %) m)))
+(s/def ::rev-5 (fn [m] (every? #(map? %) m)))
 
 (defn post-process
-  [response step]
-  (log/info "response = " response)
-  (case step
-    :rev-1 (try (let [response (remove-preamble response)
-                       result (edn/read-string response)]
-                   (if (s/valid? ::rev-1 result)
-                     result
-                     (log/warn "Invalid step-1 result" result)))
-                 (catch Exception _e
-                   (log/warn "Unreadable response:" response)))))
+  [response rev]
+  (try
+    (let [rev-spec (->> rev name (keyword "scheduling-tbd.domain.process.interview")) ; ToDo: Don't change the filename!
+          response (remove-preamble response)
+          result (edn/read-string response)]
+      (if (s/valid? rev-spec result)
+        (reset! diag result)
+        (log/warn "Invalid step-1 result" result)))
+    (catch Exception _e
+      (log/warn "Unreadable response:" response))))
 
 ;;; (inv/run-process-agent-steps data2)
 (defn run-process-agent-steps
   "Run the steps of the process agent, checking work after each step."
   [response]
   (let [{:keys [aid tid]} (db/get-agent :process-agent)
-        step-1 (llm/query-on-thread
-                {:aid aid :tid tid :role "user"
-                 :query-text  (str "Perform REV-1 on the following user input:\n\n" response)})
-        step-1 (post-process step-1 :rev-1)]
-    step-1))
+        past-rev (atom response)]
+    (doseq [rev [:rev-1 :rev-2 :rev-3 :rev-4 :rev-5]]
+      (when @past-rev
+        (let [result (llm/query-on-thread
+                      {:aid aid :tid tid :role "user"
+                       :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
+          (reset! past-rev (post-process result rev))
+          (log/info "*************** past-rev =" @past-rev))))
+    @past-rev))
+
+(defn check-instructions
+  "It might be the case that the system instructions were too long. This asks what it knows about."
+  []
+  (let [{:keys [aid tid]} (db/get-agent :process-agent)]
+    (llm/query-on-thread
+     {:aid aid :tid tid :role "user"
+      :query-text (str "I provided instructions to perform a number of transformation we call 'REVs' "
+                       "REV-1, REV-2, etc. What are the REVs that you know about?")})))
+
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 
 (defn analyze-process-ordering-response

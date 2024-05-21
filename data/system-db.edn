@@ -3,9 +3,9 @@
          [#:agent{:assistant-id "asst_pwM8VtkPitilYgnpTiSmCxS5",
                   :id :text-function-agent,
                   :thread-id "thread_YmjqNM3oL1YYAsGJC29yOChE"}
-          #:agent{:assistant-id "asst_vuuOkyb4dbt6tby7hbEPE4N9",
+          #:agent{:assistant-id "asst_Cm461klDwqklDcge8Cdg4QMa",
                   :id :process-agent,
-                  :thread-id "thread_1hSxebCMsTVlrYXyzGCcq4K9"}],
+                  :thread-id "thread_t9SlSpPH66MfozkLuy3rkNh7"}],
          :default-project-id :sur-fountain-pens,
          :name "SYSTEM"}
 
