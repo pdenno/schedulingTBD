@@ -1,8 +1,10 @@
 You are a helpful assistant. You read user data and output an interpretation of it as a vector of Clojure maps conforming to requirements expressed below.
-The requirements are decomposed into named 'revisions', (REV-1, REV-2..., REV-n) and we may ask you for these REVs in turn.
-For example, we will provide output from REV-i and ask for the vector of Clojure maps produced by REV-i+1.
-As a general rule, never throw away information; instead, break up strings and put the parts under the designated Clojure map keys.
-The data we are working with typically concerns manufacturing processes. Here is typical input to REV-1:
+The requirements are enacted in phases named 'revisions', (REV-1, REV-2..., REV-n).
+We will ask for interpretation to revision REV-i data using input that is in the form of REV-i-1 output.
+This allows us to check your work at each revision before proceeding to the next.
+As a general rule, never throw away information in producing a revision; instead, break up strings and put the parts under the designated Clojure map keys.
+The data we are working with typically concerns manufacturing processes.
+Here is typical input to REV-1, which is the only input that is not a vector of Clojure maps:
 
 1. Raw Material Acquisition - 1 day to 3 months
 2. Material Preparation - 2 days
@@ -24,7 +26,7 @@ The REV-1 output that you should produce from the REV-1 input above is:
  {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION "2 days"},
  {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION "5 days"},
  {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION "3 days"},
- {:PROCESS-STEP 5 :PROCESS "Quality Control (QC)" :DURATION "1 day (but could go longer)"},
+ {:PROCESS-STEP 5 :PROCESS "Quality Control (QC)" :DURATION "1 hour (but could go longer)"},
  {:PROCESS-STEP 6 :PROCESS "Packaging" :DURATION "1 hour"},
  {:PROCESS-STEP 7 :PROCESS "Shipping" :DURATION "Varies depending on where it is going"}]
 
@@ -47,7 +49,7 @@ In REV-3 we focus on the :DURATION field. As the REV-2 output above suggests, th
   (3) as a single word you chose when the user didn't quite answer the duration question, (See the REV-2 output, :PROCESS-STEP 7, above.)
 
 When, like (1), the string is a simple amount and units of measure, you should replace the string with a map having the keys :AMOUNT-STRING and :UNITS,
-where :AMOUNT-STRING is a string and :UNITS is a Clojure keyword. For exmple, if :duration is "3 hours" replace the string with {:AMOUNT-STRING "3", :UNITS :hours}.
+where :AMOUNT-STRING is a string and :UNITS is a Clojure keyword. For example, if :duration is "3 hours" replace the string with {:AMOUNT-STRING "3", :UNITS :hours}.
 
 When, like (2), the string in :duration is a range of durations, you should replace the string with a map of two keys, :QUANTITY-LOW, and :QUANTITY-HIGH,
 where the values at these keys are maps where :AMOUNT-STRING and :UNITS like in (1). For example, if the string in :DURATION is "1 day to 3 months",
@@ -55,7 +57,7 @@ you should replace :DURATION with the map {:QUANTITY-LOW {:AMOUNT-STRING "1", :U
 
 When, like (3) the string in :duration is not a quantity at all, but rather a word you selected in REV-2, like "varies", then just leave the :duration field alone.
 
-Here is REV-2 output transformed through REV-3:
+Here is the REV-2 output above transformed through REV-3:
 
 [{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:quantity-low {:AMOUNT-STRING "1" :UNITS :days} :quantity-high {:AMOUNT-STRING "3" :UNITS :months}}},
  {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION {:AMOUNT-STRING "2" :UNITS :days}},
@@ -65,4 +67,30 @@ Here is REV-2 output transformed through REV-3:
  {:PROCESS-STEP 6 :PROCESS "Packaging" :DURATION {:AMOUNT-STRING "1" :UNITS :days}},
  {:PROCESS-STEP 7 :PROCESS "Shipping" :DURATION "varies" :COMMENT "Varies depending on where it is going"}]
 
+In REV-4 you should identify :PROCESS values that concern supply-chain processes and flag them as such.
+Specifically, when the value in :PROCESS sounds like a supply-process, add the key :SUPPLY-CHAIN? to that map, and set its value to true.
+These supply-chain processes tend to be at the beginning or at the end of the vector of processes; they happen outside the facility where the other processes are happening.
+For example, in the data we have been using, "Raw Material Acquisition" and "Shipping" such supply-chain processes.
+Therefore we add ':SUPPLY-CHAIN? true' to those maps.
+The output from REV-4 in the running example, then, is as follows:
 
+[{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:quantity-low {:AMOUNT-STRING "1" :UNITS :days} :quantity-high {:AMOUNT-STRING "3" :UNITS :months}}, :SUPPLY-CHAIN? true},
+ {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION {:AMOUNT-STRING "2" :UNITS :days}},
+ {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION  {:AMOUNT-STRING "5" :UNITS :days}},
+ {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION {:AMOUNT-STRING "3" :UNITS :days}},
+ {:PROCESS-STEP 5 :PROCESS "Quality Control (QC)" :DURATION {:AMOUNT-STRING "1" :UNITS :hours} :COMMENT "(but could go longer)"},
+ {:PROCESS-STEP 6 :PROCESS "Packaging" :DURATION {:AMOUNT-STRING "1" :UNITS :days}},
+ {:PROCESS-STEP 7 :PROCESS "Shipping" :DURATION "varies" :COMMENT "Varies depending on where it is going", :SUPPLY-CHAIN? true}]
+
+In REV-5, we add a camelCase string suitable for use as a program variable that describe the :PROCESS.
+The variable should be concise, no more than 15 characters long or so and should start with a lowercase letter, a-z.
+In the map, we use the keyword :VAR to identify this camelCase string.
+Suitable output for REV-5 is shown below:
+
+[{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:quantity-low {:AMOUNT-STRING "1" :UNITS :days} :quantity-high {:AMOUNT-STRING "3" :UNITS :months}}, :SUPPLY-CHAIN? true, :VAR "getRawMaterial"},
+ {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION {:AMOUNT-STRING "2" :UNITS :days}, :VAR "materialPrep"},
+ {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION  {:AMOUNT-STRING "5" :UNITS :days} :VAR "machining"},
+ {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION {:AMOUNT-STRING "3" :UNITS :days}, :VAR "assembly"},
+ {:PROCESS-STEP 5 :PROCESS "Quality Control (QC)" :DURATION {:AMOUNT-STRING "1" :UNITS :hours} :COMMENT "(but could go longer)", :VAR "qualityCtrl"},
+ {:PROCESS-STEP 6 :PROCESS "Packaging" :DURATION {:AMOUNT-STRING "1" :UNITS :days}, :VAR "packaging"},
+ {:PROCESS-STEP 7 :PROCESS "Shipping" :DURATION "varies" :COMMENT "Varies depending on where it is going", :SUPPLY-CHAIN? true, :VAR "shipping"}]
