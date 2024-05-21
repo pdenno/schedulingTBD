@@ -30,3 +30,7 @@ node_modules/
 .shadow-cljs/
 node_modules/
 resources/public/js/
+
+/opt/
+.DS_Store
+/.vscode
