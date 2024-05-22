@@ -109,35 +109,30 @@
                      :id 19,
                      :tags [:process-durs :response],
                      :time #inst "2024-05-14T15:29:59.328-00:00"}
-;;;------
            #:message{:content
                      "What size batches are we talking about with respect to the processing times you just mentioned?",
                      :from :developer-injected,
                      :id 20,
                      :tags [:developer :injected :question],
                      :time #inst "2024-05-14T22:18:51.460-00:00"}
-
            #:message{:content
-                     "The processing times I mentioned are typically for a batch of approximately 500 fountain pens. This size allows for efficient use of resources while maintaining flexibility to respond to varying demand levels."
+                     "The processing times I mentioned are typically for a batch of approximately 500 fountain pens. This size allows for efficient use of resources while maintaining flexibility to respond to varying demand levels.",
                      :from :surrogate,
                      :id 21,
-                     :tags [:surrogate :injected :response],
+                     :tags [:injected :response :surrogate],
                      :time #inst "2024-05-14T22:18:51.460-00:00"}
-
            #:message{:content
-                     "You cited \"Component Preparation\"; what does that involve?"
+                     "You cited \"Component Preparation\"; what does that involve?",
                      :from :developer-injected,
                      :id 22,
                      :tags [:developer :injected :query],
                      :time #inst "2024-05-14T22:18:51.460-00:00"}
-
            #:message{:content
-                     "Component Preparation involves several key processes to get the parts ready for assembly. For fountain pens, this includes:\n\n- <b>Machining or Molding:</b> Pen barrels and caps made from metals or plastics are either precision-machined or injection molded into their specific shapes according to design specifications.\n- <b>Stamping and Shaping Nibs:</b> The nibs, usually made from stainless steel or gold, are stamped into their initial shape from sheets of metal and then further refined and shaped for the correct writing characteristics.\n- <b> Surface Treatment:</b> This can involve plating, painting, or applying other finishes to various components to achieve the desired aesthetic and functional qualities, such as corrosion resistance or color.\n-  <b>Inspection and Pre-assembly Preparation:</b> Components are inspected for quality and prepared for assembly. This might include cleaning, applying lubricants or adhesives where necessary, and ensuring all parts meet strict quality standards.\n\nThese steps are crucial for ensuring that the fountain pens are of high quality and are ready for the assembly process."
+                     "Component Preparation involves several key processes to get the parts ready for assembly. For fountain pens, this includes:\n\n- <b>Machining or Molding:</b> Pen barrels and caps made from metals or plastics are either precision-machined or injection molded into their specific shapes according to design specifications.\n- <b>Stamping and Shaping Nibs:</b> The nibs, usually made from stainless steel or gold, are stamped into their initial shape from sheets of metal and then further refined and shaped for the correct writing characteristics.\n- <b> Surface Treatment:</b> This can involve plating, painting, or applying other finishes to various components to achieve the desired aesthetic and functional qualities, such as corrosion resistance or color.\n-  <b>Inspection and Pre-assembly Preparation:</b> Components are inspected for quality and prepared for assembly. This might include cleaning, applying lubricants or adhesives where necessary, and ensuring all parts meet strict quality standards.\n\nThese steps are crucial for ensuring that the fountain pens are of high quality and are ready for the assembly process.",
                      :from :surrogate,
                      :id 23,
-                     :tags [:surrogate :injected :response],
+                     :tags [:injected :response :surrogate],
                      :time #inst "2024-05-14T22:18:51.460-00:00"}],
-
           :name "Sur Fountain Pens",
           :planning-problem
           #:problem{:domain :process-interview,
@@ -145,6 +140,52 @@
                     "(characterize-process sur-fountain-pens)",
                     :state-string
                     "#{(ongoing-discussion sur-fountain-pens) (provides-product sur-fountain-pens) (proj-id sur-fountain-pens) (have-process-steps sur-fountain-pens) (process-step sur-fountain-pens 6 distribution) (cites-raw-material-challenge sur-fountain-pens) (process-step sur-fountain-pens 5 packaging) (process-step sur-fountain-pens 1 material) (process-step sur-fountain-pens 4 quality) (proj-name \"Sur Fountain Pens\") (flow-shop sur-fountain-pens) (has-production-facility sur-fountain-pens) (production-mode sur-fountain-pens make-to-stock) (surrogate sur-fountain-pens) (process-step sur-fountain-pens 3 assembly) (process-step sur-fountain-pens 2 component)}"},
+          :processes
+          #:process{:desc
+                    "1. Material Preparation - 2 days\n2. Component Machining - 5 days\n3. Assembly - 3 days\n4. Quality Control (QC) - 1 day\n5. Packaging - 1 day\n6. Shipping - Varies (not included in processing time)",
+                    :id :sur-fountain-pens,
+                    :sub-processes
+                    [#:process{:duration
+                               #:quantity{:units :days,
+                                          :value-string "2"},
+                               :id :sur-fountain-pens--materialPrep,
+                               :var-name "materialPrep"}
+                     #:process{:duration
+                               #:quantity{:units :days,
+                                          :value-string "5"},
+                               :id :sur-fountain-pens--machining,
+                               :pre-processes
+                               [:sur-fountain-pens--materialPrep],
+                               :var-name "machining"}
+                     #:process{:duration
+                               #:quantity{:units :days,
+                                          :value-string "3"},
+                               :id :sur-fountain-pens--assembly,
+                               :pre-processes
+                               [:sur-fountain-pens--machining],
+                               :var-name "assembly"}
+                     #:process{:duration
+                               #:quantity{:units :days,
+                                          :value-string "1"},
+                               :id :sur-fountain-pens--qualityCtrl,
+                               :pre-processes
+                               [:sur-fountain-pens--assembly],
+                               :var-name "qualityCtrl"}
+                     #:process{:duration
+                               #:quantity{:units :days,
+                                          :value-string "1"},
+                               :id :sur-fountain-pens--packaging,
+                               :pre-processes
+                               [:sur-fountain-pens--qualityCtrl],
+                               :var-name "packaging"}
+                     #:process{:duration #:box{:string-val "varies"},
+                               :duration-comment
+                               "Varies (not included in processing time)",
+                               :id :sur-fountain-pens--shipping,
+                               :pre-processes
+                               [:sur-fountain-pens--packaging],
+                               :supply-chain? true,
+                               :var-name "shipping"}]},
           :surrogate
           #:surrogate{:assistant-id "asst_qJIJP8pVzINP8wUd7EpF9Hkn",
                       :id :sur-fountain-pens,
