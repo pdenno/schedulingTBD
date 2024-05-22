@@ -264,7 +264,7 @@
 (defn ^:diag delete-assistants-openai!
   "Delete from the openai account all assistants that match the argument filter function.
    The default function check for metadata :usage='surrogate'."
-  ([] (delete-assistants-openai! #(= "surrogate" (-> % :metadata (get :usage)))))
+  ([] (delete-assistants-openai! #(#{"surrogate" "agent"} (-> % :metadata (get :usage)))))
   ([selection-fn]
    (doseq [a (->> (list-assistants-openai) :data (filterv selection-fn))]
      (log/info "Deleting assistant" (:name a) (:id a))

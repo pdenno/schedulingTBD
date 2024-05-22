@@ -30,6 +30,7 @@
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
+  (alias 's      'clojure.spec.alpha)
   (alias 'uni    'clojure.core.unify)
   (alias 'edn    'clojure.edn)
   (alias 'str    'clojure.string)

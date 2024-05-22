@@ -59,7 +59,20 @@
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
    To eliminate confusion and need for back pointers, each project has its own db."
-  {
+  {;; ---------------------- box
+   :box/string-val
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "boxed value"}
+   :box/number-val
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/number
+        :doc "boxed value"}
+   :box/keyword-val
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "boxed value"}
+   :box/boolean-val
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "boxed value"}
+
    ;; ---------------------- duration
    :duration/value
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
@@ -106,6 +119,9 @@
         :doc "A string that can be edn/read-string into a set of predicates"}
 
    ;; ---------------------- process (about production process types)
+   :process/duration-comment
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a comment about the duration of a process."}
    :process/desc
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a description of this this process; perhaps stated in an interview."}
@@ -125,9 +141,15 @@
    :process/sub-processes
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "process objects that occur within the scope of this project object"}
+   :process/supply-chain?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "true if the process in a supply chain process, rather than production process"}
    :process/uri
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a URI pointing to information about this process type (e.g. in an ontology)."}
+   :process/var-name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a camelCase string naming the process that can be used in MiniZinc code."}
 
    ;; ---------------------- process-instance (about actual process that have occurred or will occur).
    :process-instance/id

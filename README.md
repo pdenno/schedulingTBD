@@ -7,7 +7,7 @@ The cognitive work we focus on is the joint (human and AI) formulation and refin
 To develop and test our theory, the software is designed to help solve manufacturing production scheduling problems by leading the user to formulate a solution with MiniZinc.
 Our research goal is to determine best practices in the design of systems that use a DSL unfamiliar to users in joint work to solve problems important to them.
 This DSL-based teaming model brings to focus the challenges of
-(1) designing DSLs fit to this purpose,
+(1) designing DSLs fit for human/AI teaming,
 (2) problem solving in technical environments,
 (3) constructionist learning, and
 (4) scientific explanation.
@@ -26,8 +26,8 @@ Feel free to contact us if this work interests you!
 
 ### Set up environment variables
   * Thus far, the work has only been tested with OpenAI LLMs and on Linux and Macs.
-  * In your .bashrc file `export OPENAI_API_KEY=sk-...`
-  * Similarly, define the following: `export SCHEDULING_TBD_DB=/opt/scheduling` (or wherever you intend to store databases for the project).
+  * In your .bashrc file define an environment variable  `export OPENAI_API_KEY=sk-...`
+  * Similarly, `export SCHEDULING_TBD_DB=/opt/scheduling` (or wherever you intend to store databases for the application).
 
 ### The server
   * Install install a Java JDK and [Clojure](https://clojure.org/).

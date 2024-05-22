@@ -98,27 +98,27 @@
                      :tags [:info-to-user :minizinc],
                      :time #inst "2024-05-13T20:24:14.991-00:00"}
            #:message{:content
-                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps (one process per line), but add to it the typical processing time so it looks like this:\n1. milling (some amount of time)\n2. mashing (some amount of time)\n...",
+                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. milling (some amount of time)\n2. mashing (some amount of time)...",
                      :from :system,
                      :id 18,
                      :tags [:process-durs :query],
-                     :time #inst "2024-05-13T20:24:20.267-00:00"}
+                     :time #inst "2024-05-22T20:01:15.895-00:00"}
            #:message{:content
-                     "1. Milling (1-2 hours)\n2. Mashing (1-2 hours)\n3. Lautering (1-2 hours)\n4. Boiling (1 hour)\n5. Cooling (1-2 hours)\n6. Fermentation (1-3 weeks)\n7. Conditioning (1-4 weeks)\n8. Packaging (2-4 hours)",
+                     "1. Milling (1-2 hours)\n2. Mashing (1-2 hours)\n3. Lautering (1-2 hours)\n4. Boiling (1 hour)\n5. Cooling (1 hour)\n6. Fermentation (1-3 weeks)\n7. Conditioning (1-2 weeks)\n8. Packaging (1-2 hours)",
                      :from :surrogate,
                      :id 19,
                      :tags [:process-durs :response],
-                     :time #inst "2024-05-13T20:24:20.296-00:00"}],
+                     :time #inst "2024-05-22T20:01:15.913-00:00"}],
           :name "SUR Craft Beer",
           :planning-problem
           #:problem{:domain :process-interview,
                     :goal-string
                     "(characterize-process sur-craft-beer)",
                     :state-string
-                    "#{(process-step sur-craft-beer 6 fermentation) (provides-product sur-craft-beer) (surrogate sur-craft-beer) (process-step sur-craft-beer 3 lautering) (proj-id sur-craft-beer) (process-step sur-craft-beer 8 packaging) (production-mode sur-craft-beer make-to-stock) (process-step sur-craft-beer 7 conditioning) (process-step sur-craft-beer 1 milling) (process-step sur-craft-beer 4 boiling) (proj-name \"Sur Craft Beer\") (flow-shop sur-craft-beer) (have-process-steps sur-craft-beer) (process-step sur-craft-beer 2 mashing) (process-step sur-craft-beer 5 cooling) (has-production-facility sur-craft-beer) (cites-raw-material-challenge sur-craft-beer) (ongoing-discussion sur-craft-beer) (have-process-durs sur-craft-beer)}"},
+                    "#{(process-step sur-craft-beer 6 fermentation) (provides-product sur-craft-beer) (surrogate sur-craft-beer) (process-step sur-craft-beer 3 lautering) (proj-id sur-craft-beer) (process-step sur-craft-beer 8 packaging) (production-mode sur-craft-beer make-to-stock) (process-step sur-craft-beer 7 conditioning) (process-step sur-craft-beer 1 milling) (process-step sur-craft-beer 4 boiling) (proj-name \"Sur Craft Beer\") (flow-shop sur-craft-beer) (have-process-steps sur-craft-beer) (process-step sur-craft-beer 2 mashing) (extreme-duration-span sur-craft-beer hours weeks) (process-step sur-craft-beer 5 cooling) (has-production-facility sur-craft-beer) (cites-raw-material-challenge sur-craft-beer) (ongoing-discussion sur-craft-beer) (have-process-durs sur-craft-beer)}"},
           :processes
           #:process{:desc
-                    "1. Milling (1-2 hours)\n2. Mashing (1-2 hours)\n3. Lautering (1-2 hours)\n4. Boiling (1 hour)\n5. Cooling (1-2 hours)\n6. Fermentation (1-3 weeks)\n7. Conditioning (1-4 weeks)\n8. Packaging (2-4 hours)",
+                    "1. Milling (1-2 hours)\n2. Mashing (1-2 hours)\n3. Lautering (1-2 hours)\n4. Boiling (1 hour)\n5. Cooling (1 hour)\n6. Fermentation (1-3 weeks)\n7. Conditioning (1-2 weeks)\n8. Packaging (1-2 hours)",
                     :id :sur-craft-beer,
                     :sub-processes
                     [#:process{:duration
@@ -132,7 +132,8 @@
                                                            :hours,
                                                            :value-string
                                                            "1"}},
-                               :id :sur-craft-beer--milling}
+                               :id :sur-craft-beer--milling,
+                               :var-name "milling"}
                      #:process{:duration
                                #:quantity-range{:high
                                                 #:quantity{:units
@@ -146,7 +147,8 @@
                                                            "1"}},
                                :id :sur-craft-beer--mashing,
                                :pre-processes
-                               [:sur-craft-beer--milling]}
+                               [:sur-craft-beer--milling],
+                               :var-name "mashing"}
                      #:process{:duration
                                #:quantity-range{:high
                                                 #:quantity{:units
@@ -160,27 +162,22 @@
                                                            "1"}},
                                :id :sur-craft-beer--lautering,
                                :pre-processes
-                               [:sur-craft-beer--mashing]}
+                               [:sur-craft-beer--mashing],
+                               :var-name "lautering"}
                      #:process{:duration
                                #:quantity{:units :hours,
                                           :value-string "1"},
                                :id :sur-craft-beer--boiling,
                                :pre-processes
-                               [:sur-craft-beer--lautering]}
+                               [:sur-craft-beer--lautering],
+                               :var-name "boiling"}
                      #:process{:duration
-                               #:quantity-range{:high
-                                                #:quantity{:units
-                                                           :hours,
-                                                           :value-string
-                                                           "2"},
-                                                :low
-                                                #:quantity{:units
-                                                           :hours,
-                                                           :value-string
-                                                           "1"}},
+                               #:quantity{:units :hours,
+                                          :value-string "1"},
                                :id :sur-craft-beer--cooling,
                                :pre-processes
-                               [:sur-craft-beer--boiling]}
+                               [:sur-craft-beer--boiling],
+                               :var-name "cooling"}
                      #:process{:duration
                                #:quantity-range{:high
                                                 #:quantity{:units
@@ -194,13 +191,14 @@
                                                            "1"}},
                                :id :sur-craft-beer--fermentation,
                                :pre-processes
-                               [:sur-craft-beer--cooling]}
+                               [:sur-craft-beer--cooling],
+                               :var-name "fermentation"}
                      #:process{:duration
                                #:quantity-range{:high
                                                 #:quantity{:units
                                                            :weeks,
                                                            :value-string
-                                                           "4"},
+                                                           "2"},
                                                 :low
                                                 #:quantity{:units
                                                            :weeks,
@@ -208,21 +206,23 @@
                                                            "1"}},
                                :id :sur-craft-beer--conditioning,
                                :pre-processes
-                               [:sur-craft-beer--fermentation]}
+                               [:sur-craft-beer--fermentation],
+                               :var-name "conditioning"}
                      #:process{:duration
                                #:quantity-range{:high
                                                 #:quantity{:units
                                                            :hours,
                                                            :value-string
-                                                           "4"},
+                                                           "2"},
                                                 :low
                                                 #:quantity{:units
                                                            :hours,
                                                            :value-string
-                                                           "2"}},
+                                                           "1"}},
                                :id :sur-craft-beer--packaging,
                                :pre-processes
-                               [:sur-craft-beer--conditioning]}]},
+                               [:sur-craft-beer--conditioning],
+                               :var-name "packaging"}]},
           :surrogate
           #:surrogate{:assistant-id "asst_hweCfQ6arHNK4R60RkvGYnnI",
                       :id :sur-craft-beer,
