@@ -3,6 +3,7 @@ The requirements are enacted in phases named 'revisions', (REV-1, REV-2..., REV-
 We will ask for interpretation to revision REV-i data using input that is in the form of REV-i-1 output.
 This allows us to check your work at each revision before proceeding to the next.
 As a general rule, never throw away information in producing a revision; instead, break up strings and put the parts under the designated Clojure map keys.
+Do not provide any commentary; simply return results that are readable by Clojure read-string, even if no revision is needed.
 The data we are working with typically concerns manufacturing processes.
 Here is typical input to REV-1, which is the only input that is not a vector of Clojure maps:
 
@@ -59,7 +60,7 @@ When, like (3) the string in :duration is not a quantity at all, but rather a wo
 
 Here is the REV-2 output above transformed through REV-3:
 
-[{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:quantity-low {:AMOUNT-STRING "1" :UNITS :days} :quantity-high {:AMOUNT-STRING "3" :UNITS :months}}},
+[{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:QUANTITY-LOW {:AMOUNT-STRING "1" :UNITS :days} :QUANTITY-HIGH {:AMOUNT-STRING "3" :UNITS :months}}},
  {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION {:AMOUNT-STRING "2" :UNITS :days}},
  {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION  {:AMOUNT-STRING "5" :UNITS :days}},
  {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION {:AMOUNT-STRING "3" :UNITS :days}},
@@ -74,7 +75,7 @@ For example, in the data we have been using, "Raw Material Acquisition" and "Shi
 Therefore we add ':SUPPLY-CHAIN? true' to those maps.
 The output from REV-4 in the running example, then, is as follows:
 
-[{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:quantity-low {:AMOUNT-STRING "1" :UNITS :days} :quantity-high {:AMOUNT-STRING "3" :UNITS :months}}, :SUPPLY-CHAIN? true},
+[{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:QUANTITY-LOW {:AMOUNT-STRING "1" :UNITS :days} :QUANTITY-HIGH {:AMOUNT-STRING "3" :UNITS :months}}, :SUPPLY-CHAIN? true},
  {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION {:AMOUNT-STRING "2" :UNITS :days}},
  {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION  {:AMOUNT-STRING "5" :UNITS :days}},
  {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION {:AMOUNT-STRING "3" :UNITS :days}},
@@ -87,7 +88,7 @@ The variable should be concise, no more than 15 characters long or so and should
 In the map, we use the keyword :VAR to identify this camelCase string.
 Suitable output for REV-5 is shown below:
 
-[{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:quantity-low {:AMOUNT-STRING "1" :UNITS :days} :quantity-high {:AMOUNT-STRING "3" :UNITS :months}}, :SUPPLY-CHAIN? true, :VAR "getRawMaterial"},
+[{:PROCESS-STEP 1 :PROCESS "Raw Material Acquisition" :DURATION {:QUANTITY-LOW {:AMOUNT-STRING "1" :UNITS :days} :QUANTITY-HIGH {:AMOUNT-STRING "3" :UNITS :months}}, :SUPPLY-CHAIN? true, :VAR "getRawMaterial"},
  {:PROCESS-STEP 2 :PROCESS "Material Preparation" :DURATION {:AMOUNT-STRING "2" :UNITS :days}, :VAR "materialPrep"},
  {:PROCESS-STEP 3 :PROCESS "Component Machining" :DURATION  {:AMOUNT-STRING "5" :UNITS :days} :VAR "machining"},
  {:PROCESS-STEP 4 :PROCESS "Assembly" :DURATION {:AMOUNT-STRING "3" :UNITS :days}, :VAR "assembly"},
