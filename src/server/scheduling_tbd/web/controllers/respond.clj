@@ -1,5 +1,7 @@
 (ns scheduling-tbd.web.controllers.respond
   (:require
+   [clojure.edn              :as edn]
+   [clojure.java.io          :as io]
    [clojure.walk             :as walk :refer [keywordize-keys]]
    [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
@@ -48,3 +50,21 @@
   (http/ok
     {:time     (str (Date. (System/currentTimeMillis)))
      :up-since (str (Date. (.getStartTime (java.lang.management.ManagementFactory/getRuntimeMXBean))))}))
+
+(defn upload-file
+  [request]
+  (let [dir-root (System/getenv "SCHEDULING_TBD_DB")
+        params (get request :multipart-params)
+        project-id (-> params (get "project-id") edn/read-string name)
+        {:keys [filename size tempfile _content-type]} (get params "file")
+        proj-filename (str dir-root "/projects/" project-id "/files/" filename)]
+    (if tempfile
+      (try
+        (log/info (str "upload-file: Copying " tempfile "(size" size ") to " proj-filename))
+        (io/copy tempfile (io/as-file proj-filename))
+        (io/delete-file tempfile)
+        (http/ok {:name filename :size size})
+        (catch Throwable e
+          (reset! diag e)
+          (http/internal-server-error "Error reading multipart.")))
+      (http/internal-server-error "Did not find multipart file."))))

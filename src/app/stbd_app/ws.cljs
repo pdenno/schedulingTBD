@@ -8,6 +8,7 @@
 
 (def ^:diag diag (atom nil))
 (def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (atom nil))
+(def project-id "Keyword for project-id." (atom nil))
 (def channel "The JS Websocket object being used for communication with the server." (atom nil))
 (def reconnecting? "True only from the time reconnect! is called until socket is once again ready." (atom false))
 (def check-process "A process that is run every second once problems are encountered to check socket readiness." (atom nil))

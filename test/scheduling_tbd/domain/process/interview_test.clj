@@ -33,6 +33,7 @@
   (alias 's      'clojure.spec.alpha)
   (alias 'uni    'clojure.core.unify)
   (alias 'edn    'clojure.edn)
+  (alias 'io     'clojure.java.io)
   (alias 'str    'clojure.string)
   (alias 'd      'datahike.api)
   (alias 'dp     'datahike.pull-api)
