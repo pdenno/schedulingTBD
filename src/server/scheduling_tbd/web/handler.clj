@@ -30,7 +30,8 @@
    [scheduling-tbd.web.websockets   :as wsock]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
-   [spec-tools.spell :as spell]))
+   [spec-tools.spell :as spell]
+   [taoensso.timbre  :as log]))
 
 ;;; Reitit: (pronounced "rate it") a routing library.
 ;;;   - https://github.com/metosin/reitit, (docs)
@@ -44,6 +45,7 @@
 ;;;   * You don't have to restart the server to see changes in the swagger page; just recompile it.
 ;;    * However, to see updates to referenced functions (e.g. the stuff in respond.clj) you need to restart the server: (user/restart).
 ;;;   * A common reason for the Swagger page failing is that you didn't completely specify the spec defs referenced.
+;;;     By this I mean that, for example, you specified :req-un [some-key], but you don't have a spec for some-key.
 ;;;   * The devl/ajax-tests are Work In Process. Some have uninvestigated bugs.
 ;;;   * You can choose not to define specs for the keys. (Really??? I'm not so sure!)
 ;;;   * The most useful debugging techniques seem to be (in order):
@@ -110,7 +112,12 @@
 (s/def :project/id keyword?)
 (s/def :project/name string?)
 
-
+(s/def ::size int?)
+(s/def ::name string?)
+(s/def ::upload-file-response (st/spec {:spec (s/keys :req-un [[::name ::size]])
+                                        :name "upload-file-reponse"
+                                        :description "Upload a file"
+                                        :json-schema/default {:name "foo.png" :size 100}}))
 (def routes
   [["/app" {:get {:no-doc true
                   :summary "Load the web app for someone."
@@ -128,6 +135,16 @@
            :parameters {:query ::ws-connection-request}
            :handler wsock/establish-websocket-handler}}]
 
+   ["/files"
+    {:swagger {:tags ["files"]}}
+
+    ;; ToDo: Fix Swagger, request needs project-id
+    ["/upload" ; In Swagger you can test this with real files.
+     {:post {;:no-doc true
+             :summary "upload a file"
+             :parameters {:multipart {:file multipart/temp-file-part}}
+             :responses {200 {:body ::upload-file-response}}
+             :handler  resp/upload-file}}]]
    ["/api"
     {:swagger {;:no-doc true
                :tags ["SchedulingTBD functions"]}}

@@ -56,7 +56,7 @@
                                            "\nCreate directories 'projects' and 'system' under it.") {})))
          db-dir (->> (case type
                        :system           "/system"
-                       :project          (str "/projects/" (name id))
+                       :project          (str "/projects/" (name id) "/db/")
                        :planning-domains "/planning-domains"
                        :him              "/etc/other-dbs/him")
                      (str base-dir))]

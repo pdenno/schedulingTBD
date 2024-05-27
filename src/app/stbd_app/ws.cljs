@@ -8,6 +8,7 @@
 
 (def ^:diag diag (atom nil))
 (def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (atom nil))
+(def project-id "Keyword for project-id." (atom nil))
 (def channel "The JS Websocket object being used for communication with the server." (atom nil))
 (def reconnecting? "True only from the time reconnect! is called until socket is once again ready." (atom false))
 (def check-process "A process that is run every second once problems are encountered to check socket readiness." (atom nil))
@@ -96,7 +97,7 @@
                 (reset! error-info-2 {:event arg})
                 (log/error "Error on socket: arg=" arg))) ; ToDo: investigate why it gets these.
         ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
-        (reset! ping-process (js/window.setInterval (fn [] (ping!)) 4000)))
+        (reset! ping-process (js/window.setInterval (fn [] (ping!)) 2000)))
     (throw (ex-info "Websocket Connection Failed:" {:client-id @client-id}))))
 
 (defn check-channel
