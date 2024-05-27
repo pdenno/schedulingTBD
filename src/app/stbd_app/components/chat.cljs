@@ -6,12 +6,16 @@
    [helix.core                 :refer [defnc $]]
    [helix.hooks                :as hooks]
    ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default"           :as ChatContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/ConversationList$default"        :as ConversationList]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Conversation$default"            :as Conversation]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default"           :as MainContainer]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default"                 :as Message]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default"   :as MessageHeader]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default"            :as MessageInput]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"             :as MessageList]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default"        :as MessageSeparator]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default"                 :as Sidebar]
+;   ["@chatscope/chat-ui-kit-react/dist/cjs/User$default"                    :as User] ; <================================
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
@@ -144,6 +148,11 @@
                          :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
                ;; https://github.com/chatscope/use-chat-example/blob/main/src/components/Chat.tsx (See expecially :onChange and :onSend.)
                ($ MainContainer
+                  ($ Sidebar {:position "left" :sx #js {:maxWidth "100px"}}
+                     ($ ConversationList
+                        ($ Conversation {:name "Process"})
+                        ($ Conversation {:name "Data"})
+                        ($ Conversation {:name "Resources"})))
                   ($ ChatContainer
                      ($ MessageList
                         {#_#_:typingIndicator ($ TypingIndicator "Interviewer is typing") ; ToDo: insert this when it is useful.
