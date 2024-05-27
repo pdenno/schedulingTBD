@@ -512,13 +512,20 @@
   [id]
   (let [backup-file (format "data/projects/%s.edn" (name id))]
     (if (.exists (io/file backup-file))
-      (let [cfg (db-cfg-map :project id)]
-        (when (d/database-exists? cfg) (d/delete-database cfg))
+      (let [cfg (db-cfg-map :project id)
+            files-dir (-> cfg :base-dir (str "/projects/" (name id) "/files"))]
+        (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
+          (d/delete-database cfg))
+        (when-not (-> cfg :store :path io/as-file .isDirectory)
+          (-> cfg :store :path io/make-parents)
+          (-> cfg :store :path io/as-file .mkdir))
         (d/create-database cfg)
         (register-db id cfg)
         (let [conn (connect-atm id)]
           (d/transact conn db-schema-proj)
           (d/transact conn (->> backup-file slurp edn/read-string)))
+        (when-not (-> files-dir io/as-file .isDirectory)
+          (-> files-dir io/as-file .mkdir))
         cfg)
     (log/error "Not recreating DB because backup file does not exist:" backup-file))))
 
@@ -615,9 +622,14 @@
    (s/assert ::project-info proj-info)
    (let [{:project/keys [id name]} (if (:force? opts) proj-info (unique-proj proj-info))
          cfg (db-cfg-map :project id)
-         dir (-> cfg :store :path)]
-     (when-not (-> dir java.io.File. .isDirectory)
-       (-> cfg :store :path java.io.File. .mkdir))
+         dir (-> cfg :store :path)
+         files-dir (-> cfg :base-dir (str "/" (name id)  "/files"))]
+     (when-not (-> dir io/as-file .isDirectory)
+       (-> cfg :store :path io/make-parents)
+       (-> cfg :store :path io/as-file .mkdir))
+     (when-not (-> files-dir io/as-file .isDirectory)
+       (io/make-parents files-dir)
+       (-> files-dir io/as-file .mkdir))
      (add-project id name dir)
      (when (d/database-exists? cfg) (d/delete-database cfg))
      (d/create-database cfg)
