@@ -76,20 +76,6 @@
             []
             msgs)))
 
-;;; ========================= File uploading ==========================
-(defn submit-image
-  "submit the selected image that is on input `#input-id`"
-  [input-id]
-   (let [el (.getElementById js/document input-id)
-    name (.-name el)
-    file (aget (.-files el) 0)
-    form-data (js/FormData.)
-    _ (.append form-data "file" file)
-     submit-params {:uri "/upload-image"
-                    :body form-data
-                    :method :post}]
-     #_(rfc/dispatch [:upload-image submit-params])))
-
 ;;; ========================= Component ===============================
 (defn make-resize-fns
   "These are used by ShareUpDown. The argument is a Hook state variable set- function."
