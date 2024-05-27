@@ -13,9 +13,11 @@
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"             :as MessageList]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default"        :as MessageSeparator]
    ["@mui/material/Box$default" :as Box]
+   ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    ;;["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
    [scheduling-tbd.util :refer [now]]
+   [stbd-app.components.attachment-modal :as attach :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.util       :refer [register-fn lookup-fn]]
    [stbd-app.ws         :as ws]
@@ -73,6 +75,20 @@
                               ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))})))))) ;  They only appear for Interviewer, which is probably good!
             []
             msgs)))
+
+;;; ========================= File uploading ==========================
+(defn submit-image
+  "submit the selected image that is on input `#input-id`"
+  [input-id]
+   (let [el (.getElementById js/document input-id)
+    name (.-name el)
+    file (aget (.-files el) 0)
+    form-data (js/FormData.)
+    _ (.append form-data "file" file)
+     submit-params {:uri "/upload-image"
+                    :body form-data
+                    :method :post}]
+     #_(rfc/dispatch [:upload-image submit-params])))
 
 ;;; ========================= Component ===============================
 (defn make-resize-fns
@@ -135,7 +151,7 @@
        {:init-height chat-height
         :share-fns resize-fns
         :up ($ Box {:sx ; This work!
-                    #js {:overflowY "auto"
+                    #js {:overflowY "auto"  ; Creates a scroll bar
                          :display "flex"    ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
                          :height box-height ; When set small enough, scroll bars appear.
                          :flexDirection "column"
@@ -147,11 +163,19 @@
                         {#_#_:typingIndicator ($ TypingIndicator "Interviewer is typing") ; ToDo: insert this when it is useful.
                          :style #js {:height "500px"}}
                         cs-msg-list))))
-        :dn ($ Stack {:direction "row" :spacing "0px"}
-               ($ MessageInput {:placeholder "Type message here...."
-                                :onSend #(do (log/info "onSend:" %)
-                                             (set-user-text %))
-                                :fancyScroll false
-                                ;;:autoFocus false ; ToDo: Needs investigation. I don't know what it does.
-                                ;; It sets height to whatever you'd like with px, but doesn't expand scroll bars. It doesn't respond to :height <percent> either.
-                                :style #js {#_#_:height "200px" :width "90%"}}))})))
+        :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!
+               ($ Stack {:direction "row" :spacing "0px"}
+                  ($ ButtonGroup
+                     ($ AttachmentModal {:code-fn (fn [] (log/info "code-fn"))
+                                         :data-fn (fn [] (log/info "data-fn"))}))
+                  ($ MessageInput {:placeholder "Type message here...."
+                                   :onSend #(do (log/info "onSend:" %)
+                                                (set-user-text %))
+                                   :attachButton false
+                                   #_#_:onAttachClick #(do (log/info "onAttachClick:" %)
+                                                           ($ SaveModal {:code-fn (fn [] (log/info "code-fn"))
+                                                                         :data-fn (fn [] (log/info "data-fn"))}))
+                                   :fancyScroll false
+                                   ;;:autoFocus false ; ToDo: Needs investigation. I don't know what it does.
+                                   ;; It sets height to whatever you'd like with px, but doesn't expand scroll bars. It doesn't respond to :height <percent> either.
+                                   :style #js {#_#_:height "200px" :width "90%"}})))})))
