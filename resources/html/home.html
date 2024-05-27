@@ -66,7 +66,7 @@
 .cs-main-container > .cs-sidebar.cs-sidebar--left {
   order: 0;
   height: 100%;
-  max-width: 320px;
+  max-width: 125px; /* POD was 320px */
   flex-basis: 35%;
   border-right: solid 1px #d1dbe3;
   /* Hmm without this, box shadow is cut at bottom */
@@ -622,7 +622,7 @@
   min-height: 1.25em;
   position: relative;
   color: rgba(0, 0, 0, 0.87);
-  background-color: #f0e699; 
+  background-color: #f0e699;
 }
 .cs-message-list__scroll-wrapper {
   box-sizing: border-box;
@@ -1045,7 +1045,7 @@
 .cs-typing-indicator__dot {
   box-sizing: inherit;
   -webkit-animation: cs-typing-indicator__typing-animation 1.5s infinite ease-in-out;
-          animation: cs-typing-indicator__typing-animation 1.5s infinite ease-in-out;
+	  animation: cs-typing-indicator__typing-animation 1.5s infinite ease-in-out;
   border-radius: 100%;
   display: inline-block;
   height: 4px;
@@ -1060,11 +1060,11 @@
 }
 .cs-typing-indicator__dot:nth-child(2) {
   -webkit-animation-delay: 300ms;
-          animation-delay: 300ms;
+	  animation-delay: 300ms;
 }
 .cs-typing-indicator__dot:nth-child(3) {
   -webkit-animation-delay: 400ms;
-          animation-delay: 400ms;
+	  animation-delay: 400ms;
 }
 .cs-typing-indicator__text {
   box-sizing: inherit;
@@ -1076,7 +1076,7 @@
   margin: 0 0 0 0.5em;
   -webkit-user-select: none;
      -moz-user-select: none;
-          user-select: none;
+	  user-select: none;
 }
 @-webkit-keyframes cs-typing-indicator__typing-animation {
   0% {
@@ -1110,7 +1110,7 @@
   flex-shrink: 0;
   -webkit-user-select: none;
      -moz-user-select: none;
-          user-select: none;
+	  user-select: none;
   display: flex;
   flex-direction: row;
   align-items: stretch;
@@ -1219,7 +1219,7 @@
   background-color: #fff;
   -webkit-user-select: none;
      -moz-user-select: none;
-          user-select: none;
+	  user-select: none;
   border-top: 0;
   border-right: 0;
   border-bottom: 0;
@@ -1387,7 +1387,7 @@
   display: block;
   background: radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 74%, white 80%, white 84%, rgba(255, 255, 255, 0) 100%);
   -webkit-animation: cs-unread-anim 2s ease-out infinite;
-          animation: cs-unread-anim 2s ease-out infinite;
+	  animation: cs-unread-anim 2s ease-out infinite;
 }
 .cs-conversation__unread {
   box-sizing: border-box;
@@ -1484,7 +1484,7 @@
 }
 .cs-conversation-list__loading-more .cs-loader::before,
 .cs-conversation-list__loading-more .cs-loader::after {
-  width: 100%;
+  /*  width: 100%; */
   height: 100%;
 }
 .cs-conversation-list .ps__rail-y {
@@ -1551,7 +1551,7 @@
   display: block;
   background: radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 74%, white 80%, white 84%, rgba(255, 255, 255, 0) 100%);
   -webkit-animation: cs-bubble-anim 2s ease-out infinite;
-          animation: cs-bubble-anim 2s ease-out infinite;
+	  animation: cs-bubble-anim 2s ease-out infinite;
 }
 
 .cs-status--available .cs-status__bullet {
@@ -1724,7 +1724,7 @@
   font-variant: normal;
   -webkit-user-select: none;
      -moz-user-select: none;
-          user-select: none;
+	  user-select: none;
   padding: 0.8em 0.8em;
   align-items: center;
   user-select: none;
@@ -1934,9 +1934,9 @@
   top: 0;
   left: 50%;
   -webkit-animation: loader-default 0.6s linear;
-          animation: loader-default 0.6s linear;
+	  animation: loader-default 0.6s linear;
   -webkit-animation-iteration-count: infinite;
-          animation-iteration-count: infinite;
+	  animation-iteration-count: infinite;
   border-radius: 50%;
   border-color: #6ea9d7 transparent transparent transparent;
   border-style: solid;
@@ -1970,7 +1970,7 @@
   right: 0;
   bottom: 0;
   -webkit-backdrop-filter: blur(10%);
-          backdrop-filter: blur(10%);
+	  backdrop-filter: blur(10%);
 }
 .cs-overlay__content {
   z-index: 220;
@@ -1988,11 +1988,11 @@
 }
 .cs-overlay--blur::before {
   -webkit-backdrop-filter: blur(2px);
-          backdrop-filter: blur(2px);
+	  backdrop-filter: blur(2px);
 }
 .cs-overlay--grayscale::before {
   -webkit-backdrop-filter: grayscale(50%);
-          backdrop-filter: grayscale(50%);
+	  backdrop-filter: grayscale(50%);
 }
 
 .cs-status-list {
@@ -2008,7 +2008,7 @@
   cursor: pointer;
   -webkit-user-select: none;
      -moz-user-select: none;
-          user-select: none;
+	  user-select: none;
 }
 .cs-status-list > li > .cs-status {
   margin: 0;
@@ -2179,8 +2179,8 @@
 .scrollbar-container {
   position: relative;
   height: 100%;
-}     
-     
+}
+
    </style>
 
 </head>
