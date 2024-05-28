@@ -1,7 +1,7 @@
 (ns stbd-app.components.attachment-modal
   "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
-   [ajax.core :refer [GET POST raw-response-format]]
+   [ajax.core :refer [GET POST #_raw-response-format]]
    [promesa.core :as p]
    [applied-science.js-interop :as j]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Buttons$default" :refer [AttachmentButton]]
@@ -31,19 +31,17 @@
                                    (-> (/ (rem size 1048576) 1048577) (* 100) int) " M")))
 
 (def drag-text "Drag and drop a file here, or click to select files.")
-(def file-id (atom 0))
 
 ;;; https://mui.com/material-ui/react-modal/
 ;;; https://react-dropzone.js.org/#section-basic-example
-(defnc AttachmentModal [{:keys [default-text] :or {default-text drag-text}}]
+(defnc AttachmentModal [{:keys [post-attach-fn default-text] :or {default-text drag-text}}]
   (let [[open, set-open] (hooks/use-state false)
         [state-text set-state-text]  (hooks/use-state default-text) ; mystery why this doesn't work.
-        modal            (hooks/use-ref nil)
+        modal           (hooks/use-ref nil)
         dz-hook         (useDropzone)
         root-props      ((j/get dz-hook :getRootProps) #js {:className "dropzone"})
         input-props     ((j/get dz-hook :getInputProps))
         accepted-files  (j/get dz-hook :acceptedFiles)]
-    (reset! diag accepted-files)
     (hooks/use-effect :once
       (set-state-text default-text)
       (log/info "state-text =" state-text)) ; mystery why this doesn't work.
@@ -69,7 +67,8 @@
                                              (p/then #(POST "/files/upload"
                                                             {:params {:filename (j/get f :name) :size (j/get f :size) :client-id @ws/client-id}
                                                              :body (doto (js/FormData.)
-                                                                     (.append "project-id" @ws/project-id)
+                                                                     (.append "project-id" (:conv/id @ws/project-info))
+                                                                     (.append "conversation-name" (:project/current-conversation @ws/project-info))
                                                                      (.append "file" f))
                                                              ;; See https://github.com/JulianBirch/cljs-ajax
                                                              ;;:response-format (raw-response-format)
@@ -78,7 +77,8 @@
                                                              :error-handler save-failure}))
                                              (p/then (fn [_] (doto accepted-files (.shift))))))))
                   ;; This causes the "loadend" event.
-                  (.readAsDataURL fr f))))
+                  (.readAsDataURL fr f)))
+              (when post-attach-fn (post-attach-fn accepted-files)))
             (handle-close [] (set-open false))]
       (dom/div {:ref modal}
         ($ AttachmentButton {:onClick handle-attach})

@@ -1,72 +1,91 @@
 [
-#:project{:id :sur-aluminium-cans,
-          :messages
-          [#:message{:content
-                     "Describe your most significant scheduling problem in a few sentences.",
-                     :from :system,
-                     :id 1,
-                     :time #inst "2024-04-29T21:45:45.972-00:00"}
-           #:message{:content
-                     "Our most significant scheduling problem involves coordinating the production and delivery of raw materials with the manufacturing schedule of aluminium cans to meet fluctuating customer demands. We must account for supplier lead times, production capacity, and logistics while minimizing inventory costs and avoiding stockouts. Additionally, managing unexpected disruptions in supply chains or machinery breakdowns further complicates the scheduling process.",
-                     :from :surrogate,
-                     :id 2,
-                     :time #inst "2024-04-29T21:45:45.996-00:00"}
-           #:message{:content
-                     "Great, we'll call your project SUR Aluminium Cans.",
-                     :from :system,
-                     :id 3,
-                     :time #inst "2024-04-29T21:45:46.018-00:00"}
-           #:message{:content
-                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
-                     :from :system,
-                     :id 4,
-                     :time #inst "2024-04-29T21:45:46.035-00:00"}
-           #:message{:content
-                     "Please briefly describe your production processes?",
-                     :from :system,
-                     :id 5,
-                     :time #inst "2024-04-29T21:46:01.130-00:00"}
-           #:message{:content
-                     "Our production process for aluminium cans involves several key steps:\n\n1. **Material Procurement:** We source high-purity aluminium and other necessary materials from suppliers.\n2. **Sheet Preparation:** The aluminium is rolled into large, thin sheets.\n3. **Cupping and Drawing:** Sheets are stamped into small cups, which are then drawn into can bodies.\n4. **Trimming:** The edges of the can bodies are trimmed to the desired height.\n5. **Washing and Drying:** The can bodies are washed and dried to prepare them for coating.\n6. **Internal and External Coating:** Can bodies are coated inside and out to prevent corrosion and prepare them for printing.\n7. **Printing and Labelling:** Cans are printed with customer-specific designs and labels.\n8. **Necking and Flanging:** The can's neck is shaped, and the edge is flanged to prepare for lid attachment.\n9. **Inspection and Testing:** Cans are inspected for quality and may undergo testing for leaks or structural integrity.\n10. **Packing and Shipping:** Approved cans are packed into cartons or pallets and shipped to customers or for further processing, like filling.\n\nEach step must be meticulously scheduled and coordinated to ensure a smooth flow through the production line, meeting both quality and delivery targets.",
-                     :from :surrogate,
-                     :id 6,
-                     :time #inst "2024-04-29T21:46:01.149-00:00"}
-           #:message{:content
-                     "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE.",
-                     :from :system,
-                     :id 7,
-                     :time #inst "2024-04-29T21:46:04.719-00:00"}
-           #:message{:content "PRODUCT",
-                     :from :surrogate,
-                     :id 8,
-                     :time #inst "2024-04-29T21:46:04.740-00:00"}
-           #:message{:content
-                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n",
-                     :from :system,
-                     :id 9,
-                     :time #inst "2024-04-29T21:46:06.928-00:00"}
-           #:message{:content "MAKE-TO-STOCK",
-                     :from :surrogate,
-                     :id 10,
-                     :time #inst "2024-04-29T21:46:06.973-00:00"}
-           #:message{:content
-                     "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
-                     :from :system,
-                     :id 11,
-                     :time #inst "2024-04-29T21:46:09.326-00:00"}
-           #:message{:content "OUR-FACILITY",
-                     :from :surrogate,
-                     :id 12,
-                     :time #inst "2024-04-29T21:46:09.343-00:00"}
-           #:message{:content
-                     "A flow-shop is a production system designed so that all jobs follows the same sequence of steps through production resources.\nA job-shop is a production system where each job might follow its own route, depending on its unique requirements.\nIs the process you described more like a flow-shop or a job-shop?\nRespond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
-                     :from :system,
-                     :id 13,
-                     :time #inst "2024-04-29T21:46:11.567-00:00"}
-           #:message{:content "FLOW-SHOP",
-                     :from :surrogate,
-                     :id 14,
-                     :time #inst "2024-04-29T21:46:11.618-00:00"}],
+#:project{:conversations
+          [#:conversation{:id :data}
+           #:conversation{:id :resource}
+           #:conversation{:messages
+                          [#:message{:content
+                                     "Describe your most significant scheduling problem in a few sentences.",
+                                     :from :system,
+                                     :id 1,
+                                     :time
+                                     #inst "2024-04-29T21:45:45.972-00:00"}
+                           #:message{:content
+                                     "Our most significant scheduling problem involves coordinating the production and delivery of raw materials with the manufacturing schedule of aluminium cans to meet fluctuating customer demands. We must account for supplier lead times, production capacity, and logistics while minimizing inventory costs and avoiding stockouts. Additionally, managing unexpected disruptions in supply chains or machinery breakdowns further complicates the scheduling process.",
+                                     :from :surrogate,
+                                     :id 2,
+                                     :time
+                                     #inst "2024-04-29T21:45:45.996-00:00"}
+                           #:message{:content
+                                     "Great, we'll call your project SUR Aluminium Cans.",
+                                     :from :system,
+                                     :id 3,
+                                     :time
+                                     #inst "2024-04-29T21:45:46.018-00:00"}
+                           #:message{:content
+                                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
+                                     :from :system,
+                                     :id 4,
+                                     :time
+                                     #inst "2024-04-29T21:45:46.035-00:00"}
+                           #:message{:content
+                                     "Please briefly describe your production processes?",
+                                     :from :system,
+                                     :id 5,
+                                     :time
+                                     #inst "2024-04-29T21:46:01.130-00:00"}
+                           #:message{:content
+                                     "Our production process for aluminium cans involves several key steps:\n\n1. **Material Procurement:** We source high-purity aluminium and other necessary materials from suppliers.\n2. **Sheet Preparation:** The aluminium is rolled into large, thin sheets.\n3. **Cupping and Drawing:** Sheets are stamped into small cups, which are then drawn into can bodies.\n4. **Trimming:** The edges of the can bodies are trimmed to the desired height.\n5. **Washing and Drying:** The can bodies are washed and dried to prepare them for coating.\n6. **Internal and External Coating:** Can bodies are coated inside and out to prevent corrosion and prepare them for printing.\n7. **Printing and Labelling:** Cans are printed with customer-specific designs and labels.\n8. **Necking and Flanging:** The can's neck is shaped, and the edge is flanged to prepare for lid attachment.\n9. **Inspection and Testing:** Cans are inspected for quality and may undergo testing for leaks or structural integrity.\n10. **Packing and Shipping:** Approved cans are packed into cartons or pallets and shipped to customers or for further processing, like filling.\n\nEach step must be meticulously scheduled and coordinated to ensure a smooth flow through the production line, meeting both quality and delivery targets.",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :time
+                                     #inst "2024-04-29T21:46:01.149-00:00"}
+                           #:message{:content
+                                     "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE.",
+                                     :from :system,
+                                     :id 7,
+                                     :time
+                                     #inst "2024-04-29T21:46:04.719-00:00"}
+                           #:message{:content "PRODUCT",
+                                     :from :surrogate,
+                                     :id 8,
+                                     :time
+                                     #inst "2024-04-29T21:46:04.740-00:00"}
+                           #:message{:content
+                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n",
+                                     :from :system,
+                                     :id 9,
+                                     :time
+                                     #inst "2024-04-29T21:46:06.928-00:00"}
+                           #:message{:content "MAKE-TO-STOCK",
+                                     :from :surrogate,
+                                     :id 10,
+                                     :time
+                                     #inst "2024-04-29T21:46:06.973-00:00"}
+                           #:message{:content
+                                     "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                                     :from :system,
+                                     :id 11,
+                                     :time
+                                     #inst "2024-04-29T21:46:09.326-00:00"}
+                           #:message{:content "OUR-FACILITY",
+                                     :from :surrogate,
+                                     :id 12,
+                                     :time
+                                     #inst "2024-04-29T21:46:09.343-00:00"}
+                           #:message{:content
+                                     "A flow-shop is a production system designed so that all jobs follows the same sequence of steps through production resources.\nA job-shop is a production system where each job might follow its own route, depending on its unique requirements.\nIs the process you described more like a flow-shop or a job-shop?\nRespond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                                     :from :system,
+                                     :id 13,
+                                     :time
+                                     #inst "2024-04-29T21:46:11.567-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 14,
+                                     :time
+                                     #inst "2024-04-29T21:46:11.618-00:00"}],
+                          :id :process}],
+          :current-conversation :process,
+          :id :sur-aluminium-cans,
           :name "SUR Aluminium Cans",
           :planning-problem
           #:problem{:domain :process-interview,

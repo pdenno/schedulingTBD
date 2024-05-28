@@ -26,37 +26,44 @@
   (ns-unmap  'scheduling-tbd.domain.process.interview-test 'llm)
   (ns-unmap  'scheduling-tbd.domain.process.interview-test 'log))
 
+(def alias? (-> (ns-aliases *ns*) keys set))
+
+(defn safe-alias
+  [al ns-sym]
+  (when (and (not (alias? al))
+             (find-ns ns-sym))
+    (alias al ns-sym)))
 
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
-  (alias 's      'clojure.spec.alpha)
-  (alias 'uni    'clojure.core.unify)
-  (alias 'edn    'clojure.edn)
-  (alias 'io     'clojure.java.io)
-  (alias 'str    'clojure.string)
-  (alias 'd      'datahike.api)
-  (alias 'dp     'datahike.pull-api)
-  (alias 'mount  'mount.core)
-  (alias 'p      'promesa.core)
-  (alias 'px     'promesa.exec)
-  ;(alias 'core   'scheduling-tbd.core)
-  (alias 'inv    'scheduling-tbd.domain.process.interview)
-  (alias 'db     'scheduling-tbd.db)
-  (alias 'how    'scheduling-tbd.how-made)
-  (alias 'llm    'scheduling-tbd.llm)
-  ;(alias 'llmt   'scheduling-tbd.llm-test)
-  (alias 'op     'scheduling-tbd.operators)
-;  (alias 'opt    'scheduling-tbd.operators-test)
-  (alias 'plan   'scheduling-tbd.planner)
-  (alias 'resp   'scheduling-tbd.web.controllers.respond)
-  (alias 'spec   'scheduling-tbd.specs)
-; (alias 'sutil  'scheduling-tbd.sutil)
-  (alias 'sur    'scheduling-tbd.surrogate)
-  ;(alias 'surt   'scheduling-tbd.surrogate-test)
-  (alias 'util   'scheduling-tbd.util)
-  (alias 'ws     'scheduling-tbd.web.websockets)
-  (alias 'openai 'wkok.openai-clojure.api))
+  (safe-alias 's      'clojure.spec.alpha)
+  (safe-alias 'uni    'clojure.core.unify)
+  (safe-alias 'edn    'clojure.edn)
+  (safe-alias 'io     'clojure.java.io)
+  (safe-alias 'str    'clojure.string)
+  (safe-alias 'd      'datahike.api)
+  (safe-alias 'dp     'datahike.pull-api)
+  (safe-alias 'mount  'mount.core)
+  (safe-alias 'p      'promesa.core)
+  (safe-alias 'px     'promesa.exec)
+  (safe-alias 'core   'scheduling-tbd.core)
+  (safe-alias 'pinv   'scheduling-tbd.domain.process.interview)
+  (safe-alias 'db     'scheduling-tbd.db)
+  (safe-alias 'how    'scheduling-tbd.how-made)
+  (safe-alias 'llm    'scheduling-tbd.llm)
+  (safe-alias 'llmt   'scheduling-tbd.llm-test)
+  (safe-alias 'op     'scheduling-tbd.operators)
+  (safe-alias 'opt    'scheduling-tbd.operators-test)
+  (safe-alias 'plan   'scheduling-tbd.planner)
+  (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
+  (safe-alias 'spec   'scheduling-tbd.specs)
+  (safe-alias 'sutil  'scheduling-tbd.sutil)
+  (safe-alias 'sur    'scheduling-tbd.surrogate)
+  (safe-alias 'surt   'scheduling-tbd.surrogate-test)
+  (safe-alias 'util   'scheduling-tbd.util)
+  (safe-alias 'ws     'scheduling-tbd.web.websockets)
+  (safe-alias 'openai 'wkok.openai-clojure.api))
 
 (def diag (atom nil))
 
@@ -291,13 +298,40 @@
     (assoc msg :message/content "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.")
     (assoc msg :message/content (apply str (map #(:msg-text/string %) (:message/content msg))))))
 
-(defn migrate-project
+#_(defn migrate-project
   "Translate :message/content to html."
   [pid]
   (let [new-proj (-> (db/get-project pid)
                      (update :project/messages (fn [msgs] (-> (reduce (fn [res msg] (conj res (msg-vec2html msg))) [] msgs) vec))))
         proj-string (with-out-str (pprint new-proj))]
     (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string))))
+
+#_(defn migrate-project
+  "Translate :message/content to html."
+  [pid]
+  (let [new-proj (as-> (db/get-project pid) ?x
+                   (assoc ?x :project/conversations
+                          [{:conversation/name :data}
+                           {:conversation/name :resource}
+                           {:conversation/name :process
+                            :conversation/messages (:project/messages ?x)}])
+                   (assoc ?x :project/current-conversation :process)
+                   (dissoc ?x :project/messages))
+        proj-string (with-out-str (pprint new-proj))]
+    (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string))))
+
+(defn migrate-project
+  "Translate :message/content to html."
+  [pid]
+  (letfn [(name2id [obj]
+            (cond (map? obj)    (reduce-kv (fn [m k v] (if (= k :conversation/name)
+                                                         (assoc m :conversation/id v)
+                                                         (assoc m k (name2id v)))) {} obj)
+                  (vector? obj) (mapv name2id obj)
+                  :else         obj))]
+    (let [proj (db/get-project pid)
+          proj-string (with-out-str (-> proj name2id pprint))]
+    (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string)))))
 
 
 (def beer-steps
