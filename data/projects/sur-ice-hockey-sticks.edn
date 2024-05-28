@@ -1,46 +1,59 @@
 [
-#:project{:id :sur-ice-hockey-sticks,
-          :messages
-          [#:message{:content
-                     "Describe your most significant scheduling problem in a few sentences.",
-                     :from :system,
-                     :id 1,
-                     :time #inst "2024-04-28T14:35:20.426-00:00"}
-           #:message{:content
-                     "The most significant scheduling problem we face in the production of ice hockey sticks is aligning the supply of raw materials (especially carbon fiber and resin, crucial for high-quality sticks) with the varying production schedules. The challenge arises due to the lead time for these materials and the fluctuating demand for different types of hockey sticks throughout the year. Additionally, we must factor in maintenance schedules for our production equipment, which can affect our ability to meet order deadlines if not planned meticulously. Balancing these elements to maintain a steady production flow without overstocking inventory or missing delivery timelines is a complex scheduling problem we need to address.",
-                     :from :surrogate,
-                     :id 2,
-                     :time #inst "2024-04-28T14:35:20.447-00:00"}
-           #:message{:content
-                     "Great, we'll call your project SUR Ice Hockey Sticks.",
-                     :from :system,
-                     :id 3,
-                     :time #inst "2024-04-28T14:35:20.467-00:00"}
-           #:message{:content
-                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
-                     :from :system,
-                     :id 4,
-                     :time #inst "2024-04-28T14:35:20.490-00:00"}
-           #:message{:content
-                     " Could you briefly describe your production processes?",
-                     :from :system,
-                     :id 5,
-                     :time #inst "2024-04-28T14:36:22.942-00:00"}
-           #:message{:content
-                     "Certainly, our production processes for making ice hockey sticks can be summarized as follows:\n\n1. **Raw Material Procurement:** We source high-quality carbon fiber and resin, essential materials for making durable and lightweight ice hockey sticks.\n\n2. **Material Preparation:** The carbon fiber is cut and prepared according to the specifications for different types of hockey sticks. The resin is also prepared to bond the carbon fibers effectively.\n\n3. **Molding and Shaping:** Prepared materials are placed into molds to form the shape of the hockey stick. This process involves layering the carbon fiber and applying resin to bond these layers together.\n\n4. **Curing and Cooling:** Once the hockey sticks are shaped, they undergo a curing process where they are heated in an oven to harden and solidify the resin. Following this, they are cooled to room temperature to set the final shape.\n\n5. **Quality Inspection:** After cooling, each hockey stick is inspected for defects and to ensure they meet our strict quality standards. This includes checking the stick for durability, weight, and balance.\n\n6. **Packaging and Shipping:** The approved hockey sticks are then packaged and prepared for shipping to various customers and retailers.\n\nThis streamlined process allows us to maintain a high level of quality and meet the demands of our customers effectively.",
-                     :from :surrogate,
-                     :id 6,
-                     :time #inst "2024-04-28T14:36:22.957-00:00"}
-           #:message{:content
-                     " Do you also makes ice hockey sticks from wood?",
-                     :from :system,
-                     :id 7,
-                     :time #inst "2024-04-28T14:37:59.140-00:00"}
-           #:message{:content
-                     "No, we specialize exclusively in the production of composite ice hockey sticks, primarily using carbon fiber and resin. This focus allows us to produce high-performance, lightweight, and durable hockey sticks that meet the advanced needs of today’s players. We do not manufacture wooden ice hockey sticks.",
-                     :from :surrogate,
-                     :id 8,
-                     :time #inst "2024-04-28T14:37:59.180-00:00"}],
+#:project{:conversations
+          [#:conversation{:id :data}
+           #:conversation{:id :resource}
+           #:conversation{:messages
+                          [#:message{:content
+                                     "Describe your most significant scheduling problem in a few sentences.",
+                                     :from :system,
+                                     :id 1,
+                                     :time
+                                     #inst "2024-04-28T14:35:20.426-00:00"}
+                           #:message{:content
+                                     "The most significant scheduling problem we face in the production of ice hockey sticks is aligning the supply of raw materials (especially carbon fiber and resin, crucial for high-quality sticks) with the varying production schedules. The challenge arises due to the lead time for these materials and the fluctuating demand for different types of hockey sticks throughout the year. Additionally, we must factor in maintenance schedules for our production equipment, which can affect our ability to meet order deadlines if not planned meticulously. Balancing these elements to maintain a steady production flow without overstocking inventory or missing delivery timelines is a complex scheduling problem we need to address.",
+                                     :from :surrogate,
+                                     :id 2,
+                                     :time
+                                     #inst "2024-04-28T14:35:20.447-00:00"}
+                           #:message{:content
+                                     "Great, we'll call your project SUR Ice Hockey Sticks.",
+                                     :from :system,
+                                     :id 3,
+                                     :time
+                                     #inst "2024-04-28T14:35:20.467-00:00"}
+                           #:message{:content
+                                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
+                                     :from :system,
+                                     :id 4,
+                                     :time
+                                     #inst "2024-04-28T14:35:20.490-00:00"}
+                           #:message{:content
+                                     " Could you briefly describe your production processes?",
+                                     :from :system,
+                                     :id 5,
+                                     :time
+                                     #inst "2024-04-28T14:36:22.942-00:00"}
+                           #:message{:content
+                                     "Certainly, our production processes for making ice hockey sticks can be summarized as follows:\n\n1. **Raw Material Procurement:** We source high-quality carbon fiber and resin, essential materials for making durable and lightweight ice hockey sticks.\n\n2. **Material Preparation:** The carbon fiber is cut and prepared according to the specifications for different types of hockey sticks. The resin is also prepared to bond the carbon fibers effectively.\n\n3. **Molding and Shaping:** Prepared materials are placed into molds to form the shape of the hockey stick. This process involves layering the carbon fiber and applying resin to bond these layers together.\n\n4. **Curing and Cooling:** Once the hockey sticks are shaped, they undergo a curing process where they are heated in an oven to harden and solidify the resin. Following this, they are cooled to room temperature to set the final shape.\n\n5. **Quality Inspection:** After cooling, each hockey stick is inspected for defects and to ensure they meet our strict quality standards. This includes checking the stick for durability, weight, and balance.\n\n6. **Packaging and Shipping:** The approved hockey sticks are then packaged and prepared for shipping to various customers and retailers.\n\nThis streamlined process allows us to maintain a high level of quality and meet the demands of our customers effectively.",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :time
+                                     #inst "2024-04-28T14:36:22.957-00:00"}
+                           #:message{:content
+                                     " Do you also makes ice hockey sticks from wood?",
+                                     :from :system,
+                                     :id 7,
+                                     :time
+                                     #inst "2024-04-28T14:37:59.140-00:00"}
+                           #:message{:content
+                                     "No, we specialize exclusively in the production of composite ice hockey sticks, primarily using carbon fiber and resin. This focus allows us to produce high-performance, lightweight, and durable hockey sticks that meet the advanced needs of today’s players. We do not manufacture wooden ice hockey sticks.",
+                                     :from :surrogate,
+                                     :id 8,
+                                     :time
+                                     #inst "2024-04-28T14:37:59.180-00:00"}],
+                          :id :process}],
+          :current-conversation :process,
+          :id :sur-ice-hockey-sticks,
           :name "SUR Ice Hockey Sticks",
           :planning-problem
           #:problem{:domain :process-interview,

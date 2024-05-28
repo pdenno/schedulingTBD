@@ -8,12 +8,21 @@
 
 (def ^:diag diag (atom nil))
 (def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (atom nil))
-(def project-id "Keyword for project-id." (atom nil))
+(def project-info "Map tracking current project/id and :conversation/id." (atom {}))
 (def channel "The JS Websocket object being used for communication with the server." (atom nil))
 (def reconnecting? "True only from the time reconnect! is called until socket is once again ready." (atom false))
 (def check-process "A process that is run every second once problems are encountered to check socket readiness." (atom nil))
 (def check-count "After a certain number of check for readiness, if still not ready, we try connect! again." (atom 0))
 (def ping-process "A process run intermittently by js/window.setInterval" (atom nil))
+
+(defn update-project-info!
+  [resp]
+  (swap! project-info
+         (fn [info]
+           (cond-> info ; ToDo: Decide what things are to be called!
+             (contains? resp :current-project)   (assoc :project/id (-> resp :current-project :project/id))
+             (contains? resp :project-id)        (assoc :project/id (:project-id resp))
+             (contains? resp :conv-id)           (assoc :conversation/id (:conv-id resp))))))
 
 ;;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
 (defn channel-ready? [] (and @channel (= 1 (.-readyState @channel))))
@@ -60,6 +69,7 @@
                                       (log/info "sur-says msg:" msg)
                                       ((lookup-fn :set-sur-text) msg)))
 
+
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
   [{:keys [dispatch-key] :as msg}]
@@ -90,8 +100,8 @@
                 (try (let [data (.-data event)]
                        (when (not-empty data) (-> data edn/read-string dispatch-msg)))
                      (catch :default e
-                       (reset! error-info {:event event :error e})
-                       (log/warn "Error in reading from websocket:" e)))))
+                       (reset! error-info {:event event :error e :data (.-data event)})
+                       (log/warn "Error reading from websocket:" e)))))
         (set! (.-onerror chan)
               (fn [& arg]
                 (reset! error-info-2 {:event arg})
@@ -134,6 +144,7 @@
     :close-channel          ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
     :ping                   ; Ping server.
     :domain-expert-says     ; Human user wrote at the chat prompt (typically answering a question).
+    :change-conversation    ; Update :project/current-conversation in the project's DB.
     :run-long               ; diagnostic
     :throw-it})             ; diagnostic
 

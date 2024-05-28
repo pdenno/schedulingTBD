@@ -134,7 +134,7 @@
   (assert (string? client-id))
   (ws/send-to-chat {:promise? false
                     :client-id client-id
-                    :dispatch-key :request-conversation
+                    :dispatch-key :render-conversation
                     :pid pid}))
 
 ;;; This only needs to work on the head partial plan, right? (That's even true once I have alternatives, right?)

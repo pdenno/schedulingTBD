@@ -16,6 +16,7 @@
    [scheduling-tbd.util  :as util :refer [now]]
    [scheduling-tbd.specs :as spec]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id]]
+   [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre :as log :refer [debug]]))
 
 (def db-schema-sys+
@@ -72,6 +73,14 @@
    :box/boolean-val
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "boxed value"}
+
+   ;; ---------------------- conversation
+   :conversation/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resource}."}
+   :conversation/messages
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "the messages of the conversation."}
 
    ;; ---------------------- duration
    :duration/value
@@ -178,7 +187,12 @@
    :project/code
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Code associated with the project."}
-
+   :project/conversations
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "The conversations of this project."}
+   :project/current-conversation
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The conversation most recently busy."}
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
@@ -188,9 +202,6 @@
    :project/industry
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a short description of the industry in which we are doing scheduling."}
-   :project/messages
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "message objects of the project"}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
@@ -298,6 +309,28 @@
            [?e :project/id ?pid]]
          @(connect-atm pid) pid)))
 
+(defn conversation-exists?
+  "Return the eid of the conversation if it exists."
+  [pid conversation]
+  (assert (#{:process :data :resource} conversation))
+  (d/q '[:find ?eid .
+         :in $ ?conversation
+         :where
+         [?eid :conversation/id ?conversation]]
+       @(connect-atm pid) conversation))
+
+(defn change-conversation
+  [{:keys [pid conv-id] :as obj}]
+  (try
+    (assert (#{:process :data :resource} conv-id))
+    (let [conn (connect-atm pid)
+          eid (project-exists? pid)]
+      (if eid
+        (d/transact conn {:tx-data [[:db/add eid :project/current-conversation conv-id]]})
+        (log/info "No change with change-conversation (1):" obj)))
+    (catch Throwable _e (log/info "No change with change-conversation (2):" obj) nil))
+  nil)
+
 (defn get-project
   "Return the project structure."
   ([pid] (get-project pid #{:db/id}))
@@ -365,25 +398,27 @@
            (not fail-when-missing?)    nil
            :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))
 
-(def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
-  #{:project/messages :message/id :message/from :message/content :message/time})
+(def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
+  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time})
 
 (defn get-messages
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  [pid]
-  (when-let [eid (project-exists? pid)]
+  [pid conversation]
+  (assert (#{:process :data :resource} conversation))
+  (if-let [eid (conversation-exists? pid conversation)]
     (->> (resolve-db-id {:db/id eid}
-                       (connect-atm pid)
-                       :keep-set message-keep-set)
-        :project/messages
-        (sort-by :message/id)
-        vec)))
+                        (connect-atm pid)
+                        :keep-set message-keep-set)
+         :conversation/messages
+         (sort-by :message/id)
+         vec)
+    []))
 
 (defn get-problem
   "Return the planning problem. We add new keys for the things that end in -string,
    that is, for :problem/goal-string and :problem/state-string :goal and :state are added respectively."
   [pid]
-  (as-> (get-project pid #{:db/id :project/messages :project/surrogate :project/code}) ?x
+  (as-> (get-project pid #{:db/id :project/conversations :project/surrogate :project/code}) ?x
     (:project/planning-problem ?x)
     (assoc ?x :goal (-> ?x :problem/goal-string edn/read-string))
     (assoc ?x :state (-> ?x :problem/state-string edn/read-string))))
@@ -572,13 +607,10 @@
 (defn max-msg-id
   "Return the current highest message ID used in the project."
   [pid]
-  (when-let [eid (project-exists? pid)]
-    (as-> (resolve-db-id {:db/id eid}
-                        (connect-atm pid)
-                        :keep-set #{:project/messages :message/id}) ?o
-      (:project/messages ?o)
-      (map :message/id ?o)
-      (if (empty? ?o) 0 (apply max ?o)))))
+  (let [ids (d/q '[:find [?msg-id ...]
+                   :where [_ :message/id ?msg-id]]
+                 @(connect-atm pid))]
+    (if (empty? ids) 0 (apply max ids))))
 
 ;;; See "Map forms" at https://docs.datomic.com/pro/transactions/transactions.html
 ;;; This is typical: You get the eid of the thing you want to add properties to.
@@ -586,16 +618,16 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to the database with :project/id = id."
-  ([pid from msg] (add-msg pid from msg []))
-  ([pid from msg tags]
+  ([pid from msg conversation] (add-msg pid from msg conversation []))
+  ([pid from msg conversation tags]
    (reset! diag [pid from msg tags])
    (assert (#{:system :human :surrogate :developer-injected} from))
    (assert (string? msg))
    ;;(log/info "add-msg: pid =" pid "msg =" msg)
    (if-let [conn (connect-atm pid)]
      (let [msg-id (inc (max-msg-id pid))]
-       (d/transact conn {:tx-data [{:db/id (project-exists? pid)
-                                    :project/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
+       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid conversation)
+                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
                                                         (not-empty tags) (assoc :message/tags tags))}]}))
      (throw (ex-info "Could not connect to DB." {:pid pid})))))
 
@@ -677,12 +709,13 @@
   (doseq [id (list-projects {:from-storage? true})]
     (register-db id (db-cfg-map :project id))))
 
-(defn init-db-cfgs
+(defn init-dbs
   "Register DBs using "
   []
   (register-project-dbs)
   (register-db :system (db-cfg-map :system))
+  (ws/register-ws-dispatch :change-conversation change-conversation)
   {:sys-cfg (db-cfg-map :system)})
 
 (defstate sys&proj-database-cfgs
-  :start (init-db-cfgs))
+  :start (init-dbs))

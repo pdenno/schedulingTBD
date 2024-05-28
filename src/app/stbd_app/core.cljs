@@ -107,56 +107,43 @@
       (register-fn :set-conversation set-conversation)
       (register-fn :set-code set-code)
       (register-fn :core-load-proj ; This is called by project.cljs when you change projects.
-              (fn [p] ; p is a map with two keys: :project/id :project/name (a proj-info element).
-                (set-proj p)
-                (reset! ws/project-id (:project/id p))
-                (set-conversation {:conv [] :conf-for proj})
-                (-> p
-                    :project/id
-                    dba/get-conversation
-                    (p/then (fn [resp] (set-conversation resp) resp))
-                    (p/then (fn [resp] (set-code (:code resp)) resp))
-                    (p/then (fn [_] (ws/send-msg {:dispatch-key :resume-conversation :project-id (:project/id p)}))))))
-      ;; Display the default current-project (a contrivance for development)
+                   (fn [p] ; p is a map with two keys: :project/id :project/name (a proj-info element).
+                     (set-proj p)
+                     (swap! ws/project-info #(assoc % :project/id p))
+                     ((lookup-fn :render-conversation) {:pid (:project/id p)})
+                     (ws/send-msg {:dispatch-key :resume-conversation :project-id (:project/id p)})))
       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
-          (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
-                       (set-proj (:current-project %))
-                       (reset! ws/project-id (-> % :current-project :project/id))
-                       (-> %
-                           :current-project
-                           :project/id
-                           dba/get-conversation
-                           (p/then (fn [resp] (set-conversation resp) resp))
-                           (p/then (fn [resp] (set-code (:code resp) resp)))))))
-
-      #_(-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
-          (p/then #(do (set-proj-infos (conj (:others %) (:current-project %)))
-                       (lookup-fn :core-load-proj) (:current-project %)))))
-      ($ Stack {:direction "column" :height useful-height}
-         ($ Typography
-            {:variant "h4"
-             :color "white"
-             :backgroundColor "primary.main"
-             :padding "2px 2px 2px 20px"
-             :noWrap false
-             :height banner-height}
-            ($ Stack {:direction "row"}
-               "schedulingTBD"
-               ($ Box
-                  ($ SelectProject {:current-proj proj :proj-infos proj-infos}))))
-         ($ ShareLeftRight
-            {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
-                       ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :proj-info proj}))
-             :right ($ ShareUpDown
-                       {:init-height code-side-height
-                        :up ($ Editor {:text code
-                                       :name "code-editor"
-                                       :height code-side-height})
-                        :dn ($ Box)
-                        :share-fns (:right-share top-share-fns)})
-             :share-fns (:left-share top-share-fns)
-             :lf-pct 0.50
-             :init-width width}))))
+          (p/then (fn [resp]
+                    ;(log/info "core: get-project-list:" resp)
+                    (set-proj-infos (conj (:others resp) (:current-project resp)))
+                    (set-proj (:current-project resp))
+                    ((lookup-fn :render-conversation) {:pid (-> resp :current-project :project/id)})))))
+    ;; ------- component (end of use-effect :once)
+    ($ Stack {:direction "column" :height useful-height}
+       ($ Typography
+          {:variant "h4"
+           :color "white"
+           :backgroundColor "primary.main"
+           :padding "2px 2px 2px 20px"
+           :noWrap false
+           :height banner-height}
+          ($ Stack {:direction "row"}
+             "schedulingTBD"
+             ($ Box
+                ($ SelectProject {:current-proj proj :proj-infos proj-infos}))))
+       ($ ShareLeftRight
+          {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
+                     ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :proj-info proj}))
+           :right ($ ShareUpDown
+                     {:init-height code-side-height
+                      :up ($ Editor {:text code
+                                     :name "code-editor"
+                                     :height code-side-height})
+                      :dn ($ Box)
+                      :share-fns (:right-share top-share-fns)})
+           :share-fns (:left-share top-share-fns)
+           :lf-pct 0.50
+           :init-width width}))))
 
 (defnc app []
   {:helix/features {:check-invalid-hooks-usage true}}

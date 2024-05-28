@@ -45,7 +45,7 @@
 (defn close-ws-channels [client-id]
   (when (contains? @socket-channels client-id)
     (let [{:keys [in out err]} (get @socket-channels client-id)]
-      (log/info "Closing websocket channels for inactive client" client-id (now))
+      ;;(log/info "Closing websocket channels for inactive client" client-id (now))
       ;; Set exit? and send something so go loop will be jogged and see it.
       (swap! socket-channels #(assoc-in % [client-id :exit?] true))
       ;;(go (>! in (str {:dispatch-key :stop}))) ; <===================================================== ToDo: Needs investigation.
@@ -67,7 +67,7 @@
   "Close the channel and forget the promises associated with the client.
    This is typically from a client unmount."
   [client-id]
-  (log/info client-id "closes its websocket.")
+  ;;(log/info client-id "closes its websocket.")
   (swap! ping-dates #(dissoc % client-id))
   (close-ws-channels client-id)
   (clear-promises! client-id))
@@ -143,7 +143,7 @@
       (loop []
         (when-let [msg (<! in)] ; Listen for messages.
           (let [msg (edn/read-string msg)]
-            (when-not (= :ping (:dispatch-key msg)) (log/info "Received message:"  msg))
+            (when-not (#{:ping :alive-confirm} (:dispatch-key msg)) (log/info "Received message:"  msg))
             (if (= :stop (:dispatch-key msg))
               (swap! socket-channels #(assoc-in % [client-id :exit?] true))
               (let [prom (px/submit! (fn [] (dispatch msg)))]
@@ -157,7 +157,7 @@
       ;; I think there is still value in looking for inactive sockets and closing them, but I probably should implement
       ;; alive? because the client will have to make another websocke request otherwise, and it doesn't seem to notice
       ;; that the sever isn't listening to it!
-      (log/info "Exiting dispatching loop:" client-id))))
+      #_(log/info "Exiting dispatching loop:" client-id))))
 
 (defn establish-websocket-handler
   "Handler for http:/ws request. Returns nothing interesting.
@@ -167,7 +167,7 @@
    In that case, the old channel will eventually get destroyed by close-inactive-channels.
    Returns a map with value for key :ring.websocket/listener."
   [request]
-  (log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
+  ;;(log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
   (future (close-inactive-channels))
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]
@@ -300,7 +300,7 @@
 (defn client-confirms-alive
   "Because the ws go loop can drop, we use this as part of reconnecting."
   [{:keys [client-id]}]
-  (log/info "client confirms alive:" client-id)
+  ;;(log/info "client confirms alive:" client-id)
   (swap! socket-channels #(assoc-in % [client-id :alive] true))
   nil)
 
@@ -317,8 +317,7 @@
                           :close-channel        close-channel}))
 
 (defn dispatch [{:keys [dispatch-key] :as msg}]
-  (when-not (= :ping dispatch-key)  (log/info "dispatch: Received msg:" msg))
-  (when-not (= :ping dispatch-key)  (reset! diag msg))
+  (when-not (#{:ping :alive-confirm} dispatch-key)  (log/info "dispatch: Received msg:" msg))
   (let [res (cond (= dispatch-key :stop)                        nil ; What needs to be done has already been done.
                   (contains? @dispatch-table dispatch-key)      ((get @dispatch-table dispatch-key) msg)
                   :else                                         (log/error "No dispatch function for " msg))]

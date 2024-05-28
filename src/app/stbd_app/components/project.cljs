@@ -9,7 +9,7 @@
    ;;["@mui/material/styles"              :as styles :refer [createTheme themeOptions ThemeProvider]] ; WIP
    [helix.core         :as helix :refer [defnc $]]
    [stbd-app.util      :refer [lookup-fn]]
-   #_[taoensso.timbre    :as log :refer-macros [info debug log]]))
+   [taoensso.timbre    :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -28,7 +28,7 @@
 (def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT" :menu-text "START A NEW PROJECT"})
 
 (defn order-projects
-  "Return a vector of maps containing :project/id and :project/name where
+  "Return a vector of maps containing :project/id, :project/name and :menu-text where
    current is first, 'new-project' is second and the remainder are all other
    known projects sorted alphabetically."
   [current proj-infos]
@@ -59,7 +59,8 @@
                       :onChange (fn [_e v]
                                   (let [proj-str (j/get-in v [:props :value])
                                         proj (some #(when (= proj-str (:menu-text %)) %) proj-infos+)]
-                                    ((lookup-fn :core-load-proj) proj)))}
+                                    (log/info "Select project: proj =" proj)
+                                    ((lookup-fn :core-load-proj) (dissoc proj :menu-text))))}
               (for [p (map :menu-text proj-infos+)]
                 ($ MenuItem {:key p :value p} p)))))))
 
