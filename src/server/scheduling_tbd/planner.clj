@@ -109,21 +109,24 @@
                                     []
                                     (:method/rhsides task))))
 
+(defn matching-tasks
+  "Return a vector of tasks that unify."
+  [task patterns]
+  (reduce (fn [res pat] (if-let [m (matching-task? task pat)] (conj res m) res))
+          []
+          patterns))
+
 ;;; You will need to walk stop-here to pick the one you want, but having done that, do this:
 ;;; (plan/satisfying-tasks (:task @plan/diag) (:elems @plan/diag) (:state @plan/diag))
 (defn satisfying-tasks
   "Return edited task patterns for operators and methods matching given, task (a positive literal), patterns, and state."
-  [task patterns state]
-  (let [matching-tasks (reduce (fn [res pat] (if-let [m (matching-task? task pat)] (conj res m) res))
-                               []
-                               patterns)
-        res (reduce (fn [res {:keys [task bindings]}]
-                      (if-let [r (satisfying-elems task state)]
-                        (into res (map (fn [sat-elem] (update sat-elem :bindings #(merge bindings %))) r))
-                        res))
-                    []
-                    matching-tasks)]
-    res))
+  [task patterns state m-tasks]
+   (reduce (fn [res {:keys [task bindings]}]
+             (if-let [r (satisfying-elems task state)]
+               (into res (map (fn [sat-elem] (update sat-elem :bindings #(merge bindings %))) r))
+               res))
+           []
+           m-tasks))
 
 ;;; ToDo: I think it is probably wrong to use an HTTP call for get-conversation, but for the time being, that's what we are using.
 ;;;       This will cause the client to make that HTTP call.
@@ -196,8 +199,9 @@
                                                                               (-> % rest vec)))] ; drop this task; add the steps
                                (into [new-partial] (rest partials))))))
 
+(def stop-here-diag (atom nil))
 (defn stop-here [data]
-  (reset! diag data))
+  (reset! stop-here-diag data))
 
 ;;; (plan/plan9 project-id :process-interview-1 client-id {:start-facts (db/get-state project-id)})
 (defn ^:diag plan9
@@ -207,13 +211,19 @@
    Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
   [domain-id state goal & {:keys [client-id] :as opts}]  ; opts typically includes :pid.
   (assert (string? client-id))
+  (assert (#{:process :data :resource} domain-id))
   (let [elems   (-> (sutil/get-domain domain-id) :domain/elems)
         result (loop [partials [{:plan [] :new-tasks [goal] :state state}]
                       cnt 1]
                  ;;(log/info "new-tasks =" (-> partials first :new-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
                  (log/info "partial = " (first partials))
                  (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
-                       s-tasks (satisfying-tasks task elems (-> partials first :state))]
+                       state (-> partials first :state)
+                       matching (matching-tasks task elems)
+                       s-tasks (satisfying-tasks task elems state matching)]
+                   (log/info "task =" task)
+                   (log/info "matching =" matching)
+                   (log/info "satisfying =" s-tasks)
                    (when (empty? s-tasks) (stop-here {:task task :elems elems :state (-> partials first :state)}))
                    (cond
                      (empty? partials)                         {:result :failure :reason :end-of-interview} ; ToDo: this was :no-successful-plans.
@@ -240,8 +250,19 @@
       (Thread/sleep 1000) ; Wait to allow any request-converation/refresh-client to complete.
       (ws/send-to-chat {:promise? false, :client-id client-id, :msg response-to-user}))))
 
-
 ;;; -------------------------------------- Plan checking --------------------------------------------------------------------
+;;; (what-is-runnable? '(characterize-process sur-fountain-pens) '#{(proj-id sur-fountain-pens) (proj-name "SUR Fountain Pens") (surrogate sur-fountain-pens)})
+(defn ^:diag  what-is-runnable?
+  "Return the satisfying tasks for a given state (and planning domain)."
+  ([task state] (what-is-runnable? task state :process))
+  ([task state domain-id]
+   (let [elems (-> (sutil/get-domain domain-id) :domain/elems)
+         matching (matching-tasks task elems)
+         satisfying (satisfying-tasks task elems state matching)]
+     (log/info "matching =" matching)
+     (log/info "satisfying =" satisfying)
+     satisfying)))
+
 #_(defn check-domain-to-goals
   "Return nil if domain references the problem otherwise :error-domain-not-addressing-goal.
    This doesn't check whether the problem can be inferred by means of axioms."  ; ToDo: Fix this.
@@ -268,26 +289,31 @@
     ;(check-goals-are-ground goal-vec) ; This is something for after translation, thus don't other with it.
     pass-obj))
 
-;;; (plan/resume-conversation {:project-id :sur-craft-beer :client-id (ws/recent-client!)})
+;;; (plan/resume-conversation {:pid :sur-craft-beer :client-id (ws/recent-client!)})
+;;; (plan/resume-conversation {:pid :sur-fountain-pens :conv-id :data :client-id (ws/recent-client!)})
 (defn resume-conversation
   "Start the interview loop. :resume-conversation is a dispatch key from client.
    This is called even for where PID is :START-A-NEW-PROJECT."
-  [{:keys [project-id client-id]}]
+  [{:keys [pid conv-id client-id] :as args}]
   (assert (string? client-id))
-  (if (= project-id :START-A-NEW-PROJECT)
-    (let [state '[(proj-id START-A-NEW-PROJECT)]
-          goal '(characterize-process START-A-NEW-PROJECT)] ; <======== ?pid or START-A-NEW-PROJECT
-      (plan9 :process-interview state goal {:client-id client-id :pid project-id}))
-    (let [{:keys [state goal]} (db/get-problem project-id)]
-      (log/info "======== resume conversation: planning-state = " state)
-      (plan9 :process-interview state goal {:client-id client-id :pid project-id}))))
+  (try
+    (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+    (if (= pid :START-A-NEW-PROJECT)
+      (let [state '[(proj-id START-A-NEW-PROJECT)]
+            goal '(characterize-process START-A-NEW-PROJECT)]
+        (plan9 :process state goal {:client-id client-id :pid pid}))
+      (let [{:keys [state goal]} (db/get-problem pid)]
+        (log/info "======== resume conversation: planning-state = " state)
+        (db/change-conversation args)
+        (plan9 conv-id state goal {:client-id client-id :pid pid})))
+    (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn init-planner!
   []
   (ws/register-ws-dispatch :resume-conversation resume-conversation)
-  (register-planning-domain
-   :process-interview
-   (-> "data/planning-domains/process-interview-1.edn" slurp edn/read-string)))
+  (register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
+  (register-planning-domain :data     (-> "data/planning-domains/data-interview.edn" slurp edn/read-string))
+  (register-planning-domain :resource (-> "data/planning-domains/resource-interview.edn" slurp edn/read-string)))
 
 (defn quit-planner!
   "Quit the planner. It can be restarted with a shell command through mount."

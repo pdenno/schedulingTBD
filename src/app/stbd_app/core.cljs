@@ -109,9 +109,9 @@
       (register-fn :core-load-proj ; This is called by project.cljs when you change projects.
                    (fn [p] ; p is a map with two keys: :project/id :project/name (a proj-info element).
                      (set-proj p)
-                     (swap! ws/project-info #(assoc % :project/id p))
+                     (ws/update-project-info! p)
                      ((lookup-fn :render-conversation) {:pid (:project/id p)})
-                     (ws/send-msg {:dispatch-key :resume-conversation :project-id (:project/id p)})))
+                     (ws/send-msg {:dispatch-key :resume-conversation :pid (:project/id p) :conv-id (:conversation/id @ws/project-info)})))
       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
           (p/then (fn [resp]
                     ;(log/info "core: get-project-list:" resp)

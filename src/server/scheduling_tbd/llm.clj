@@ -283,53 +283,6 @@
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
 
-;;; ToDo: So far, I haven't seen any advantage in using agents for this. I suppose there might be advantage were
-;;;       there follow-up questions, but how would that work? Everything so far is around vector of maps.
-;;;       Solution?: See if you can factor the problem down into parts for which the planner can be used.
-;;;       Would be good do have the functions of the operators of the planner embedded...some how..
-;;;------------------- Agent ---------------
-(defn ^:diag recreate-agent!
-  "Create a agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
-   Store what is needed to identify it in system DB."
-  [{:keys [id instruction]}]
-  (let [assist (make-assistant :name (name id) :instructions instruction :metadata {:usage :agent})
-        aid    (:id assist)
-        thread (make-thread {:assistant-id aid
-                             :metadata {:usage :agent}})
-        tid    (:id thread)
-        conn   (connect-atm :system)
-        eid    (d/q '[:find ?eid .
-                      :where [?eid :system/name "SYSTEM"]]
-                    @(connect-atm :system))]
-    (d/transact conn {:tx-data [{:db/id eid
-                                 :system/agents {:agent/id id
-                                                 :agent/assistant-id aid
-                                                 :agent/thread-id tid}}]})))
-
-;;; ToDo: I go back and forth on whether this should be :text-function-agent, which only does those four types below
-;;;       (and in which case the
-(def text-function-agent
-  {:id :text-function-agent
-   :instruction
-   (str "You are a helpful assistant that interprets our requests and output results as a vector of Clojure maps. "
-        "Your response must be directly readable by the Clojure function 'read-string' to a vector of Clojure maps. "
-        "The maps you will produce contain two keys :SENTENCE and :TYPE \n"
-        "For each sentence in the input, the value of :SENTENCE is the sentence. \n"
-        "For each sentence in the input, the falue of :TYPE may be one of the four Clojure keywords, "
-        "the choice depending on how you interpret the sentence:\n"
-                   "   :declarative -- the sentence makes a statement,\n"
-                   "   :iterrogative -- the sentence asks a question,\n"
-                   "   :imperative -- the sentence, tells someone to do something, or\n"
-                   "   :exclamatory -- the sentence expresses surprise, anger, pain etc.:\n")
-   :training
-   [{:role "user"
-     :content "I am a student. Are you a student? Welcome the new student. There are so many students here!"}
-    {:role "assistant"
-     :content (str "[{:SENTENCE \"I am a student.\" :TYPE :declarative}, "
-                   "{:SENTENCE \"Are you a student?\" :TYPE :interrogative}, "
-                   "{:SENTENCE \"Welcome the new student.\" :TYPE :imperative}, "
-                   "{:SENTENCE \"There are so many students here!\" :TYPE :exclamatory}]")}]})
-
 #_(def theory-bridging-agent
   {:id :theory-bridging-agent
    :instruction

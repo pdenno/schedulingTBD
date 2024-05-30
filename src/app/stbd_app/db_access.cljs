@@ -42,13 +42,18 @@
     prom))
 
 ;;; This is used by either the client or the server/planner to update the conversation.
-;;; There is a ws dispatch for :change-conversation (to one of #{:process :data :resource}) which would then require this be called.
+;;; There is a ws dispatch for :resume-conversation (to one of #{:process :data :resource}) which would then require this be called.
 (register-fn
  :render-conversation
  (fn [{:keys [pid]}]
    (assert (keyword? pid))
    (-> (get-conversation pid)
        (p/then (fn [resp]
-                 (ws/update-project-info! resp)
-                 ((lookup-fn :set-conversation) resp)
-                 ((lookup-fn :set-code) (:code resp)))))))
+                 (let [resp (cond-> resp
+                              (-> resp :conv empty?) (assoc :conv [#:message{:content "No discussion here yet.",
+                                                                             :from :system,
+                                                                             :time (js/Date. (.now js/Date))}]))]
+                   (ws/update-project-info! resp)
+                   ;; These are hooks in core.cljs
+                   ((lookup-fn :set-conversation) resp)
+                   ((lookup-fn :set-code) (:code resp))))))))
