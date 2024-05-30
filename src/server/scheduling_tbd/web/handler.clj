@@ -103,13 +103,9 @@
                                                                   :conv-id "process"
                                                                   :client-id "2f30f002-37b7-4dd1-bc01-5484273012f0"}}))
 
-#_(s/def ::conv-proj (st/spec {:spec #(or (string? %) (keyword? %)) ; ToDo: Investigate. I think keyword? is sufficient.
-                             :name "conv-proj" ; The description for responses is not shown in Swagger UI.
-                             :description "The project-id for which the conversation is provided."
-                             :json-schema/default "sur-craft-beer"}))
 (s/def ::conv (s/coll-of map?))
 (s/def ::code string?)
-(s/def ::get-conversation-response (s/keys :req-un [::project-id ::conv-id ::conv] :opt-un [::code]))
+(s/def ::get-conversation-response (s/keys :req-un [::project-id ::conv] :opt-un [::code ::conv-id]))
 (s/def ::project-id (st/spec {:spec #(or (string? %) (keyword? %))
                               :name "project-id"
                               :description "A kebab-case string (will be keywordized) unique to the system DB identifying a project."

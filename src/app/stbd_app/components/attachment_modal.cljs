@@ -34,27 +34,24 @@
 
 ;;; https://mui.com/material-ui/react-modal/
 ;;; https://react-dropzone.js.org/#section-basic-example
-(defnc AttachmentModal [{:keys [post-attach-fn default-text] :or {default-text drag-text}}]
+(defnc AttachmentModal [{:keys [post-attach-fn]}]
   (let [[open, set-open] (hooks/use-state false)
-        [state-text set-state-text]  (hooks/use-state default-text) ; mystery why this doesn't work.
+        [state-text set-state-text]  (hooks/use-state drag-text) ; mystery why this doesn't work.
         modal           (hooks/use-ref nil)
         dz-hook         (useDropzone)
         root-props      ((j/get dz-hook :getRootProps) #js {:className "dropzone"})
         input-props     ((j/get dz-hook :getInputProps))
         accepted-files  (j/get dz-hook :acceptedFiles)]
-    (hooks/use-effect :once
-      (set-state-text default-text)
-      (log/info "state-text =" state-text)) ; mystery why this doesn't work.
-    (letfn [(save-success [_] (when (j/get modal :current)(set-open false)))
+    (letfn [(save-success [_] (when (j/get modal :current)
+                                ;;(set-open false)
+                                (set-state-text "Saving to server succeeded.")))
             (save-failure [status status-text]
               (when (j/get modal :current)
                 (log/info "Saving example failed: status = " status " status text = " status-text)
                 (set-state-text "Communication with the server failed.")
                 (set-open true)))
             (handle-attach []
-              (when (j/get modal :current)
-                (set-open true)
-                (set-state-text "Drag a file here to upload it.")))
+              (when (j/get modal :current) (set-open true) (set-state-text drag-text)))
             (upload-files []
               (doseq [f (js->clj accepted-files)] ; Copy because I do .shift on it below.
                 (log/info "upload file:" (j/get f :name))
@@ -67,8 +64,8 @@
                                              (p/then #(POST "/files/upload"
                                                             {:params {:filename (j/get f :name) :size (j/get f :size) :client-id @ws/client-id}
                                                              :body (doto (js/FormData.)
-                                                                     (.append "project-id" (:conv/id @ws/project-info))
-                                                                     (.append "conversation-name" (:project/current-conversation @ws/project-info))
+                                                                     (.append "project-id" (:project/id @ws/project-info))
+                                                                     (.append "conversation-id" (:conversation/id @ws/project-info))
                                                                      (.append "file" f))
                                                              ;; See https://github.com/JulianBirch/cljs-ajax
                                                              ;;:response-format (raw-response-format)
@@ -93,7 +90,7 @@
                                    :id "save-modal-title"
                                    :variant "h6"
                                    :component "h6"}
-                       drag-text #_(if (empty? state-text) drag-text state-text)))) ; mystery why this doesn't work.
+                       (if (empty? state-text) drag-text state-text)))) ; mystery why this doesn't work.
               ($ Stack
                  ($ Box {:height "300px" :width "300px"}
                     ($ Typography {:sx #js {:padding  "10px 10px 30px 10px"}

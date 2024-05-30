@@ -67,7 +67,7 @@
                                                              :surrogate/thread-id (:id thread)}}]})
         (db/get-assistant-id pid))))
 
-;;; (sur/start-surrogate {:product "paving" :client-id (ws/recent-client!)})
+;;; (sur/start-surrogate {:product "fountain pens" :client-id (ws/recent-client!)})
 (defn start-surrogate
   "Create or recover a surrogate and ask client to :load-proj. :load-proj will start the planner; not done here directly.
      product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
@@ -103,7 +103,7 @@
                (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
                (ws/send-to-chat (assoc chat-args :msg "We had a problem answering this questions."))))))))
 
-(defn get-surrogate-messages-openai
+(defn ^:diag get-surrogate-messages-openai
   [pid]
   (when-let [tid (d/q '[:find ?tid .
                         :where

@@ -45,6 +45,7 @@
                                     :load-proj            ; Make a request to restart the project, including doing a resume-conversation
                                     :render-conversation  ; Like :load-proj but don't do a resume-conversation.
                                     :ping-confirm         ; Server confirms your ping.
+                                    :interviewer-busy?    ; Tells client to prevent changing the conversation/planning domain.
                                     :sur-says
                                     :tbd-says
                                     :update-code} x))

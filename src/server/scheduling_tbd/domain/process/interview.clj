@@ -303,12 +303,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
 ;;; ----------------- analyze-process-durs-response (done with :process-agent) ----------------------------
-;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
-(def process-agent
-  "Instructions and training for :process-agent to help it get started."
-  {:id :process-agent
-   :instruction (slurp "data/instructions/process-agent.txt")})
-
 ;;; These are named by the output of the given revision.
 (s/def :rev-1/PROCESS string?)
 (s/def :rev-1/PROCESS-STEP number?)

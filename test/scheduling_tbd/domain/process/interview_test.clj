@@ -26,17 +26,19 @@
   (ns-unmap  'scheduling-tbd.domain.process.interview-test 'llm)
   (ns-unmap  'scheduling-tbd.domain.process.interview-test 'log))
 
-(def alias? (-> (ns-aliases *ns*) keys set))
+(def alias? (atom (-> (ns-aliases *ns*) keys set)))
 
 (defn safe-alias
   [al ns-sym]
-  (when (and (not (alias? al))
+  (when (and (not (@alias? al))
              (find-ns ns-sym))
     (alias al ns-sym)))
 
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
+  (reset! alias? (-> (ns-aliases *ns*) keys set))
+  (safe-alias 'io     'clojure.java.io)
   (safe-alias 's      'clojure.spec.alpha)
   (safe-alias 'uni    'clojure.core.unify)
   (safe-alias 'edn    'clojure.edn)

@@ -149,7 +149,7 @@
               (let [prom (px/submit! (fn [] (dispatch msg)))]
                 (-> prom
                     (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like :resume-conversation don't return anything themselves.
-                    (p/catch (fn [err] (log/error "Error dispatching on socket: client-id =" client-id "err =" err))))))
+                    (p/catch (fn [err] (log/error "Error dispatching: msg = " msg "err =" err))))))
             (when-not (exiting? client-id) (recur)))))
       ;; There are many reasons a websocket connection might be dropped.
       ;; It is absolutely necessary that it exits the go loop when the socket closes; a race condition my occur otherwise.
@@ -280,7 +280,8 @@
             msg-obj (cond-> content
                       p-key               (assoc :p-key p-key)
                       true                (assoc :timestamp (now)))]
-        (log/info "send-to-chat: msg-obj =" msg-obj)
+        (when-not (= :alive? dispatch-key)
+          (log/info "send-to-chat: msg-obj =" msg-obj))
         (go (>! out (str msg-obj)))
         prom)
       (log/error "Could not find out async channel for client" client-id))))
