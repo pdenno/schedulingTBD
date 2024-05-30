@@ -13,6 +13,7 @@
 (defn get-project-list
   "Return a promise that will resolve to a map {:current-project <project-info> :others [<project-info>...]}."
   []
+  (log/info "get-project-list")
   (let [prom (p/deferred)]
     (GET (str "/api/list-projects?client-id=" @ws/client-id)
          {:timeout 3000
@@ -24,13 +25,15 @@
 
 ;;; {:conv-for id :conv [{:message/from :system :message/content [{:msg-text/string "You want to start a new project?"}]}]})
 (defn get-conversation
-  "Return a promise that will resolve to the vector of a maps describing the complete conversation so far.
+  "Return a promise that will resolve to the vector of a maps representing a conversation.
+   What conversation is returned depends on the value of :project/current-conversation in the DB; values are #{:process :resource :data}.
    Example of what the promise resolves to:
-   {:conv-for id :conv [{:message/from :system :message/content [{:msg-text/string 'Hi!'}]}]}."
+   {:project-id :sur-craft-beer :conv-id :process :conv [{:message/from :system :message/content [{:msg-text/string 'Hi!'}]}]}."
   [pid]
+  (assert (keyword? pid))
   (log/info "Call to get-conversation for" pid)
   (let [prom (p/deferred)]
-    (GET (str "/api/get-conversation?project-id=" (name pid) "&client-id=" @ws/client-id)
+    (GET (str "/api/get-conversation?project-id=" (name pid) "&client-id=" @ws/client-id) ; ToDo: martian!
          {:timeout 3000
           :handler (fn [resp] (p/resolve! prom resp))
           :error-handler (fn [{:keys [status status-text]}]
@@ -38,11 +41,19 @@
                                                     {:status status :status-text status-text})))})
     prom))
 
-;;; This is like :core-load-proj except that it doesn't do (ws/send-msg {:dispatch-key :resume-conversation...}).
-;;; It is used when, for example, you start a surrogate.
+;;; This is used by either the client or the server/planner to update the conversation.
+;;; There is a ws dispatch for :resume-conversation (to one of #{:process :data :resource}) which would then require this be called.
 (register-fn
- :request-conversation
- (fn [obj] (let [prom (get-conversation (:pid obj))]
-             (-> prom
-                 (p/then (fn [resp] ((lookup-fn :set-conversation) resp) resp))
-                 (p/then (fn [resp] ((lookup-fn :set-code) (:code resp)) resp))))))
+ :render-conversation
+ (fn [{:keys [pid]}]
+   (assert (keyword? pid))
+   (-> (get-conversation pid)
+       (p/then (fn [resp]
+                 (let [resp (cond-> resp
+                              (-> resp :conv empty?) (assoc :conv [#:message{:content "No discussion here yet.",
+                                                                             :from :system,
+                                                                             :time (js/Date. (.now js/Date))}]))]
+                   (ws/update-project-info! resp)
+                   ;; These are hooks in core.cljs
+                   ((lookup-fn :set-conversation) resp)
+                   ((lookup-fn :set-code) (:code resp))))))))

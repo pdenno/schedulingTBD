@@ -11,11 +11,11 @@
    [clojure.spec.alpha           :as s]
    [clojure.string               :as str]
    [datahike.api                 :as d]
-   ;[datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.util  :as util :refer [now]]
+   [scheduling-tbd.llm   :as llm]
    [scheduling-tbd.specs :as spec]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id]]
+   [scheduling-tbd.util  :as util :refer [now]]
    [taoensso.timbre :as log :refer [debug]]))
 
 (def db-schema-sys+
@@ -72,6 +72,14 @@
    :box/boolean-val
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "boxed value"}
+
+   ;; ---------------------- conversation
+   :conversation/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resource}."}
+   :conversation/messages
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "the messages of the conversation."}
 
    ;; ---------------------- duration
    :duration/value
@@ -178,7 +186,12 @@
    :project/code
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Code associated with the project."}
-
+   :project/conversations
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "The conversations of this project."}
+   :project/current-conversation
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The conversation most recently busy."}
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
@@ -188,9 +201,6 @@
    :project/industry
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a short description of the industry in which we are doing scheduling."}
-   :project/messages
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "message objects of the project"}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
@@ -279,6 +289,40 @@
 (def db-schema-sys  (datahike-schema db-schema-sys+))
 (def db-schema-proj (datahike-schema db-schema-proj+))
 
+;;; ---------------------------------- agents ----------------------------------------------
+(defn add-agent!
+  "Create a agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
+   Store what is needed to identify it in system DB."
+  [{:keys [id instruction]}]
+  (let [assist (llm/make-assistant :name (name id) :instructions instruction :metadata {:usage :agent})
+        aid    (:id assist)
+        thread (llm/make-thread {:assistant-id aid
+                                 :metadata {:usage :agent}})
+        tid    (:id thread)
+        conn   (connect-atm :system)
+        eid    (d/q '[:find ?eid .
+                      :where [?eid :system/name "SYSTEM"]]
+                    @(connect-atm :system))]
+    (d/transact conn {:tx-data [{:db/id eid
+                                 :system/agents {:agent/id id
+                                                 :agent/assistant-id aid
+                                                 :agent/thread-id tid}}]})))
+
+;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
+(def process-agent
+  "Instructions and training for :process-agent to help it get started."
+  {:id :process-agent
+   :instruction (slurp "data/instructions/process-agent.txt")})
+
+;;; ToDo: I go back and forth on whether this should be :text-function-agent, which only does those four types below
+;;;       (and in which case the
+(def text-function-agent
+  {:id :text-function-agent
+   :instruction (slurp "data/instructions/text-function-agent.txt")})
+
+(def known-agents [process-agent text-function-agent])
+
+;;; ------------------------------------------------- projects and system db generally ----------------------
 ;;; Atom for the configuration map used for connecting to the project db.
 (defonce proj-base-cfg (atom nil))
 
@@ -297,6 +341,29 @@
            :where
            [?e :project/id ?pid]]
          @(connect-atm pid) pid)))
+
+(defn conversation-exists?
+  "Return the eid of the conversation if it exists."
+  ([pid] (conversation-exists? pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
+  ([pid conversation]
+   (assert (#{:process :data :resource} conversation))
+   (d/q '[:find ?eid .
+          :in $ ?conversation
+          :where
+          [?eid :conversation/id ?conversation]]
+        @(connect-atm pid) conversation)))
+
+(defn change-conversation
+  [{:keys [pid conv-id] :as obj}]
+  (try
+    (assert (#{:process :data :resource} conv-id))
+    (let [conn (connect-atm pid)
+          eid (project-exists? pid)]
+      (if eid
+        (d/transact conn {:tx-data [[:db/add eid :project/current-conversation conv-id]]})
+        (log/info "No change with change-conversation (1):" obj)))
+    (catch Throwable _e (log/info "No change with change-conversation (2):" obj) nil))
+  nil)
 
 (defn get-project
   "Return the project structure."
@@ -365,25 +432,28 @@
            (not fail-when-missing?)    nil
            :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))
 
-(def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
-  #{:project/messages :message/id :message/from :message/content :message/time})
+(def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
+  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time})
 
 (defn get-messages
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  [pid]
-  (when-let [eid (project-exists? pid)]
-    (->> (resolve-db-id {:db/id eid}
-                       (connect-atm pid)
-                       :keep-set message-keep-set)
-        :project/messages
-        (sort-by :message/id)
-        vec)))
+  ([pid] (get-messages pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
+  ([pid conversation]
+   (assert (#{:process :data :resource} conversation))
+   (if-let [eid (conversation-exists? pid conversation)]
+     (->> (resolve-db-id {:db/id eid}
+                         (connect-atm pid)
+                         :keep-set message-keep-set)
+          :conversation/messages
+          (sort-by :message/id)
+          vec)
+     [])))
 
 (defn get-problem
   "Return the planning problem. We add new keys for the things that end in -string,
    that is, for :problem/goal-string and :problem/state-string :goal and :state are added respectively."
   [pid]
-  (as-> (get-project pid #{:db/id :project/messages :project/surrogate :project/code}) ?x
+  (as-> (get-project pid #{:db/id :project/conversations :project/surrogate :project/code}) ?x
     (:project/planning-problem ?x)
     (assoc ?x :goal (-> ?x :problem/goal-string edn/read-string))
     (assoc ?x :state (-> ?x :problem/state-string edn/read-string))))
@@ -493,8 +563,9 @@
       (spit filename s)))
 
 (defn recreate-system-db!
-  "Recreate the system database from an EDN file."
-  [& {:keys [target-dir] :or {target-dir "data/"}}]
+  "Recreate the system database from an EDN file
+   By default this creates new agents."
+  [& {:keys [target-dir new-agents?] :or {target-dir "data/" new-agents? true}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
     (let [cfg (db-cfg-map :system)]
       (log/info "Recreating the system database.")
@@ -504,6 +575,8 @@
       (let [conn (connect-atm :system)]
         (d/transact conn db-schema-sys)
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
+      (when new-agents?
+        (doseq [a known-agents] (add-agent! a)))
       cfg)
     (log/error "Not recreating system DB: No backup file.")))
 
@@ -572,20 +645,17 @@
 (defn max-msg-id
   "Return the current highest message ID used in the project."
   [pid]
-  (when-let [eid (project-exists? pid)]
-    (as-> (resolve-db-id {:db/id eid}
-                        (connect-atm pid)
-                        :keep-set #{:project/messages :message/id}) ?o
-      (:project/messages ?o)
-      (map :message/id ?o)
-      (if (empty? ?o) 0 (apply max ?o)))))
+  (let [ids (d/q '[:find [?msg-id ...]
+                   :where [_ :message/id ?msg-id]]
+                 @(connect-atm pid))]
+    (if (empty? ids) 0 (apply max ids))))
 
 ;;; See "Map forms" at https://docs.datomic.com/pro/transactions/transactions.html
 ;;; This is typical: You get the eid of the thing you want to add properties to.
 ;;; You specify that as the :db/id and then just add whatever you want for the properties.
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
-  "Create a message object and add it to the database with :project/id = id."
+  "Create a message object and add it to current conversation of the database with :project/id = id."
   ([pid from msg] (add-msg pid from msg []))
   ([pid from msg tags]
    (reset! diag [pid from msg tags])
@@ -594,21 +664,22 @@
    ;;(log/info "add-msg: pid =" pid "msg =" msg)
    (if-let [conn (connect-atm pid)]
      (let [msg-id (inc (max-msg-id pid))]
-       (d/transact conn {:tx-data [{:db/id (project-exists? pid)
-                                    :project/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
-                                                        (not-empty tags) (assoc :message/tags tags))}]}))
+       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
+                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
+                                                             (not-empty tags) (assoc :message/tags tags))}]}))
      (throw (ex-info "Could not connect to DB." {:pid pid})))))
 
-(defn add-project
+(defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
-  ([id proj-name dir]
-   (d/transact (connect-atm :system)
-               {:tx-data [{:project/id id
-                           :project/name proj-name
-                           :project/dir dir}]})))
+  [id proj-name dir]
+  (d/transact (connect-atm :system)
+              {:tx-data [{:project/id id
+                          :project/name proj-name
+                          :project/dir dir}]}))
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
+;;; (db/create-proj-db! {:project/id :remove-me :project/name "remove me"} {} {:force? true})
 (defn create-proj-db!
   "Create a project database for the argument project.
    The project-info map must include :project/id and :project/name.
@@ -620,24 +691,29 @@
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
   ([proj-info additional-info opts]
    (s/assert ::project-info proj-info)
-   (let [{:project/keys [id name]} (if (:force? opts) proj-info (unique-proj proj-info))
+   (let [{id :project/id pname :project/name} ; BTW, never name something 'name'.
+         (if (:force? opts) proj-info (unique-proj proj-info))
          cfg (db-cfg-map :project id)
          dir (-> cfg :store :path)
-         files-dir (-> cfg :base-dir (str "/" (name id)  "/files"))]
+         files-dir (-> cfg :base-dir (str "/" pname  "/files"))]
      (when-not (-> dir io/as-file .isDirectory)
        (-> cfg :store :path io/make-parents)
        (-> cfg :store :path io/as-file .mkdir))
      (when-not (-> files-dir io/as-file .isDirectory)
        (io/make-parents files-dir)
        (-> files-dir io/as-file .mkdir))
-     (add-project id name dir)
+     (add-project-to-system id pname dir)
      (when (d/database-exists? cfg) (d/delete-database cfg))
      (d/create-database cfg)
      (register-db id cfg)
      ;; Add to project db
      (d/transact (connect-atm id) db-schema-proj)
      (d/transact (connect-atm id) {:tx-data [{:project/id id
-                                              :project/name name}]})
+                                              :project/name pname
+                                              :project/current-conversation :process
+                                              :project/conversations [{:conversation/id :process}
+                                                                      {:conversation/id :data}
+                                                                      {:conversation/id :resource}]}]})
      (when (not-empty additional-info)
        (d/transact (connect-atm id) additional-info))
      ;; Add knowledge of this project to the system db.
@@ -677,7 +753,7 @@
   (doseq [id (list-projects {:from-storage? true})]
     (register-db id (db-cfg-map :project id))))
 
-(defn init-db-cfgs
+(defn init-dbs
   "Register DBs using "
   []
   (register-project-dbs)
@@ -685,4 +761,4 @@
   {:sys-cfg (db-cfg-map :system)})
 
 (defstate sys&proj-database-cfgs
-  :start (init-db-cfgs))
+  :start (init-dbs))

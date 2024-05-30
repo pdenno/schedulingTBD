@@ -8,12 +8,26 @@
 
 (def ^:diag diag (atom nil))
 (def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (atom nil))
-(def project-id "Keyword for project-id." (atom nil))
+(def project-info "Map tracking current project/id and :conversation/id." (atom {:conversation/id :process}))
 (def channel "The JS Websocket object being used for communication with the server." (atom nil))
 (def reconnecting? "True only from the time reconnect! is called until socket is once again ready." (atom false))
 (def check-process "A process that is run every second once problems are encountered to check socket readiness." (atom nil))
 (def check-count "After a certain number of check for readiness, if still not ready, we try connect! again." (atom 0))
 (def ping-process "A process run intermittently by js/window.setInterval" (atom nil))
+
+(defn update-project-info!
+  "Update the project-info atom from an app action or server response."
+  [resp]
+  (swap! project-info
+         (fn [info]
+           (let [{:keys [current-project project-id conv-id]} resp
+                 {pid :project/id} resp]
+             (cond-> info
+               (not (contains? info :conv-id))     (assoc :conversation/id :process)
+               current-project   (assoc :project/id current-project)
+               project-id        (assoc :project/id project-id)
+               pid               (assoc :project/id pid)
+               conv-id           (assoc :conversation/id conv-id))))))
 
 ;;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
 (defn channel-ready? [] (and @channel (= 1 (.-readyState @channel))))
@@ -51,6 +65,10 @@
 (register-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
 (register-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
 (register-fn :load-proj             (fn [{:keys [new-proj-map]}] ((lookup-fn :core-load-proj) new-proj-map)))
+(register-fn :interviewer-busy?     (fn [{:keys [value]}]
+                                      (when value (log/info "====Starting interview===="))
+                                      ((lookup-fn :set-busy?) value)
+                                      (when-not value (log/info "---Stopping interview----"))))
 (register-fn :tbd-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
                                       (log/info "tbd-says msg:" msg)
@@ -59,6 +77,8 @@
                                       (when p-key (remember-promise p-key))
                                       (log/info "sur-says msg:" msg)
                                       ((lookup-fn :set-sur-text) msg)))
+
+
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
@@ -90,8 +110,8 @@
                 (try (let [data (.-data event)]
                        (when (not-empty data) (-> data edn/read-string dispatch-msg)))
                      (catch :default e
-                       (reset! error-info {:event event :error e})
-                       (log/warn "Error in reading from websocket:" e)))))
+                       (reset! error-info {:event event :error e :data (.-data event)})
+                       (log/warn "Error reading from websocket:" e)))))
         (set! (.-onerror chan)
               (fn [& arg]
                 (reset! error-info-2 {:event arg})
@@ -134,6 +154,7 @@
     :close-channel          ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
     :ping                   ; Ping server.
     :domain-expert-says     ; Human user wrote at the chat prompt (typically answering a question).
+    :interviewer-busy?      ; Enable/disable various UI features depending on whether interviewer is busy.
     :run-long               ; diagnostic
     :throw-it})             ; diagnostic
 
