@@ -219,6 +219,9 @@
    :project/surrogate?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if domain expertise is provided by an artificial agent."}
+   :project/tables
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "true if domain expertise is provided by an artificial agent."}
 
    ;; ---------------------- quantity (an amount of something)
    :quantity/value-string
@@ -282,47 +285,25 @@
               Typically this substitutes the subject-of-expertise into a template string."}
    :surrogate/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread that this surrogate uses."}})
+        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread that this surrogate uses."}
 
+   ;; ------------------------ table
+   :table/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "The ID of a table, unique in the context of this project DB."}
+   
+   :table/purpose
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The purpose of this table, on of the enumeration #{:customer orders}"}
+
+   :table/filename
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The filename as it appears in the project directory}"}})
 
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
 (def db-schema-proj (datahike-schema db-schema-proj+))
 
-;;; ---------------------------------- agents ----------------------------------------------
-(defn add-agent!
-  "Create a agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
-   Store what is needed to identify it in system DB."
-  [{:keys [id instruction]}]
-  (let [assist (llm/make-assistant :name (name id) :instructions instruction :metadata {:usage :agent})
-        aid    (:id assist)
-        thread (llm/make-thread {:assistant-id aid
-                                 :metadata {:usage :agent}})
-        tid    (:id thread)
-        conn   (connect-atm :system)
-        eid    (d/q '[:find ?eid .
-                      :where [?eid :system/name "SYSTEM"]]
-                    @(connect-atm :system))]
-    (d/transact conn {:tx-data [{:db/id eid
-                                 :system/agents {:agent/id id
-                                                 :agent/assistant-id aid
-                                                 :agent/thread-id tid}}]})))
-
-;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
-(def process-agent
-  "Instructions and training for :process-agent to help it get started."
-  {:id :process-agent
-   :instruction (slurp "data/instructions/process-agent.txt")})
-
-;;; ToDo: I go back and forth on whether this should be :text-function-agent, which only does those four types below
-;;;       (and in which case the
-(def text-function-agent
-  {:id :text-function-agent
-   :instruction (slurp "data/instructions/text-function-agent.txt")})
-
-(def known-agents [process-agent text-function-agent])
-
-;;; ------------------------------------------------- projects and system db generally ----------------------
 ;;; Atom for the configuration map used for connecting to the project db.
 (defonce proj-base-cfg (atom nil))
 
@@ -341,29 +322,6 @@
            :where
            [?e :project/id ?pid]]
          @(connect-atm pid) pid)))
-
-(defn conversation-exists?
-  "Return the eid of the conversation if it exists."
-  ([pid] (conversation-exists? pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
-  ([pid conversation]
-   (assert (#{:process :data :resource} conversation))
-   (d/q '[:find ?eid .
-          :in $ ?conversation
-          :where
-          [?eid :conversation/id ?conversation]]
-        @(connect-atm pid) conversation)))
-
-(defn change-conversation
-  [{:keys [pid conv-id] :as obj}]
-  (try
-    (assert (#{:process :data :resource} conv-id))
-    (let [conn (connect-atm pid)
-          eid (project-exists? pid)]
-      (if eid
-        (d/transact conn {:tx-data [[:db/add eid :project/current-conversation conv-id]]})
-        (log/info "No change with change-conversation (1):" obj)))
-    (catch Throwable _e (log/info "No change with change-conversation (2):" obj) nil))
-  nil)
 
 (defn get-project
   "Return the project structure."
@@ -432,28 +390,25 @@
            (not fail-when-missing?)    nil
            :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))
 
-(def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time})
+(def message-keep-set "A set of properties with root :project/messages used to retrieve typically relevant message content."
+  #{:project/messages :message/id :message/from :message/content :message/time})
 
 (defn get-messages
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  ([pid] (get-messages pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
-  ([pid conversation]
-   (assert (#{:process :data :resource} conversation))
-   (if-let [eid (conversation-exists? pid conversation)]
-     (->> (resolve-db-id {:db/id eid}
-                         (connect-atm pid)
-                         :keep-set message-keep-set)
-          :conversation/messages
-          (sort-by :message/id)
-          vec)
-     [])))
+  [pid]
+  (when-let [eid (project-exists? pid)]
+    (->> (resolve-db-id {:db/id eid}
+                       (connect-atm pid)
+                       :keep-set message-keep-set)
+        :project/messages
+        (sort-by :message/id)
+        vec)))
 
 (defn get-problem
   "Return the planning problem. We add new keys for the things that end in -string,
    that is, for :problem/goal-string and :problem/state-string :goal and :state are added respectively."
   [pid]
-  (as-> (get-project pid #{:db/id :project/conversations :project/surrogate :project/code}) ?x
+  (as-> (get-project pid #{:db/id :project/messages :project/surrogate :project/code}) ?x
     (:project/planning-problem ?x)
     (assoc ?x :goal (-> ?x :problem/goal-string edn/read-string))
     (assoc ?x :state (-> ?x :problem/state-string edn/read-string))))

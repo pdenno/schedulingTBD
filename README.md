@@ -6,7 +6,7 @@ SchedulingTBD is exploratory software to study human/AI teaming in cognitive wor
 The cognitive work we focus on is the joint (human and AI) formulation and refinement of analytical models in a domain-specific language (DSL), [MiniZinc](https://www.minizinc.org/).
 To develop and test our theory, the software is designed to help solve manufacturing production scheduling problems by leading the user to formulate a solution with MiniZinc.
 Our research goal is to determine best practices in the design of systems that use a DSL unfamiliar to users in joint work to solve problems important to them.
-This DSL-based teaming model brings to focus the challenges of
+This DSL-based teaming model brings to focus some challenges of
 (1) designing DSLs fit for human/AI teaming,
 (2) problem solving in technical environments,
 (3) constructionist learning, and
@@ -32,7 +32,8 @@ Feel free to contact us if this work interests you!
 ### The server
   * Install install a Java JDK and [Clojure](https://clojure.org/).
   * Start a server REPL by starting Clojure in your editor from anywhere in the repository and running `(start)` in the `user` namespace.
-  * If you are starting from scratch, you'll need to create the system and projects databases. The files for these are data/system-db.edn and the edn files in data/projects.
+  * If you are starting from scratch (no databases under the `SCHEDULING_TBD_DB` directory), you'll need to create the system and projects databases.
+	The backup files for these are `data/system-db.edn` and the edn files in `data/projects`. Do the following:
 
  ```
 (in-ns 'scheduling-tbd.db)

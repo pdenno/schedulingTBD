@@ -2,7 +2,8 @@
 #:project{:conversations
           [#:conversation{:id :data}
            #:conversation{:id :resource}
-           #:conversation{:messages
+           #:conversation{:id :process,
+                          :messages
                           [#:message{:content
                                      "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.",
                                      :from :system,
@@ -20,8 +21,7 @@
                                      :from :system,
                                      :id 3,
                                      :time
-                                     #inst "2023-11-14T10:05:40.028-00:00"}],
-                          :id :process}],
+                                     #inst "2023-11-14T10:05:40.028-00:00"}]}],
           :current-conversation :process,
           :id :snowboards-production-scheduling,
           :name "Snowboards production scheduling",

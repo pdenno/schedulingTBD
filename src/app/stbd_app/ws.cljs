@@ -7,7 +7,7 @@
    [taoensso.timbre :as log  :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
-(def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (atom nil))
+(def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (atom (str (random-uuid))))
 (def project-info "Map tracking current project/id and :conversation/id." (atom {:conversation/id :process}))
 (def channel "The JS Websocket object being used for communication with the server." (atom nil))
 (def reconnecting? "True only from the time reconnect! is called until socket is once again ready." (atom false))
@@ -99,7 +99,10 @@
 (def error-info-2 (atom nil))
 
 (defn connect! []
-  (reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid if/when we start using transit.
+  ;; 2024-05-31: I was getting
+  ;; *ERROR [scheduling-tbd.web.websockets:287] - Could not find out async channel for client [uuid]*
+  ;; in long-running interactions. I don't think I had good rationale for resetting client-id! 
+  ;;(reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid if/when we start using transit. 
   (reset-state)
   (if-let [chan (js/WebSocket. (ws-url @client-id))]
     (do (log/info "Websocket Connected!" @client-id)
@@ -131,7 +134,7 @@
         (reset! check-count 0)
         (p/resolve! prom))
     (do (swap! check-count inc)
-        (when (> @check-count 9) ; Wait 10 seconds before asking for a new connection.
+        (when (> @check-count 3) ; Wait +10+ 3 seconds before asking for a new connection.
           (reset! check-count 0)
           (connect!)))))
 
