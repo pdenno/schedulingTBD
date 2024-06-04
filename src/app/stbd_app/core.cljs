@@ -110,14 +110,16 @@
                    (fn [p] ; p is a map with two keys: :project/id :project/name (a proj-info element).
                      (set-proj p)
                      (ws/update-project-info! p)
-                     ((lookup-fn :render-conversation) {:pid (:project/id p)})
-                     (ws/send-msg {:dispatch-key :resume-conversation :pid (:project/id p) :conv-id (:conversation/id @ws/project-info)})))
+                     ((lookup-fn :update-conversation-text) {:pid (:project/id p)})
+                     (ws/send-msg {:dispatch-key :resume-conversation-plan :pid (:project/id p)
+                                   ;; There is no reason to believe that we know what conversation is current.
+                                   #_#_:conv-id (:conversation/id @ws/project-info)})))
       (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
           (p/then (fn [resp]
                     ;(log/info "core: get-project-list:" resp)
                     (set-proj-infos (conj (:others resp) (:current-project resp)))
                     (set-proj (:current-project resp))
-                    ((lookup-fn :render-conversation) {:pid (-> resp :current-project :project/id)})))))
+                    ((lookup-fn :update-conversation-text) {:pid (-> resp :current-project :project/id)})))))
     ;; ------- component (end of use-effect :once)
     ($ Stack {:direction "column" :height useful-height}
        ($ Typography

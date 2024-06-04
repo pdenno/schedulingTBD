@@ -169,6 +169,7 @@
        (p/then #(log/info "Long-running:" %))
        (p/catch #(log/warn "Long-running (exception):" %))))
 
+;;; ToDo: Ought to have the ability to find multiple.
 (defn find-fact
   "Unify the fact (which need not be ground) to the fact-list"
   [fact fact-list]

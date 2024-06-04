@@ -28,26 +28,31 @@
   "Return a promise that will resolve to the vector of a maps representing a conversation.
    What conversation is returned depends on the value of :project/current-conversation in the DB; values are #{:process :resource :data}.
    Example of what the promise resolves to:
-   {:project-id :sur-craft-beer :conv-id :process :conv [{:message/from :system :message/content [{:msg-text/string 'Hi!'}]}]}."
-  [pid]
-  (assert (keyword? pid))
-  (log/info "Call to get-conversation for" pid)
-  (let [prom (p/deferred)]
-    (GET (str "/api/get-conversation?project-id=" (name pid) "&client-id=" @ws/client-id) ; ToDo: martian!
-         {:timeout 3000
-          :handler (fn [resp] (p/resolve! prom resp))
-          :error-handler (fn [{:keys [status status-text]}]
-                           (p/reject! prom (ex-info "CLJS-AJAX error on /api/get-conversation"
-                                                    {:status status :status-text status-text})))})
-    prom))
+   {:project-id :sur-craft-beer :conv-id :process :conv [{:message/from :system :message/content [{:msg-text/string 'Hi!'}]}]}.
+   If the call provides conv-id, :project/current-conversation is set in the DB."
+  ([pid] (get-conversation pid nil))
+  ([pid conv-id]
+   (assert (keyword? pid))
+   (log/info "Call to get-conversation for" pid "conv-id =" conv-id)
+   (let [prom (p/deferred)
+         url (if conv-id
+               (str "/api/get-conversation?project-id=" (name pid) "&conv-id=" (name conv-id) "&client-id=" @ws/client-id)
+               (str "/api/get-conversation?project-id=" (name pid) "&client-id=" @ws/client-id))]
+     (GET url
+          {:timeout 3000
+           :handler (fn [resp] (p/resolve! prom resp))
+           :error-handler (fn [{:keys [status status-text]}]
+                            (p/reject! prom (ex-info "CLJS-AJAX error on /api/get-conversation"
+                                                     {:status status :status-text status-text})))})
+     prom)))
 
 ;;; This is used by either the client or the server/planner to update the conversation.
-;;; There is a ws dispatch for :resume-conversation (to one of #{:process :data :resource}) which would then require this be called.
+;;; There is a ws dispatch for :resume-conversation-plan (to one of #{:process :data :resource}) which would then require this be called.
 (register-fn
- :render-conversation
- (fn [{:keys [pid]}]
+ :update-conversation-text
+ (fn [{:keys [pid conv-id]}]
    (assert (keyword? pid))
-   (-> (get-conversation pid)
+   (-> (get-conversation pid conv-id)
        (p/then (fn [resp]
                  (let [resp (cond-> resp
                               (-> resp :conv empty?) (assoc :conv [#:message{:content "No discussion here yet.",

@@ -148,7 +148,7 @@
               (swap! socket-channels #(assoc-in % [client-id :exit?] true))
               (let [prom (px/submit! (fn [] (dispatch msg)))]
                 (-> prom
-                    (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like :resume-conversation don't return anything themselves.
+                    (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation-plan don't return anything themselves.
                     (p/catch (fn [err] (log/error "Error dispatching: msg = " msg "err =" err))))))
             (when-not (exiting? client-id) (recur)))))
       ;; There are many reasons a websocket connection might be dropped.
@@ -308,9 +308,9 @@
 (defn init-dispatch-table!
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets.
    Other entries in this table include (they are added by register-ws-dispatch):
-       :resume-conversation plan/resume-conversation
-       :surrogate-call      sur/start-surrogate
-       :ask-llm             llm/llm-directly."
+       :resume-conversation-plan plan/resume-conversation
+       :surrogate-call           sur/start-surrogate
+       :ask-llm                  llm/llm-directly."
   []
   (reset! dispatch-table {:ping                 ping-confirm
                           :domain-expert-says   domain-expert-says
