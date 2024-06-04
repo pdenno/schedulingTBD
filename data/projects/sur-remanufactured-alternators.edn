@@ -1,78 +1,137 @@
 [
-#:project{:conversations
-          [#:conversation{:id :data}
-           #:conversation{:id :resource}
-           #:conversation{:messages
+#:project{:code
+          "enum Task = {disassembly, cleaning, inspection, component, reassembly, testing, packaging};",
+          :conversations
+          [#:conversation{:id :process,
+                          :messages
                           [#:message{:content
                                      "Describe your most significant scheduling problem in a few sentences.",
                                      :from :system,
                                      :id 1,
+                                     :tags [:initial-question :query],
                                      :time
-                                     #inst "2024-04-30T14:57:37.359-00:00"}
+                                     #inst "2024-05-31T02:33:07.837-00:00"}
                            #:message{:content
-                                     "Our most significant scheduling problem involves coordinating the production of remanufactured alternators with the fluctuating supply of core units (used alternators) available for remanufacturing and the varying demand from our customers. We need to ensure that we have a steady supply of core units to work on, optimize our production schedule to meet customer demand efficiently, and minimize inventory holding costs. Balancing these aspects while dealing with uncertainties in supply and demand makes our scheduling complex. Additionally, ensuring our workforce is scheduled effectively to handle the workload without excessive overtime or idle time adds another layer of complexity.",
+                                     "Our most significant scheduling problem is balancing production capacity with fluctuating supply chain availability. We face frequent delays in receiving key components such as bearings and voltage regulators, which disrupts our assembly line schedules. Additionally, we have to accommodate last-minute orders and changes in customer demand, making it challenging to optimize production efficiency and lead times. The variance in component arrival and the need for adaptive scheduling often result in either underutilization of our workforce or bottlenecks that delay shipments.",
                                      :from :surrogate,
                                      :id 2,
+                                     :tags
+                                     [:initial-question :response],
                                      :time
-                                     #inst "2024-04-30T14:57:37.385-00:00"}
+                                     #inst "2024-05-31T02:33:07.852-00:00"}
                            #:message{:content
                                      "Great, we'll call your project SUR Remanufactured Alternators.",
                                      :from :system,
                                      :id 3,
+                                     :tags [:informative],
                                      :time
-                                     #inst "2024-04-30T14:57:37.416-00:00"}
+                                     #inst "2024-05-31T02:33:08.547-00:00"}
                            #:message{:content
                                      "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
                                      :from :system,
                                      :id 4,
                                      :time
-                                     #inst "2024-04-30T14:57:37.436-00:00"}
+                                     #inst "2024-05-31T02:33:08.569-00:00"}
                            #:message{:content
-                                     "Please briefly describe your production processes?",
+                                     "Please briefly describe your production processes.",
                                      :from :system,
                                      :id 5,
                                      :time
-                                     #inst "2024-04-30T14:57:49.804-00:00"}
+                                     #inst "2024-05-31T02:33:17.266-00:00"}
                            #:message{:content
-                                     "Our production process for remanufacturing alternators consists of several key steps:\n\n1. **Inspection and Disassembly**: Received core units are inspected for suitability. Those deemed fit for remanufacturing are disassembled into their component parts.\n2. **Cleaning**: All components are thoroughly cleaned to remove dirt, oil, and other contaminants.\n3. **Testing and Repair**: Each part is tested for functionality. Components that fail the test are either repaired or replaced with new or remanufactured parts.\n4. **Reassembly**: Once all parts are verified to be in good working order, the alternator is meticulously reassembled.\n5. **Final Testing**: The reassembled alternators undergo a final test to ensure they meet our quality standards.\n6. **Packaging and Shipping**: Approved alternators are then packaged and prepared for shipping to customers.\n\nEach stage has its own set of challenges, including maintaining quality, managing parts inventory, and ensuring efficient workflow through each step to minimize turnaround time.",
+                                     "Our production process for remanufacturing alternators involves several key steps:\n\n1. <b>Disassembly:</b> Used alternators are disassembled into component parts.\n2. <b>Cleaning:</b> Parts are cleaned to remove dirt, oil, and other contaminants.\n3. <b>Inspection and Testing:</b> Each component is inspected and tested to determine if it can be reused or needs to be replaced.\n4. <b>Component Replacement:</b> Worn or defective parts are replaced with new or refurbished parts.\n5. <b>Reassembly:</b> Components are reassembled into a fully functioning alternator.\n6. <b>Testing:</b> The remanufactured alternators are tested to ensure they meet specific performance criteria.\n7. <b>Packaging and Shipping:</b> Once verified for quality, the alternators are packaged and sent out to customers.\n\nEach stage has its own set timelines and resource requirements, and disruptions in any stage can affect the subsequent processes.",
                                      :from :surrogate,
                                      :id 6,
+                                     :tags [:process-description],
                                      :time
-                                     #inst "2024-04-30T14:57:49.826-00:00"}
+                                     #inst "2024-05-31T02:33:17.286-00:00"}
                            #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product or a service?\nRespond respectively with either the single word PRODUCT or SERVICE.",
+                                     "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
                                      :from :system,
                                      :id 7,
+                                     :tags [:query],
                                      :time
-                                     #inst "2024-04-30T14:57:55.683-00:00"}
+                                     #inst "2024-05-31T02:33:20.280-00:00"}
                            #:message{:content "PRODUCT",
                                      :from :surrogate,
                                      :id 8,
+                                     :tags [:response],
                                      :time
-                                     #inst "2024-04-30T14:57:55.711-00:00"}
+                                     #inst "2024-05-31T02:33:20.319-00:00"}
                            #:message{:content
-                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\nIn MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand.\nIn MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\nENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants,\nit is relying on you to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics.\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.\n",
+                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
                                      :from :system,
                                      :id 9,
+                                     :tags [:query],
                                      :time
-                                     #inst "2024-04-30T14:57:57.622-00:00"}
-                           #:message{:content "MAKE-TO-STOCK",
+                                     #inst "2024-05-31T02:33:23.306-00:00"}
+                           #:message{:content "MAKE-TO-ORDER",
                                      :from :surrogate,
                                      :id 10,
+                                     :tags [:response],
                                      :time
-                                     #inst "2024-04-30T14:57:57.643-00:00"}
+                                     #inst "2024-05-31T02:33:23.331-00:00"}
                            #:message{:content
-                                     "Some work, for example factory work, must be performed in a specially designed facility.\nOther work, like cutting down a tree, can only be performed at a location designated by the customer.\nAre the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site?\nRespond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
                                      :from :system,
                                      :id 11,
+                                     :tags [:query],
                                      :time
-                                     #inst "2024-04-30T14:57:59.571-00:00"}
-                           #:message{:content "MAKE-TO-STOCK",
+                                     #inst "2024-05-31T02:33:27.649-00:00"}
+                           #:message{:content "OUR-FACILITY",
                                      :from :surrogate,
                                      :id 12,
+                                     :tags [:response],
                                      :time
-                                     #inst "2024-04-30T14:57:59.595-00:00"}],
-                          :id :process}],
+                                     #inst "2024-05-31T02:33:27.663-00:00"}
+                           #:message{:content
+                                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                                     :from :system,
+                                     :id 13,
+                                     :time
+                                     #inst "2024-05-31T02:33:31.163-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 14,
+                                     :time
+                                     #inst "2024-05-31T02:33:31.213-00:00"}
+                           #:message{:content
+                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
+                                     :from :system,
+                                     :id 15,
+                                     :tags [:process-steps :query],
+                                     :time
+                                     #inst "2024-05-31T02:33:35.759-00:00"}
+                           #:message{:content
+                                     "1. Disassembly\n2. Cleaning\n3. Inspection and Testing\n4. Component Replacement\n5. Reassembly\n6. Testing\n7. Packaging and Shipping",
+                                     :from :surrogate,
+                                     :id 16,
+                                     :tags [:process-steps :response],
+                                     :time
+                                     #inst "2024-05-31T02:33:35.796-00:00"}
+                           #:message{:content
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. The 'enum values' name the steps of your process in the order they are executed for each product.",
+                                     :from :system,
+                                     :id 17,
+                                     :tags [:info-to-user :minizinc],
+                                     :time
+                                     #inst "2024-05-31T02:33:35.838-00:00"}
+                           #:message{:content
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. disassembly (some amount of time)\n2. cleaning (some amount of time)...",
+                                     :from :system,
+                                     :id 18,
+                                     :tags [:process-durs :query],
+                                     :time
+                                     #inst "2024-05-31T02:33:39.078-00:00"}
+                           #:message{:content
+                                     "1. Disassembly (30 minutes)\n2. Cleaning (20 minutes)\n3. Inspection and Testing (45 minutes)\n4. Component Replacement (60 minutes)\n5. Reassembly (50 minutes)\n6. Testing (30 minutes)\n7. Packaging and Shipping (20 minutes)",
+                                     :from :surrogate,
+                                     :id 19,
+                                     :tags [:process-durs :response],
+                                     :time
+                                     #inst "2024-05-31T02:33:39.124-00:00"}]}
+           #:conversation{:id :data}
+           #:conversation{:id :resource}],
           :current-conversation :process,
           :id :sur-remanufactured-alternators,
           :name "SUR Remanufactured Alternators",
@@ -81,14 +140,14 @@
                     :goal-string
                     "(characterize-process sur-remanufactured-alternators)",
                     :state-string
-                    "#{(proj-id sur-remanufactured-alternators) (ongoing-discussion sur-remanufactured-alternators) (proj-name \"SUR Remanufactured Alternators\") (cites-raw-material-challenge sur-remanufactured-alternators) (provides-product sur-remanufactured-alternators) (fails-query facility-vs-site sur-remanufactured-alternators) (production-mode sur-remanufactured-alternators make-to-stock) (surrogate sur-remanufactured-alternators)}"},
+                    "#{(proj-id sur-remanufactured-alternators) (flow-shop sur-remanufactured-alternators) (ongoing-discussion sur-remanufactured-alternators) (process-step sur-remanufactured-alternators 6 testing) (proj-name \"SUR Remanufactured Alternators\") (cites-raw-material-challenge sur-remanufactured-alternators) (have-process-steps sur-remanufactured-alternators) (process-step sur-remanufactured-alternators 2 cleaning) (process-step sur-remanufactured-alternators 7 packaging) (provides-product sur-remanufactured-alternators) (process-step sur-remanufactured-alternators 1 disassembly) (has-production-facility sur-remanufactured-alternators) (surrogate sur-remanufactured-alternators) (production-mode sur-remanufactured-alternators make-to-order) (process-step sur-remanufactured-alternators 5 reassembly) (process-step sur-remanufactured-alternators 3 inspection) (process-step sur-remanufactured-alternators 4 component)}"},
           :surrogate
-          #:surrogate{:assistant-id "asst_2w18wZInagasGVP8rZey4vpd",
+          #:surrogate{:assistant-id "asst_xEU23bgeSGtQGmA1Zw8AisOE",
                       :id :sur-remanufactured-alternators,
                       :subject-of-expertise
                       "remanufactured alternators",
                       :system-instruction
-                      "\n   You manage a company that makes remanufactured alternators. \n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_dv3HKruXRYb7QXl6Jyr64AWt"}}
+                      "You manage a company that makes remanufactured alternators.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_8uvGjgLQPTxcQgPz33XL9tU9"}}
 
 ]

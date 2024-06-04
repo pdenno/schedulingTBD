@@ -2,7 +2,8 @@
 #:project{:conversations
           [#:conversation{:id :data}
            #:conversation{:id :resource}
-           #:conversation{:messages
+           #:conversation{:id :process,
+                          :messages
                           [#:message{:content
                                      "Describe your most significant scheduling problem in a few sentences.",
                                      :from :system,
@@ -128,8 +129,7 @@
                                      :id 19,
                                      :tags [:process-durs :response],
                                      :time
-                                     #inst "2024-05-22T20:01:15.913-00:00"}],
-                          :id :process}],
+                                     #inst "2024-05-22T20:01:15.913-00:00"}]}],
           :code
           "enum Task = {milling, mashing, lautering, boiling, cooling, fermentation, conditioning, packaging};",
           :processes
