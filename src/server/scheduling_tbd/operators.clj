@@ -90,9 +90,11 @@
   (let [op-tag (-> head first keyword)]
     (cond (some #(uni/unify head %) inject-failures)         (do (log/info "+++Operator FAILURE (INJECTED):" op-tag)
                                                                   (throw (ex-info "run-operator injected failure" {:op-head op-tag})))
-          (every?
-           (fn [a-item]
-             (some #(uni/unify a-item %) state)) a-list)     (log/info "+++Operator" op-tag "pass-through (SATISFIED)")
+          (and
+           (not-empty a-list)
+           (every?
+            (fn [a-item]
+              (some #(uni/unify a-item %) state)) a-list))   (log/info "+++Operator" op-tag "pass-through (SATISFIED)")
 
           (@operator-method? op-tag)                         (do (operator-meth (-> opts
                                                                                     (assoc :state state)
@@ -156,7 +158,7 @@
                (ws/send-to-chat (-> obj
                                     (assoc :msg agent-query)
                                     (assoc :dispatch-key :tbd-says))))]                                             ; This cannot timeout.
-    (p/await prom))); You can't put anything else here or a promise will be passed!
+    (p/await prom))); You can't put anything else here or a promise will be passed! ; ToDo: Fix this. Put a catch before the p/await!.
 
 (defn chat-pair
   "Call to run the chat and put the query and response into the project's database.
@@ -266,9 +268,10 @@
 ;;; ======================================================================================================================
 ;;; ------------------------- Data operators -----------------------------------------------------------------------------
 ;;; ======================================================================================================================
-
-(defoperator :!run-table-agent [{:keys [state] :as obj}]
-  (log/info "Run the table agent here."))
+(defoperator :!run-table-agent [{:keys [_state] :as obj}]
+  (log/info "-------------------Run the table agent here.-----------------")
+  (-> obj db-action))
 
 (defaction :!run-table-agent [{:keys [state] :as obj}]
-    (log/info "Write table info to the DB here."))
+  (log/info "-----------------Write table info to the DB here.----------")
+  state)

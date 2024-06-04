@@ -3,10 +3,11 @@
   (:require
    [clojure.core.unify        :as uni]
    [clojure.edn               :as edn]
+   [datahike.api              :as d]
    [mount.core                :as mount :refer [defstate]]
    [scheduling-tbd.db         :as db]
    [scheduling-tbd.operators  :as op]
-   [scheduling-tbd.sutil      :as sutil :refer [error-for-chat register-planning-domain find-fact]]
+   [scheduling-tbd.sutil      :as sutil :refer [connect-atm error-for-chat register-planning-domain find-fact]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre           :as log]))
 
@@ -137,7 +138,7 @@
   (assert (string? client-id))
   (ws/send-to-chat {:promise? false
                     :client-id client-id
-                    :dispatch-key :render-conversation
+                    :dispatch-key :update-conversation-text
                     :pid pid}))
 
 ;;; This only needs to work on the head partial plan, right? (That's even true once I have alternatives, right?)
@@ -203,27 +204,26 @@
 (defn stop-here [data]
   (reset! stop-here-diag data))
 
-;;; (plan/plan9 project-id :process-interview-1 client-id {:start-facts (db/get-state project-id)})
-(defn ^:diag plan9
+(defn plan9
   "A dynamic HTN planner.
    Operates on a stack (vector) of 'partials' (partial plans, described in the docstring of update-planning).
    Initialize the stack to a partial from a problem definition.
    Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
-  [domain-id state goal & {:keys [client-id] :as opts}]  ; opts typically includes :pid.
+  [domain-id state goals & {:keys [client-id] :as opts}]  ; opts typically includes :pid.
   (assert (string? client-id))
   (assert (#{:process :data :resource} domain-id))
   (let [elems   (-> (sutil/get-domain domain-id) :domain/elems)
-        result (loop [partials [{:plan [] :new-tasks [goal] :state state}]
+        result (loop [partials [{:plan [] :new-tasks [(first goals)] :state state}] ; ToDo: Only planning first of goals so far.
                       cnt 1]
                  ;;(log/info "new-tasks =" (-> partials first :new-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
-                 (log/info "partial = " (first partials))
+                 ;;(log/info "partial = " (first partials))
                  (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
                        state (-> partials first :state)
                        matching (matching-tasks task elems)
                        s-tasks (satisfying-tasks task elems state matching)]
-                   (log/info "task =" task)
-                   (log/info "matching =" matching)
-                   (log/info "satisfying =" s-tasks)
+                   ;;(log/info "task =" task)
+                   ;;(log/info "matching =" matching)
+                   ;;(log/info "satisfying =" s-tasks)
                    (when (empty? s-tasks) (stop-here {:task task :elems elems :state (-> partials first :state)}))
                    (cond
                      (empty? partials)                         {:result :failure :reason :end-of-interview} ; ToDo: this was :no-successful-plans.
@@ -289,7 +289,23 @@
     ;(check-goals-are-ground goal-vec) ; This is something for after translation, thus don't other with it.
     pass-obj))
 
-;;; (plan/resume-conversation {:pid :sur-craft-beer :client-id (ws/recent-client!)})
+;;; ToDo: This needs work!
+;;;   1) It ought return a vector of goals.
+;;;   2)
+;;;       Note also that :problem/goal-string ought to be a keyword.
+(defn form-goals
+  "'problem' is a SHOP2-like problem structure; these are comprised of a state and a vector of goals.
+   Return a map with :goals and :state set."
+  [state conv-id]
+  (case conv-id
+    :process   (let [pid (-> (find-fact '(proj-id ?p) state) second)]
+                 (list 'characterize-process pid))
+    :data      (->> (filter #(= (first %) 'uploaded-table) state)
+                    (mapv #(list 'characterize-table (second %))))
+    :resource (->> (filter #(= (first %) 'resource) state)
+                   (mapv #(list 'characterize-resource (second %))))))
+
+;;; (plan/resume-conversation {:pid :sur-craft-beer :client-id (ws/recent-client!) :conv-id :data})
 ;;; (plan/resume-conversation {:pid :sur-fountain-pens :conv-id :data :client-id (ws/recent-client!)})
 (defn resume-conversation
   "Start the interview loop. :resume-conversation is a dispatch key from client.
@@ -302,15 +318,24 @@
       (let [state '[(proj-id START-A-NEW-PROJECT)]
             goal '(characterize-process START-A-NEW-PROJECT)]
         (plan9 :process state goal {:client-id client-id :pid pid}))
-      (let [{:keys [state goal]} (db/get-problem pid)]
+      (let [conv-id (or conv-id
+                        (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid)))
+            state  (-> (d/q '[:find ?s .
+                         :where
+                         [_ :project/planning-problem ?pp]
+                         [?pp :problem/state-string ?s]]
+                       @(sutil/connect-atm pid))
+                       edn/read-string)
+            goals (form-goals state conv-id)
+            args (assoc args :conv-id conv-id)]
         (log/info "======== resume conversation: planning-state = " state)
         (db/change-conversation args)
-        (plan9 conv-id state goal {:client-id client-id :pid pid})))
+        (plan9 conv-id state goals {:client-id client-id :pid pid})))
     (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn init-planner!
   []
-  (ws/register-ws-dispatch :resume-conversation resume-conversation)
+  (ws/register-ws-dispatch :resume-conversation-plan resume-conversation)
   (register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
   (register-planning-domain :data     (-> "data/planning-domains/data-interview.edn" slurp edn/read-string))
   (register-planning-domain :resource (-> "data/planning-domains/resource-interview.edn" slurp edn/read-string)))

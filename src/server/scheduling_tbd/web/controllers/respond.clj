@@ -17,19 +17,24 @@
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    get-conversation always returns the conversation corresponding to :project/current-converation in the project's DB.
-   Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}})."
+   Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
+   Note that this can CHANGE :project/current-conversation."
   [request]
-  (let [{:keys [project-id]} (-> request :query-params keywordize-keys)
-        project-id (keyword project-id)
-        eid (db/project-exists? project-id)
-        conv-id (when eid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm project-id)))
-        msgs    (when (and eid conv-id) (db/get-messages project-id conv-id))
-        code    (when eid (db/get-code project-id))]
-    (log/info "get-conversation for" project-id "conv-id =" conv-id)
-    (cond (= project-id :START-A-NEW-PROJECT)     (http/ok {:project-id project-id :conv []})
-          (not conv-id)                           (http/ok {:project-id project-id :conv []})
-          msgs                                    (http/ok {:project-id project-id :conv msgs :conv-id conv-id :code code})
-          :else                                   (http/not-found))))
+  (let [{:keys [project-id conv-id]} (-> request :query-params keywordize-keys)]
+    (when conv-id (db/change-conversation {:pid (keyword project-id) :conv-id (keyword conv-id)}))
+    (let [project-id (keyword project-id)
+          eid (db/project-exists? project-id)
+          conv-id (when eid
+                    (-> (or conv-id
+                            (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm project-id)))
+                        keyword))
+          msgs    (when (and eid conv-id) (db/get-messages project-id conv-id))
+          code    (when eid (db/get-code project-id))]
+      (log/info "get-conversation for" project-id "conv-id =" conv-id)
+      (cond (= project-id :START-A-NEW-PROJECT)     (http/ok {:project-id project-id :conv []})
+            (not conv-id)                           (http/ok {:project-id project-id :conv []})
+            msgs                                    (http/ok {:project-id project-id :conv msgs :conv-id conv-id :code code})
+            :else                                   (http/not-found)))))
 
 (def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
 

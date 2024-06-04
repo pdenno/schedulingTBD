@@ -39,13 +39,13 @@
 
 ;;; ------ These concern out-bound on ws/send-to-chat. -------------------
 ;;; ToDo: I need to be able to push an update to the conversation!
-(defn outbound-dispatch-key? [x] (#{:run-long             ; diagnostic
-                                    :clear-promise-keys   ; Server tells you to forget a promise.
-                                    :alive?               ; Server is asking whether you are alive.
-                                    :load-proj            ; Make a request to restart the project, including doing a resume-conversation
-                                    :render-conversation  ; Like :load-proj but don't do a resume-conversation.
-                                    :ping-confirm         ; Server confirms your ping.
-                                    :interviewer-busy?    ; Tells client to prevent changing the conversation/planning domain.
+(defn outbound-dispatch-key? [x] (#{:run-long                  ; diagnostic
+                                    :clear-promise-keys        ; Server tells you to forget a promise.
+                                    :alive?                    ; Server is asking whether you are alive.
+                                    :load-proj                 ; Make a request to restart the project, including doing a resume-conversation
+                                    :update-conversation-text  ; Like :load-proj but don't do a resume-conversation.
+                                    :ping-confirm              ; Server confirms your ping.
+                                    :interviewer-busy?         ; Tells client to prevent changing the conversation/planning domain.
                                     :sur-says
                                     :tbd-says
                                     :update-code} x))
