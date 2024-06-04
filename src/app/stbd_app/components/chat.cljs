@@ -15,14 +15,15 @@
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"             :as MessageList]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default"        :as MessageSeparator]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default"                 :as Sidebar]
-;   ["@chatscope/chat-ui-kit-react/dist/cjs/User$default"                    :as User] ; <================================
+   ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
+   [promesa.core    :as p]
    [scheduling-tbd.util :refer [now]]
    [stbd-app.components.attachment-modal :as attach :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
+   [stbd-app.db-access  :as dba]
    [stbd-app.util       :refer [register-fn lookup-fn]]
    [stbd-app.ws         :as ws]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
@@ -107,9 +108,12 @@
     (letfn [(change-conversation-click [to]
               (when-not busy?
                 (if-let [pid (:project/id @ws/project-info)]
-                  (do (ws/send-msg {:dispatch-key :resume-conversation :pid pid :conv-id to}) ; This first because it sets DB's :project/current-conversation.
-                      ((lookup-fn :render-conversation) {:pid pid})
-                      (set-active-conv to))
+                  #_((lookup-fn :update-conversation-text) {:pid pid :conv-id to})
+                  (-> (dba/get-conversation pid to)
+                      (p/then (fn [_resp]
+                                (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id to})
+                                (ws/update-project-info! {:conv-id to})
+                                (set-active-conv to))))
                   (log/info "change-conversation-click fails: ws/project-info =" @ws/project-info))))
             (process-user-input [text]
               (when (not-empty text)

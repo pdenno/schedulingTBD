@@ -6,6 +6,7 @@
  :domain/description "A planning domain to run an interview about uploaded tables of data, or surrogate-created data." ; I think!
  :domain/elems [{:method/head (characterize-table ?table)
                  :method/rhsides [{:method/case-name "no-tables-uploaded"    ; ToDo: I don't think current code allows spaces in the case name.
+                                   :method/preconds [(not (uploaded-table ?table))]
                                    :method/task-list [(!no-tables-question)]} ; SHOP2 convention: If it starts with a ! it is an operator.
 
                                   {:method/case-name "uploaded-table"
@@ -16,4 +17,8 @@
 
                 {:operator/head (!run-table-agent ?table)
                  :operator/preconds [(uploaded-table ?table)]
-                 :operator/a-list   [(table-discussed ?table)]}]}
+                 ;; I've commented out this add-list action so that you can run the agent over and over, ignoring that it has already been discussed.
+                 ;; Note that when you update the plan, you have to run
+                 ;; (register-planning-domain :data (-> "data/planning-domains/data-interview.edn" slurp edn/read-string))
+                 ;; again. (Or just recompile planner.clj, which will do that).
+                 #_#_:operator/a-list   [(table-discussed ?table)]}]}

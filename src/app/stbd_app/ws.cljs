@@ -61,7 +61,7 @@
 (defn recv-msg-type? [k] (contains? @dispatch-table k))
 
 ;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, and maybe other places.
-(register-fn :clear-promise-keys    (fn [obj] (-> obj :promis-keys clear-promise-keys!)))
+(register-fn :clear-promise-keys    (fn [obj] (-> obj :promise-keys clear-promise-keys!)))
 (register-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
 (register-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
 (register-fn :load-proj             (fn [{:keys [new-proj-map]}] ((lookup-fn :core-load-proj) new-proj-map)))
@@ -101,8 +101,8 @@
 (defn connect! []
   ;; 2024-05-31: I was getting
   ;; *ERROR [scheduling-tbd.web.websockets:287] - Could not find out async channel for client [uuid]*
-  ;; in long-running interactions. I don't think I had good rationale for resetting client-id! 
-  ;;(reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid if/when we start using transit. 
+  ;; in long-running interactions. I don't think I had good rationale for resetting client-id!
+  ;;(reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid if/when we start using transit.
   (reset-state)
   (if-let [chan (js/WebSocket. (ws-url @client-id))]
     (do (log/info "Websocket Connected!" @client-id)
@@ -149,17 +149,17 @@
     (reset! reconnecting? true)))
 
 (def send-msg-type?
-  #{:alive-confirm          ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected. ToDo: Remove it? Not implemented.
-    :ask-llm                ; User asked a "LLM:..." question at the chat prompt.
-    :start-surrogate        ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation.
-    :surrogate-follow-up    ; User wrote "SUR?" <some question about dialog to date>
-    :resume-conversation    ; Restart the planner (works for :START-A-NEW-PROJECT too).
-    :close-channel          ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
-    :ping                   ; Ping server.
-    :domain-expert-says     ; Human user wrote at the chat prompt (typically answering a question).
-    :interviewer-busy?      ; Enable/disable various UI features depending on whether interviewer is busy.
-    :run-long               ; diagnostic
-    :throw-it})             ; diagnostic
+  #{:alive-confirm             ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected. ToDo: Remove it? Not implemented.
+    :ask-llm                   ; User asked a "LLM:..." question at the chat prompt.
+    :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation-plan.
+    :surrogate-follow-up       ; User wrote "SUR?" <some question about dialog to date>
+    :resume-conversation-plan  ; Restart the planner (works for :START-A-NEW-PROJECT too).
+    :close-channel             ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
+    :ping                      ; Ping server.
+    :domain-expert-says        ; Human user wrote at the chat prompt (typically answering a question).
+    :interviewer-busy?         ; Enable/disable various UI features depending on whether interviewer is busy.
+    :run-long                  ; diagnostic
+    :throw-it})                ; diagnostic
 
 (defn send-msg
   "Add client-id and send the message to the server over the websocket.
