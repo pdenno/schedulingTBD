@@ -289,10 +289,8 @@
     ;(check-goals-are-ground goal-vec) ; This is something for after translation, thus don't other with it.
     pass-obj))
 
-;;; ToDo: This needs work!
-;;;   1) It ought return a vector of goals.
-;;;   2)
-;;;       Note also that :problem/goal-string ought to be a keyword.
+;;; ToDo: Need to rework project/problem. Maybe the DB can define the problem, but
+;;;       I think the way it is doing it now is going to require too much maintenance.
 (defn form-goals
   "'problem' is a SHOP2-like problem structure; these are comprised of a state and a vector of goals.
    Return a map with :goals and :state set."
