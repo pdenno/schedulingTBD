@@ -1,0 +1,237 @@
+[
+ #:project{:tables [{:table/id :customer-orders-1
+                     :table/purpose :customer-orders
+                     :table/filename "customer-orders.csv"}]
+           :conversations
+          [#:conversation{:id :process,
+                          :messages
+                          [#:message{:content
+                                     "Describe your most significant scheduling problem in a few sentences.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:initial-question :query],
+                                     :time
+                                     #inst "2024-05-30T23:57:09.436-00:00"}
+                           #:message{:content
+                                     "Our most significant scheduling problem is coordinating the production timelines with fluctuating demand and raw material availability. We need to manage the delivery schedules from multiple suppliers, align them with our production capacity, and adjust for changes in order demand from clients. This complexity often leads to either overproduction, resulting in excessive inventory, or underproduction, causing delays in fulfilling orders. Efficiently optimizing these variables to minimize costs while meeting delivery deadlines is our central challenge.",
+                                     :from :surrogate,
+                                     :id 2,
+                                     :tags
+                                     [:initial-question :response],
+                                     :time
+                                     #inst "2024-05-30T23:57:09.496-00:00"}
+                           #:message{:content
+                                     "Great, we'll call your project SUR Aluminum Cans.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags [:informative],
+                                     :time
+                                     #inst "2024-05-30T23:57:10.395-00:00"}
+                           #:message{:content
+                                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
+                                     :from :system,
+                                     :id 4,
+                                     :time
+                                     #inst "2024-05-30T23:57:10.418-00:00"}
+                           #:message{:content
+                                     "Please briefly describe your production processes.",
+                                     :from :system,
+                                     :id 5,
+                                     :time
+                                     #inst "2024-05-30T23:57:21.764-00:00"}
+                           #:message{:content
+                                     "Our production process for aluminum cans involves several key steps:\n\n1. <b>Material Procurement:</b> We source high-purity aluminum rolls from suppliers.\n\n2. <b>Coil Slitting:</b> These aluminum rolls are slit into smaller sizes suitable for can production.\n\n3. <b>Cupping:</b> The slit aluminum is then stamped into small, round cups.\n\n4. <b>Drawing and Ironing:</b> The cups are drawn into cylindrical shapes and ironed to thin out the walls to the desired thickness.\n\n5. <b>Trimming:</b> The tops of the cans are trimmed to ensure they are even and smooth.\n\n6. <b>Washing and Drying:</b> After trimming, the cans are washed and dried to remove any oils and residues.\n\n7. <b>Internal Coating:</b> A protective coating is applied inside the cans to prevent corrosion and preserve the contents’ flavor and quality.\n\n8. <b>Baking:</b> The internal coating is cured through a baking process.\n\n9. <b>Printing:</b> The external surface of the cans is then printed with labels and designs specific to the client's requirements.\n\n10. <b>Necking:</b> The top of the can is tapered to facilitate easier lid application during the filling process by our clients.\n\n11. <b>Packing and Shipment:</b> Finally, the finished cans are packed and shipped to various clients based on their orders.\n\nEach step needs to be meticulously scheduled and executed to ensure efficiency and meet production targets.",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :tags [:process-description],
+                                     :time
+                                     #inst "2024-05-30T23:57:21.812-00:00"}
+                           #:message{:content
+                                     "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
+                                     :from :system,
+                                     :id 7,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-05-30T23:57:27.455-00:00"}
+                           #:message{:content "PRODUCT",
+                                     :from :surrogate,
+                                     :id 8,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-05-30T23:57:27.488-00:00"}
+                           #:message{:content
+                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
+                                     :from :system,
+                                     :id 9,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-05-30T23:57:30.362-00:00"}
+                           #:message{:content "MAKE-TO-ORDER",
+                                     :from :surrogate,
+                                     :id 10,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-05-30T23:57:30.386-00:00"}
+                           #:message{:content
+                                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                                     :from :system,
+                                     :id 11,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-05-30T23:57:33.393-00:00"}
+                           #:message{:content "OUR-FACILITY",
+                                     :from :surrogate,
+                                     :id 12,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-05-30T23:57:33.421-00:00"}
+                           #:message{:content
+                                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                                     :from :system,
+                                     :id 13,
+                                     :time
+                                     #inst "2024-05-30T23:57:36.744-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 14,
+                                     :time
+                                     #inst "2024-05-30T23:57:36.810-00:00"}
+                           #:message{:content
+                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
+                                     :from :system,
+                                     :id 15,
+                                     :tags [:process-steps :query],
+                                     :time
+                                     #inst "2024-05-30T23:57:41.533-00:00"}
+                           #:message{:content
+                                     "1. Material Procurement\n2. Coil Slitting\n3. Cupping\n4. Drawing and Ironing\n5. Trimming\n6. Washing and Drying\n7. Internal Coating\n8. Baking\n9. Printing\n10. Necking\n11. Packing and Shipment",
+                                     :from :surrogate,
+                                     :id 16,
+                                     :tags [:process-steps :response],
+                                     :time
+                                     #inst "2024-05-30T23:57:41.596-00:00"}
+                           #:message{:content
+                                     "Okay, we now know enough to get started on a MiniZinc solution.\nIn the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>.\nThe 'enum values' name the steps of your process in the order they are executed for each product.",
+                                     :from :system,
+                                     :id 17,
+                                     :tags [:info-to-user :minizinc],
+                                     :time
+                                     #inst "2024-05-30T23:57:41.664-00:00"}
+                           #:message{:content
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. material (some amount of time)\n2. coil (some amount of time)...",
+                                     :from :system,
+                                     :id 18,
+                                     :tags [:process-durs :query],
+                                     :time
+                                     #inst "2024-05-30T23:57:49.393-00:00"}
+                           #:message{:content
+                                     "1. Material Procurement: 2 days\n2. Coil Slitting: 1 hour\n3. Cupping: 30 minutes\n4. Drawing and Ironing: 1 hour\n5. Trimming: 15 minutes\n6. Washing and Drying: 30 minutes\n7. Internal Coating: 45 minutes\n8. Baking: 1 hour\n9. Printing: 2 hours\n10. Necking: 30 minutes\n11. Packing and Shipment: 1 hour",
+                                     :from :surrogate,
+                                     :id 19,
+                                     :tags [:process-durs :response],
+                                     :time
+                                     #inst "2024-05-30T23:57:49.425-00:00"}]}
+           #:conversation{:id :data}
+           #:conversation{:id :resource}],
+          :code
+          "enum Task = {material, coil, cupping, drawing, trimming, washing, internal, baking, printing, necking, packing};",
+          :processes
+          #:process{:desc
+                    "1. Material Procurement: 2 days\n2. Coil Slitting: 1 hour\n3. Cupping: 30 minutes\n4. Drawing and Ironing: 1 hour\n5. Trimming: 15 minutes\n6. Washing and Drying: 30 minutes\n7. Internal Coating: 45 minutes\n8. Baking: 1 hour\n9. Printing: 2 hours\n10. Necking: 30 minutes\n11. Packing and Shipment: 1 hour",
+                    :id :sur-aluminum-cans,
+                    :sub-processes
+                    [#:process{:duration
+                               #:quantity{:units :days,
+                                          :value-string "2"},
+                               :id :sur-aluminum-cans--materialProcure,
+                               :supply-chain? true,
+                               :var-name "materialProcure"}
+                     #:process{:duration
+                               #:quantity{:units :hours,
+                                          :value-string "1"},
+                               :id :sur-aluminum-cans--coilSlitting,
+                               :pre-processes
+                               [:sur-aluminum-cans--materialProcure],
+                               :var-name "coilSlitting"}
+                     #:process{:duration
+                               #:quantity{:units :minutes,
+                                          :value-string "30"},
+                               :id :sur-aluminum-cans--cupping,
+                               :pre-processes
+                               [:sur-aluminum-cans--coilSlitting],
+                               :var-name "cupping"}
+                     #:process{:duration
+                               #:quantity{:units :hours,
+                                          :value-string "1"},
+                               :id :sur-aluminum-cans--drawIron,
+                               :pre-processes
+                               [:sur-aluminum-cans--cupping],
+                               :var-name "drawIron"}
+                     #:process{:duration
+                               #:quantity{:units :minutes,
+                                          :value-string "15"},
+                               :id :sur-aluminum-cans--trimming,
+                               :pre-processes
+                               [:sur-aluminum-cans--drawIron],
+                               :var-name "trimming"}
+                     #:process{:duration
+                               #:quantity{:units :minutes,
+                                          :value-string "30"},
+                               :id :sur-aluminum-cans--washDry,
+                               :pre-processes
+                               [:sur-aluminum-cans--trimming],
+                               :var-name "washDry"}
+                     #:process{:duration
+                               #:quantity{:units :minutes,
+                                          :value-string "45"},
+                               :id :sur-aluminum-cans--intCoating,
+                               :pre-processes
+                               [:sur-aluminum-cans--washDry],
+                               :var-name "intCoating"}
+                     #:process{:duration
+                               #:quantity{:units :hours,
+                                          :value-string "1"},
+                               :id :sur-aluminum-cans--baking,
+                               :pre-processes
+                               [:sur-aluminum-cans--intCoating],
+                               :var-name "baking"}
+                     #:process{:duration
+                               #:quantity{:units :hours,
+                                          :value-string "2"},
+                               :id :sur-aluminum-cans--printing,
+                               :pre-processes
+                               [:sur-aluminum-cans--baking],
+                               :var-name "printing"}
+                     #:process{:duration
+                               #:quantity{:units :minutes,
+                                          :value-string "30"},
+                               :id :sur-aluminum-cans--necking,
+                               :pre-processes
+                               [:sur-aluminum-cans--printing],
+                               :var-name "necking"}
+                     #:process{:duration
+                               #:quantity{:units :hours,
+                                          :value-string "1"},
+                               :id :sur-aluminum-cans--packShip,
+                               :pre-processes
+                               [:sur-aluminum-cans--necking],
+                               :supply-chain? true,
+                               :var-name "packShip"}]},
+          :current-conversation :process,
+          :planning-problem
+          #:problem{:domain :process-interview,
+                    :goal-string
+                    "(characterize-process sur-aluminum-cans)",
+                    :state-string
+                    "#{(process-step sur-aluminum-cans 9 printing) (proj-id sur-aluminum-cans) (surrogate sur-aluminum-cans) (process-step sur-aluminum-cans 10 necking) (process-step sur-aluminum-cans 1 material) (flow-shop sur-aluminum-cans) (process-step sur-aluminum-cans 8 baking) (cites-raw-material-challenge sur-aluminum-cans) (process-step sur-aluminum-cans 4 drawing) (extreme-duration-span sur-aluminum-cans days hours minutes) (process-step sur-aluminum-cans 11 packing) (have-process-steps sur-aluminum-cans) (process-step sur-aluminum-cans 7 internal) (process-step sur-aluminum-cans 6 washing) (provides-product sur-aluminum-cans) (process-step sur-aluminum-cans 3 cupping) (has-production-facility sur-aluminum-cans) (process-step sur-aluminum-cans 5 trimming) (proj-name \"SUR Aluminum Cans\") (have-process-durs sur-aluminum-cans) (process-step sur-aluminum-cans 2 coil) (production-mode sur-aluminum-cans make-to-order) (ongoing-discussion sur-aluminum-cans) (uploaded-table customer-orders)}"},
+          :name "SUR Aluminum Cans",
+          :surrogate
+          #:surrogate{:assistant-id "asst_wMY6Ic3N9JThpv5Q08lw13NW",
+                      :id :sur-aluminum-cans,
+                      :subject-of-expertise "aluminum cans",
+                      :system-instruction
+                      "You manage a company that makes aluminum cans.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_fEVzOdryRUjtVA38Q3IMiu6L"},
+          :id :sur-aluminum-cans}
+
+]

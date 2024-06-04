@@ -205,7 +205,8 @@
     query-text - a string.
    Returns text but uses promesa internally to deal with errors."
   [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 60 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
-  ;(log/info "query-on-thread: query-text =" query-text)
+  ;;(log/info "query-on-thread: query-text =" query-text)
+  (reset! diag _obj)
   (assert (#{"user" "assistant"} role))
   (assert (string? query-text))
   (assert (not-empty query-text))

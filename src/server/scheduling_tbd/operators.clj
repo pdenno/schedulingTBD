@@ -229,8 +229,8 @@
   (let [more-state (inv/analyze-process-steps-response obj)
         new-code (inv/mzn-process-steps more-state)
         minizinc-enum-announce
-        (str "Okay, we now know enough to get started on a MiniZinc solution.\n"
-             "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>.\n"
+        (str "Okay, we now know enough to get started on a MiniZinc solution. "
+             "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. "
              "The 'enum values' name the steps of your process in the order they are executed for each product.")]
     (db/add-planning-state pid more-state)
     (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
@@ -261,3 +261,14 @@
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
   (let [more-state (inv/analyze-process-durs-response obj)]
     (db/add-planning-state pid more-state)))
+
+
+;;; ======================================================================================================================
+;;; ------------------------- Data operators -----------------------------------------------------------------------------
+;;; ======================================================================================================================
+
+(defoperator :!run-table-agent [{:keys [state] :as obj}]
+  (log/info "Run the table agent here."))
+
+(defaction :!run-table-agent [{:keys [state] :as obj}]
+    (log/info "Write table info to the DB here."))
