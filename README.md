@@ -13,7 +13,7 @@ This DSL-based teaming model brings to focus some challenges of
 (4) scientific explanation.
 
 In the software, we engage the user in chat-based conversation implemented with large language models (LLMs) and a multi-agent architecture.
-As of this writing, we are implementing interviewing agents to understand the goals of users and introduce the DSL technology.
+As of this writing, we are implementing interviewing agents to understand the goals of users and introduce them to the DSL technology.
 We are far enough along to posit a few lines of MiniZinc towards formulation of a solution. We expect to be able to formulate entire solutions to some problems soon.
 Currently we are testing the interviewing process with surrogate human users, LLM-based agents simulating expertise in a manufacturing domain.
 We plan to test hundreds of such domain expert surrogates before enabling similar functionality for human experts.

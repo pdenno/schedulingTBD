@@ -6,7 +6,7 @@
    [datahike.api              :as d]
    [mount.core                :as mount :refer [defstate]]
    [scheduling-tbd.db         :as db]
-   [scheduling-tbd.operators  :as op]
+   [scheduling-tbd.op-utils   :as ou]
    [scheduling-tbd.sutil      :as sutil :refer [connect-atm error-for-chat register-planning-domain find-fact]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre           :as log]))
@@ -122,12 +122,12 @@
 (defn satisfying-tasks
   "Return edited task patterns for operators and methods matching given, task (a positive literal), patterns, and state."
   [task patterns state m-tasks]
-   (reduce (fn [res {:keys [task bindings]}]
-             (if-let [r (satisfying-elems task state)]
-               (into res (map (fn [sat-elem] (update sat-elem :bindings #(merge bindings %))) r))
-               res))
-           []
-           m-tasks))
+  (reduce (fn [res {:keys [task bindings]}]
+            (if-let [r (satisfying-elems task state)]
+              (into res (map (fn [sat-elem] (update sat-elem :bindings #(merge bindings %))) r))
+              res))
+          []
+          m-tasks))
 
 ;;; ToDo: I think it is probably wrong to use an HTTP call for get-conversation, but for the time being, that's what we are using.
 ;;;       This will cause the client to make that HTTP call.
@@ -178,18 +178,18 @@
                                (-> partials rest vec)) ; No way forward from this navigation. The partial can be removed.
 
           ;; Execute the operator. If it succeeds, update state, new-tasks, and plan.
-          (operator? task)   (try (op/run-operator!
+          (operator? task)   (try (ou/run-operator!
                                    (if (= pid :START-A-NEW-PROJECT) '[(proj-id START-A-NEW-PROJECT)] (db/get-planning-state pid))
                                    task
                                    opts) ; ToDo: Assumes only run-operator can throw.
-                                  (let [new-state (op/operator-update-state (db/get-planning-state pid) task bindings)
+                                  (let [new-state (ou/operator-update-state (db/get-planning-state pid) task bindings)
                                         op-head (-> task :operator/head (uni/subst bindings))
                                         new-partial (-> part
                                                         (assoc :state new-state)
                                                         (update :new-tasks #(-> % rest vec))
                                                         (update :plan #(conj % op-head))
                                                         vector)]
-                                    (db/put-planning-state pid new-state) ; Because op/operator-update-state doesn't do this!
+                                    (db/put-planning-state pid new-state) ; Because ou/operator-update-state doesn't do this!
                                     (when (find-fact '(surrogate ?x) new-state) ; If it is a surrogate, update the client's view of the conversation.
                                       (refresh-client client-id pid))
                                     (into new-partial (rest partials)))
@@ -297,7 +297,7 @@
   [state conv-id]
   (case conv-id
     :process   (let [pid (-> (find-fact '(proj-id ?p) state) second)]
-                 (list 'characterize-process pid))
+                 [(list 'characterize-process pid)])
     :data      (->> (filter #(= (first %) 'uploaded-table) state)
                     (mapv #(list 'characterize-table (second %))))
     :resource (->> (filter #(= (first %) 'resource) state)
@@ -306,7 +306,7 @@
 ;;; (plan/resume-conversation {:pid :sur-craft-beer :client-id (ws/recent-client!) :conv-id :data})
 ;;; (plan/resume-conversation {:pid :sur-fountain-pens :conv-id :data :client-id (ws/recent-client!)})
 (defn resume-conversation
-  "Start the interview loop. :resume-conversation is a dispatch key from client.
+  "Start the interview loop. :resume-conversation-plan is a dispatch key from client.
    This is called even for where PID is :START-A-NEW-PROJECT."
   [{:keys [pid conv-id client-id] :as args}]
   (assert (string? client-id))
@@ -315,7 +315,7 @@
     (if (= pid :START-A-NEW-PROJECT)
       (let [state '[(proj-id START-A-NEW-PROJECT)]
             goal '(characterize-process START-A-NEW-PROJECT)]
-        (plan9 :process state goal {:client-id client-id :pid pid}))
+        (plan9 :process state [goal] {:client-id client-id :pid pid}))
       (let [conv-id (or conv-id
                         (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid)))
             state  (-> (d/q '[:find ?s .

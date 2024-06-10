@@ -69,8 +69,9 @@
 
 ;;; (sur/start-surrogate {:product "fountain pens" :client-id (ws/recent-client!)})
 (defn start-surrogate
-  "Create or recover a surrogate and ask client to :load-proj. :load-proj will start the planner; not done here directly.
-     product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
+  "Create or recover a surrogate and ask client to :load-proj.
+   :load-proj will cause the client to get-conversation (http and chat). The chat part will :resume-conversation-plan (call back to server to restart planner).
+    product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
                Any of the :segment/name from the 'How it's Made' DB would work here.
   "
   [{:keys [product client-id]} & {:keys [force?] :or {force? true}}] ; ToDo: handle force?=false, See similar-surrogate?
