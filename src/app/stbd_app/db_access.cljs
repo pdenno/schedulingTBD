@@ -3,7 +3,7 @@
   (:require
    [ajax.core        :refer [GET]]
    [promesa.core    :as p]
-   [stbd-app.util   :refer [register-fn lookup-fn]]
+   [stbd-app.util   :refer [register-fn lookup-fn update-common-info!]]
    [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
@@ -15,7 +15,7 @@
   []
   (log/info "get-project-list")
   (let [prom (p/deferred)]
-    (GET (str "/api/list-projects?client-id=" @ws/client-id)
+    (GET (str "/api/list-projects?client-id=" ws/client-id)
          {:timeout 3000
           :handler (fn [resp] (p/resolve! prom resp))
           :error-handler (fn [{:keys [status status-text]}]
@@ -24,20 +24,20 @@
     prom))
 
 ;;; {:conv-for id :conv [{:message/from :system :message/content [{:msg-text/string "You want to start a new project?"}]}]})
-(defn get-conversation
+(defn get-conversation-http
   "Return a promise that will resolve to the vector of a maps representing a conversation.
    What conversation is returned depends on the value of :project/current-conversation in the DB; values are #{:process :resource :data}.
    Example of what the promise resolves to:
    {:project-id :sur-craft-beer :conv-id :process :conv [{:message/from :system :message/content [{:msg-text/string 'Hi!'}]}]}.
    If the call provides conv-id, :project/current-conversation is set in the DB."
-  ([pid] (get-conversation pid nil))
+  ([pid] (get-conversation-http pid nil))
   ([pid conv-id]
    (assert (keyword? pid))
    (log/info "Call to get-conversation for" pid "conv-id =" conv-id)
    (let [prom (p/deferred)
          url (if conv-id
-               (str "/api/get-conversation?project-id=" (name pid) "&conv-id=" (name conv-id) "&client-id=" @ws/client-id)
-               (str "/api/get-conversation?project-id=" (name pid) "&client-id=" @ws/client-id))]
+               (str "/api/get-conversation?project-id=" (name pid) "&conv-id=" (name conv-id) "&client-id=" ws/client-id)
+               (str "/api/get-conversation?project-id=" (name pid) "&client-id=" ws/client-id))]
      (GET url
           {:timeout 3000
            :handler (fn [resp] (p/resolve! prom resp))
@@ -52,13 +52,13 @@
  :update-conversation-text
  (fn [{:keys [pid conv-id]}]
    (assert (keyword? pid))
-   (-> (get-conversation pid conv-id)
+   (-> (get-conversation-http pid conv-id)
        (p/then (fn [resp]
                  (let [resp (cond-> resp
                               (-> resp :conv empty?) (assoc :conv [#:message{:content "No discussion here yet.",
                                                                              :from :system,
                                                                              :time (js/Date. (.now js/Date))}]))]
-                   (ws/update-project-info! resp)
+                   (update-common-info! resp)
                    ;; These are hooks in core.cljs
                    ((lookup-fn :set-conversation) resp)
                    ((lookup-fn :set-code) (:code resp))))))))

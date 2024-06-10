@@ -1,8 +1,6 @@
 (ns stbd-app.components.chat
    "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
-   ;;[applied-science.js-interop :as j]
-   [clojure.spec.alpha :as s]
    [helix.core                 :refer [defnc $]]
    [helix.hooks                :as hooks]
    ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default"           :as ChatContainer]
@@ -24,7 +22,7 @@
    [stbd-app.components.attachment-modal :as attach :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
-   [stbd-app.util       :refer [register-fn lookup-fn]]
+   [stbd-app.util       :refer [register-fn lookup-fn common-info update-common-info!]]
    [stbd-app.ws         :as ws]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
@@ -95,26 +93,42 @@
   []
   ((lookup-fn :set-cs-msg-list) (msgs2cs ((lookup-fn :get-msg-list)))))
 
-(defnc Chat [{:keys [chat-height conv-map proj-info]}]
+;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
+;;; In the other cases, it takes whatever the DB says is current.
+(defn get-conversation
+  ([pid] (get-conversation pid nil))
+  ([pid conv-id]
+   (-> (dba/get-conversation-http pid conv-id)
+       (p/then (fn [{:keys [conv conv-id]}]
+                 (let [conv (if (empty? conv)
+                              [#:message{:content "No discussion here yet.", :from :system, :time (js/Date. (.now js/Date))}]
+                              conv)]
+                   (reset! msgs-atm conv)
+                   ((lookup-fn :set-cs-msg-list) (msgs2cs conv))
+                   ((lookup-fn :set-active-conv) conv-id)
+                   (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
+                   (update-common-info! {:project/id pid :conv-id conv-id}))))
+       (p/catch (fn [e]
+                  (log/info "get-conversation failed:" e))))))
+
+(register-fn :get-conversation get-conversation)
+
+(defnc Chat [{:keys [chat-height proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state nil)
         [sur-text set-sur-text]         (hooks/use-state "")                         ; Something said by a surrogate, different path of execution than user-text.
         [tbd-text set-tbd-text]         (hooks/use-state "")                         ; Something the system said, a dispatch-obj with :msg.
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
-        [active-conv set-active-conv]   (hooks/use-state nil)
+        [active-conv set-active-conv]   (hooks/use-state nil) ; active-conv is a keyword
         [busy? set-busy?]               (hooks/use-state nil)
         resize-fns (make-resize-fns set-box-height)]
     (log/info "active-conv =" active-conv)
     (letfn [(change-conversation-click [to]
+              (log/info "change-conversation-click:" to)
               (when-not busy?
-                (if-let [pid (:project/id @ws/project-info)]
-                  #_((lookup-fn :update-conversation-text) {:pid pid :conv-id to})
-                  (-> (dba/get-conversation pid to)
-                      (p/then (fn [_resp]
-                                (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id to})
-                                (ws/update-project-info! {:conv-id to})
-                                (set-active-conv to))))
-                  (log/info "change-conversation-click fails: ws/project-info =" @ws/project-info))))
+                (if-let [pid (:project/id @common-info)]
+                  (get-conversation pid to)
+                  (log/info "change-conversation-click fails: common-info =" @common-info))))
             (process-user-input [text]
               (when (not-empty text)
                 (log/info "use-effect: text" text)
@@ -128,24 +142,19 @@
                   ;; ToDo: Human-injected questions, though some of them are stored, don't store the human-injected annotation.
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.
                   (set-msg-list (conj msg-list {:message/content (str "<b>[Human-injected question]</b><br/>"(or question q))
-                                          :message/from :system}))
+                                                :message/from :system}))
                   (log/info "Before ws/send-msg: msg =" msg)
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
-                        (register-fn :set-tbd-text set-tbd-text)
-                        (register-fn :set-sur-text set-sur-text)
-                        (register-fn :set-busy?    set-busy?)
-                        (register-fn :get-msg-list  (fn [] @msgs-atm))  ; These two used to update message time.
-                        (register-fn :set-cs-msg-list set-cs-msg-list)  ; These two used to update message time.
-                        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-list)) 60000)))
+        (register-fn :set-tbd-text set-tbd-text)
+        (register-fn :set-sur-text set-sur-text)
+        (register-fn :set-active-conv set-active-conv)
+        (register-fn :set-busy? set-busy?)
+        (register-fn :get-msg-list  (fn [] @msgs-atm))  ; These two used to update message time.
+        (register-fn :set-cs-msg-list set-cs-msg-list)  ; These two used to update message time.
+        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-list)) 60000)))
       ;; These are interrelated. For example, ((lookup-fn :set-sur-text) "foo") --> set-msg-list --> set-cs-msg-list --> UI update.
-      (hooks/use-effect [conv-map]
-        (-> conv-map :conv set-msg-list)
-        (-> conv-map :conv-id set-active-conv))
-      (hooks/use-effect [msg-list]
-        (reset! msgs-atm msg-list)
-        (set-cs-msg-list (msgs2cs msg-list)))
       (hooks/use-effect [tbd-text]  ; Put TBD's (server's) message into the chat.
         (when (not-empty tbd-text)
           (set-msg-list (conj msg-list {:message/content tbd-text :message/from :system}))))
