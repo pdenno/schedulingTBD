@@ -329,7 +329,9 @@
         (log/info "======== resume conversation: planning-state = " state)
         (db/change-conversation args)
         (plan9 conv-id state goals {:client-id client-id :pid pid})))
-    (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+    (finally
+      (log/info "Set busy? false")
+      (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn init-planner!
   []

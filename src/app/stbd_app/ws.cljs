@@ -7,27 +7,13 @@
    [taoensso.timbre :as log  :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
-(def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (atom (str (random-uuid))))
-(def project-info "Map tracking current project/id and :conversation/id." (atom {:conversation/id :process}))
+(def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (str (random-uuid)))
 (def channel "The JS Websocket object being used for communication with the server." (atom nil))
 (def reconnecting? "True only from the time reconnect! is called until socket is once again ready." (atom false))
 (def check-process "A process that is run every second once problems are encountered to check socket readiness." (atom nil))
 (def check-count "After a certain number of check for readiness, if still not ready, we try connect! again." (atom 0))
 (def ping-process "A process run intermittently by js/window.setInterval" (atom nil))
 
-(defn update-project-info!
-  "Update the project-info atom from an app action or server response."
-  [resp]
-  (swap! project-info
-         (fn [info]
-           (let [{:keys [current-project project-id conv-id]} resp
-                 {pid :project/id} resp]
-             (cond-> info
-               (not (contains? info :conv-id))     (assoc :conversation/id :process)
-               current-project   (assoc :project/id current-project)
-               project-id        (assoc :project/id project-id)
-               pid               (assoc :project/id pid)
-               conv-id           (assoc :conversation/id conv-id))))))
 
 ;;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
 (defn channel-ready? [] (and @channel (= 1 (.-readyState @channel))))
@@ -64,11 +50,10 @@
 (register-fn :clear-promise-keys    (fn [obj] (-> obj :promise-keys clear-promise-keys!)))
 (register-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
 (register-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
-(register-fn :load-proj             (fn [{:keys [new-proj-map]}] ((lookup-fn :core-load-proj) new-proj-map)))
 (register-fn :interviewer-busy?     (fn [{:keys [value]}]
-                                      (when value (log/info "====Starting interview===="))
+                                      #_(when value (log/info "====Starting interview===="))
                                       ((lookup-fn :set-busy?) value)
-                                      (when-not value (log/info "---Stopping interview----"))))
+                                      #_(when-not value (log/info "---Stopping interview----"))))
 (register-fn :tbd-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
                                       (log/info "tbd-says msg:" msg)
@@ -77,8 +62,6 @@
                                       (when p-key (remember-promise p-key))
                                       (log/info "sur-says msg:" msg)
                                       ((lookup-fn :set-sur-text) msg)))
-
-
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
@@ -92,7 +75,6 @@
   "Ping the server to keep the socket alive."
   []
   (when-not @reconnecting?
-    ;;(log/info "Ping attempt.")
     (send-msg {:dispatch-key :ping, :ping-id (swap! ping-id inc)})))
 
 (def error-info (atom nil))
@@ -104,8 +86,8 @@
   ;; in long-running interactions. I don't think I had good rationale for resetting client-id!
   ;;(reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid if/when we start using transit.
   (reset-state)
-  (if-let [chan (js/WebSocket. (ws-url @client-id))]
-    (do (log/info "Websocket Connected!" @client-id)
+  (if-let [chan (js/WebSocket. (ws-url client-id))]
+    (do (log/info "Websocket Connected!" client-id)
         (reset! channel chan)
         (reset! reconnecting? false)
         (set! (.-onmessage chan)
@@ -121,7 +103,7 @@
                 (log/error "Error on socket: arg=" arg))) ; ToDo: investigate why it gets these.
         ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
         (reset! ping-process (js/window.setInterval (fn [] (ping!)) 2000)))
-    (throw (ex-info "Websocket Connection Failed:" {:client-id @client-id}))))
+    (throw (ex-info "Websocket Connection Failed:" {:client-id client-id}))))
 
 (defn check-channel
   "This gets called by send-msg when (channel-ready?) is not true."
@@ -167,7 +149,7 @@
   [{:keys [dispatch-key] :as msg-obj}]
   (if-not (send-msg-type? dispatch-key)
     (log/error "Invalid message type in" msg-obj)
-    (let [msg-obj (assoc msg-obj :client-id @client-id)]
+    (let [msg-obj (assoc msg-obj :client-id client-id)]
       (if @channel
         (if (channel-ready?)
           (do (.send @channel (str msg-obj))

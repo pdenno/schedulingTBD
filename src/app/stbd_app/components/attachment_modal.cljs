@@ -18,6 +18,7 @@
    ["@mui/material/Typography$default" :as Typography]
    ["@mui/material/Modal$default" :as Modal]
    ["@mui/material/Dialog$default" :as Dialog]
+   [stbd-app.util   :refer [common-info]]
    [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
@@ -62,10 +63,10 @@
                                          (-> (js/fetch url)      ; returns a promise
                                              (p/then #(.text %)) ; returns a promise
                                              (p/then #(POST "/files/upload"
-                                                            {:params {:filename (j/get f :name) :size (j/get f :size) :client-id @ws/client-id}
+                                                            {:params {:filename (j/get f :name) :size (j/get f :size) :client-id ws/client-id}
                                                              :body (doto (js/FormData.)
-                                                                     (.append "project-id" (:project/id @ws/project-info))
-                                                                     (.append "conversation-id" (:conversation/id @ws/project-info))
+                                                                     (.append "project-id" (:project/id @common-info))
+                                                                     (.append "conversation-id" (:conversation/id @common-info))
                                                                      (.append "file" f))
                                                              ;; See https://github.com/JulianBirch/cljs-ajax
                                                              ;;:response-format (raw-response-format)

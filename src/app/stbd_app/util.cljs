@@ -28,3 +28,19 @@
   [k func]
   (swap! dispatch-table #(assoc % k func))
   #_(log/info "Registered function for websocket:" k))
+
+(def common-info "Map tracking current project/id and :conversation/id." (atom {:conversation/id :process}))
+
+(defn update-common-info!
+  "Update the common-info atom from an app action or server response."
+  [resp]
+  (swap! common-info
+         (fn [info]
+           (let [{:keys [current-project project-id conv-id]} resp
+                 {pid :project/id} resp]
+             (cond-> info
+               (not (contains? info :conv-id))     (assoc :conversation/id :process)
+               current-project   (assoc :project/id current-project)
+               project-id        (assoc :project/id project-id)
+               pid               (assoc :project/id pid)
+               conv-id           (assoc :conversation/id conv-id))))))
