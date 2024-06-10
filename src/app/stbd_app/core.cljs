@@ -18,7 +18,7 @@
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.db-access :as dba]
-   [stbd-app.util   :as util :refer [register-fn lookup-fn]]
+   [stbd-app.util   :as util :refer [register-fn lookup-fn update-common-info!]]
    [stbd-app.ws     :as ws]
    [taoensso.timbre :as log :refer-macros [info debug log]]))
 
@@ -106,20 +106,12 @@
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
       (register-fn :set-conversation set-conversation)
       (register-fn :set-code set-code)
-      (register-fn :core-load-proj ; This is called by project.cljs when you change projects.
-                   (fn [p] ; p is a map with two keys: :project/id :project/name (a proj-info element).
-                     (set-proj p)
-                     (ws/update-project-info! p)
-                     ((lookup-fn :update-conversation-text) {:pid (:project/id p)})
-                     (ws/send-msg {:dispatch-key :resume-conversation-plan :pid (:project/id p)
-                                   ;; There is no reason to believe that we know what conversation is current.
-                                   #_#_:conv-id (:conversation/id @ws/project-info)})))
-      (-> (dba/get-project-list)  ; Returns a promise. Resolves to map with client's :current-project and :others.
-          (p/then (fn [resp]
-                    ;(log/info "core: get-project-list:" resp)
-                    (set-proj-infos (conj (:others resp) (:current-project resp)))
-                    (set-proj (:current-project resp))
-                    ((lookup-fn :update-conversation-text) {:pid (-> resp :current-project :project/id)})))))
+    (-> (dba/get-project-list) ;  Resolves to map with client's :current-project :others, and conv-id the first two are maps of :projec/id :project/name.
+        (p/then (fn [{:keys [current-project others conv-id] :as _resp}]
+                  (set-proj-infos (conj others current-project))
+                  (set-proj current-project)
+                  (update-common-info! {:project/id (:project/id current-project)})
+                  ((lookup-fn :get-conversation) (:project/id current-project) conv-id)))))
     ;; ------- component (end of use-effect :once)
     ($ Stack {:direction "column" :height useful-height}
        ($ Typography
@@ -132,7 +124,7 @@
           ($ Stack {:direction "row"}
              "schedulingTBD"
              ($ Box
-                ($ SelectProject {:current-proj proj :proj-infos proj-infos}))))
+                ($ SelectProject {:current-proj proj :proj-infos proj-infos})))) ; <================================
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
                      ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :proj-info proj}))
