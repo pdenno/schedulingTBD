@@ -22,7 +22,7 @@
    [stbd-app.components.attachment-modal :as attach :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
-   [stbd-app.util       :refer [register-fn lookup-fn common-info update-common-info!]]
+   [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
    [stbd-app.ws         :as ws]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
@@ -100,6 +100,7 @@
   ([pid conv-id]
    (-> (dba/get-conversation-http pid conv-id)
        (p/then (fn [{:keys [conv conv-id]}]
+                 (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "conv =" conv)
                  (let [conv (if (empty? conv)
                               [#:message{:content "No discussion here yet.", :from :system, :time (js/Date. (.now js/Date))}]
                               conv)]
@@ -112,26 +113,22 @@
                   (log/info "get-conversation failed:" e))))))
 
 (register-fn :get-conversation get-conversation)
+(def msg-list-external (atom []))
 
 (defnc Chat [{:keys [chat-height proj-info]}]
-  (let [[msg-list set-msg-list]         (hooks/use-state nil)
-        [sur-text set-sur-text]         (hooks/use-state "")                         ; Something said by a surrogate, different path of execution than user-text.
-        [tbd-text set-tbd-text]         (hooks/use-state "")                         ; Something the system said, a dispatch-obj with :msg.
+  (let [[msg-list set-msg-list]         (hooks/use-state [])
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
         [active-conv set-active-conv]   (hooks/use-state nil) ; active-conv is a keyword
         [busy? set-busy?]               (hooks/use-state nil)
         resize-fns (make-resize-fns set-box-height)]
-    (log/info "active-conv =" active-conv)
     (letfn [(change-conversation-click [to]
-              (log/info "change-conversation-click:" to)
               (when-not busy?
                 (if-let [pid (:project/id @common-info)]
                   (get-conversation pid to)
                   (log/info "change-conversation-click fails: common-info =" @common-info))))
             (process-user-input [text]
               (when (not-empty text)
-                (log/info "use-effect: text" text)
                 (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)
                       [surrogate? product] (re-matches #"\s*SUR:(.*)" text)
                       [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" text)
@@ -143,24 +140,19 @@
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.
                   (set-msg-list (conj msg-list {:message/content (str "<b>[Human-injected question]</b><br/>"(or question q))
                                                 :message/from :system}))
-                  (log/info "Before ws/send-msg: msg =" msg)
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
-        (register-fn :set-tbd-text set-tbd-text)
-        (register-fn :set-sur-text set-sur-text)
+        (register-fn :set-tbd-text (fn [text] (set-msg-list (conj @msgs-atm {:message/content text :message/from :system}))))
+        (register-fn :set-sur-text (fn [text] (set-msg-list (conj @msgs-atm {:message/content text :message/from :surrogate}))))
         (register-fn :set-active-conv set-active-conv)
         (register-fn :set-busy? set-busy?)
         (register-fn :get-msg-list  (fn [] @msgs-atm))  ; These two used to update message time.
         (register-fn :set-cs-msg-list set-cs-msg-list)  ; These two used to update message time.
         (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-list)) 60000)))
-      ;; These are interrelated. For example, ((lookup-fn :set-sur-text) "foo") --> set-msg-list --> set-cs-msg-list --> UI update.
-      (hooks/use-effect [tbd-text]  ; Put TBD's (server's) message into the chat.
-        (when (not-empty tbd-text)
-          (set-msg-list (conj msg-list {:message/content tbd-text :message/from :system}))))
-      (hooks/use-effect [sur-text]  ; Put TBD's (server's) message into the chat.
-        (when (not-empty sur-text)
-          (set-msg-list (conj msg-list {:message/content sur-text :message/from :surrogate}))))
+       (hooks/use-effect [msg-list]
+         (reset! msgs-atm msg-list)
+         (set-cs-msg-list (msgs2cs msg-list)))
       ;; ----------------- component UI structure.
       ($ ShareUpDown
          {:init-height chat-height

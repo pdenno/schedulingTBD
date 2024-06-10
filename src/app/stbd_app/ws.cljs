@@ -3,7 +3,7 @@
   (:require
    [clojure.edn     :as edn]
    [promesa.core    :as p]
-   [stbd-app.util   :as util :refer [dispatch-table lookup-fn register-fn]]
+   [stbd-app.util   :as util :refer [common-info dispatch-table lookup-fn register-fn update-common-info!]]
    [taoensso.timbre :as log  :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
@@ -47,21 +47,34 @@
 (defn recv-msg-type? [k] (contains? @dispatch-table k))
 
 ;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, and maybe other places.
+;;; The ones here correspond to dispatch keys, but other are used to break-out React hooks or avoid namespace cycles.
 (register-fn :clear-promise-keys    (fn [obj] (-> obj :promise-keys clear-promise-keys!)))
+
 (register-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
+
 (register-fn :ping-confirm          (fn [_] :ok #_(log/info "Ping confirm")))
+
+;;; The server uses this one after the client sends it :start-surrogate (which creates the surrogate's DB).
+(register-fn :load-proj             (fn [{:keys [new-proj-map]}] ; New projects start on :process
+                                      (update-common-info! (assoc new-proj-map :conv-id :process))
+                                      ((lookup-fn :set-current-project) new-proj-map)
+                                      ((lookup-fn :get-conversation) (:project/id new-proj-map))))
+
 (register-fn :interviewer-busy?     (fn [{:keys [value]}]
                                       #_(when value (log/info "====Starting interview===="))
                                       ((lookup-fn :set-busy?) value)
+                                      (update-common-info! {:busy? value})
                                       #_(when-not value (log/info "---Stopping interview----"))))
+
 (register-fn :tbd-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
                                       (log/info "tbd-says msg:" msg)
-                                      ((lookup-fn :set-tbd-text) msg)))
+                                        ((lookup-fn :set-tbd-text) msg)))
+
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
                                       (log/info "sur-says msg:" msg)
-                                      ((lookup-fn :set-sur-text) msg)))
+                                        ((lookup-fn :set-sur-text) msg)))
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."

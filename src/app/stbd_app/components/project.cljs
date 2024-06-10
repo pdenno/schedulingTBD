@@ -8,9 +8,8 @@
    ["@mui/material/MenuItem$default"    :as MenuItem]
    ["@mui/material/Select$default"      :as Select]
    ;;["@mui/material/styles"              :as styles :refer [createTheme themeOptions ThemeProvider]] ; WIP
-   [stbd-app.ws        :as ws]
    [helix.core         :as helix :refer [defnc $]]
-   [stbd-app.util      :as util :refer [lookup-fn]]
+   [stbd-app.util      :as util :refer [lookup-fn register-fn]]
    [taoensso.timbre    :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
@@ -50,6 +49,7 @@
   [{:keys [current-proj proj-infos]}]
   (let [[current set-current] (hooks/use-state current-proj)
         menu-infos (atom [])]
+    (register-fn :set-current-project set-current)
     (when current-proj
       (reset! menu-infos (order-projects (or current current-proj) proj-infos)) ; This one needed or doesn't show first time.
       ($ FormControl {:size "small"} ; small makes a tiny difference, :sx's :margin and :height do not.
