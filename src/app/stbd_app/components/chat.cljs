@@ -178,7 +178,7 @@
                                            :onClick (fn [_] (change-conversation-click :resource))})))
                     ($ ChatContainer
                        ($ MessageList
-                          {:typingIndicator (when busy? ($ TypingIndicator {:content "Interviewer is typing"})) ; ToDo: insert this when it is useful.
+                          {:typingIndicator (when busy? ($ TypingIndicator {:content "Interviewer is typing"}))
                            :style #js {:height "500px"}}
                           cs-msg-list))))
           :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!

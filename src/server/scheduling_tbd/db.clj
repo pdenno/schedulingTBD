@@ -293,12 +293,60 @@
         :doc "The ID of a table, unique in the context of this project DB."}
 
    :table/purpose
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The purpose of this table, on of the enumeration #{:customer orders}"}
 
    :table/filename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The filename as it appears in the project directory}"}})
+        :doc "The filename as it appears in the project directory}"}
+
+   :table/identity-condition ; ToDo: we expect more cardinality :many, but not yet.
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "The subset of column names (:object/attribute-name) that identify objects."}
+
+   :table/attributes
+      #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+           :doc "Attribute objects for the tableThe subset of column names (:object/attribute-name) that identify objects."}
+
+   :table/data
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "A vector of :object objects."}
+
+   :attribute/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The name of the attribute, often based on the column name."}
+
+   :attribute/description
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "A description of the purpose of the attribute."}
+
+   :attribute/cardinality
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "#{:one :many}"}
+
+   :attribute/datatype
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "#{:string :number, etc.}"}
+
+   :object/row
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
+        :doc "Row that realized this object."}
+
+   :object/attribute-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Name of the column (or generated name) for tRow that realized this object."}
+
+   :object/attribute-value
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "Name of the column (or generated name) for tRow that realized this object."}
+
+   :object/attribute-value-pairs
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref}
+
+   :column/tuple
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword}
+   })
+
 
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
