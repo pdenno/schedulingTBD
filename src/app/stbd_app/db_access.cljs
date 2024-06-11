@@ -33,7 +33,7 @@
   ([pid] (get-conversation-http pid nil))
   ([pid conv-id]
    (assert (keyword? pid))
-   (log/info "Call to get-conversation for" pid "conv-id =" conv-id)
+   (log/info "Call to get-conversation-http for" pid "conv-id =" conv-id)
    (let [prom (p/deferred)
          url (if conv-id
                (str "/api/get-conversation?project-id=" (name pid) "&conv-id=" (name conv-id) "&client-id=" ws/client-id)

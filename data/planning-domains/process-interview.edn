@@ -6,7 +6,7 @@
  :domain/elems [{:method/head (characterize-process ?proj)
                  :method/rhsides [{:method/case-name "from-scratch"
                                    :method/preconds [(proj-id ?proj) (not (ongoing-discussion ?proj))] ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
-                                   :method/task-list [(!initial-question ?proj)
+                                   :method/task-list [(!initial-process-question ?proj)
                                                       (discuss-process-detail ?proj)]}
 
                                   {:method/case-name "ongoing-discussion"
@@ -16,8 +16,8 @@
                                    :method/task-list [(discuss-process-detail ?proj)]}]}
 
                 ;; ====== (not (ongoing-discussion ?proj)) ===============================
-                ;; (!initial-question ?proj)
-                {:operator/head (!initial-question ?proj)
+                ;; (!initial-process-question ?proj)
+                {:operator/head (!initial-process-question ?proj)
                  :operator/preconds [(not (ongoing-discussion ?proj))]
                  :operator/a-list [(ongoing-discussion ?proj)]}
 

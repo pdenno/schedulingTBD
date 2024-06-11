@@ -13,7 +13,6 @@
    [mount.core              :as mount :refer [defstate]]
    [promesa.core            :as p]
    [scheduling-tbd.db       :as proj-db]
-   [scheduling-tbd.domain.process.interview   :as inv]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm db-cfg-map]]
    [taoensso.timbre :as log]))
@@ -205,6 +204,15 @@
          [?e :segment/challenge-intro]]
        @(connect-atm :him) name))
 
+;;; ToDo: Seeing how we are getting so much text about supply chain/inventory management, maybe not mention supply chain.
+;;;       I'd like to say "manufacturing processes" rather than "business's processes" (where appropriate) so maybe run this after mfg/service query.
+;;;       In the mfg case, the user would ask about manufacturing scheduling problems.
+;;;       Thus have two versions of this, one for manufacturing and one for services.
+(defn pretend-you-manage-prompt
+  [manage-what]
+  [{:role "system"    :content (format "Pretend you manage %s. You have good knowledge of the business's processes and supply chain." manage-what)}
+   {:role "user"      :content "In no more than 5 sentences, describe your principal scheduling problem."}])
+
 ;;;--------------------- Populating :segment/challenge-intro  ---------------------
 (defn write-challenge-intro
   "Write the value for :segment/challenge-intro for the argument segment name.
@@ -212,7 +220,7 @@
   [seg-name]
   (if (segment-exists? seg-name)
     (if-let [challenge (-> (str "a company that makes " seg-name)
-                             inv/pretend-you-manage-prompt
+                             pretend-you-manage-prompt
                              (llm/query-llm {:model-class :gpt-4})
                              (p/await))]
       (do (log/info "Intro Response: " challenge)
