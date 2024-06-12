@@ -50,7 +50,7 @@
   (safe-alias 'p      'promesa.core)
   (safe-alias 'px     'promesa.exec)
   (safe-alias 'core   'scheduling-tbd.core)
-  (safe-alias 'pinv   'scheduling-tbd.domain.process.interview)
+  (safe-alias 'pinv   'scheduling-tbd.domain.process.p-interview)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'llm    'scheduling-tbd.llm)

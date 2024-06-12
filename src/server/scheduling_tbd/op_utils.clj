@@ -84,8 +84,10 @@
 (defmulti db-action #'db-action-dispatch)
 
 (defn run-operator!
-  "Run the action associated with the operator, returning an updated state EXCEPT where fails."
-  [state {:operator/keys [head a-list] :as _task} {:keys [inject-failures pid] :as opts}]
+  "Run the action associated with the operator, returning an updated state EXCEPT where fails.
+   Where the testing? option is true, there typically are not defoperation operators actions and the state
+   returned is just the state argument; there is no state-chaning response from user, so it behaves like SHOP2."
+  [state {:operator/keys [head a-list] :as _task} {:keys [testing? inject-failures pid] :as opts}]
   (let [op-tag (-> head first keyword)]
     (cond (some #(uni/unify head %) inject-failures)         (do (log/info "+++Operator FAILURE (INJECTED):" op-tag)
                                                                   (throw (ex-info "run-operator injected failure" {:op-head op-tag})))
@@ -101,7 +103,11 @@
                                                                                     (dissoc :inject-failures)))
                                                                  (log/info "+++Operator" op-tag "ran (ACTUAL) state = " (db/get-planning-state pid)))
 
-          :else                                               (log/info "+++Operator" op-tag "pass-through (NOT RECOGNIZED)"))))
+          :else                                               (do (if testing?
+                                                                    (log/info  "+++Operator" op-tag "pass-through (No defoperator, testing)")
+                                                                    (log/error "+++Operator" op-tag "Expected a matching defoperator."))
+                                                                  state))))
+
 
 
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?

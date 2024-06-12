@@ -4,6 +4,7 @@ We will ask for interpretation to revision REV-i data using input that is in the
 This allows us to check your work at each revision before proceeding to the next.
 As a general rule, never throw away information in producing a revision; instead, break up strings and put the parts under the designated Clojure map keys.
 Do not provide any commentary; simply return results that are readable by Clojure read-string, even if no revision is needed.
+We may ask for the same revision twice consecutively; this is especially true if the first answer you provided did not meet specifications.
 The data we are working with typically concerns manufacturing processes.
 Here is typical input to REV-1, which is the only input that is not a vector of Clojure maps:
 

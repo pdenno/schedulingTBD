@@ -208,7 +208,7 @@
   "Do heuristic light modification to the argument text to make it more like HTML.
    Specifically:
      - Change: **bold** to <b>bold</b>.
-   This is mostly for use with OpenAI tools, which give bold some things with markdown."
+   This is mostly for use with OpenAI tools."
   [s]
   (let [lines (for [line (str/split-lines s)]
                 (let [[success pre bold post] (re-matches #"(.*)\*\*(.+)\*\*(.*)" line)] ; ToDo: I can't put \- in the bold stuff.

@@ -305,8 +305,8 @@
         :doc "The subset of column names (:object/attribute-name) that identify objects."}
 
    :table/attributes
-      #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-           :doc "Attribute objects for the tableThe subset of column names (:object/attribute-name) that identify objects."}
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "Attribute objects for the tableThe subset of column names (:object/attribute-name) that identify objects."}
 
    :table/data
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
@@ -344,8 +344,7 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref}
 
    :column/tuple
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword}
-   })
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword}})
 
 
 (def ^:diag diag (atom nil))
@@ -372,18 +371,16 @@
                                                  :agent/thread-id tid}}]})))
 
 ;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
-(def process-agent
+(def process-durs-agent
   "Instructions and training for :process-agent to help it get started."
-  {:id :process-agent
-   :instruction (slurp "data/instructions/process-agent.txt")})
+  {:id :process-durs-agent
+   :instruction (slurp "data/instructions/process-durs-agent.txt")})
 
-;;; ToDo: I go back and forth on whether this should be :text-function-agent, which only does those four types below
-;;;       (and in which case the
 (def text-function-agent
   {:id :text-function-agent
    :instruction (slurp "data/instructions/text-function-agent.txt")})
 
-(def known-agents [process-agent text-function-agent])
+(def known-agents [process-durs-agent text-function-agent])
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 ;;; Atom for the configuration map used for connecting to the project db.

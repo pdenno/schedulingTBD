@@ -46,7 +46,7 @@
       (when cites-supply?
         (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
                        "we'd like to put that aside for a minute and talk about the processes that make product.")]
-          ;(ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
+          (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
           (db/add-msg pid :system msg)))
       ;; Complete preliminary analysis in a parallel agent that, in the case of a human expert, works independently.
       (db/add-planning-state pid (inv/parallel-expert-prelim-analysis pid)))))

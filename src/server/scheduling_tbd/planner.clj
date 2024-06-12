@@ -2,6 +2,7 @@
   "This provides functions to prune a planning domain and run an interview."
   (:require
    [clojure.core.unify        :as uni]
+   [clojure.datafy            :refer [datafy]]
    [clojure.edn               :as edn]
    [datahike.api              :as d]
    [mount.core                :as mount :refer [defstate]]
@@ -141,6 +142,17 @@
                     :dispatch-key :update-conversation-text
                     :pid pid}))
 
+(defn extend-partials
+  "Update the partials vector by replacing the head partial with a vector of partials resulting from
+   an extension (to a possible next plan task) for each task in s-tasks."
+  [partials s-tasks]
+  (let [head-partial (first partials)]
+    (into (mapv (fn [{:keys [bindings task]}]
+                  (let [rhs (:method/rhs task)]
+                    (update head-partial :new-tasks (fn [tasks] (into (mapv #(uni/subst % bindings) rhs) (rest tasks))))))
+                s-tasks)
+          (rest partials))))
+
 ;;; This only needs to work on the head partial plan, right? (That's even true once I have alternatives, right?)
 ;;; Later, this is the place to execute the plan by running operators that interact with the user to update state.
 ;;; I think I can borrow the inference engine from explain lib. It might also be useful for making full navigations to calculate plan cost.
@@ -169,9 +181,9 @@
    s-tasks (satisfying-elements) is a map containing the following keys:
       :bindings  - is a map of variable bindings,
       :task      - is information from the operator or method RHS satisfying RHS the preconditions."
-  [partials s-tasks {:keys [pid client-id] :as opts}]
-  (assert (string? client-id))
-  (let [part (first partials)
+  [partials s-tasks {:keys [pid client-id testing?] :as opts}] ; In testing there might not be client-id or pid.
+  (let [part                    (first partials)
+        {:keys [state]}         part
         {:keys [task bindings]} (first s-tasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
     (cond (empty? s-tasks)   (do
                                (log/info "Navigation fails:" part)
@@ -179,26 +191,24 @@
 
           ;; Execute the operator. If it succeeds, update state, new-tasks, and plan.
           (operator? task)   (try (ou/run-operator!
-                                   (if (= pid :START-A-NEW-PROJECT) '[(proj-id START-A-NEW-PROJECT)] (db/get-planning-state pid))
+                                   (if (= pid :START-A-NEW-PROJECT) '[(proj-id START-A-NEW-PROJECT)] state)
                                    task
                                    opts) ; ToDo: Assumes only run-operator can throw.
-                                  (let [new-state (ou/operator-update-state (db/get-planning-state pid) task bindings)
+                                  (let [new-state (ou/operator-update-state state task bindings)
                                         op-head (-> task :operator/head (uni/subst bindings))
                                         new-partial (-> part
                                                         (assoc :state new-state)
                                                         (update :new-tasks #(-> % rest vec))
                                                         (update :plan #(conj % op-head))
                                                         vector)]
-                                    (db/put-planning-state pid new-state) ; Because ou/operator-update-state doesn't do this!
                                     (when (find-fact '(surrogate ?x) new-state) ; If it is a surrogate, update the client's view of the conversation.
-                                      (refresh-client client-id pid))
+                                      (when-not testing? (refresh-client client-id pid)))
                                     (into new-partial (rest partials)))
-                                  (catch Exception e [(assoc part :error e)]))
+                                  (catch Exception e
+                                    (into [(assoc part :error e)] (rest partials))))
 
           ;; Update the task list with the tasks from the RHS
-          (method? task)     (let [new-partial (update part :new-tasks #(into (mapv (fn [t] (uni/subst t bindings)) (:method/rhs task))
-                                                                              (-> % rest vec)))] ; drop this task; add the steps
-                               (into [new-partial] (rest partials))))))
+          (method? task)   (extend-partials partials s-tasks))))
 
 (def stop-here-diag (atom nil))
 (defn stop-here [data]
@@ -209,41 +219,42 @@
    Operates on a stack (vector) of 'partials' (partial plans, described in the docstring of update-planning).
    Initialize the stack to a partial from a problem definition.
    Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations."
-  [domain-id state goals & {:keys [client-id] :as opts}]  ; opts typically includes :pid.
-  (assert (string? client-id))
-  (assert (#{:process :data :resource} domain-id))
-  (let [elems   (-> (sutil/get-domain domain-id) :domain/elems)
-        result (loop [partials [{:plan [] :new-tasks [(first goals)] :state state}] ; ToDo: Only planning first of goals so far.
-                      cnt 1]
-                 ;;(log/info "new-tasks =" (-> partials first :new-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
-                 ;;(log/info "partial = " (first partials))
-                 (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
-                       state (-> partials first :state)
-                       matching (matching-tasks task elems)
-                       s-tasks (satisfying-tasks task elems state matching)]
-                   ;;(log/info "task =" task)
-                   ;;(log/info "matching =" matching)
-                   ;;(log/info "satisfying =" s-tasks)
-                   (when (empty? s-tasks) (stop-here {:task task :elems elems :state (-> partials first :state)}))
-                   (cond
-                     (empty? partials)                         {:result :failure :reason :end-of-interview} ; ToDo: this was :no-successful-plans.
-                     (-> partials first :new-tasks empty?)     {:result :success :plan-info (first partials)}
-                     (> cnt 5)                                 {:result :stopped :partials partials}
-                     :else  (let [partials (update-planning partials s-tasks opts)
-                                  partials (if-let [err (-> partials first :error)]
-                                             (do (log/warn "***Plan fails owing to s-tasks" s-tasks)
-                                                 (log/error err)
-                                                 (reset! diag {:err err :partials partials :s-tasks s-tasks :opts opts})
-                                                 (throw (ex-info "In dev quit here" {:err err :partials partials :s-tasks s-tasks :opts opts}))
-                                                 (-> partials rest vec)
-                                                 (ws/send-to-chat {:promise? false, :client-id client-id,
-                                                                   :msg (error-for-chat "We had a problem in this conversation:\n" err)}))
-                                             partials)]
-                              (recur partials
-                                     (inc cnt))))))
-        response-to-user (case (:result result)
+  [domain-id state goals & {:as opts}]  ; opts typically includes :pid.
+  (assert ((-> @sutil/planning-domains keys set) domain-id))
+  (let [elems   (-> (sutil/get-domain domain-id) :domain/elems)]
+    (loop [partials [{:plan [] :new-tasks [(first goals)] :state state}] ; ToDo: Only planning first of goals so far.
+           cnt 1]
+      ;;(log/info "new-tasks =" (-> partials first :new-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
+      ;;(log/info "partial = " (first partials))
+      (let [task (-> partials first :new-tasks first) ; <===== The task might have bindings; This needs to be fixed. (Need to know the var that is bound).
+            state (-> partials first :state)
+            matching (matching-tasks task elems)
+            s-tasks (satisfying-tasks task elems state matching)]
+        ;;(log/info "task =" task)
+        ;;(log/info "matching =" matching)
+        ;;(log/info "satisfying =" s-tasks)
+        (when (empty? s-tasks) (stop-here {:task task :elems elems :state (-> partials first :state)}))
+        (cond
+          (empty? partials)                         {:result :failure :reason :no-successful-plans}
+          (-> partials first :new-tasks empty?)     {:result :success :plan-info (first partials)}
+          (> cnt 50)                                {:result :stopped :partials partials}
+          :else  (let [partials (update-planning partials s-tasks opts)
+                       partials (if-let [err (-> partials first :error datafy)]
+                                  (do (log/error "Plan execution error: cause =" (:cause err) ", data =" (:data err))
+                                      (reset! diag {:err err :partials partials :s-tasks s-tasks :opts opts})
+                                      (-> partials rest vec)) ; Reject plan, try next.
+                                  partials)]
+                   (recur partials
+                          (inc cnt))))))))
+
+(defn plan9-post-actions
+  "ws/send-to-chat depending on how planning went."
+  [result pid client-id]
+  (log/info "Planner updating project state:" (:state result))
+  (db/put-planning-state pid (:state result))
+  (let [response-to-user (case (:result result)
                            :success (error-for-chat "That's all the conversation we do right now.")
-                           :stopped (error-for-chat "We stopped intentionally after 5 interactions.")
+                           :stopped (error-for-chat "We stopped intentionally after 50 interactions.")
                            :failure (error-for-chat (str "We stopped owing to " (:reason result))) nil)]
     ;; ToDo: Even this isn't sufficent at times!
     (when response-to-user
@@ -314,8 +325,9 @@
     (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
     (if (= pid :START-A-NEW-PROJECT)
       (let [state '[(proj-id START-A-NEW-PROJECT)]
-            goal '(characterize-process START-A-NEW-PROJECT)]
-        (plan9 :process state [goal] {:client-id client-id :pid pid}))
+            goal '(characterize-process START-A-NEW-PROJECT)
+            res (plan9 :process state [goal] {:client-id client-id :pid pid})]
+        (plan9-post-actions res pid client-id))
       (let [conv-id (or conv-id
                         (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid)))
             state  (-> (d/q '[:find ?s .
@@ -328,17 +340,15 @@
             args (assoc args :conv-id conv-id)]
         (log/info "======== resume conversation: planning-state = " state)
         (db/change-conversation args)
-        (plan9 conv-id state goals {:client-id client-id :pid pid})))
+        (let [res (plan9 conv-id state goals {:client-id client-id :pid pid})]
+          (plan9-post-actions res pid client-id))))
     (finally
       (log/info "Set busy? false")
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn init-planner!
   []
-  (ws/register-ws-dispatch :resume-conversation-plan resume-conversation)
-  (register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
-  (register-planning-domain :data     (-> "data/planning-domains/data-interview.edn" slurp edn/read-string))
-  (register-planning-domain :resource (-> "data/planning-domains/resource-interview.edn" slurp edn/read-string)))
+  (ws/register-ws-dispatch :resume-conversation-plan resume-conversation))
 
 (defn quit-planner!
   "Quit the planner. It can be restarted with a shell command through mount."

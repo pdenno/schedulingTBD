@@ -11,10 +11,12 @@
    [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [connect-atm find-fact yes-no-unknown string2sym]]
+   [scheduling-tbd.sutil          :as sutil :refer [connect-atm find-fact register-planning-domain yes-no-unknown string2sym]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
+
+(register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
 
 ;;; ------------------------------- project name --------------------------------------
 ;;; The user would be prompted: "Tell us what business you are in and what your scheduling problem is."
@@ -371,7 +373,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
               :else             obj))]
       (sk obj))))
 
-(defn llm-output-to-clj
+#_(defn llm-output-to-clj
   "Remove preamble, read-string and spec-text chatty LLM response.
    Return a vector map process maps, that still have 'LLM keys'."
   [response rev-spec]
@@ -410,8 +412,10 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
       (when @past-rev
         (let [result (llm/query-on-thread
                       {:aid aid :tid tid :role "user"
+                       :tries 3 :test-fn (fn [resp] (s/valid? rev resp))
+                       :preprocess-fn (fn [resp] (-> resp remove-preamble edn/read-string))
                        :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
-          (reset! past-rev (llm-output-to-clj result rev))
+          (reset! past-rev result)
           (log/info "***************" rev "="  @past-rev))))
     (post-process @past-rev (name pid))))
 
@@ -446,7 +450,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
     (llm/query-on-thread
      {:aid aid :tid tid :role "user"
       :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
-                       "REV-1, REV-2, etc. What are the REVs that you know about?")})))
+                       "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))
 
 #_(def table-agent
   {:id :table-agent

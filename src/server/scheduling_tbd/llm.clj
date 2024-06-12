@@ -7,6 +7,7 @@
 
    N.B. LSP annotates many operators here as '0 references'; of course, they are used."
   (:require
+   [clojure.datafy               :refer [datafy]]
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
    [datahike.api                 :as d]
@@ -197,7 +198,7 @@
 
 ;;; You can also use this with role 'assistant', but the use cases might be a bit esoteric. (I can't think of any.)
 ;;; https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-role
-(defn query-on-thread
+(defn query-on-thread-aux
   "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
     aid      - assistant ID (the OpenAI notion)
     tid      - thread ID (ttheOpenAI notion)
@@ -206,7 +207,6 @@
    Returns text but uses promesa internally to deal with errors."
   [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 60 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   ;;(log/info "query-on-thread: query-text =" query-text)
-  (reset! diag _obj)
   (assert (#{"user" "assistant"} role))
   (assert (string? query-text))
   (assert (not-empty query-text))
@@ -235,6 +235,23 @@
               (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)})),
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
+
+(defn query-on-thread
+  "Wrap query-on-thread-aux to allow multiple tries at the same query.
+    :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
+    :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
+  [& {:keys [test-fn preprocess-fn] :or {test-fn (fn [_] true), preprocess-fn identity} :as obj}]
+  (let [obj (cond-> obj ; All recursive calls will contains? :tries.
+              (not (contains? obj :tries)) (assoc :tries 1))]
+    (assert (< (:tries obj) 10))
+    (if (> (:tries obj) 0)
+      (try (let [raw (reset! diag (query-on-thread-aux obj))
+                 res (preprocess-fn raw)]
+             (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
+           (catch Exception e
+             (log/warn "query-on-thread failed (might try again):" (-> e datafy :cause))
+             (query-on-thread (update obj :tries dec))))
+      (log/warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
 
 (defn ^:diag list-thread-messages
   "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
