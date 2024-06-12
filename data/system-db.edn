@@ -32,9 +32,9 @@
           :id :sur-canned-vegetables,
           :name "Sur Canned Vegetables"}
 
-#:project{:dir "/opt/scheduling/projects/sur-aluminium-cans",
-          :id :sur-aluminium-cans,
-          :name "Sur Aluminium Cans"}
+#:project{:dir "/opt/scheduling/projects/sur-aluminum-cans",
+          :id :sur-aluminum-cans,
+          :name "Sur Aluminum Cans"}
 
 #:project{:dir
           "/opt/scheduling/projects/sur-remanufactured-alternators",

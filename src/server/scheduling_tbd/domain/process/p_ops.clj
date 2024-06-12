@@ -46,8 +46,9 @@
       (when cites-supply?
         (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
                        "we'd like to put that aside for a minute and talk about the processes that make product.")]
-          (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
-          (db/add-msg pid :system msg)))
+          ;(ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
+          (db/add-msg pid :system msg)
+          (ws/refresh-client client-id pid :process)))
       ;; Complete preliminary analysis in a parallel agent that, in the case of a human expert, works independently.
       (db/add-planning-state pid (inv/parallel-expert-prelim-analysis pid)))))
 
@@ -74,12 +75,9 @@
     (db/add-planning-state pid more-state)
     (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
     (db/put-code pid new-code)
-    ;; ToDo: This should really be just for humans.
-    (ws/send-to-chat {:client-id client-id
-                      :dispatch-key :tbd-says
-                      :promise? false
-                      :msg minizinc-enum-announce})
+    ;; ToDo: This should really be just for humans. Maybe use the DB's message tags to decide that. (or to decide what to send).
     (db/add-msg pid :system minizinc-enum-announce [:info-to-user :minizinc])
+    (ws/refresh-client client-id pid :process)
     more-state))
 
 ;;; ----- :!query-process-durs ---------------------------------------------------------------------------------------------------------------------
@@ -96,7 +94,8 @@
                       "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)")]
     (-> obj (assoc :agent-query agent-query) (chat-pair [:process-durs]) db-action)))
 
-(defaction :!query-process-durs [{:keys [response pid] :as obj}]
+(defaction :!query-process-durs [{:keys [client-id response pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
   (let [more-state (inv/analyze-process-durs-response obj)]
+    (ws/refresh-client client-id pid :process)
     (db/add-planning-state pid more-state)))

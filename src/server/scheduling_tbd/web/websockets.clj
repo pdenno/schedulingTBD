@@ -327,6 +327,17 @@
         (log/info "dispatch: Sending response:" res))
       res)))
 
+;;; ToDo: Should this and a few others have promises? And should :promise? be called :round-trip?
+(defn refresh-client
+  "Send a message to the client to reload the conversation. Typically done with surrogate."
+  [client-id pid conv-id]
+  (assert (string? client-id))
+  (send-to-chat {:promise? false
+                 :client-id client-id
+                 :dispatch-key :update-conversation-text
+                 :pid pid
+                 :conv-id conv-id}))
+
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []
   (clear-promises!)

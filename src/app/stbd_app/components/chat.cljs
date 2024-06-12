@@ -91,7 +91,8 @@
 (defn update-msg-list
   "Update the dates on the msg list."
   []
-  ((lookup-fn :set-cs-msg-list) (msgs2cs ((lookup-fn :get-msg-list)))))
+  (log/info "update-msg-list")
+  ((lookup-fn :set-cs-msg-list) ((lookup-fn :get-msg-list))))
 
 ;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
 ;;; In the other cases, it takes whatever the DB says is current.
@@ -100,12 +101,12 @@
   ([pid conv-id]
    (-> (dba/get-conversation-http pid conv-id)
        (p/then (fn [{:keys [conv conv-id]}]
-                 (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "conv =" conv)
+                 (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "count =" (count conv))
                  (let [conv (if (empty? conv)
                               [#:message{:content "No discussion here yet.", :from :system, :time (js/Date. (.now js/Date))}]
                               conv)]
                    (reset! msgs-atm conv)
-                   ((lookup-fn :set-cs-msg-list) (msgs2cs conv))
+                   ((lookup-fn :set-cs-msg-list) conv)
                    ((lookup-fn :set-active-conv) conv-id)
                    (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
                    (update-common-info! {:project/id pid :conv-id conv-id}))))
@@ -113,7 +114,6 @@
                   (log/info "get-conversation failed:" e))))))
 
 (register-fn :get-conversation get-conversation)
-(def msg-list-external (atom []))
 
 (defnc Chat [{:keys [chat-height proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state [])
@@ -147,12 +147,12 @@
         (register-fn :set-sur-text (fn [text] (set-msg-list (conj @msgs-atm {:message/content text :message/from :surrogate}))))
         (register-fn :set-active-conv set-active-conv)
         (register-fn :set-busy? set-busy?)
-        (register-fn :get-msg-list  (fn [] @msgs-atm))  ; These two used to update message time.
-        (register-fn :set-cs-msg-list set-cs-msg-list)  ; These two used to update message time.
+        (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
+        (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs))))  ; These two used to update message time.
         (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-list)) 60000)))
-       (hooks/use-effect [msg-list]
-         (reset! msgs-atm msg-list)
-         (set-cs-msg-list (msgs2cs msg-list)))
+      (hooks/use-effect [msg-list]
+        (reset! msgs-atm msg-list)
+        (set-cs-msg-list (msgs2cs msg-list)))
       ;; ----------------- component UI structure.
       ($ ShareUpDown
          {:init-height chat-height

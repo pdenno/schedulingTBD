@@ -541,28 +541,29 @@
     (d/transact conn {:tx-data [[:db/add eid :project/code code-text]]})))
 
 (defn get-planning-state
-  "Return the planning state vector (a collection of ground propositions) for the argument project, or [] if none."
+  "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
   [pid]
   (if-let [state-str (d/q '[:find ?s .
                             :where
                             [_ :project/planning-problem ?pp]
                             [?pp :problem/state-string ?s]]
-                          @(connect-atm pid) pid)]
-    (->> state-str edn/read-string (sort-by first) vec)
-    []))
+                          @(connect-atm pid))]
+    (-> state-str edn/read-string set)
+    #{}))
 
 (defn put-planning-state
   "Write an updated state to the project database. Argument is a vector or set. "
   [pid state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
-  (let [state-set (set state)
-        conn (connect-atm pid)
-        eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
-    (d/transact conn
-                {:tx-data [[:db/add eid :problem/state-string (str state-set)]]})))
+  (if (empty? state)
+    (throw (ex-info "state is empty" {:pid pid}))
+    (let [state-set (set state)
+          conn (connect-atm pid)
+          eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
+      (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str state-set)]]}))))
 
 (defn add-planning-state
-  "Add the argument vector of ground proposition to state."
+  "Add the argument vector of ground proposition to state, a set."
   [pid more-state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
   (log/info "add-planning-state: more-state = " more-state)

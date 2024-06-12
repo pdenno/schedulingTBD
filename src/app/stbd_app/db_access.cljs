@@ -46,19 +46,19 @@
                                                      {:status status :status-text status-text})))})
      prom)))
 
-;;; This is used by either the client or the server/planner to update the conversation.
-;;; There is a ws dispatch for :resume-conversation-plan (to one of #{:process :data :resource}) which would then require this be called.
+;;; This is used by the server/planner to update the conversation.
+;;; Unlike chat/get-conversation, it doesn't resume-conversation because planning is already underway.
 (register-fn
  :update-conversation-text
  (fn [{:keys [pid conv-id]}]
    (assert (keyword? pid))
    (-> (get-conversation-http pid conv-id)
        (p/then (fn [resp]
+                 (log/info "update-conversation-text: msg count =" (-> resp :conv count))
                  (let [resp (cond-> resp
                               (-> resp :conv empty?) (assoc :conv [#:message{:content "No discussion here yet.",
                                                                              :from :system,
                                                                              :time (js/Date. (.now js/Date))}]))]
                    (update-common-info! resp)
-                   ;; These are hooks in core.cljs
-                   ((lookup-fn :set-conversation) resp)
+                   ((lookup-fn :set-cs-msg-list) (:conv resp))
                    ((lookup-fn :set-code) (:code resp))))))))

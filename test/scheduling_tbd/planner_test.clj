@@ -1,43 +1,11 @@
 (ns scheduling-tbd.planner-test
   (:require
-   [clojure.edn             :as edn]
-   [clojure.pprint          :refer [cl-format]]
    [clojure.spec.alpha      :as s]
    [clojure.test            :refer [deftest is testing]]
    [mznp.rewrite            :as rw]
-   [scheduling-tbd.db       :as db]
    [scheduling-tbd.planner  :as plan]
    [scheduling-tbd.specs    :as specs]
-   [scheduling-tbd.sutil    :as sutil]
-   [scheduling-tbd.web.websockets :as ws]
-   [taoensso.timbre          :as log]))
-
-(defn ^:diag ns-setup!
-  "Use this to setup useful aliases for working in this NS."
-  []
-  (alias 'uni    'clojure.core.unify)
-  (alias 'str    'clojure.string)
-  (alias 'd      'datahike.api)
-  (alias 'dp     'datahike.pull-api)
-  (alias 'mount  'mount.core)
-  (alias 'p      'promesa.core)
-  (alias 'px     'promesa.exec)
-  (alias 'core   'scheduling-tbd.core)
-  (alias 'dom    'scheduling-tbd.domain)
-  ;(alias 'domt    'scheduling-tbd.domain-test)
-  (alias 'how    'scheduling-tbd.how-made)
-  (alias 'llm    'scheduling-tbd.llm)
-  ;(alias 'llmt   'scheduling-tbd.llm-test)
-  (alias 'op     'scheduling-tbd.operators)
-  (alias 'opt    'scheduling-tbd.operators-test)
-  (alias 'resp   'scheduling-tbd.web.controllers.respond)
-  (alias 'spec   'scheduling-tbd.specs)
-  (alias 'sutil  'scheduling-tbd.sutil)
-  (alias 'sur    'scheduling-tbd.surrogate)
-  ;(alias 'surt   'scheduling-tbd.surrogate-test)
-  (alias 'util   'scheduling-tbd.util)
-  (alias 'ws     'scheduling-tbd.web.websockets)
-  (alias 'openai 'wkok.openai-clojure.api))
+   [scheduling-tbd.sutil    :as sutil]))
 
 (defn ^:diag test-mznp []
   (rw/rewrite*
@@ -101,8 +69,17 @@
         (finally
           (sutil/deregister-planning-domain ~id))))
 
+(defn tryme []
+  (with-planning-domain [:travel-domain travel-domain]
+    (plan/plan9
+     :travel-domain
+     '#{(at-work me) (have-car me)}
+     '[(be-at-home me)]
+     {:shop2? true})))
+
+
 (deftest simple-plans
-  (testing "Testing a simple sequential plan."
+  (testing "Testing a simple plan."
     (is (= '{:result :success,
              :plan-info {:plan [(!walk-to-car me) (!drive-car me) (!walk-garage-to-home me)],
                          :new-tasks [],
@@ -112,9 +89,9 @@
               :travel-domain
               '#{(at-work me) (have-car me)}
               '[(be-at-home me)]
-              {:testing? true})))))
+              {:shop2? true})))))
 
-  (testing "Testing a simple sequential plan, negated pre-condition."
+  (testing "Testing an alternative plan."
     (is (= '{:result :success,
              :plan-info {:plan [(!walk-to-bus-stop me) (!board-bus me) (!exit-bus me)],
                          :new-tasks [],
@@ -124,9 +101,9 @@
                 :travel-domain
                 '#{(at-work me)}
                 '[(be-at-home me)]
-                {:testing? true})))))
+                {:shop2? true})))))
 
-  (testing "Testing failure of the one plan, success of alternative."
+  (testing "Testing failure of the one plan, success of an alternative."
     (is (= '{:result :success,
              :plan-info {:plan [(!walk-to-bus-stop me) (!board-bus me) (!exit-bus me)],
                          :new-tasks [],
@@ -136,15 +113,15 @@
               :travel-domain
               '#{(at-work me) (have-car me)}
               '[(be-at-home me)]
-              {:testing? true
+              {:shop2? true
                :inject-failures '[(!drive-car me)]})))))
 
-  (testing "Testing failure of the only possible plan."
+  (testing "Testing failure of all plans."
     (is (= '{:result :failure, :reason :no-successful-plans}
            (with-planning-domain [:travel-domain travel-domain]
              (plan/plan9
               :travel-domain
               '#{(at-work me) (have-car me)}
               '[(be-at-home me)]
-              {:testing? true
+              {:shop2? true
                :inject-failures '[(!drive-car me) (!board-bus me)]}))))))
