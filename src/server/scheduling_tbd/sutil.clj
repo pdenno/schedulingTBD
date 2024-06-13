@@ -56,7 +56,7 @@
                                            "\nCreate directories 'projects' and 'system' under it.") {})))
          db-dir (->> (case type
                        :system           "/system"
-                       :project          (str "/projects/" (name id) "/db/")
+                       :project          (str "/projects/" (name id))
                        :planning-domains "/planning-domains"
                        :him              "/etc/other-dbs/him")
                      (str base-dir))]
@@ -169,7 +169,6 @@
        (p/then #(log/info "Long-running:" %))
        (p/catch #(log/warn "Long-running (exception):" %))))
 
-;;; ToDo: Ought to have the ability to find multiple.
 (defn find-fact
   "Unify the fact (which need not be ground) to the fact-list"
   [fact fact-list]
