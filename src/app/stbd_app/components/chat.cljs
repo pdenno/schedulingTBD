@@ -122,6 +122,7 @@
         [active-conv set-active-conv]   (hooks/use-state nil) ; active-conv is a keyword
         [busy? set-busy?]               (hooks/use-state nil)
         resize-fns (make-resize-fns set-box-height)]
+    (log/info "box-height = " box-height)
     (letfn [(change-conversation-click [to]
               (when-not busy?
                 (if-let [pid (:project/id @common-info)]
@@ -164,22 +165,22 @@
                            :flexDirection "column"
                            :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
                  ;; https://github.com/chatscope/use-chat-example/blob/main/src/components/Chat.tsx (See expecially :onChange and :onSend.)
-                 ($ MainContainer
+                 ($ MainContainer {:sx {:display "flex" :height box-height}}
                     ($ Sidebar {:position "left" :sx #js {:maxWidth "100px"}}
                        ($ ConversationList
                           ($ Conversation {:name "Process"
                                            :active (= active-conv :process)
                                            :onClick (fn [_] (change-conversation-click :process))})
-                          ($ Conversation {:name "Data"
-                                           :active (= active-conv :data)
-                                           :onClick (fn [_] (change-conversation-click :data))})
                           ($ Conversation {:name "Resources"
                                            :active (= active-conv :resource)
-                                           :onClick (fn [_] (change-conversation-click :resource))})))
+                                           :onClick (fn [_] (change-conversation-click :resource))})
+                          ($ Conversation {:name "Data"
+                                           :active (= active-conv :data)
+                                           :onClick (fn [_] (change-conversation-click :data))})))
                     ($ ChatContainer
                        ($ MessageList
                           {:typingIndicator (when busy? ($ TypingIndicator {:content "Interviewer is typing"}))
-                           :style #js {:height "500px"}}
+                          #_#_ :style #js {:height "500px"}}
                           cs-msg-list))))
           :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!
                  ($ Stack {:direction "row" :spacing "0px"}

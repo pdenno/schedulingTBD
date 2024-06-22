@@ -135,12 +135,16 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    depending on whether the project describes respectively work to provide a product or work to provide a service."
   [aid tid]
   (let [query (str "Would you characterize your company's work as primarily providing a product or a service? " ; ToDo: "firm's work" in all of these not good?
-                   "Respond respectively with either the single word PRODUCT or SERVICE.")
-        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
-        preds (cond (re-matches #".*(?i)PRODUCT.*" answer) '[(provides-product ?x)]
-                    (re-matches #".*(?i)SERVICE.*" answer) '[(provides-service ?x)]
-                    :else                                  '[(fails-query product-vs-service ?x)])]
-    {:query query :answer answer :preds preds}))
+                   "Respond respectively with either the single word PRODUCT or SERVICE.")]
+     (llm/query-on-thread {:aid aid :tid tid :query-text query
+                           :tries 2
+                           :preprocess-fn
+                           (fn [response]
+                             (merge {:query query :answer response}
+                                    (cond (re-matches #".*(?i)PRODUCT.*" response) {:preds '[(provides-product ?x)]}
+                                          (re-matches #".*(?i)SERVICE.*" response) {:preds '[(provides-service ?x)]}
+                                          :else                                    {:preds '[(fails-query product-vs-service ?x)]})))
+                           :test-fn (fn [x] (not (uni/unify (-> x :preds first) '(fails-query ?x ?y))))})))
 
 ;;; ToDo: Maybe what I really want is to split scheduling vs some notion of constraint satisfaction (which would include project management and cyclical scheduling)
 ;;;       But for the time meaning, it was this that came to mind.
@@ -155,13 +159,18 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                    "For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, "
                    "it is relying on you to determine how to best accommodate the engine and arrange the seats. "
                    "Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. "
-                   "Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ")
-        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
-        preds (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" answer)        '[(production-mode ?x make-to-stock)]
-                    (re-matches #".*(?i)MAKE-TO-ORDER.*" answer)        '[(production-mode ?x make-to-order)]
-                    (re-matches #".*(?i)ENGINEER-TO-ORDER.*" answer)    '[(production-mode ?x engineer-to-order)]
-                    :else                                               '[(fails-query production-mode ?x)])]
-    {:query query :answer answer :preds preds}))
+                   "Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ")]
+        (llm/query-on-thread {:aid aid :tid tid :query-text query
+                              :tries 2
+                              :preprocess-fn
+                              (fn [response]
+                                (merge {:query query :answer response}
+                                       (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" response)        {:preds '[(production-mode ?x make-to-stock)]}
+                                             (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        {:preds '[(production-mode ?x make-to-order)]}
+                                             (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    {:preds '[(production-mode ?x engineer-to-order)]}
+                                             :else                                                 {:preds '[(fails-query production-mode ?x)]})))
+                              :test-fn (fn [x] (not (uni/unify (-> x :preds first) '(fails-query ?x ?y))))})))
+
 
 (defn facility-vs-site
   "Return a vector of ground predicates (so far just either [(is-product ?x)] or [(is-service ?x)],
@@ -170,12 +179,16 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   (let [query (str "Some work, for example factory work, must be performed in a specially designed facility. "
                    "Other work, like cutting down a tree, can only be performed at a location designated by the customer. "
                    "Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? "
-                   "Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.")
-        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
-        preds (cond (re-matches #".*(?i)OUR-FACILITY.*" answer)  '[(has-production-facility ?x)]
-                    (re-matches #".*(?i)CUSTOMER-SITE.*" answer) '[(performed-at-customer-site ?x)]
-                    :else                                        '[(fails-query facility-vs-site ?x)])]
-    {:query query :answer answer :preds preds}))
+                   "Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.")]
+    (llm/query-on-thread {:aid aid :tid tid :query-text query
+                          :tries 2
+                          :preprocess-fn
+                          (fn [response]
+                            (merge {:query query :answer response}
+                                   (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  {:preds '[(has-production-facility ?x)]}
+                                         (re-matches #".*(?i)CUSTOMER-SITE.*" response) {:preds '[(performed-at-customer-site ?x)]}
+                                         :else                                          {:preds '[(fails-query facility-vs-site ?x)]})))
+                          :test-fn (fn [x] (not (uni/unify (-> x :preds first) '(fails-query ?x ?y))))})))
 
 (defn flow-vs-job
   "Return a vector of ground predicates (so far just either [(is-flow-shop ?x)] or [(is-job-shop ?x)] or [])
@@ -185,12 +198,17 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   (let [query (str "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. "
                    "A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. "
                    "Is the process you described more like a flow-shop or a job-shop? "
-                   "Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.")
-        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
-        preds (cond (re-matches #".*(?i)FLOW-SHOP.*" answer) '[(flow-shop ?x)]
-                    (re-matches #".*(?i)JOB-SHOP.*" answer)  '[(job-shop ?x)]
-                    :else                                    '[(fails-query flow-vs-job ?x)])]
-    {:query query :answer answer :preds preds}))
+                   "Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.")]
+    (llm/query-on-thread {:aid aid :tid tid :query-text query
+                          :tries 2
+                          :preprocess-fn
+                          (fn [response]
+                            (merge {:query query :answer response}
+                                   (cond (re-matches #".*(?i)FLOW-SHOP.*" response)  {:preds '[(flow-shop ?x)]}
+                                         (re-matches #".*(?i)JOB-SHOP.*"  response)  {:preds '[(job-shop ?x)]}
+                                         :else                                       {:preds '[(fails-query flow-vs-job ?x)]})))
+                          :test-fn (fn [x] (not (uni/unify (-> x :preds first) '(fails-query ?x ?y))))})))
+
 
 ;;; ToDo: Define attributes in DB and test starting a parallel expert.
 (defn parallel-expert-prelim-analysis
@@ -224,7 +242,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                (when write?
                  (db/add-msg pid :system query [:query])
                  (db/add-msg pid :surrogate answer [:response]))))
-           ;; The job-shop/flow-shop question is relevant only in situations shown.
+           ;; The job-shop/flow-shop question is relevant only in situations shown. <================ So do this with planner ????
            (when (and (find-fact '(provides-product ?x) @new-props)
                       (find-fact '(has-production-facility ?x) @new-props))
              (let [{:keys [query answer preds]} (flow-vs-job aid tid)
@@ -295,7 +313,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-;;; ----------------- analyze-process-durs-response (done with :process-agent) ----------------------------
+;;; ----------------- analyze-process-durs-response (done with :process-dur-agent) ----------------------------
 ;;; These are named by the output of the given revision.
 (s/def :rev-1/PROCESS string?)
 (s/def :rev-1/PROCESS-STEP number?)
@@ -373,20 +391,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
               :else             obj))]
       (sk obj))))
 
-#_(defn llm-output-to-clj
-  "Remove preamble, read-string and spec-text chatty LLM response.
-   Return a vector map process maps, that still have 'LLM keys'."
-  [response rev-spec]
-  (try
-    (let [response (remove-preamble response)
-          process-maps (edn/read-string response)]
-      (if (s/valid? rev-spec process-maps)
-        process-maps
-        (throw (ex-info "Does not pass spec check:" {:rev-spec rev-spec :process-maps process-maps}))))
-    (catch Exception e
-      (reset! diag {:response response :rev-spec rev-spec :error e})
-      (log/error "Unreadable response for rev" rev-spec ":" response :error e))))
-
 (defn post-process
   "Make the process-agent's LLM output suitable for the project's DB (process object etc.)"
   [process-maps super-process]
@@ -403,10 +407,10 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
             (-> db-style count range))))
 
 ;;; (inv/run-process-agent-steps data2)
-(defn run-process-agent-steps
+(defn run-process-dur-agent-steps
   "Run the steps of the process agent, checking work after each step."
   [response pid]
-  (let [{:keys [aid tid]} (db/get-agent :process-agent)
+  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent)
         past-rev (atom response)]
     (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]]
       (when @past-rev
@@ -432,7 +436,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Used predominantly with surrogates, study the response to a query about process durations,
    writing findings to the project database and returning state propositions."
   [{:keys [response pid] :as _obj}]
-  (let [process-objects (run-process-agent-steps response pid)
+  (let [process-objects (run-process-dur-agent-steps response pid)
         full-obj {:process/id pid
                   :process/desc response
                   :process/sub-processes process-objects}]
@@ -446,7 +450,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (defn ^:diag check-instructions
   "It might be the case that the system instructions were too long. This asks what it knows about."
   []
-  (let [{:keys [aid tid]} (db/get-agent :process-agent)]
+  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent)]
     (llm/query-on-thread
      {:aid aid :tid tid :role "user"
       :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "

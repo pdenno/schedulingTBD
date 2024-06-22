@@ -318,7 +318,7 @@
 (defn query-agent
   "Make a query to the Clojure agent."
   [agent-id query]
-  (assert (#{:process-agent :text-function-agent} agent-id))
+  (assert (#{:process-dur-agent :text-function-agent} agent-id))
   (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
                                      :keys aid tid
                                      :in $ ?agent-id

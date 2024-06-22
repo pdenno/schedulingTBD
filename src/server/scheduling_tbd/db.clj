@@ -371,16 +371,16 @@
                                                  :agent/thread-id tid}}]})))
 
 ;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
-(def process-durs-agent
-  "Instructions and training for :process-agent to help it get started."
-  {:id :process-durs-agent
-   :instruction (slurp "data/instructions/process-durs-agent.txt")})
+(def process-dur-agent
+  "Instructions and training for :process-dur-agent to help it get started."
+  {:id :process-dur-agent
+   :instruction (slurp "data/instructions/process-dur-agent.txt")})
 
 (def text-function-agent
   {:id :text-function-agent
    :instruction (slurp "data/instructions/text-function-agent.txt")})
 
-(def known-agents [process-durs-agent text-function-agent])
+(def known-agents [process-dur-agent text-function-agent])
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 ;;; Atom for the configuration map used for connecting to the project db.
@@ -796,7 +796,7 @@
 (defn get-agent
   "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)."
   [agent-id]
-  (assert (#{:process-agent :table-agent} agent-id))
+  (assert (#{:process-dur-agent :table-agent} agent-id))
   (-> (d/q '[:find ?aid ?tid
              :keys aid tid
              :in $ ?agent-id
