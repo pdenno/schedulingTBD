@@ -178,7 +178,9 @@
 (def planning-domains "An atom that associates a keyword key with a planning domain stucture (containing :domain/elems, :domain/problem)."
   (atom {}))
 
-(defn register-planning-domain [id domain]
+(defn register-planning-domain
+  "
+  [id domain]
   (log/info "Registering planning domain" id)
   (swap! planning-domains #(assoc % id domain)))
 (defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))

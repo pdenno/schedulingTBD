@@ -24,25 +24,15 @@
                 ;; ====== (ongoing-discussion ?proj) ===============================
                 {:method/head (discuss-process-detail ?proj)
                  :method/rhsides [{:method/case-name "well-known"
-                                   :method/task-list [(!query-process-steps ?proj)
-                                                      (!cites-supply-issues? ?proj)
-                                                      (!query-process-durs ?proj)]}
-                                  #_{:method/case-name "not-well-known"
-                                     :method/preconds [(flow-shop ?proj) (not (well-known-process ?proj))]
-                                     :method/task-list [(!query-process-steps ?proj)]}]}
-
-                ;; ====== (flow-shop-durs ?proj) ===============================
-                {:method/head (discuss-process-detail ?proj)
-                 :method/rhsides [{:method/case-name "well-known"
                                    :method/preconds [(flow-shop ?proj)]
-                                   :method/task-list [(!query-process-steps ?proj)
+                                   :method/task-list [(!yes-no-process-steps ?proj)
                                                       (!query-process-durs ?proj)]}
                                   #_{:method/case-name "not-well-known"
                                      :method/preconds [(flow-shop ?proj) (not (well-known-process ?proj))]
                                      :method/task-list [(!query-process-steps ?proj)]}]}
 
-                ;; (!query-process-steps ?proj)
-                {:operator/head (!query-process-steps ?proj)
+                ;; (!yes-no-process-steps ?proj)
+                {:operator/head (!yes-no-process-steps ?proj)
                  :operator/preconds [(proj-id ?proj)]
                  :operator/a-list [(have-process-steps ?proj)]} ; We've arranged so that if you already have all the a-list facts, it runs a no-op.
 

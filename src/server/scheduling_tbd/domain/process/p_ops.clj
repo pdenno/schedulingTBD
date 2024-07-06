@@ -1,12 +1,16 @@
 (ns scheduling-tbd.domain.process.p-ops
   "Planning operators for the process interview"
   (:require
+   [clojure.edn                               :as edn]
    [scheduling-tbd.db                         :as db]
    [scheduling-tbd.domain.process.p-interview :as inv]
    [scheduling-tbd.op-utils                   :as ou :refer [chat-pair db-action defoperator defaction make-human-project surrogate?]]
-   [scheduling-tbd.sutil                      :as sutil :refer [find-fact]]
+   [scheduling-tbd.sutil                      :as sutil :refer [register-planning-domain find-fact]]
    [scheduling-tbd.web.websockets             :as ws]
    [taoensso.timbre                           :as log]))
+
+;;; Place this in any file where you are developing the process interview so updates will be found.
+(register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
 
 (def ^:diag diag (atom nil))
 
@@ -31,7 +35,7 @@
     (-> obj (assoc :agent-query agent-query) (chat-pair [:initial-process-question]) db-action)))
 
 ;;; (op/db-action (assoc op/example :client-id (ws/recent-client!)))
-(defaction :!initial-process-question [{:keys [state response client-id agent-query] :as _obj}]
+(defaction :!initial-process-question [{:keys [state response client-id] :as _obj}]
   (log/info "*******db-action (!initial-process-question): response =" response "state =" state)
   (let [surrogate? (surrogate? state)
         analysis-state (inv/analyze-intro-response response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
@@ -39,30 +43,31 @@
     ;;--------  Now human/surrogate can be treated nearly identically ---------
     (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
           [_ pname] (find-fact '(proj-name ?x) analysis-state)
-          cites-supply? (find-fact '(cites-raw-material-challenge ?x) analysis-state)
           pid (keyword pid)]
       (db/add-planning-state pid analysis-state)
       (db/add-msg pid :system (format "Great, we'll call your project %s." pname) [:informative])
-      (when cites-supply?
-        (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
-                       "we'd like to put that aside for a minute and talk about the processes that make product.")]
-          ;(ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
-          (db/add-msg pid :system msg)
-          (ws/refresh-client client-id pid :process)))
       ;; Complete preliminary analysis in a parallel agent that, in the case of a human expert, works independently.
       (db/add-planning-state pid (inv/parallel-expert-prelim-analysis pid)))))
 
-;;; ----- :!yes-no-process-steps ---------------------------------------------------------------------------------------------------------------------
-(defoperator :!yes-no-process-steps [{:keys [state] :as obj}]
+(defoperator :!cites-supply-issues? [{:keys [state response client-id] :as _obj}]
+  (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
+                 "we'd like to put that aside for a minute and talk about the processes that make product.")]
+    (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
+    (let [[_ pid]   (find-fact '(proj-id ?x) state)]
+      (db/add-msg pid :system msg)
+      (ws/refresh-client client-id pid :process))))
+
+;;; ----- :!query-process-steps ---------------------------------------------------------------------------------------------------------------------
+(defoperator :!query-process-steps [{:keys [state] :as obj}]
   (let [agent-query (if (surrogate? state)
                       (str "Please list the steps of your process, one per line in the order they are executed to produce a product, "
                            "so it looks like this:\n"
                            "1. (the first step)\n"
                            "2. (the second step)...\n")
                       "Select the process steps from the list on the right that are typically part of your processes. \n (When done hit \"Submit\".)")]
-    (-> obj (assoc :agent-query agent-query) (chat-pair [:process-steps]) db-action)))
+    (-> obj (assoc :agent-query agent-query) (chat-pair [:query-process-steps]) db-action)))
 
-(defaction :!yes-no-process-steps [{:keys [pid response client-id] :as obj}]
+(defaction :!query-process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
   (reset! diag obj)
   (log/info "!yes-no-process-steps (action): response =" response)

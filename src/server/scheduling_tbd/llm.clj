@@ -119,7 +119,11 @@
           capitalize?                 (str/capitalize))
         (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
 
-(defn list-openai-models [] (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse))
+(defn list-openai-models
+  "List id and create date of all available models.
+   BTW, if there is no internet connection, on startup, this will be the first complaint."
+  []
+  (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse))
 
 (defn select-llm-models-openai
   []

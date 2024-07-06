@@ -14,8 +14,26 @@
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm find-fact register-planning-domain yes-no-unknown string2sym]]
    [taoensso.timbre               :as log]))
 
-(def ^:diag diag (atom nil))
 
+;;; (characterize-process ?p) => (classify-production-process ?p)
+;;;                              (analyze-process ?p)
+;;;
+;;; (classify-production-process ?p) => (!query-describe-challenge ?p)
+;;;                                     (!describe-process ?p)
+;;;                                     (!product-or-service? ?p)
+;;;                                     (!production-pattern ?p)      ; make-to-stock etc.
+;;;                                     (!activity-location-type ?p)
+;;;                                     (!shop-type ?p)
+;;;
+;;; (analyze-process ?p)   => :when (flow-shop ?p)
+;;;                           (!query-process-steps ?p)
+;;;                           (!query-process-durs ?p)
+;;;
+
+
+(def ^:diagAccess-NIST-Yubikey diag (atom nil))
+
+;;; Place this in any file where you are developing the process interview so updates will be found.
 (register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
 
 ;;; ------------------------------- project name --------------------------------------
