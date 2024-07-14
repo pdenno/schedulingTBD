@@ -47,7 +47,8 @@
      prom)))
 
 ;;; This is used by the server/planner to update the conversation.
-;;; Unlike chat/get-conversation, it doesn't resume-conversation because planning is already underway.
+;;; Unlike chat/get-conversation, the function for (lookup-fn :get-conversation),
+;;; it doesn't resume-conversation because planning is already underway.
 (register-fn
  :update-conversation-text
  (fn [{:keys [pid conv-id]}]

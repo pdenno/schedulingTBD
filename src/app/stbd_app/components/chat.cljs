@@ -102,14 +102,11 @@
    (-> (dba/get-conversation-http pid conv-id)
        (p/then (fn [{:keys [conv conv-id]}]
                  (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "count =" (count conv))
-                 (let [conv (if (empty? conv)
-                              [#:message{:content "No discussion here yet.", :from :system, :time (js/Date. (.now js/Date))}]
-                              conv)]
-                   (reset! msgs-atm conv)
-                   ((lookup-fn :set-cs-msg-list) conv)
-                   ((lookup-fn :set-active-conv) conv-id)
-                   (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
-                   (update-common-info! {:project/id pid :conv-id conv-id}))))
+                 (reset! msgs-atm conv)
+                 ((lookup-fn :set-cs-msg-list) conv)
+                 ((lookup-fn :set-active-conv) conv-id)
+                 (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
+                 (update-common-info! {:project/id pid :conv-id conv-id})))
        (p/catch (fn [e]
                   (log/info "get-conversation failed:" e))))))
 

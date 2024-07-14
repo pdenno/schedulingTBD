@@ -7,11 +7,14 @@
    [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
+   [scheduling-tbd.util  :as util :refer [now]]
    [taoensso.timbre          :as log])
   (:import
    [java.util Date]))
 
 (def ^:diag diag (atom {}))
+
+
 
 ;;; (resp/get-conversation {:query-params {:project-id "sur-craft-beer"}})
 (defn get-conversation
@@ -28,11 +31,13 @@
                     (-> (or conv-id
                             (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm project-id)))
                         keyword))
-          msgs    (when (and eid conv-id) (db/get-messages project-id conv-id))
+          msgs        (when (and eid conv-id) (db/get-conversation project-id conv-id))
+          empty-conv  [#:message{:content "No discussion here yet.", :from :system, :time (now)}]
           code    (when eid (db/get-code project-id))]
-      (log/info "get-conversation for" project-id "conv-id =" conv-id)
-      (cond (= project-id :START-A-NEW-PROJECT)     (http/ok {:project-id project-id :conv []})
-            (not conv-id)                           (http/ok {:project-id project-id :conv []})
+      (log/info "get-conversation for" project-id "conv-id =" conv-id "message count =" (count msgs))
+      (cond (= project-id :START-A-NEW-PROJECT)     (http/ok {:project-id project-id :conv empty-conv})
+            (not conv-id)                           (http/ok {:project-id project-id :conv empty-conv})
+            (empty? msgs)                           (http/ok {:project-id project-id :conv empty-conv})
             msgs                                    (http/ok {:project-id project-id :conv msgs :conv-id conv-id :code code})
             :else                                   (http/not-found)))))
 

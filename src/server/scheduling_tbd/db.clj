@@ -495,9 +495,9 @@
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
   #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time})
 
-(defn get-messages
+(defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  ([pid] (get-messages pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
+  ([pid] (get-conversation pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
   ([pid conversation]
    (assert (#{:process :data :resource} conversation))
    (if-let [eid (conversation-exists? pid conversation)]
@@ -543,18 +543,21 @@
 (defn get-planning-state
   "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
   [pid]
-  (if-let [state-str (d/q '[:find ?s .
-                            :where
-                            [_ :project/planning-problem ?pp]
-                            [?pp :problem/state-string ?s]]
-                          @(connect-atm pid))]
-    (-> state-str edn/read-string set)
-    #{}))
+  (if (= pid :START-A-NEW-PROJECT)
+    '#{(proj-id START-A-NEW-PROJECT)} ; Special treatment for new projects.
+    (if-let [state-str (d/q '[:find ?s .
+                              :where
+                              [_ :project/planning-problem ?pp]
+                              [?pp :problem/state-string ?s]]
+                            @(connect-atm pid))]
+      (-> state-str edn/read-string set)
+      #{})))
 
 (defn put-planning-state
-  "Write an updated state to the project database. Argument is a vector or set. "
+  "Write the complete state to the project database. Argument is a vector or set. "
   [pid state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
+  (log/info "put-planning-state: state =" state)
   (if (empty? state)
     (throw (ex-info "state is empty" {:pid pid}))
     (let [state-set (set state)
@@ -567,8 +570,10 @@
   [pid more-state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
   (log/info "add-planning-state: more-state = " more-state)
-  (let [new-state (into (get-planning-state pid) more-state)]
-    (put-planning-state pid new-state)
+  (let [new-state (into (get-planning-state pid) more-state)
+        conn (connect-atm pid)
+        eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
+    (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str new-state)]]})
     new-state))
 
 (defn get-process

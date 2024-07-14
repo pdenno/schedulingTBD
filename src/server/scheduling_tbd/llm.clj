@@ -285,10 +285,19 @@
   [id]
   (openai/delete-assistant {:assistant_id id} (api-credentials llm-provider)))
 
-(defn ^:diag delete-assistants-openai!
+(defn ^:diag delete-surrogates-openai!
   "Delete from the openai account all assistants that match the argument filter function.
    The default function check for metadata :usage='surrogate'."
-  ([] (delete-assistants-openai! #(#{"surrogate" "agent"} (-> % :metadata (get :usage)))))
+  ([] (delete-surrogates-openai! #(= "surrogate" (-> % :metadata (get :usage)))))
+  ([selection-fn]
+   (doseq [a (->> (list-assistants-openai) :data (filterv selection-fn))]
+     (log/info "Deleting assistant" (:name a) (:id a))
+     (delete-assistant-openai (:id a)))))
+
+(defn ^:diag delete-agents-openai!
+  "Delete from the openai account all assistants that match the argument filter function.
+   The default function check for metadata :usage='surrogate'."
+  ([] (delete-agents-openai! #(=  "agent" (-> % :metadata (get :usage)))))
   ([selection-fn]
    (doseq [a (->> (list-assistants-openai) :data (filterv selection-fn))]
      (log/info "Deleting assistant" (:name a) (:id a))

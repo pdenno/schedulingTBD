@@ -154,9 +154,8 @@
       ;; There are many reasons a websocket connection might be dropped.
       ;; It is absolutely necessary that it exits the go loop when the socket closes; a race condition my occur otherwise.
       ;; The socket is closes when, for example, there is a WebSocketTimeoutException from the client (see error-listener).
-      ;; I think there is still value in looking for inactive sockets and closing them, but I probably should implement
-      ;; alive? because the client will have to make another websocke request otherwise, and it doesn't seem to notice
-      ;; that the sever isn't listening to it!
+      ;; I think there is still value in looking for inactive sockets and closing them. I implemented alive? because the client
+      ;; will have to make another websocke request otherwise, and it doesn't seem to notice that the sever isn't listening to it!
       #_(log/info "Exiting dispatching loop:" client-id))))
 
 (defn establish-websocket-handler
@@ -168,7 +167,7 @@
    Returns a map with value for key :ring.websocket/listener."
   [request]
   ;;(log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
-  (future (close-inactive-channels))
+  (future (close-inactive-channels)) ; ToDo: There could be several of these running. Does it matter? Probably want an atom for it.
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]
       (error-listener client-id)   ; This and next are go loops,

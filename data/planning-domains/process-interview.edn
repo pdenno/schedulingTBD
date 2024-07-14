@@ -16,14 +16,15 @@
                                    :method/task-list [(!describe-challenge ?p)
                                                       (remark-raw-material-challenge? ?p)]}]}
 
-                {:method/head (remark-raw-material-challenge? ?p)
+                {:method/head (remark-raw-material-challenge? ?p) ; ToDo: This is even valuable for a parallel expert. "Say something."
                  :method/rhsides [{:method/case "cited"
                                    :method/preconds [(cites-raw-material-challenge ?p)]
                                    :method/task-list [(!remark-raw-material-challenge ?p)]}
                                   {:method/case "not-cited"
                                    :method/preconds [(not (cites-raw-material-challenge ?p))]
-                                   :method/task-list [(!pass-thru)]}]}
+                                   :method/task-list [(!do-nothing)]}]}
 
+                {:operator/head (!do-nothing)}             ; Special purpose
                 {:operator/head (!describe-challenge ?p)}  ; This is first question of process interview.
                 {:operator/head (!remark-raw-material-challenge ?p)}
 
@@ -50,16 +51,16 @@
 
                 {:operator/head (!query-process-steps ?p)  ; This is parallel expert warm up.
                  :operator/preconds [(flow-shop ?p)]
-                 :operator/a-list [(done !query-process-steps ?p)]}
+                 :operator/a-list [(done !query-process-steps ?p)]} ; <================ These are going to be automatic.
 
                 {:operator/head (!query-process-durs ?p)
                  :operator/preconds [(flow-shop ?p)]
-                 :operator/a-list [(done !query-process-durs ?p)]}
+                 :operator/a-list [(done !query-process-durs ?p)]} ; <================ These are going to be automatic.
 
 ;;; ------------------------- verify-process --------------------------------------
                 {:method/head (verify-process ?p)
                  :method/rhsides [{:method/preconds [(proj-id ?p)]
-                                   :method/task-list [(!pass-thru)]}]} ; NYI
+                                   :method/task-list [(!do-nothing)]}]} ; NYI
 
 ;;; ------------------------- axioms  -------------------------------------
                 {:axiom/head (same ?x ?x)}

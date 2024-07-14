@@ -22,19 +22,20 @@
                   :msg-link/text "learn more about how this works"}]}
    {:msg-text/string "."}])
 
-;;;=================================================== Operators ======================================
-;;; Operator db-actions update state in the db (db/add-plannin-state) and return nil.
-;;; The update does not include the call to operator-update-state, which applies the d-list and a-list.
-;;; operator-update-state is called by the planner, plan/update-planning.
+(defoperator :!do-nothing [obj] obj)
 
+;;;=================================================== Operators ========================================
+;;; The operator's defoperator (expands to an ou/operator-meth method) takes a single argument that is a
+;;; map of options, which includes keys  :state, and :tag (the :!whatever which names the operator.
+
+;;; The operator's defaction (expands to an ou/ db-action method) updates state in the db (db/add-planning-state)
+;;; and return nil. Further updating owing to the a/d lists of the operator occurs later in
+;;; ou/operator-update-state, which is called by plan/update-planning.
 (defoperator :!describe-challenge [{:keys [state] :as obj}]
-  (let [agent-query (if (surrogate? state)
-                      "Describe your most significant scheduling problem in a few sentences."
-                      (str "Describe your most significant scheduling problem in a few sentences or "
-                           "<a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>."))]
+  (let [query "Describe your most significant scheduling problem in a few sentences."]
     (-> obj
-        (assoc :agent-query agent-query)
-        (chat-pair {:msg-keys [:initial-process-question]})
+        (assoc :agent-query query)
+        (chat-pair {:tags [:!describe-challenge]})
         db-action)))
 
 ;;; (op/db-action (assoc op/example :client-id (ws/recent-client!)))
@@ -48,22 +49,22 @@
           [_ pname] (find-fact '(proj-name ?x) analysis-state)
           pid (keyword pid)]
       (db/add-planning-state pid analysis-state)
-      (db/add-msg pid :system (format "Great, we'll call your project %s." pname) [:informative])
+      (db/add-msg pid :system (format "Great, we'll call your project %s." pname) [:!describe-challenge :informative])
       (ws/refresh-client client-id pid :process))))
 
 ;;; Above :!describe-challenges may add-planning-state (cites-raw-material-challenge ?p).
-(defoperator :!remark-raw-material-challenge [{:keys [pid state response client-id] :as _obj}]
-  (let [msg (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
+(defoperator :!remark-raw-material-challenge [{:keys [pid client-id] :as _obj}]
+  (let [info (str "Though you've cited a challenge with inputs (raw material, workers, or other resources), "
                  "we'd like to put that aside for a minute and talk about the processes that make product.")]
-    (ws/send-to-chat {:promise? nil :client-id client-id :dispatch-key :tbd-says :msg msg})
-    (db/add-msg pid :system msg)))
+    (db/add-msg pid :system info [:!remark-raw-material-challenge :informative])
+    (ws/refresh-client client-id pid :process)))
 
 ;;; ----- :!describe-process -----------------------------------------------------------------
 (defoperator :!describe-process [obj]
   (let [query "Please briefly describe your production processes."]
     (-> obj
         (assoc :agent-query query)
-        chat-pair)))
+        chat-pair {:tags :!describe-process})))
 
 ;;; ----- :!query-product-or-service ---------------------------------------------------------
 (defoperator :!query-product-or-service [obj]
@@ -71,13 +72,14 @@
                    "Respond respectively with either the single word PRODUCT or SERVICE.")]
     (-> obj
         (assoc :agent-query query)
-        (chat-pair {:tries 2})
+        (chat-pair {:tags [:query-product-or-service] :tries 2})
         db-action)))
 
-(defaction :!query-product-or-service [{:keys [pid client-id response] :as _obj}]
-  (let [new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid)
-                       (re-matches #".*(?i)SERVICE.*" response) (list 'provides-service pid)
-                       :else                                    (list 'fails-query 'product-or-service? pid))]
+(defaction :!query-product-or-service [{:keys [pid response] :as _obj}]
+  (let [pid-sym (-> pid name symbol)
+        new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid-sym)
+                       (re-matches #".*(?i)SERVICE.*" response) (list 'provides-service pid-sym)
+                       :else                                    (list 'fails-query 'product-or-service? pid-sym))]
     (db/add-planning-state pid [new-fact])))
 
 ;;; ----- :!query-production-mode ---------------------------------------------------------
@@ -92,14 +94,15 @@
                    "Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ")]
     (-> obj
         (assoc :agent-query query)
-        (chat-pair #_{:tries 2}) ; <============================== Not sure tries>1 makes sense unless :preprocess-fn and :test are specified.
+        (chat-pair {:tags [:!query-production-mode] #_#_:tries 2}) ; <============================== Not sure tries>1 makes sense unless :preprocess-fn and :test are specified.
         db-action)))
 
 (defaction :!query-production-mode [{:keys [pid response] :as _obj}]
-  (let [new-fact (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" response)        (list 'production-mode pid 'make-to-stock)
-                       (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        (list 'production-mode pid 'make-to-order)
-                       (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    (list 'production-mode pid 'engineer-to-order)
-                       :else                                                 (list 'fails-query 'production-mode pid))]
+  (let [pid-sym (-> pid name symbol)
+        new-fact (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" response)        (list 'production-mode pid-sym 'make-to-stock)
+                       (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        (list 'production-mode pid-sym 'make-to-order)
+                       (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    (list 'production-mode pid-sym 'engineer-to-order)
+                       :else                                                 (list 'fails-query 'production-mode pid-sym))]
     (db/add-planning-state pid [new-fact])))
 
 ;;; ----- :!query-activity-location-type ---------------------------------------------------------
@@ -110,14 +113,14 @@
                    "Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.")]
     (-> obj
         (assoc :agent-query query)
-        (chat-pair #_{:tries 2})
+        (chat-pair {:tags [:!query-activity-location-type] #_#_:tries 2})
         db-action)))
 
-;;; ----- :!query-activity-location-type ---------------------------------------------------------
 (defaction :!query-activity-location-type [{:keys [pid response] :as _obj}]
-  (let [new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'has-production-facility pid)
-                       (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'performed-at-customer-site pid)
-                       :else                                          (list 'fails-query 'facility-vs-site pid))]
+  (let [pid-sym (-> pid name symbol)
+        new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'has-production-facility pid-sym)
+                       (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'performed-at-customer-site pid-sym)
+                       :else                                          (list 'fails-query 'facility-vs-site pid-sym))]
     (db/add-planning-state pid [new-fact])))
 
 ;;; ----- :!query-shop-type ---------------------------------------------------------
@@ -128,13 +131,14 @@
                    "Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.")]
     (-> obj
         (assoc :agent-query query)
-        (chat-pair #_{:tries 2})
+        (chat-pair {:tags [:!query-shop-type] #_#_:tries 2})
         db-action)))
 
 (defaction :!query-shop-type [{:keys [pid response] :as _obj}]
-  (let [new-fact (cond (re-matches #".*(?i)FLOW-SHOP.*" response)  {:preds '[(flow-shop ?x)]}
-                       (re-matches #".*(?i)JOB-SHOP.*"  response)  {:preds '[(job-shop ?x)]}
-                       :else                                       {:preds '[(fails-query flow-vs-job ?x)]})]
+  (let [pid-sym (-> pid name symbol)
+        new-fact (cond (re-matches #".*(?i)FLOW-SHOP.*" response)  (list 'flow-shop pid-sym)
+                       (re-matches #".*(?i)JOB-SHOP.*"  response)  (list 'job-shop pid-sym)
+                       :else                                       (list 'fails-query 'flow-vs-job pid-sym))]
     (db/add-planning-state pid [new-fact])))
 
 ;;; ----- :!query-process-steps. This is for flow shops. ------------------------------------------------
@@ -147,28 +151,17 @@
                       "Select the process steps from the list on the right that are typically part of your processes. \n (When done hit \"Submit\".)")]
     (-> obj
         (assoc :agent-query agent-query)
-        (chat-pair {:msg-keys [:query-process-steps]})
-        db-action)))
+        (chat-pair {:tags [:query-process-steps]}))))
 
 (defaction :!query-process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
-  (reset! diag obj)
-  (log/info "!yes-no-process-steps (action): response =" response)
-  (let [more-state (inv/analyze-process-steps-response obj)
-        new-code (inv/mzn-process-steps more-state)
-        minizinc-enum-announce
-        (str "Okay, we now know enough to get started on a MiniZinc solution. "
-             "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. "
-             "The 'enum values' name the steps of your process in the order they are executed for each product.")]
-    (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
-    (db/put-code pid new-code)
-    ;; ToDo: This should really be just for humans. Maybe use the DB's message tags to decide that. (or to decide what to send).
-    (db/add-msg pid :system minizinc-enum-announce [:info-to-user :minizinc])
-    (ws/refresh-client client-id pid :process)
+  (let [more-state (inv/analyze-process-steps-response obj)]
+    (log/info "---------------------- !query-process-steps: more-state = " more-state)
     (db/add-planning-state pid more-state)))
 
 ;;; ----- :!query-process-durs -----------------------------------------------------------
 (defoperator :!query-process-durs [{:keys [state] :as obj}]
+  (log/info "---------------------- !query-process-durs: state = "state)
   (let [agent-query (if (surrogate? state)
                       (format (str "I suppose processing times for each of the steps you just mentioned might vary from product to product. "
                                    "But generally speaking, how long does each step take? "
@@ -181,11 +174,20 @@
                       "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)")]
     (-> obj
         (assoc :agent-query agent-query)
-        (chat-pair {:msg-keys [:process-durs]})
+        (chat-pair {:tags [:!query-process-durs]})
         db-action)))
 
 (defaction :!query-process-durs [{:keys [client-id response pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
-  (let [more-state (inv/analyze-process-durs-response obj)]
+  (let [more-state (inv/analyze-process-durs-response obj)
+        new-code (inv/mzn-process-steps more-state)
+        minizinc-enum-announce
+        (str "Okay, we now know enough to get started on a MiniZinc solution. "
+             "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. "
+             "The 'enum values' name the steps of your process in the order they are executed for each product.")]
+    (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
+    (db/put-code pid new-code)
+    ;; ToDo: This should really be just for humans. Maybe use the DB's message tags to decide that. (or to decide what to send).
+    (db/add-msg pid :system minizinc-enum-announce [:info-to-user :minizinc])
     (ws/refresh-client client-id pid :process)
     (db/add-planning-state pid more-state)))
