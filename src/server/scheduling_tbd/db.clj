@@ -563,11 +563,13 @@
       (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str state-set)]]}))))
 
 (defn add-planning-state
-  "Add the argument vector of ground proposition to state, a set."
+  "Add the argument vector of ground proposition to state, a set. Return the new state."
   [pid more-state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
   (log/info "add-planning-state: more-state = " more-state)
-  (put-planning-state pid (into (get-planning-state pid) more-state)))
+  (let [new-state (into (get-planning-state pid) more-state)]
+    (put-planning-state pid new-state)
+    new-state))
 
 (defn get-process
   "Return the process structure for the argument pid and process-id."

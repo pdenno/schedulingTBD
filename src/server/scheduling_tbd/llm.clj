@@ -246,8 +246,10 @@
     :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
   [& {:keys [test-fn preprocess-fn] :or {test-fn (fn [_] true), preprocess-fn identity} :as obj}]
   (let [obj (cond-> obj ; All recursive calls will contains? :tries.
-              (not (contains? obj :tries)) (assoc :tries 1))]
+              (or (not (contains? obj :tries))
+                  (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
     (assert (< (:tries obj) 10))
+    (log/info "preprocess-fn = " preprocess-fn)
     (if (> (:tries obj) 0)
       (try (let [raw (reset! diag (query-on-thread-aux obj))
                  res (preprocess-fn raw)]

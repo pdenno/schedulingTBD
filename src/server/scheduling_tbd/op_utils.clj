@@ -3,6 +3,7 @@
   (:refer-clojure :exclude [send])
   (:require
    [clojure.core.unify    :as uni]
+   [clojure.datafy        :refer [datafy]]
    [clojure.pprint        :refer [cl-format]]
    [clojure.spec.alpha    :as s]
    [promesa.core          :as p]
@@ -10,7 +11,7 @@
    [scheduling-tbd.db     :as db]
    [scheduling-tbd.llm    :as llm]
    [scheduling-tbd.specs  :as spec]
-   [scheduling-tbd.sutil  :as sutil :refer [find-fact]]
+   [scheduling-tbd.sutil  :as sutil :refer [find-fact domain-conversation]]
    [scheduling-tbd.web.websockets  :as ws]
    [taoensso.timbre       :as log]))
 
@@ -62,7 +63,8 @@
 
 ;;; --------  db-actions is similar but adds a second object, the response from the operator -----------------------------------
 (defmacro defaction
-  "Macro to wrap methods for updating the project's database for effects from running an operation."
+  "Macro to wrap methods for updating the project's database for effects from running an operation.
+   Returned value is not meaningful."
   {:clj-kondo/lint-as 'clojure.core/defmacro
    :arglists '(tag [arg-map] & body)}
   [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
@@ -88,6 +90,7 @@
    Where the testing? option is true, there typically are not defoperation operators actions and the state
    returned is just the state argument; there is no state-chaning response from user, so it behaves like SHOP2."
   [state {:operator/keys [head a-list] :as _task} {:keys [testing? inject-failures pid] :as opts}]
+  (log/info "\n\n\n***** run-operator! head =" head)
   (let [op-tag (-> head first keyword)]
     (cond (some #(uni/unify head %) inject-failures)         (do (log/info "+++Operator FAILURE (INJECTED):" op-tag)
                                                                   (throw (ex-info "run-operator injected failure" {:op-head op-tag})))
@@ -95,19 +98,23 @@
            (not-empty a-list)
            (every?
             (fn [a-item]
-              (some #(uni/unify a-item %) state)) a-list))   (log/info "+++Operator" op-tag "pass-through (SATISFIED)")
+              (some #(uni/unify a-item %) state)) a-list))   (do (log/info "+++Operator" op-tag "pass-through (SATISFIED)")
+                                                                 (db/get-planning-state pid))
+
+
+          (= op-tag :!pass-thru)                             (do (log/info "+++Operator" op-tag "pass-through (:pass-thru)")
+                                                                 (db/get-planning-state pid))
 
           (@operator-method? op-tag)                         (do (operator-meth (-> opts
                                                                                     (assoc :state state)
                                                                                     (assoc :tag op-tag)
                                                                                     (dissoc :inject-failures)))
-                                                                 (log/info "+++Operator" op-tag "ran (ACTUAL) state = " (db/get-planning-state pid)))
+                                                                 (db/get-planning-state pid))
 
           :else                                               (do (if testing?
                                                                     (log/info  "+++Operator" op-tag "pass-through (No defoperator, testing)")
                                                                     (log/error "+++Operator" op-tag "Expected a matching defoperator."))
                                                                   state))))
-
 
 
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
@@ -150,30 +157,39 @@
    Returns promise which will resolve to the original obj argument except:
      1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
      2) :response is added. Typically its value is a string."
-  [{:keys [pid state agent-query] :as obj}]
-  (log/info "Chat pair: surrogate? =" (surrogate? state))
+  [{:keys [pid state agent-query] :as obj} {:keys [tries preprocess-fn] :or {tries 1 preprocess-fn identity}}]
   (let [aid (db/get-assistant-id pid nil)
         tid (db/get-thread-id pid nil)
         agent-type (if (surrogate? state) :surrogate :human)
         prom (if (= :surrogate agent-type)
                (px/submit! (fn []
                              (try
-                               (llm/query-on-thread :tid tid :aid aid :query-text agent-query)   ; This can timeout.
+                               (llm/query-on-thread :tid tid            ; This can timeout.
+                                                    :aid aid
+                                                    :query-text agent-query
+                                                    :tries tries
+                                                    :preprocess-fn preprocess-fn)
                                (catch Exception e {:error e}))))
                (ws/send-to-chat (-> obj
                                     (assoc :msg agent-query)
-                                    (assoc :dispatch-key :tbd-says))))]                                             ; This cannot timeout.
-    (p/await prom))); You can't put anything else here or a promise will be passed! ; ToDo: Fix this. Put a catch before the p/await!.
+                                    (assoc :dispatch-key :tbd-says))))] ; This cannot timeout.
+    (-> prom
+;;        (p/catch (fn [e]
+;;                   (reset! diag (datafy e))
+;;                   (log/error "Failed in chag-pair-aux:" (datafy e))))
+        p/await)))
 
 (defn chat-pair
   "Call to run the chat and put the query and response into the project's database.
-   Returns the argument object with :response set to some text."
-  ([obj] (chat-pair obj []))
-  ([{:keys [pid state agent-query] :as obj} msg-keys]
-   (let [response-text (chat-pair-aux obj)]
+   Returns the argument object with :response set to some text.
+   Note that this also updates the UI (ws/refresh-client)"
+  ([obj] (chat-pair obj {}))
+  ([{:keys [pid state agent-query client-id domain-id] :as obj}, {:keys [msg-keys] :or {msg-keys []} :as opts}]
+   (let [response-text (chat-pair-aux obj opts)]
      (if (string? response-text)
        (let [user-role (if (surrogate? state) :surrogate :human)]
          (db/add-msg pid :system agent-query (conj msg-keys :query))
          (db/add-msg pid user-role response-text (conj msg-keys :response))
+         (ws/refresh-client client-id pid (domain-conversation domain-id)) ; ToDo: fix this.
          (assoc obj :response response-text))
        (throw (ex-info "Unknown response from operator" {:response response-text}))))))

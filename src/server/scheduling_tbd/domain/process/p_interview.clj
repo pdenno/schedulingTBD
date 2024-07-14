@@ -14,24 +14,7 @@
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm find-fact register-planning-domain yes-no-unknown string2sym]]
    [taoensso.timbre               :as log]))
 
-
-;;; (characterize-process ?p) => (classify-production-process ?p)
-;;;                              (analyze-process ?p)
-;;;
-;;; (classify-production-process ?p) => (!query-describe-challenge ?p)
-;;;                                     (!describe-process ?p)
-;;;                                     (!product-or-service? ?p)
-;;;                                     (!production-pattern ?p)      ; make-to-stock etc.
-;;;                                     (!activity-location-type ?p)
-;;;                                     (!shop-type ?p)
-;;;
-;;; (analyze-process ?p)   => :when (flow-shop ?p)
-;;;                           (!query-process-steps ?p)
-;;;                           (!query-process-durs ?p)
-;;;
-
-
-(def ^:diagAccess-NIST-Yubikey diag (atom nil))
+(def ^:diag diag (atom nil))
 
 ;;; Place this in any file where you are developing the process interview so updates will be found.
 (register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
@@ -135,11 +118,11 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   [text]
   (-> (conj raw-material-challenge-partial
             {:role "user" :content (format "[%s]" text)})
-      (query-llm {:model-class :gpt-3.5})
+      (query-llm {:model-class :gpt-4})
       yes-no-unknown))
 
 ;;; ----------------------- parallel expert preliminary analysis  ---------------------------------------------------------
-(defn ask-about-process-on-thread!
+#_(defn ask-about-process-on-thread!
   "Ask the surrogate to describe production processes. We don't care what is returned, we just
    are developing context to do some downstream preliminary analysis.
    We put these into the conversation under surrogate."
@@ -148,7 +131,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
     {:query msg
      :answer (llm/query-on-thread :aid aid :tid tid :query-text msg)}))
 
-(defn product-vs-service
+#_(defn product-vs-service
   "Return a vector of ground predicates (so far just either [(provides-product ?x)] or [(provides-service ?x)],
    depending on whether the project describes respectively work to provide a product or work to provide a service."
   [aid tid]
@@ -166,7 +149,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 
 ;;; ToDo: Maybe what I really want is to split scheduling vs some notion of constraint satisfaction (which would include project management and cyclical scheduling)
 ;;;       But for the time meaning, it was this that came to mind.
-(defn production-mode
+#_(defn production-mode
   "Return a vector of one predicates of the form (production-mode ?x <mode>) where <mode> is on of make-to-stock, make-to-order, or engineer-to-order.
    depending on what the agent deems more relevant to their operations."
   [aid tid]
@@ -190,7 +173,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                               :test-fn (fn [x] (not (uni/unify (-> x :preds first) '(fails-query ?x ?y))))})))
 
 
-(defn facility-vs-site
+#_(defn facility-vs-site
   "Return a vector of ground predicates (so far just either [(is-product ?x)] or [(is-service ?x)],
    depending on whether the project describes respectively work to provide a product or work to provide a service."
   [aid tid]
@@ -208,7 +191,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                                          :else                                          {:preds '[(fails-query facility-vs-site ?x)]})))
                           :test-fn (fn [x] (not (uni/unify (-> x :preds first) '(fails-query ?x ?y))))})))
 
-(defn flow-vs-job
+#_(defn flow-vs-job
   "Return a vector of ground predicates (so far just either [(is-flow-shop ?x)] or [(is-job-shop ?x)] or [])
    depending on whether the project describes respectively work to provide a product or work to provide a service.
    Note that this question is only applied where (provides-product ?x) (scheduling-problem ?x) (has-production-facility ?x)."
@@ -229,7 +212,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 
 
 ;;; ToDo: Define attributes in DB and test starting a parallel expert.
-(defn parallel-expert-prelim-analysis
+#_(defn parallel-expert-prelim-analysis
   "Query surogate for preliminary characterization of the scheduling problem including:
       - product vs. service
       - production facility vs. customer site,

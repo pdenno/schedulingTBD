@@ -8,12 +8,12 @@
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
            funcool/promesa                     {:mvn/version "11.0.678"}
-           io.replikativ/datahike              {:mvn/version "0.6.1562"}
+           io.replikativ/datahike              {:mvn/version "0.6.1568"}
            metosin/muuntaja                    {:mvn/version "0.6.10"}
-           metosin/reitit                      {:mvn/version "0.7.0"}
-           metosin/ring-http-response          {:mvn/version "0.9.3"}
+           metosin/reitit                      {:mvn/version "0.7.1"}
+           metosin/ring-http-response          {:mvn/version "0.9.4"}
            mount/mount                         {:mvn/version "0.1.18"}
-           net.clojars.wkok/openai-clojure     {:mvn/version "0.18.0"}
+           net.clojars.wkok/openai-clojure     {:mvn/version "0.18.1"}
            org.apache.logging.log4j/log4j-api  {:mvn/version "2.23.1"} ; ToDo: Move logging to :dev.
            org.apache.logging.log4j/log4j-core {:mvn/version "2.23.1"} ; ToDo: Move logging to :dev.
            org.clj-commons/hickory             {:mvn/version "0.7.4"}
@@ -24,9 +24,9 @@
            org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"} ;  "0.1.19" Does not exist.
            org.slf4j/slf4j-nop                 {:mvn/version "2.0.13"}    ; Stop spurious logging!
            ring/ring-defaults                  {:mvn/version "0.5.0"}
-           ring/ring-jetty-adapter             {:mvn/version "1.12.1"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
-           ring/ring-core                      {:mvn/version "1.12.1"}  ;; I switched to try org.ring-clojure/ring-websocket-async
-           ring/ring-devel                     {:mvn/version "1.12.1"}  ;; Of course, both could have been accommodated.
+           ring/ring-jetty-adapter             {:mvn/version "1.12.2"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
+           ring/ring-core                      {:mvn/version "1.12.2"}  ;; I switched to try org.ring-clojure/ring-websocket-async
+           ring/ring-devel                     {:mvn/version "1.12.2"}  ;; Of course, both could have been accommodated.
            ring-cors/ring-cors                 {:mvn/version "0.1.13"}
            selmer/selmer                       {:mvn/version "1.12.61"}} ; Used for home.html.
 
@@ -37,7 +37,7 @@
                           ;; :dev includes src/server (for use with exerciser) thus much of this stuff.
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
                                            ;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
-                                           cider/cider-nrepl               {:mvn/version "0.49.0"}
+                                           cider/cider-nrepl               {:mvn/version "0.49.1"}
                                            com.lambdaisland/classpath      {:mvn/version "0.5.48"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
                                            lilactown/helix                 {:mvn/version "0.2.1"}
@@ -53,20 +53,20 @@
                                          org.clojure/tools.namespace  {:mvn/version "1.5.0"}}}
 
            :app       {:extra-paths ["src/app" "src/server" "test"] ; src/server has shared util.cljc
-                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.28.9"}
+                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.28.10"}
                                      lilactown/helix                {:mvn/version "0.2.1"}
                                      cljs-ajax/cljs-ajax            {:mvn/version "0.8.4"}
                                      applied-science/js-interop     {:mvn/version "0.4.2"}}}
 
            :kaochaSTBD {:extra-paths    ["test" "env/dev"]
-                        :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.28.9"}
+                        :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.28.10"}
                                          lambdaisland/kaocha       {:mvn/version "1.91.1392"}
                                          lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                                          com.lambdaisland/glogi    {:mvn/version "1.3.169"}
                                          nrepl/nrepl               {:mvn/version "1.2.0"}
-                                         cider/cider-nrepl         {:mvn/version "0.49.0"}}}
+                                         cider/cider-nrepl         {:mvn/version "0.49.1"}}}
 
-           :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.10.4"}}
+           :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
                       :ns-default build}
 
            ;; clj -M:morpheus -d graphs -f svg -e 'clojure.core/.*|:clj-kondo/unknown-namespace/.*|:cljs.core/.*' src
@@ -75,15 +75,19 @@
                             :main-opts       ["-m" "thomasa.morpheus.main"]}}}
 
 ;;; clj -X:search/outdated
-;;;  |    :file |                                 :name |    :current |   :latest |
-;;;  |----------+---------------------------------------+-------------+-----------|
-;;;  | deps.edn |                     cider/cider-nrepl |      0.47.1 |    0.49.0 |
-;;;  |          |         io.github.clojure/tools.build |      0.10.3 |    0.10.4 |
-;;;  |          |                io.replikativ/datahike |    0.6.1559 |  0.6.1562 |
-;;;  |          |                   lambdaisland/kaocha |   1.89.1380 | 1.91.1392 |
-;;;  |          |                       lilactown/helix |       0.2.0 |     0.2.1 |
-;;;  |          |       net.clojars.wkok/openai-clojure |      0.16.0 |    0.18.0 |
-;;;  |          |                           nrepl/nrepl |       1.1.1 |     1.2.0 |
-;;;  |          | org.ring-clojure/ring-websocket-async | 0.1.0-beta2 |     0.2.0 | ; Keep beta2
-;;;  |          |                         selmer/selmer |     1.12.59 |   1.12.61 |
-;;;  |          |                  thheller/shadow-cljs |      2.28.6 |    2.28.9 |
+;;;
+;;;  |    :file |                                 :name |    :current |  :latest |
+;;;  |----------+---------------------------------------+-------------+----------|
+;;;  | deps.edn |                     cider/cider-nrepl |      0.49.0 |   0.49.1 |
+;;;  |          |                     cider/cider-nrepl |      0.49.0 |   0.49.1 |
+;;;  |          |         io.github.clojure/tools.build |      0.10.4 |   0.10.5 |
+;;;  |          |                io.replikativ/datahike |    0.6.1562 | 0.6.1568 |
+;;;  |          |                        metosin/reitit |       0.7.0 |    0.7.1 |
+;;;  |          |            metosin/ring-http-response |       0.9.3 |    0.9.4 |
+;;;  |          |       net.clojars.wkok/openai-clojure |      0.18.0 |   0.18.1 |
+;;;  |          | org.ring-clojure/ring-websocket-async | 0.1.0-beta2 |    0.2.0 | ; Keep beta2
+;;;  |          |                        ring/ring-core |      1.12.1 |   1.12.2 |
+;;;  |          |                       ring/ring-devel |      1.12.1 |   1.12.2 |
+;;;  |          |               ring/ring-jetty-adapter |      1.12.1 |   1.12.2 |
+;;;  |          |                  thheller/shadow-cljs |      2.28.9 |  2.28.10 |
+;;;  |          |                  thheller/shadow-cljs |      2.28.9 |  2.28.10 |

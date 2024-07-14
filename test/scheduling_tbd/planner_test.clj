@@ -72,13 +72,11 @@
 (defn tryme []
   (with-planning-domain [:travel-domain travel-domain]
     (plan/plan9
-     :travel-domain
      '#{(at-work me) (have-car me)}
      '[(be-at-home me)]
-     {:shop2? true})))
+     {:domain-id :travel-domain :shop2? true}))) ; <================== These are all broken because I removed :shop2?
 
-
-(deftest simple-plans
+(deftest simple-plans ; <================== These are all broken because I removed :shop2?
   (testing "Testing a simple plan."
     (is (= '{:result :success,
              :plan-info {:plan [(!walk-to-car me) (!drive-car me) (!walk-garage-to-home me)],
@@ -86,10 +84,9 @@
                          :state #{(have-car me) (at-home me)}}}
            (with-planning-domain [:travel-domain travel-domain]
              (plan/plan9
-              :travel-domain
               '#{(at-work me) (have-car me)}
               '[(be-at-home me)]
-              {:shop2? true})))))
+              {:domain-id :travel-domain :shop2? true})))))
 
   (testing "Testing an alternative plan."
     (is (= '{:result :success,
@@ -98,10 +95,9 @@
                          :state #{(at-home me)}}}
              (with-planning-domain [:travel-domain travel-domain]
                (plan/plan9
-                :travel-domain
                 '#{(at-work me)}
                 '[(be-at-home me)]
-                {:shop2? true})))))
+                {:domain-id :travel-domain :shop2? true})))))
 
   (testing "Testing failure of the one plan, success of an alternative."
     (is (= '{:result :success,
@@ -120,8 +116,7 @@
     (is (= '{:result :failure, :reason :no-successful-plans}
            (with-planning-domain [:travel-domain travel-domain]
              (plan/plan9
-              :travel-domain
               '#{(at-work me) (have-car me)}
               '[(be-at-home me)]
-              {:shop2? true
+              {:domain-id :travel-domain :shop2? true
                :inject-failures '[(!drive-car me) (!board-bus me)]}))))))

@@ -169,7 +169,7 @@
    s-tasks (satisfying-elements) is a map containing the following keys:
       :bindings  - is a map of variable bindings,
       :task      - is information from the operator or method RHS satisfying RHS the preconditions."
-  [partials s-tasks {:keys [pid client-id shop2? conv-id] :as opts}] ; when shop2 there won't be client-id nor pid.
+  [partials s-tasks {:keys [pid] :as opts}] ; when shop2 there won't be client-id nor pid.
   (let [part                    (first partials)
         {:keys [state]}         part
         {:keys [task bindings]} (first s-tasks)] ; <======================== Every, not just first. (Probably just a reduce over this?)
@@ -182,16 +182,14 @@
                                    (if (= pid :START-A-NEW-PROJECT) '[(proj-id START-A-NEW-PROJECT)] state)
                                    task
                                    opts) ; ToDo: Assumes only run-operator can throw.
-                                  (let [more-state (if shop2? state (into (db/get-planning-state pid) state))
-                                        new-state (ou/operator-update-state more-state task bindings)
+                                  (let [old-state (into (db/get-planning-state pid) state)
+                                        new-state (ou/operator-update-state old-state task bindings)
                                         op-head (-> task :operator/head (uni/subst bindings))
                                         new-partial (-> part
                                                         (assoc :state new-state)
                                                         (update :path-tasks #(-> % rest vec))
                                                         (update :plan #(conj % op-head)))]
-                                    (when-not shop2?
-                                      (db/put-planning-state pid new-state)
-                                      (ws/refresh-client client-id pid conv-id))
+                                    (db/put-planning-state pid new-state)
                                     (into [new-partial] (rest partials)))
                                   (catch Exception e ; Drop this path <=============================== ToDo: Also need to unwind state.
                                     (into [(assoc part :error e)] (rest partials))))
@@ -203,26 +201,30 @@
 (defn stop-here [data]
   (reset! stop-here-diag data))
 
+;;; (plan/plan9 :process, '#{(proj-id sur-fountain-pens) (proj-name "SUR Fountain Pens") (surrogate sur-fountain-pens)}, '[(characterize-process sur-fountain-pens)],
+;;;  {:client-id "a0e1e948-492c-4860-bede-b8b50cbe0275", :pid :sur-fountain-pens, :conv-id :process, :surrogate? '(surrogate sur-fountain-pens)})
+
 (defn plan9
   "A dynamic HTN planner.
    Operates on a stack (vector) of 'partials' (partial plans, described in the docstring of update-planning).
    Initialize the stack to a partial from a problem definition.
    Iterates a process of looking for tasks that satisfy the head new-task, replacing it and running operations.
    domain-id is a conv-id."
-  [domain-id state goals & {:keys [client-id pid shop2? surrogate?] :as opts}]  ; shop2? is about running the planner like SHOP2,...
+  [state goals & {:keys [domain-id] :as opts}]  ; shop2? is about running the planner like SHOP2,...
+  (reset! diag {:domain-id domain-id :state state :goals goals :opts opts})
   (assert ((-> @sutil/planning-domains keys set) domain-id))         ; ...that is, no defoperators, client-id, nor pid.
   (let [elems   (-> (sutil/get-domain domain-id) :domain/elems)]
     (loop [partials [{:plan [] :path-tasks [(first goals)] :state state}] ; ToDo: Only planning first of goals so far.
            cnt 1]
-      ;;(log/info "path-tasks =" (-> partials first :path-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
-      ;;(log/info "partials = "partials)
+      (log/info "path-tasks =" (-> partials first :path-tasks) "plan =" (-> partials first :plan) "state = "(-> partials first :state))
+      (log/info "partials = "partials)
       (let [task (-> partials first :path-tasks first) ; <===== ToDo: Might want bindings on task???
             state (-> partials first :state)
             matching (matching-tasks task elems)
             s-tasks (satisfying-tasks task elems state matching)]
-        ;;(log/info "task =" task)
-        ;;(log/info "matching =" matching)
-        ;;(log/info "satisfying =" s-tasks)
+        (log/info "task =" task)
+        (log/info "matching =" matching)
+        (log/info "satisfying =" s-tasks)
         (when (empty? s-tasks) (stop-here {:task task :elems elems :partials partials}))
         (cond
           (empty? partials)                         {:result :failure :reason :no-successful-plans}
@@ -230,16 +232,13 @@
           (> cnt 50)                                {:result :stopped :partials partials}
           :else  (let [partials (update-planning partials s-tasks opts)
                        partials (if-let [err (-> partials first :error datafy)]
-                                  (do (log/error "Plan execution error: cause =" (:cause err) ", data =" (:data err))
-                                      (reset! diag {:err err :partials partials :s-tasks s-tasks :opts opts})
-                                      (-> partials rest vec)) ; Reject plan, try next.
-                                  partials)
-                       plan-state (-> partials first :state)]
-                   (when-not shop2?
-                     (let [db-state (db/get-planning-state pid)]
-                       (when (not= db-state plan-state)
-                         (throw (ex-info "db-state and plan state are different" {:db-state db-state :plan-state plan-state})))
-                       (when surrogate? (ws/refresh-client client-id pid domain-id))))
+                                  (let [next-plan (-> partials rest vec)]
+                                    (log/error "Plan execution error: cause =" (:cause err) ", data =" (:data err))
+                                    (reset! diag {:err err :partials partials :s-tasks s-tasks :opts opts})
+                                    (if (empty? next-plan)
+                                      (throw (ex-info "No plans remain." {:diag @diag}))
+                                      next-plan))
+                                  partials)]
                    (recur partials
                           (inc cnt))))))))
 
@@ -298,7 +297,7 @@
       ;; -------------------- New project
       (let [state '[(proj-id START-A-NEW-PROJECT)]
             goal '(characterize-process START-A-NEW-PROJECT)
-            res (plan9 :process state [goal] {:client-id client-id :pid pid :conv-id conv-id})]
+            res (plan9 state [goal] {:domain-id :process :client-id client-id :pid pid :conv-id conv-id})]
         (plan9-post-actions res client-id pid conv-id))
       ;; -------------------- Typical
       (let [conv-id (or conv-id
@@ -309,7 +308,7 @@
             args (assoc args :conv-id conv-id)]
         (log/info "======== resume conversation: planning-state = " state)
         (db/change-conversation args)
-        (let [res (plan9 conv-id state goals {:client-id client-id :pid pid :conv-id conv-id :surrogate? surrogate?})]
+        (let [res (plan9 state goals {:domain-id conv-id :client-id client-id :pid pid :conv-id conv-id :surrogate? surrogate?})]
           (plan9-post-actions res client-id pid conv-id))))
     (finally
       (log/info "Set busy? false")

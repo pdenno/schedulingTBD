@@ -179,10 +179,11 @@
   (atom {}))
 
 (defn register-planning-domain
-  "
+  "Store the planning domain at the argument id."
   [id domain]
   (log/info "Registering planning domain" id)
   (swap! planning-domains #(assoc % id domain)))
+
 (defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
 (defn get-domain [id] (get @planning-domains id))
 
@@ -223,3 +224,9 @@
          (subs last 0 (dec (count last))))))
 
 (defn string2sym [s] (-> s str/lower-case (str/replace #"\s+" "-") symbol))
+
+(defn domain-conversation
+  [domain-id]
+  (let [res (-> domain-id get-domain :domain/conversation)]
+    (assert (#{:process :data :resource} res))
+    res))
