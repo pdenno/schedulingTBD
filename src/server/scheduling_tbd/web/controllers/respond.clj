@@ -7,6 +7,7 @@
    [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
+   [scheduling-tbd.util  :as util :refer [now]]
    [taoensso.timbre          :as log])
   (:import
    [java.util Date]))
@@ -21,20 +22,20 @@
    Note that this can CHANGE :project/current-conversation."
   [request]
   (let [{:keys [project-id conv-id]} (-> request :query-params keywordize-keys)]
+    (log/info "get-conversation (1): project-id = " project-id "conv-id =" conv-id)
     (when conv-id (db/change-conversation {:pid (keyword project-id) :conv-id (keyword conv-id)}))
     (let [project-id (keyword project-id)
           eid (db/project-exists? project-id)
-          conv-id (when eid
+          conv-id (if eid
                     (-> (or conv-id
                             (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm project-id)))
-                        keyword))
-          msgs    (when (and eid conv-id) (db/get-messages project-id conv-id))
-          code    (when eid (db/get-code project-id))]
-      (log/info "get-conversation for" project-id "conv-id =" conv-id)
-      (cond (= project-id :START-A-NEW-PROJECT)     (http/ok {:project-id project-id :conv []})
-            (not conv-id)                           (http/ok {:project-id project-id :conv []})
-            msgs                                    (http/ok {:project-id project-id :conv msgs :conv-id conv-id :code code})
-            :else                                   (http/not-found)))))
+                        keyword)
+                    :process)
+          empty-conv  [#:message{:id 1 :content "No discussion here yet.", :from :system, :time (now)}]
+          msgs        (if (and eid conv-id) (db/get-conversation project-id conv-id) empty-conv)
+          code    (if eid (db/get-code project-id) "")]
+      (log/info "get-conversation (2):" project-id "conv-id =" conv-id "message count =" (count msgs))
+      (http/ok {:project-id project-id :conv msgs :conv-id conv-id :code code}))))
 
 (def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
 

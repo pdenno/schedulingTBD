@@ -1,5 +1,5 @@
 (ns scheduling-tbd.surrogate-test
-  "Testing of human expert surrogatehis may grow to serve as a surrogate human expert for testing SchedulingTBD's interview process.
+  "Testing of human expert surrogate. This may grow to serve as a surrogate human expert for testing SchedulingTBD's interview process.
    Currently this just tests Wkok's API for OpenAI assistants with the Craft Beer Conversation, data/interviews/2024-01-05-craft-brewing.org."
   (:require
    [clojure.test             :refer [deftest is testing]]
@@ -10,17 +10,50 @@
 
 (def ^:diag diag (atom nil))
 
+(def alias? (atom (-> (ns-aliases *ns*) keys set)))
+
+(defn safe-alias
+  [al ns-sym]
+  (when (and (not (@alias? al))
+             (find-ns ns-sym))
+    (alias al ns-sym)))
+
+(defn ^:diag ns-setup!
+  "Use this to setup useful aliases for working in this NS."
+  []
+  (reset! alias? (-> (ns-aliases *ns*) keys set))
+  (safe-alias 'io     'clojure.java.io)
+  (safe-alias 's      'clojure.spec.alpha)
+  (safe-alias 'uni    'clojure.core.unify)
+  (safe-alias 'edn    'clojure.edn)
+  (safe-alias 'io     'clojure.java.io)
+  (safe-alias 'str    'clojure.string)
+  (safe-alias 'd      'datahike.api)
+  (safe-alias 'dp     'datahike.pull-api)
+  (safe-alias 'mount  'mount.core)
+  (safe-alias 'p      'promesa.core)
+  (safe-alias 'px     'promesa.exec)
+  (safe-alias 'core   'scheduling-tbd.core)
+  (safe-alias 'pinv   'scheduling-tbd.domain.process.p-interview)
+  (safe-alias 'db     'scheduling-tbd.db)
+  (safe-alias 'how    'scheduling-tbd.how-made)
+  (safe-alias 'llm    'scheduling-tbd.llm)
+  (safe-alias 'llmt   'scheduling-tbd.llm-test)
+  (safe-alias 'ou     'scheduling-tbd.op-utils)
+  (safe-alias 'opt    'scheduling-tbd.operators-test)
+  (safe-alias 'plan   'scheduling-tbd.planner)
+  (safe-alias 'plant  'scheduling-tbd.planner-test)
+  (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
+  (safe-alias 'spec   'scheduling-tbd.specs)
+  (safe-alias 'sutil  'scheduling-tbd.sutil)
+  (safe-alias 'sur    'scheduling-tbd.surrogate)
+  (safe-alias 'surt   'scheduling-tbd.surrogate-test)
+  (safe-alias 'util   'scheduling-tbd.util)
+  (safe-alias 'ws     'scheduling-tbd.web.websockets)
+  (safe-alias 'openai 'wkok.openai-clojure.api))
+
 ;;; A challenge for this is that the surrogate is free to whatever it likes but we don't yet have
 ;;; all the tools needed to make sense of what it is saying (the meta-theoretical tools, etc.).
-
-(def system-instruction
-  "This is the instruction that configures the role of the OpenAI assistant."
-
-  "You manage a company that makes %s.
-   You are an expert in production of the company's products and management of its supply chains.
-   You help me by answering questions that will allow us together to build a scheduling systems for your company.
-   Your answers typically are short, just a few sentences each.")
-
 (def beer-example
   "Example data for running an interview (sans planner computing the questions)."
   {:project/name "Craft beer surrogate"
@@ -74,12 +107,38 @@
            :surrogate/openai-obj-str (str assistant)})]
    {:force? true}))
 
+(def system-instruction
+  "This is the instruction that configures the role of the OpenAI assistant."
 
-(deftest making-assistant
+  "You manage a company that makes %s.
+   You are an expert in production of the company's products and management of its supply chains.
+   You help me by answering questions that will allow us together to build a scheduling systems for your company.
+   Your answers typically are short, just a few sentences each.")
+
+(deftest assistant-tests
   (testing "Testing code to make an assistant."
-    (let [expertise "plate glass"
-          instructions (format sur/system-instruction expertise)
-          asst (llm/make-assistant :name (str expertise " surrogate") :instructions instructions :metadata {:usage :surrogate})]
-      (is (= "assistant" (:object asst)))
-      (log/info "id = " (:id asst))
-      (llm/delete-assistant-openai (:id asst)))))
+    (let [aid-atm (atom nil)]
+      (try (let [expertise "plate glass"
+                 instructions (format system-instruction expertise)
+                 asst (llm/make-assistant :name (str expertise " surrogate") :instructions instructions :metadata {:usage :surrogate})
+                 aid  (:id asst)
+                 tid (-> (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}}) :id)
+                 answer (llm/query-on-thread :aid aid :tid tid :query-text "Using only two words, name what your company makes.")]
+             (reset! aid-atm aid)
+             (is (= answer "Plate glass.")))
+           (finally (llm/delete-assistant-openai @aid-atm))))))
+
+(deftest query-on-thread-tests
+  (testing "Testing code to make an assistant."
+    (let [aid-atm (atom nil)
+          instructions "No matter what you are asked, you respond with a sentence of just one word: \"Great!\""]
+      (try (let [expertise "plate glass"
+                 asst (llm/make-assistant :name (str expertise " surrogate") :instructions instructions :metadata {:usage :surrogate})
+                 aid  (:id asst)
+                 tid (-> (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}}) :id)
+                 answer (llm/query-on-thread :aid aid :tid tid :query-text "How is it going?"
+                                             :tries 2
+                                             :test-fn (fn [x] (log/info "You said:" x) (= x "Great!")))]
+             (reset! aid-atm aid)
+             (is (nil?  answer)))
+      (finally (llm/delete-assistant-openai @aid-atm))))))

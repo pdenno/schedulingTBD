@@ -1,0 +1,30 @@
+ int : nProducts = 1;
+ set of int: Product = 1..nProducts;
+ set of int: Hour = 0..365;
+ enum Task = %s;
+ array [Product, Task] of int: taskDuration = %s;
+
+ % We assume a task uses one major resource; resources are synonymous with tasks.
+ array [Product, Task] of var Hour: taskStarts; % 'var' means it is a decision variable.
+ array [Product, Task] of var Hour: taskEnds;
+
+ % We'll use this below to ensure a resource can only be used by one product at a time.
+ array [Task, Hour] of var Product: busyWith;
+
+ % The first two Product are already in the fermentation tank and bright tank respectively.
+ constraint taskStarts[1,mill] = -35;   % Product 1 is therefore in the bright tank...
+ constraint taskStarts[2,mill] = -5;    % ...and out before this one moves there.
+
+ % Next task must start right after previous task ends. No place to put WIP.
+ constraint forall (p in Product) (taskEnds[p, mill   ] + 1 == taskStarts[p, ferment]);
+ constraint forall (p in Product) (taskEnds[p, ferment] + 1 == taskStarts[p, bright]);
+
+ % A task ends taskDuration days after it starts.
+ constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);
+
+ % A resource(task) can only be used with one product at a time.
+ constraint forall (t in Task, p in Product, d in Hour where d >= taskStarts[p,t] /\ d <= taskEnds[p,t])
+                    (busyWith[t,d] == p);
+
+ % Hours elapsed when the final task ends.
+ solve minimize sum (p in Product) (taskEnds[nProducts]);

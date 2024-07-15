@@ -2,69 +2,79 @@
 ;;; (sutil/register-planning-domain :process-interview (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
 
 {:domain/id :process-interview
+ :domain/conversation :process
  :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
- :domain/elems [{:method/head (characterize-process ?proj)
-                 :method/rhsides [{:method/case-name "from-scratch"
-                                   :method/preconds [(proj-id ?proj) (not (ongoing-discussion ?proj))] ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
-                                   :method/task-list [(!initial-process-question ?proj)
-                                                      (discuss-process-detail ?proj)]}
+ :domain/elems [{:method/head (characterize-process ?p)
+                 :method/rhsides [{:method/preconds [(proj-id ?p)]
+                                   :method/task-list [(describe-challenge ?p)
+                                                      (classify-production-type ?p)
+                                                      (analyze-process ?p)
+                                                      (verify-process ?p)]}]}
 
-                                  {:method/case-name "ongoing-discussion"
-                                   :method/preconds [(ongoing-discussion ?proj)   ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
-                                                     (proj-id ?proj)
-                                                     (not (process-defined ?proj))]
-                                   :method/task-list [(discuss-process-detail ?proj)]}]}
+                {:method/head (describe-challenge ?p)
+                 :method/rhsides [{:method/preconds [(proj-id ?p)]
+                                   :method/task-list [(!describe-challenge ?p)
+                                                      (remark-raw-material-challenge? ?p)]}]}
 
-                ;; ====== (not (ongoing-discussion ?proj)) ===============================
-                ;; (!initial-process-question ?proj)
-                {:operator/head (!initial-process-question ?proj)
-                 :operator/preconds [(not (ongoing-discussion ?proj))]
-                 :operator/a-list [(ongoing-discussion ?proj)]}
+                {:method/head (remark-raw-material-challenge? ?p) ; ToDo: This is even valuable for a parallel expert. "Say something."
+                 :method/rhsides [{:method/case "cited"
+                                   :method/preconds [(cites-raw-material-challenge ?p)]
+                                   :method/task-list [(!remark-raw-material-challenge ?p)]}
+                                  {:method/case "not-cited"
+                                   :method/preconds [(not (cites-raw-material-challenge ?p))]
+                                   :method/task-list [(!do-nothing)]}]}
 
-                ;; ====== (ongoing-discussion ?proj) ===============================
-                {:method/head (discuss-process-detail ?proj)
-                 :method/rhsides [{:method/case-name "well-known"
-                                   :method/preconds [(flow-shop ?proj)]
-                                   :method/task-list [(!yes-no-process-steps ?proj)
-                                                      (!query-process-durs ?proj)]}
-                                  #_{:method/case-name "not-well-known"
-                                     :method/preconds [(flow-shop ?proj) (not (well-known-process ?proj))]
-                                     :method/task-list [(!query-process-steps ?proj)]}]}
+                {:operator/head (!do-nothing)}             ; Special purpose
+                {:operator/head (!describe-challenge ?p)}  ; This is first question of process interview.
+                {:operator/head (!remark-raw-material-challenge ?p)}
 
-                ;; (!yes-no-process-steps ?proj)
-                {:operator/head (!yes-no-process-steps ?proj)
-                 :operator/preconds [(proj-id ?proj)]
-                 :operator/a-list [(have-process-steps ?proj)]} ; We've arranged so that if you already have all the a-list facts, it runs a no-op.
+;;; ------------ classify-production-type (parallel expert stuff) -------------------
+                {:method/head (classify-production-type ?p)
+                 :method/rhsides [{:method/preconds [(proj-id ?p)]
+                                   :method/task-list [(!describe-process ?p)
+                                                      (!query-product-or-service ?p)
+                                                      (!query-production-mode ?p)
+                                                      (!query-activity-location-type ?p)
+                                                      (!query-shop-type ?p)]}]}
 
-                ;; (!query-process-steps ?proj)
-                {:operator/head (!query-process-steps ?proj)
-                 :operator/preconds [(proj-id ?proj) (flow-shop ?proj)]
-                 :operator/a-list [(have-process-steps ?proj)]}
+                {:operator/head (!describe-process ?p)}  ; This is parallel expert warm up.
+                {:operator/head (!query-product-or-service ?p)}
+                {:operator/head (!query-production-mode ?p)}
+                {:operator/head (!query-activity-location-type ?p)}
+                {:operator/head (!query-shop-type ?p)}
 
-                ;; (!query-process-durs ?proj)
-                {:operator/head (!query-process-durs ?proj)
-                 :operator/preconds [(flow-shop ?proj)]
-                 :operator/a-list [(have-process-durs ?proj)]}
+;;; ------------------------- analyze-process -------------------------------------
+                {:method/head (analyze-process ?p)
+                 :method/rhsides [{:method/preconds [(proj-id ?p)]
+                                   :method/task-list [(!query-process-steps ?p)
+                                                      (!query-process-durs ?p)]}]}
 
-                ;; (!yes-no-process-ordering ?proj)
-                {:operator/head (!yes-no-process-ordering ?proj)
-                 :operator/preconds [#_(well-known-process ?proj) (flow-shop ?proj)]
-                 :operator/a-list [(have-process-ordering ?proj)]}
+                {:operator/head (!query-process-steps ?p)  ; This is parallel expert warm up.
+                 :operator/preconds [(flow-shop ?p)]
+                 :operator/a-list [(done !query-process-steps ?p)]} ; <================ These are going to be automatic.
 
-                ;; (!query-process-ordering ?proj)
-                #_{:operator/head (!query-process-ordering ?proj)
-                 :operator/preconds [(not (well-known-process ?proj)) (flow-shop ?proj)]
-                 :operator/a-list [(have-process-ordering ?proj)]}
+                {:operator/head (!query-process-durs ?p)
+                 :operator/preconds [(flow-shop ?p)]
+                 :operator/a-list [(done !query-process-durs ?p)]} ; <================ These are going to be automatic.
 
-                ;; (:- (process-defined ?proj)  ; ToDo: Maybe wait until shop disappears, but would like to use process-defined in filtering.
-                {:axiom/head (process-defined ?proj)
-                 :axiom/rhsides [{:axiom/rhs [(have-process-steps ?proj)
-                                              (have-process-ordering ?proj) ; ToDo: This might be solved by whether or not is it 'job-shop' style.
-                                              (have-process-durs ?proj)]}]}
+;;; ------------------------- verify-process --------------------------------------
+                {:method/head (verify-process ?p)
+                 :method/rhsides [{:method/preconds [(proj-id ?p)]
+                                   :method/task-list [(!do-nothing)]}]} ; NYI
 
-                ;; (:- (same ?x ?x) ())
+;;; ------------------------- axioms  -------------------------------------
                 {:axiom/head (same ?x ?x)}
 
                 ;; (:- (different ?x ?y) ((not (same ?x ?y))))
                 {:axiom/head (different ?x ?y)
-                 :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}]}
+                 :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}
+
+
+                {:axiom/head (done analyze-process ?p)
+                 :axiom/rhsides [{:axiom/rhs
+                                  ((done !describe-challenge ?p)
+                                   (done !describe-process ?p)
+                                   (done !query-product-or-service? ?p)
+                                   (done !query-production-pattern ?p)
+                                   (done !query-activity-location-type ?p)
+                                   (done !query-shop-type ?p))}]}]}

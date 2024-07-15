@@ -305,8 +305,8 @@
         :doc "The subset of column names (:object/attribute-name) that identify objects."}
 
    :table/attributes
-      #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-           :doc "Attribute objects for the tableThe subset of column names (:object/attribute-name) that identify objects."}
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "Attribute objects for the tableThe subset of column names (:object/attribute-name) that identify objects."}
 
    :table/data
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
@@ -344,8 +344,7 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref}
 
    :column/tuple
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword}
-   })
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword}})
 
 
 (def ^:diag diag (atom nil))
@@ -372,18 +371,16 @@
                                                  :agent/thread-id tid}}]})))
 
 ;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
-(def process-agent
-  "Instructions and training for :process-agent to help it get started."
-  {:id :process-agent
-   :instruction (slurp "data/instructions/process-agent.txt")})
+(def process-dur-agent
+  "Instructions and training for :process-dur-agent to help it get started."
+  {:id :process-dur-agent
+   :instruction (slurp "data/instructions/process-dur-agent.txt")})
 
-;;; ToDo: I go back and forth on whether this should be :text-function-agent, which only does those four types below
-;;;       (and in which case the
 (def text-function-agent
   {:id :text-function-agent
    :instruction (slurp "data/instructions/text-function-agent.txt")})
 
-(def known-agents [process-agent text-function-agent])
+(def known-agents [process-dur-agent text-function-agent])
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 ;;; Atom for the configuration map used for connecting to the project db.
@@ -459,11 +456,13 @@
        (let [files (-> base-dir (str "/projects/") clojure.java.io/file .listFiles)]
          (mapv #(-> % .getName keyword) files))
        (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases.") {})))
-     ;; Otherwise we list using system db. These are the 'legitmate' projects (they aren't :project/deleted? = true).
-     (d/q '[:find [?proj-id ...]
-            :where
-            [?e :project/id  ?proj-id]]
-          @(connect-atm :system)))))
+     ;; Otherwise we list using system db. These are the 'legitmate' projects in the project datebase
+     (-> (d/q '[:find [?proj-id ...]
+                :where
+                [?e :project/id  ?proj-id]]
+              @(connect-atm :system))
+         sort
+         vec))))
 
 (defn get-thread-id
   "Get the thread object of the argument PID."
@@ -498,9 +497,9 @@
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
   #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time})
 
-(defn get-messages
+(defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  ([pid] (get-messages pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
+  ([pid] (get-conversation pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
   ([pid conversation]
    (assert (#{:process :data :resource} conversation))
    (if-let [eid (conversation-exists? pid conversation)]
@@ -544,32 +543,40 @@
     (d/transact conn {:tx-data [[:db/add eid :project/code code-text]]})))
 
 (defn get-planning-state
-  "Return the planning state vector (a collection of ground propositions) for the argument project, or [] if none."
+  "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
   [pid]
-  (if-let [state-str (d/q '[:find ?s .
-                            :where
-                            [_ :project/planning-problem ?pp]
-                            [?pp :problem/state-string ?s]]
-                          @(connect-atm pid) pid)]
-    (->> state-str edn/read-string (sort-by first) vec)
-    []))
+  (if (= pid :START-A-NEW-PROJECT)
+    '#{(proj-id START-A-NEW-PROJECT)} ; Special treatment for new projects.
+    (if-let [state-str (d/q '[:find ?s .
+                              :where
+                              [_ :project/planning-problem ?pp]
+                              [?pp :problem/state-string ?s]]
+                            @(connect-atm pid))]
+      (-> state-str edn/read-string set)
+      #{})))
 
 (defn put-planning-state
-  "Write an updated state to the project database. Argument is a vector or set. "
+  "Write the complete state to the project database. Argument is a vector or set. "
   [pid state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
-  (let [state-set (set state)
-        conn (connect-atm pid)
-        eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
-    (d/transact conn
-                {:tx-data [[:db/add eid :problem/state-string (str state-set)]]})))
+  (log/info "put-planning-state: state =" state)
+  (if (empty? state)
+    (throw (ex-info "state is empty" {:pid pid}))
+    (let [state-set (set state)
+          conn (connect-atm pid)
+          eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
+      (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str state-set)]]}))))
 
 (defn add-planning-state
-  "Add the argument vector of ground proposition to state."
+  "Add the argument vector of ground proposition to state, a set. Return the new state."
   [pid more-state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
   (log/info "add-planning-state: more-state = " more-state)
-  (put-planning-state pid (into (get-planning-state pid) more-state)))
+  (let [new-state (into (get-planning-state pid) more-state)
+        conn (connect-atm pid)
+        eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
+    (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str new-state)]]})
+    new-state))
 
 (defn get-process
   "Return the process structure for the argument pid and process-id."
@@ -798,7 +805,7 @@
 (defn get-agent
   "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)."
   [agent-id]
-  (assert (#{:process-agent :table-agent} agent-id))
+  (assert (#{:process-dur-agent :table-agent} agent-id))
   (-> (d/q '[:find ?aid ?tid
              :keys aid tid
              :in $ ?agent-id

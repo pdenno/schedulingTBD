@@ -57,7 +57,7 @@
             aid    (:id assist)
             thread (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}})
             prob (surrogate-init-problem pid pname)] ; Surrogates have just one thread.
-        (log/info "Made assistant" aid "for instructions" instructions)
+        ;(log/info "Made assistant" aid "for instructions" instructions)
         (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)
                                          :project/planning-problem prob
                                          :project/surrogate {:surrogate/id pid

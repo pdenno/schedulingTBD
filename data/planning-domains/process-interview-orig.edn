@@ -1,0 +1,70 @@
+;;; After updating this:
+;;; (sutil/register-planning-domain :process-interview (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
+
+{:domain/id :process-interview
+ :domain/description "A planning domain to run an interview about the manufacturing processes that are the subject of scheduling"
+ :domain/elems [{:method/head (characterize-process ?proj)
+                 :method/rhsides [{:method/case-name "from-scratch"
+                                   :method/preconds [(proj-id ?proj) (not (ongoing-discussion ?proj))] ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
+                                   :method/task-list [(!initial-process-question ?proj)
+                                                      (discuss-process-detail ?proj)]}
+
+                                  {:method/case-name "ongoing-discussion"
+                                   :method/preconds [(ongoing-discussion ?proj)   ; (proj-id ?proj) is needed to unify against (characterize-process ?proj)
+                                                     (proj-id ?proj)
+                                                     (not (process-defined ?proj))]
+                                   :method/task-list [(discuss-process-detail ?proj)]}]}
+
+                ;; ====== (not (ongoing-discussion ?proj)) ===============================
+                ;; (!initial-process-question ?proj)
+                {:operator/head (!initial-process-question ?proj)
+                 :operator/preconds [(not (ongoing-discussion ?proj))]
+                 :operator/a-list [(ongoing-discussion ?proj)]}
+
+                ;; ====== (ongoing-discussion ?proj) ===============================
+                {:method/head (discuss-process-detail ?proj)
+                 :method/rhsides [{:method/case-name "well-known"
+                                   :method/preconds [(flow-shop ?proj)]
+                                   :method/task-list [(!yes-no-process-steps ?proj)
+                                                      (!query-process-durs ?proj)]}
+                                  #_{:method/case-name "not-well-known"
+                                     :method/preconds [(flow-shop ?proj) (not (well-known-process ?proj))]
+                                     :method/task-list [(!query-process-steps ?proj)]}]}
+
+                ;; (!yes-no-process-steps ?proj)
+                {:operator/head (!yes-no-process-steps ?proj)
+                 :operator/preconds [(proj-id ?proj)]
+                 :operator/a-list [(have-process-steps ?proj)]} ; We've arranged so that if you already have all the a-list facts, it runs a no-op.
+
+                ;; (!query-process-steps ?proj)
+                {:operator/head (!query-process-steps ?proj)
+                 :operator/preconds [(proj-id ?proj) (flow-shop ?proj)]
+                 :operator/a-list [(have-process-steps ?proj)]}
+
+                ;; (!query-process-durs ?proj)
+                {:operator/head (!query-process-durs ?proj)
+                 :operator/preconds [(flow-shop ?proj)]
+                 :operator/a-list [(have-process-durs ?proj)]}
+
+                ;; (!yes-no-process-ordering ?proj)
+                {:operator/head (!yes-no-process-ordering ?proj)
+                 :operator/preconds [#_(well-known-process ?proj) (flow-shop ?proj)]
+                 :operator/a-list [(have-process-ordering ?proj)]}
+
+                ;; (!query-process-ordering ?proj)
+                #_{:operator/head (!query-process-ordering ?proj)
+                 :operator/preconds [(not (well-known-process ?proj)) (flow-shop ?proj)]
+                 :operator/a-list [(have-process-ordering ?proj)]}
+
+                ;; (:- (process-defined ?proj)  ; ToDo: Maybe wait until shop disappears, but would like to use process-defined in filtering.
+                {:axiom/head (process-defined ?proj)
+                 :axiom/rhsides [{:axiom/rhs [(have-process-steps ?proj)
+                                              (have-process-ordering ?proj) ; ToDo: This might be solved by whether or not is it 'job-shop' style.
+                                              (have-process-durs ?proj)]}]}
+
+                ;; (:- (same ?x ?x) ())
+                {:axiom/head (same ?x ?x)}
+
+                ;; (:- (different ?x ?y) ((not (same ?x ?y))))
+                {:axiom/head (different ?x ?y)
+                 :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}]}

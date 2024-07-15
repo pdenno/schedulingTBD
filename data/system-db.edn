@@ -1,11 +1,11 @@
 [
 #:system{:agents
-         [#:agent{:assistant-id "asst_IOnupEVdjt7W5L5uVAtjDoFo",
+         [#:agent{:assistant-id "asst_5rQpFqdjpMnQN11VBOjduCw1",
                   :id :text-function-agent,
-                  :thread-id "thread_9QRoP9qy8paiHjFl9IjBlfW5"}
-          #:agent{:assistant-id "asst_THLPIgG0TS3YpS2DVGHwJhir",
-                  :id :process-agent,
-                  :thread-id "thread_A9uEefFAetxxR3O8ObHhn9T2"}],
+                  :thread-id "thread_BRf8CpxyiAjsuc5MK7F3qCjZ"}
+          #:agent{:assistant-id "asst_3euKnxjb7b2FNZGmz6Ep7Zb0",
+                  :id :process-dur-agent,
+                  :thread-id "thread_SwCzuA30WsUHFZmfcCwKwKmo"}],
          :default-project-id :sur-fountain-pens,
          :name "SYSTEM"}
 
@@ -32,9 +32,9 @@
           :id :sur-canned-vegetables,
           :name "Sur Canned Vegetables"}
 
-#:project{:dir "/opt/scheduling/projects/sur-aluminium-cans",
-          :id :sur-aluminium-cans,
-          :name "Sur Aluminium Cans"}
+#:project{:dir "/opt/scheduling/projects/sur-aluminum-cans",
+          :id :sur-aluminum-cans,
+          :name "Sur Aluminum Cans"}
 
 #:project{:dir
           "/opt/scheduling/projects/sur-remanufactured-alternators",

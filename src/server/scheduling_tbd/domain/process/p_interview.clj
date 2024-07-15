@@ -11,10 +11,13 @@
    [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [connect-atm find-fact yes-no-unknown string2sym]]
+   [scheduling-tbd.sutil          :as sutil :refer [connect-atm register-planning-domain yes-no-unknown string2sym]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
+
+;;; Place this in any file where you are developing the process interview so updates will be found.
+(register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
 
 ;;; ------------------------------- project name --------------------------------------
 ;;; The user would be prompted: "Tell us what business you are in and what your scheduling problem is."
@@ -115,124 +118,8 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   [text]
   (-> (conj raw-material-challenge-partial
             {:role "user" :content (format "[%s]" text)})
-      (query-llm {:model-class :gpt-3.5})
+      (query-llm {:model-class :gpt-4})
       yes-no-unknown))
-
-;;; ----------------------- parallel expert preliminary analysis  ---------------------------------------------------------
-(defn ask-about-process-on-thread!
-  "Ask the surrogate to describe production processes. We don't care what is returned, we just
-   are developing context to do some downstream preliminary analysis.
-   We put these into the conversation under surrogate."
-  [aid tid]
-  (let [msg "Please briefly describe your production processes."]
-    {:query msg
-     :answer (llm/query-on-thread :aid aid :tid tid :query-text msg)}))
-
-(defn product-vs-service
-  "Return a vector of ground predicates (so far just either [(provides-product ?x)] or [(provides-service ?x)],
-   depending on whether the project describes respectively work to provide a product or work to provide a service."
-  [aid tid]
-  (let [query (str "Would you characterize your company's work as primarily providing a product or a service? " ; ToDo: "firm's work" in all of these not good?
-                   "Respond respectively with either the single word PRODUCT or SERVICE.")
-        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
-        preds (cond (re-matches #".*(?i)PRODUCT.*" answer) '[(provides-product ?x)]
-                    (re-matches #".*(?i)SERVICE.*" answer) '[(provides-service ?x)]
-                    :else                                  '[(fails-query product-vs-service ?x)])]
-    {:query query :answer answer :preds preds}))
-
-;;; ToDo: Maybe what I really want is to split scheduling vs some notion of constraint satisfaction (which would include project management and cyclical scheduling)
-;;;       But for the time meaning, it was this that came to mind.
-(defn production-mode
-  "Return a vector of one predicates of the form (production-mode ?x <mode>) where <mode> is on of make-to-stock, make-to-order, or engineer-to-order.
-   depending on what the agent deems more relevant to their operations."
-  [aid tid]
-  (let [query (str "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. "
-                   "In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. "
-                   "In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. "
-                   "ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. "
-                   "For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, "
-                   "it is relying on you to determine how to best accommodate the engine and arrange the seats. "
-                   "Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. "
-                   "Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ")
-        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
-        preds (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" answer)        '[(production-mode ?x make-to-stock)]
-                    (re-matches #".*(?i)MAKE-TO-ORDER.*" answer)        '[(production-mode ?x make-to-order)]
-                    (re-matches #".*(?i)ENGINEER-TO-ORDER.*" answer)    '[(production-mode ?x engineer-to-order)]
-                    :else                                               '[(fails-query production-mode ?x)])]
-    {:query query :answer answer :preds preds}))
-
-(defn facility-vs-site
-  "Return a vector of ground predicates (so far just either [(is-product ?x)] or [(is-service ?x)],
-   depending on whether the project describes respectively work to provide a product or work to provide a service."
-  [aid tid]
-  (let [query (str "Some work, for example factory work, must be performed in a specially designed facility. "
-                   "Other work, like cutting down a tree, can only be performed at a location designated by the customer. "
-                   "Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? "
-                   "Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.")
-        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
-        preds (cond (re-matches #".*(?i)OUR-FACILITY.*" answer)  '[(has-production-facility ?x)]
-                    (re-matches #".*(?i)CUSTOMER-SITE.*" answer) '[(performed-at-customer-site ?x)]
-                    :else                                        '[(fails-query facility-vs-site ?x)])]
-    {:query query :answer answer :preds preds}))
-
-(defn flow-vs-job
-  "Return a vector of ground predicates (so far just either [(is-flow-shop ?x)] or [(is-job-shop ?x)] or [])
-   depending on whether the project describes respectively work to provide a product or work to provide a service.
-   Note that this question is only applied where (provides-product ?x) (scheduling-problem ?x) (has-production-facility ?x)."
-  [aid tid]
-  (let [query (str "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. "
-                   "A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. "
-                   "Is the process you described more like a flow-shop or a job-shop? "
-                   "Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.")
-        answer (llm/query-on-thread {:aid aid :tid tid :query-text query})
-        preds (cond (re-matches #".*(?i)FLOW-SHOP.*" answer) '[(flow-shop ?x)]
-                    (re-matches #".*(?i)JOB-SHOP.*" answer)  '[(job-shop ?x)]
-                    :else                                    '[(fails-query flow-vs-job ?x)])]
-    {:query query :answer answer :preds preds}))
-
-;;; ToDo: Define attributes in DB and test starting a parallel expert.
-(defn parallel-expert-prelim-analysis
-  "Query surogate for preliminary characterization of the scheduling problem including:
-      - product vs. service
-      - production facility vs. customer site,
-      - scheduling vs. project management, and
-      - flow-shop vs. job-shop   (of course, this one only for product/production facility/scheduling).
-   If the project is a surrogate expert, this work is done in the surrogate thread,
-   otherwise a new surrogate (called a 'parallel expert') is started and its
-   Assistant ID and Thread ID are stored. (This part not done yet.)
-   Return a vector of new propositions."
-  ([pid] (parallel-expert-prelim-analysis pid true))
-  ([pid write?]
-   (when-not (find-fact '(surrogate ?proj) (db/get-planning-state pid)) ; ToDo: Complete for human expert.
-     (throw (ex-info "Parallel expert not yet implemented." {})))
-   (let [proj-sym (-> pid name symbol)
-         proj-bind {'?x proj-sym}
-         aid (db/get-assistant-id pid)
-         tid (db/get-thread-id pid)
-         new-props (atom [])
-         {:keys [query answer]} (ask-about-process-on-thread! aid tid)] ; This one asks a question that sets up context.
-     (if (string? answer)
-       (do (when write?
-             (db/add-msg pid :system query)
-             (db/add-msg pid :surrogate answer [:process-description]))
-           (doseq [f [product-vs-service production-mode facility-vs-site]]
-             (let [{:keys [query answer preds]} (f aid tid)]
-               (swap! new-props into (map #(uni/subst % proj-bind) preds))
-               (Thread/sleep 1000) ; ToDo: I'm guessing here. There might be problems in polling OpenAI to quickly???
-               (when write?
-                 (db/add-msg pid :system query [:query])
-                 (db/add-msg pid :surrogate answer [:response]))))
-           ;; The job-shop/flow-shop question is relevant only in situations shown.
-           (when (and (find-fact '(provides-product ?x) @new-props)
-                      (find-fact '(has-production-facility ?x) @new-props))
-             (let [{:keys [query answer preds]} (flow-vs-job aid tid)
-                   more-props (map #(uni/subst % proj-bind) preds)]
-             (swap! new-props into more-props)
-             (when write?
-               (db/add-msg pid :system query)
-               (db/add-msg pid :surrogate answer))))
-           @new-props)
-       [(list 'fails-query 'process-description proj-sym)]))))
 
 (defn mzn-process-steps
   "Use state information to write a string enumerating process steps."
@@ -264,20 +151,20 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (conj proj-state (list 'cites-raw-material-challenge (-> pid name symbol)))
         proj-state)))
 
-;;; ToDo: The process-step propositions are used to create a MZn enum. Otherwise not needed; they are going to be in the DB.
+;;; ToDo: If this ever fails, replace it with an agent!
 (defn analyze-process-steps-response
-  "Return state addition for analyzing a Y/N user response about process steps."
+  "Return state addition for analyzing a Y/N user response about process steps.
+   The state objects look like (have-process <pid> <num> <proc-name) OR (fails-process-step <line>)."
   [{:keys [response pid] :as _obj}]
-  (let [pid-sym (-> pid name symbol)
-        steps (->> (for [line (str/split-lines response)]
-                     (let [[success step-num proc-name] (re-matches #"^\s*(\d+)\.?\s+(\w+).*" line)]
-                       (if success
-                         (list 'process-step pid-sym (edn/read-string step-num) (string2sym proc-name))
-                         (if (re-matches #"^\s*$" line)
-                           nil
-                           (list 'fails-process-step line)))))
-                   (filterv identity))]
-    (conj steps (list 'have-process-steps pid-sym))))
+  (let [pid-sym (-> pid name symbol)]
+    (->> (for [line (str/split-lines response)]
+           (let [[success step-num proc-name] (re-matches #"^\s*(\d+)\.?\s+([\w,\s]+).*" line)]
+             (if success
+               (list 'process-step pid-sym (edn/read-string step-num) (str/trim proc-name))
+               (if (re-matches #"^\s*$" line)
+                 nil
+                 (list 'fails-process-step line)))))
+         (filterv identity))))
 
 (defn extreme-dur-span?
   "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more."
@@ -293,7 +180,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-;;; ----------------- analyze-process-durs-response (done with :process-agent) ----------------------------
+;;; ----------------- analyze-process-durs-response (done with :process-dur-agent) ----------------------------
 ;;; These are named by the output of the given revision.
 (s/def :rev-1/PROCESS string?)
 (s/def :rev-1/PROCESS-STEP number?)
@@ -371,20 +258,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
               :else             obj))]
       (sk obj))))
 
-(defn llm-output-to-clj
-  "Remove preamble, read-string and spec-text chatty LLM response.
-   Return a vector map process maps, that still have 'LLM keys'."
-  [response rev-spec]
-  (try
-    (let [response (remove-preamble response)
-          process-maps (edn/read-string response)]
-      (if (s/valid? rev-spec process-maps)
-        process-maps
-        (throw (ex-info "Does not pass spec check:" {:rev-spec rev-spec :process-maps process-maps}))))
-    (catch Exception e
-      (reset! diag {:response response :rev-spec rev-spec :error e})
-      (log/error "Unreadable response for rev" rev-spec ":" response :error e))))
-
 (defn post-process
   "Make the process-agent's LLM output suitable for the project's DB (process object etc.)"
   [process-maps super-process]
@@ -401,18 +274,20 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
             (-> db-style count range))))
 
 ;;; (inv/run-process-agent-steps data2)
-(defn run-process-agent-steps
+(defn run-process-dur-agent-steps
   "Run the steps of the process agent, checking work after each step."
   [response pid]
-  (let [{:keys [aid tid]} (db/get-agent :process-agent)
+  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent)
         past-rev (atom response)]
     (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]]
       (when @past-rev
         (let [result (llm/query-on-thread
                       {:aid aid :tid tid :role "user"
+                       :tries 3 :test-fn (fn [resp] (s/valid? rev resp))
+                       :preprocess-fn (fn [resp] (-> resp remove-preamble edn/read-string))
                        :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
-          (reset! past-rev (llm-output-to-clj result rev))
-          (log/info "***************" rev "="  @past-rev))))
+          (reset! past-rev result)
+          #_(log/info "***************" rev "="  @past-rev))))
     (post-process @past-rev (name pid))))
 
 (defn put-process-sequence!
@@ -428,7 +303,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Used predominantly with surrogates, study the response to a query about process durations,
    writing findings to the project database and returning state propositions."
   [{:keys [response pid] :as _obj}]
-  (let [process-objects (run-process-agent-steps response pid)
+  (let [process-objects (run-process-dur-agent-steps response pid)
         full-obj {:process/id pid
                   :process/desc response
                   :process/sub-processes process-objects}]
@@ -442,35 +317,11 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (defn ^:diag check-instructions
   "It might be the case that the system instructions were too long. This asks what it knows about."
   []
-  (let [{:keys [aid tid]} (db/get-agent :process-agent)]
+  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent)]
     (llm/query-on-thread
      {:aid aid :tid tid :role "user"
       :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
-                       "REV-1, REV-2, etc. What are the REVs that you know about?")})))
-
-#_(def table-agent
-  {:id :table-agent
-   :instruction (slurp "data/instructions/table-agent.txt")})
-
-#_(defn test-table-agent
-  "It might be the case that the system instructions were too long. This asks what it knows about."
-  [table]
-  (let [{:keys [aid tid]} (db/get-agent :table-agent)]
-    (llm/query-on-thread
-     {:aid aid :tid tid :role "user"
-      :query-text (str "Perform Task-1 on this table: "table)})))
-
-
-#_(def test-1
-  (str "Part number | Part description | Price\n"
-       "2335 | Widget | $1.12\n"
-       "2995 | FoBar | $1.82\n"))
-
-#_(def test-2
-  (str "This is from a supplier that does make-to-order manufacturing, we want to get the key that corresponds to a job in their factory.\n\n"
-       "Customer ID | Order date | Qty | Part description | Part number | Preferred customer?  "
-       "sx33 | 2024-05-11 | 17 | turbo assembly | tur-1353fd | No  "
-       "al33 | 2024-05-21 | 1 | Alternator | alt-j334j | yes  "))
+                       "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))
 
 ;;; --------------------------------------- unimplemented (from the plan) -----------------------------
 (defn ^:diag analyze-process-ordering-response

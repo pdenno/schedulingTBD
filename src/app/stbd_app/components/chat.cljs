@@ -18,7 +18,6 @@
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core    :as p]
-   [scheduling-tbd.util :refer [now]]
    [stbd-app.components.attachment-modal :as attach :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
@@ -29,6 +28,8 @@
 (def ^:diag diag (atom nil))
 
 ;;; ----------------------------- formatting ChatScope messages --------------------------------------
+;;; BTW: (.now js/Date) is an integer.
+;;;      (js/Date. (.now js/Date)) is an #Inst.
 (def today "A string like 'Sat May 04 2024'" (-> (js/Date. (.now js/Date)) str (subs 0 15)))
 (def start-of-day-millis (-> today js/Date.parse))
 
@@ -38,7 +39,7 @@
   "Return a string 'just now', '2 minutes ago' etc. for the argument Instant relative to now."
   [instant]
   (let [msg-epoch-millis (inst-ms instant)
-        now-epoch-millis (now)
+        now-epoch-millis (.now js/Date)
         diff (- now-epoch-millis msg-epoch-millis)]
     (cond (< diff 60000) "just now"
           (<= 60000  diff 120000)   "1 minute ago"
@@ -61,7 +62,7 @@
   [msgs]
   (let [new-date (atom today)]
     (reduce (fn [r msg]
-              (let [{:message/keys [content from time] :or {time (js/Date. (now))}} msg
+              (let [{:message/keys [content from time] :or {time (js/Date. (.now js/Date))}} msg
                     content (msg-with-title content from)
                     msg-date (-> time inst2date (subs 0 15))]
                 (as-> r ?r
@@ -91,29 +92,34 @@
 (defn update-msg-list
   "Update the dates on the msg list."
   []
-  ((lookup-fn :set-cs-msg-list) (msgs2cs ((lookup-fn :get-msg-list)))))
+  (log/info "update-msg-list")
+  ((lookup-fn :set-cs-msg-list) ((lookup-fn :get-msg-list))))
 
 ;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
-  ([pid] (get-conversation pid nil))
+  ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
   ([pid conv-id]
    (-> (dba/get-conversation-http pid conv-id)
        (p/then (fn [{:keys [conv conv-id]}]
-                 (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "conv =" conv)
-                 (let [conv (if (empty? conv)
-                              [#:message{:content "No discussion here yet.", :from :system, :time (js/Date. (.now js/Date))}]
-                              conv)]
-                   (reset! msgs-atm conv)
-                   ((lookup-fn :set-cs-msg-list) (msgs2cs conv))
-                   ((lookup-fn :set-active-conv) conv-id)
-                   (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
-                   (update-common-info! {:project/id pid :conv-id conv-id}))))
+                 (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "count =" (count conv))
+                 (reset! msgs-atm conv)
+                 ((lookup-fn :set-cs-msg-list) conv)
+                 ((lookup-fn :set-active-conv) conv-id)
+                 (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
+                 (update-common-info! {:project/id pid :conv-id conv-id})))
        (p/catch (fn [e]
                   (log/info "get-conversation failed:" e))))))
 
 (register-fn :get-conversation get-conversation)
-(def msg-list-external (atom []))
+
+(defn add-msg
+  "Add messages to the msgs-atm.
+   This is typically used for individual messages that come through :tbd-says or :sur-says,
+   as opposed to bulk update through get-conversation."
+  [msgs text from]
+  (let [msg-id (inc (or (apply max (->> msgs (map :message/id) (filter identity))) 0))]
+    (reset! msgs-atm (conj msgs {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))}))))
 
 (defnc Chat [{:keys [chat-height proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state [])
@@ -143,16 +149,16 @@
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
-        (register-fn :set-tbd-text (fn [text] (set-msg-list (conj @msgs-atm {:message/content text :message/from :system}))))
-        (register-fn :set-sur-text (fn [text] (set-msg-list (conj @msgs-atm {:message/content text :message/from :surrogate}))))
+        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg @msgs-atm text :system))))
+        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg @msgs-atm text :surrogate))))
         (register-fn :set-active-conv set-active-conv)
         (register-fn :set-busy? set-busy?)
-        (register-fn :get-msg-list  (fn [] @msgs-atm))  ; These two used to update message time.
-        (register-fn :set-cs-msg-list set-cs-msg-list)  ; These two used to update message time.
+        (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
+        (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs))))  ; These two used to update message time.
         (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-list)) 60000)))
-       (hooks/use-effect [msg-list]
-         (reset! msgs-atm msg-list)
-         (set-cs-msg-list (msgs2cs msg-list)))
+      (hooks/use-effect [msg-list]
+        (reset! msgs-atm msg-list)
+        (set-cs-msg-list (msgs2cs msg-list)))
       ;; ----------------- component UI structure.
       ($ ShareUpDown
          {:init-height chat-height
@@ -164,22 +170,22 @@
                            :flexDirection "column"
                            :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
                  ;; https://github.com/chatscope/use-chat-example/blob/main/src/components/Chat.tsx (See expecially :onChange and :onSend.)
-                 ($ MainContainer
+                 ($ MainContainer {:sx {:display "flex" :height box-height}}
                     ($ Sidebar {:position "left" :sx #js {:maxWidth "100px"}}
                        ($ ConversationList
                           ($ Conversation {:name "Process"
                                            :active (= active-conv :process)
                                            :onClick (fn [_] (change-conversation-click :process))})
-                          ($ Conversation {:name "Data"
-                                           :active (= active-conv :data)
-                                           :onClick (fn [_] (change-conversation-click :data))})
                           ($ Conversation {:name "Resources"
                                            :active (= active-conv :resource)
-                                           :onClick (fn [_] (change-conversation-click :resource))})))
+                                           :onClick (fn [_] (change-conversation-click :resource))})
+                          ($ Conversation {:name "Data"
+                                           :active (= active-conv :data)
+                                           :onClick (fn [_] (change-conversation-click :data))})))
                     ($ ChatContainer
                        ($ MessageList
                           {:typingIndicator (when busy? ($ TypingIndicator {:content "Interviewer is typing"}))
-                           :style #js {:height "500px"}}
+                          #_#_ :style #js {:height "500px"}}
                           cs-msg-list))))
           :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!
                  ($ Stack {:direction "row" :spacing "0px"}

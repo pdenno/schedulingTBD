@@ -154,9 +154,8 @@
       ;; There are many reasons a websocket connection might be dropped.
       ;; It is absolutely necessary that it exits the go loop when the socket closes; a race condition my occur otherwise.
       ;; The socket is closes when, for example, there is a WebSocketTimeoutException from the client (see error-listener).
-      ;; I think there is still value in looking for inactive sockets and closing them, but I probably should implement
-      ;; alive? because the client will have to make another websocke request otherwise, and it doesn't seem to notice
-      ;; that the sever isn't listening to it!
+      ;; I think there is still value in looking for inactive sockets and closing them. I implemented alive? because the client
+      ;; will have to make another websocke request otherwise, and it doesn't seem to notice that the sever isn't listening to it!
       #_(log/info "Exiting dispatching loop:" client-id))))
 
 (defn establish-websocket-handler
@@ -168,7 +167,7 @@
    Returns a map with value for key :ring.websocket/listener."
   [request]
   ;;(log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
-  (future (close-inactive-channels))
+  (future (close-inactive-channels)) ; ToDo: There could be several of these running. Does it matter? Probably want an atom for it.
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]
       (error-listener client-id)   ; This and next are go loops,
@@ -259,32 +258,24 @@
     (log/error "domain-expert-says: no p-key (e.g. no question in play)")))
 
 ;;;-------------------- Sending questions etc. to a client --------------------------
-(defn use-promise?
-  "Return true if a promise should be generated for the argument type of dispatch."
-  [dispatch-key] ; The complete list of these is ::spec/outbound-dispatch-key.
-  (#{:tbd-says} dispatch-key))
-
 (defn send-to-chat
   "Send the argument structure to the client.
    If :promise?=true, return a promise that is resolved when the domain-expert responds to the message.
    The only key of the argument map that is required is :client-id. :dispatch-key defaults to :tbd-says.
    :promise? defaults to true only when the dispatch key is :tbd-says."
-  [{:keys [client-id dispatch-key] :or {dispatch-key :tbd-says} :as content}]
-  (let [promise? (if (contains? content :promise?) (:promise? content) (use-promise? dispatch-key))
-        content (cond-> content ; Just so that we can uses s/assert below!
-                  (not (contains? content :dispatch-key))  (assoc :dispatch-key :tbd-says))]
-    (s/assert ::spec/chat-msg-obj content)
-    (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
-    (if-let [out (->> client-id (get @socket-channels) :out)]
-      (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
-            msg-obj (cond-> content
-                      p-key               (assoc :p-key p-key)
-                      true                (assoc :timestamp (now)))]
-        (when-not (= :alive? dispatch-key)
-          (log/info "send-to-chat: msg-obj =" msg-obj))
-        (go (>! out (str msg-obj)))
-        prom)
-      (log/error "Could not find out async channel for client" client-id))))
+  [{:keys [client-id dispatch-key promise?] :as content}]
+  (s/assert ::spec/chat-msg-obj content)
+  (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
+  (if-let [out (->> client-id (get @socket-channels) :out)]
+    (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
+          msg-obj (cond-> content
+                    p-key               (assoc :p-key p-key)
+                    true                (assoc :timestamp (now)))]
+      (when-not (= :alive? dispatch-key)
+        (log/info "send-to-chat: msg-obj =" msg-obj))
+      (go (>! out (str msg-obj)))
+      prom)
+    (log/error "Could not find out async channel for client" client-id)))
 
 ;;; A map from keys to functions used to call responses from clients.
 ;;; This is defonce so that it doesn't get blown away when websockets.clj is reloaded.
@@ -326,6 +317,17 @@
       (when-not (= (:dispatch-key res) :ping-confirm)
         (log/info "dispatch: Sending response:" res))
       res)))
+
+;;; ToDo: Should this and a few others have promises? And should :promise? be called :round-trip?
+(defn refresh-client
+  "Send a message to the client to reload the conversation. Typically done with surrogate."
+  [client-id pid conv-id]
+  (assert (string? client-id))
+  (send-to-chat {:promise? false
+                 :client-id client-id
+                 :dispatch-key :update-conversation-text
+                 :pid pid
+                 :conv-id conv-id}))
 
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []

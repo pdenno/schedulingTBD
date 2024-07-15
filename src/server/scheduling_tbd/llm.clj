@@ -7,6 +7,7 @@
 
    N.B. LSP annotates many operators here as '0 references'; of course, they are used."
   (:require
+   [clojure.datafy               :refer [datafy]]
    [clojure.edn                  :as edn]
    [clojure.spec.alpha           :as s]
    [datahike.api                 :as d]
@@ -118,7 +119,11 @@
           capitalize?                 (str/capitalize))
         (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
 
-(defn list-openai-models [] (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse))
+(defn list-openai-models
+  "List id and create date of all available models.
+   BTW, if there is no internet connection, on startup, this will be the first complaint."
+  []
+  (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse))
 
 (defn select-llm-models-openai
   []
@@ -197,7 +202,7 @@
 
 ;;; You can also use this with role 'assistant', but the use cases might be a bit esoteric. (I can't think of any.)
 ;;; https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-role
-(defn query-on-thread
+(defn query-on-thread-aux
   "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
     aid      - assistant ID (the OpenAI notion)
     tid      - thread ID (ttheOpenAI notion)
@@ -206,7 +211,6 @@
    Returns text but uses promesa internally to deal with errors."
   [& {:keys [tid aid role query-text timeout-secs] :or {timeout-secs 60 role "user"} :as _obj}] ; "user" when "assistant" is surrogate.
   ;;(log/info "query-on-thread: query-text =" query-text)
-  (reset! diag _obj)
   (assert (#{"user" "assistant"} role))
   (assert (string? query-text))
   (assert (not-empty query-text))
@@ -223,18 +227,39 @@
       (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
             msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data) ; ToDo: 20 is a guess.
             response (response-msg query-text msg-list)]
-        (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text})),
+        (cond (> now timeout)                        (do (log/warn "Timeout")
+                                                         (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text}))),
 
               (and (= "completed" (:status r))
                    (not-empty response))              (markdown2html response),
 
               (and (= "completed" (:status r))
-                   (empty? response))                 (throw (ex-info "query-on-thread empty response:" {:status (:status r)})),
+                   (empty? response))                 (do (log/warn "empty resposne")
+                                                          (throw (ex-info "query-on-thread empty response:" {:status (:status r)}))),
 
 
-              (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)})),
+              (#{"expired" "failed"} (:status r))     (do (log/warn "failed/expired last_error = " (:last_error r))
+                                                          (throw (ex-info "query-on-thread failed:" {:status (:status r)}))),
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
+
+(defn query-on-thread
+  "Wrap query-on-thread-aux to allow multiple tries at the same query.
+    :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
+    :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
+  [& {:keys [test-fn preprocess-fn] :or {test-fn (fn [_] true), preprocess-fn identity} :as obj}]
+  (let [obj (cond-> obj ; All recursive calls will contains? :tries.
+              (or (not (contains? obj :tries))
+                  (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
+    (assert (< (:tries obj) 10))
+    (if (> (:tries obj) 0)
+      (try (let [raw (reset! diag (query-on-thread-aux obj))
+                 res (preprocess-fn raw)]
+             (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
+           (catch Exception e
+             (log/warn "query-on-thread failed (might try again):" (-> e datafy :cause))
+             (query-on-thread (update obj :tries dec))))
+      (log/warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
 
 (defn ^:diag list-thread-messages
   "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
@@ -262,10 +287,19 @@
   [id]
   (openai/delete-assistant {:assistant_id id} (api-credentials llm-provider)))
 
-(defn ^:diag delete-assistants-openai!
+(defn ^:diag delete-surrogates-openai!
   "Delete from the openai account all assistants that match the argument filter function.
    The default function check for metadata :usage='surrogate'."
-  ([] (delete-assistants-openai! #(#{"surrogate" "agent"} (-> % :metadata (get :usage)))))
+  ([] (delete-surrogates-openai! #(= "surrogate" (-> % :metadata (get :usage)))))
+  ([selection-fn]
+   (doseq [a (->> (list-assistants-openai) :data (filterv selection-fn))]
+     (log/info "Deleting assistant" (:name a) (:id a))
+     (delete-assistant-openai (:id a)))))
+
+(defn ^:diag delete-agents-openai!
+  "Delete from the openai account all assistants that match the argument filter function.
+   The default function check for metadata :usage='surrogate'."
+  ([] (delete-agents-openai! #(=  "agent" (-> % :metadata (get :usage)))))
   ([selection-fn]
    (doseq [a (->> (list-assistants-openai) :data (filterv selection-fn))]
      (log/info "Deleting assistant" (:name a) (:id a))
@@ -301,7 +335,7 @@
 (defn query-agent
   "Make a query to the Clojure agent."
   [agent-id query]
-  (assert (#{:process-agent :text-function-agent} agent-id))
+  (assert (#{:process-dur-agent :text-function-agent} agent-id))
   (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
                                      :keys aid tid
                                      :in $ ?agent-id

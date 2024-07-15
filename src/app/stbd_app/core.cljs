@@ -96,7 +96,6 @@
   (let [banner-height 58 ; was 42 hmmm...
         [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
         [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
-        [conversation set-conversation]       (hooks/use-state {:conv [] :conv-for "nobody"})
         [code set-code]                       (hooks/use-state "")
         useful-height (int (- height banner-height))
         chat-side-height useful-height
@@ -104,7 +103,6 @@
     (hooks/use-effect :once
       (log/info "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
-      (register-fn :set-conversation set-conversation)
       (register-fn :set-code set-code)
     (-> (dba/get-project-list) ;  Resolves to map with client's :current-project :others, and conv-id the first two are maps of :projec/id :project/name.
         (p/then (fn [{:keys [current-project others conv-id] :as _resp}]
@@ -124,10 +122,10 @@
           ($ Stack {:direction "row"}
              "schedulingTBD"
              ($ Box
-                ($ SelectProject {:current-proj proj :proj-infos proj-infos})))) ; <================================
+                ($ SelectProject {:current-proj proj :proj-infos proj-infos}))))
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
-                     ($ chat/Chat {:chat-height chat-side-height :conv-map conversation :proj-info proj}))
+                     ($ chat/Chat {:chat-height chat-side-height :proj-info proj}))
            :right ($ ShareUpDown
                      {:init-height code-side-height
                       :up ($ Editor {:text code

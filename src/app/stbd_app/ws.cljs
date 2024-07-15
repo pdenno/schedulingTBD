@@ -69,12 +69,12 @@
 (register-fn :tbd-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
                                       (log/info "tbd-says msg:" msg)
-                                        ((lookup-fn :set-tbd-text) msg)))
+                                        ((lookup-fn :add-tbd-text) msg)))
 
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
                                       (log/info "sur-says msg:" msg)
-                                        ((lookup-fn :set-sur-text) msg)))
+                                        ((lookup-fn :add-sur-text) msg)))
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."

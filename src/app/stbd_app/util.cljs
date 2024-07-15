@@ -45,3 +45,6 @@
                project-id        (assoc :project/id project-id)
                pid               (assoc :project/id pid)
                conv-id           (assoc :conversation/id conv-id))))))
+
+(defn now []
+  (js/Date. (.now js/Date)))

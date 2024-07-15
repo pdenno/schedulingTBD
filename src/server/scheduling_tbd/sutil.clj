@@ -178,9 +178,12 @@
 (def planning-domains "An atom that associates a keyword key with a planning domain stucture (containing :domain/elems, :domain/problem)."
   (atom {}))
 
-(defn register-planning-domain [id domain]
+(defn register-planning-domain
+  "Store the planning domain at the argument id."
+  [id domain]
   (log/info "Registering planning domain" id)
   (swap! planning-domains #(assoc % id domain)))
+
 (defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
 (defn get-domain [id] (get @planning-domains id))
 
@@ -208,7 +211,7 @@
   "Do heuristic light modification to the argument text to make it more like HTML.
    Specifically:
      - Change: **bold** to <b>bold</b>.
-   This is mostly for use with OpenAI tools, which give bold some things with markdown."
+   This is mostly for use with OpenAI tools."
   [s]
   (let [lines (for [line (str/split-lines s)]
                 (let [[success pre bold post] (re-matches #"(.*)\*\*(.+)\*\*(.*)" line)] ; ToDo: I can't put \- in the bold stuff.
@@ -221,3 +224,9 @@
          (subs last 0 (dec (count last))))))
 
 (defn string2sym [s] (-> s str/lower-case (str/replace #"\s+" "-") symbol))
+
+(defn domain-conversation
+  [domain-id]
+  (let [res (-> domain-id get-domain :domain/conversation)]
+    (assert (#{:process :data :resource} res))
+    res))

@@ -3,14 +3,13 @@
   (:refer-clojure :exclude [send])
   (:require
    [clojure.core.unify    :as uni]
+   [clojure.datafy        :refer [datafy]]
    [clojure.pprint        :refer [cl-format]]
-   [clojure.spec.alpha    :as s]
    [promesa.core          :as p]
    [promesa.exec          :as px]
    [scheduling-tbd.db     :as db]
    [scheduling-tbd.llm    :as llm]
-   [scheduling-tbd.specs  :as spec]
-   [scheduling-tbd.sutil  :as sutil :refer [find-fact]]
+   [scheduling-tbd.sutil  :as sutil :refer [find-fact domain-conversation]]
    [scheduling-tbd.web.websockets  :as ws]
    [taoensso.timbre       :as log]))
 
@@ -62,7 +61,8 @@
 
 ;;; --------  db-actions is similar but adds a second object, the response from the operator -----------------------------------
 (defmacro defaction
-  "Macro to wrap methods for updating the project's database for effects from running an operation."
+  "Macro to wrap methods for updating the project's database for effects from running an operation.
+   Returned value is not meaningful."
   {:clj-kondo/lint-as 'clojure.core/defmacro
    :arglists '(tag [arg-map] & body)}
   [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
@@ -70,7 +70,7 @@
      (when @debugging? (println (cl-format nil "==> ~A (act)" ~tag)))
      (let [res# (do ~@body)]
        (if (seq? res#) (doall res#) res#)
-       (do (when @debugging?     (println (cl-format nil "<-- ~A (act) returns ~S" ~tag res#)))
+       (do (when @debugging? (println (cl-format nil "<-- ~A (act) returns ~S" ~tag res#)))
            res#))))
 
 (defn db-action-dispatch
@@ -84,41 +84,36 @@
 (defmulti db-action #'db-action-dispatch)
 
 (defn run-operator!
-  "Run the action associated with the operator, returning an updated state EXCEPT where fails."
-  [state {:operator/keys [head a-list] :as _task} {:keys [inject-failures pid] :as opts}]
-  (let [op-tag (-> head first keyword)]
-    (cond (some #(uni/unify head %) inject-failures)         (do (log/info "+++Operator FAILURE (INJECTED):" op-tag)
-                                                                  (throw (ex-info "run-operator injected failure" {:op-head op-tag})))
-          (and
-           (not-empty a-list)
-           (every?
-            (fn [a-item]
-              (some #(uni/unify a-item %) state)) a-list))   (log/info "+++Operator" op-tag "pass-through (SATISFIED)")
-
-          (@operator-method? op-tag)                         (do (operator-meth (-> opts
-                                                                                    (assoc :state state)
-                                                                                    (assoc :tag op-tag)
-                                                                                    (dissoc :inject-failures)))
-                                                                 (log/info "+++Operator" op-tag "ran (ACTUAL) state = " (db/get-planning-state pid)))
-
-          :else                                               (log/info "+++Operator" op-tag "pass-through (NOT RECOGNIZED)"))))
-
+  "Run the action associated with the operator, updating planning-state in the DB."
+  [{:operator/keys [head] :as _task} {:keys [inject-failures pid verbose?] :or {verbose? true} :as opts}]
+  (when verbose? (log/info "\n\n\n***** run-operator! head =" head))
+  (let [state (db/get-planning-state pid)
+        op-tag (-> head first keyword)
+        done (list 'done (-> op-tag name symbol) (-> pid name symbol))]
+    ;; This is done for side effects.
+    (cond (some #(uni/unify head %) inject-failures)      (throw (ex-info "run-operator injected failure" {:op-head op-tag}))
+          (some #(= done %) state)                        (when verbose? (log/info "+++Operator" op-tag "pass-through (done prepreposition)"))
+          (@operator-method? op-tag)                      (do (operator-meth (-> opts
+                                                                                 (assoc :state state)
+                                                                                 (assoc :tag op-tag)
+                                                                                 (dissoc :inject-failures)))
+                                                              (db/add-planning-state pid [done]))
+          :else                                           (throw (ex-info "No operator for method" {:op-tag op-tag})))
+    nil))
 
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
 ;;;       For the time being, I'm just adding uniquely
-(defn operator-update-state
-  "Update the project's DB, specifically :project/state-string with infromation from last response and operator a-list and d-list.
-      - old-state   - a set of proposition.
-      - proj-id     - task a planner operator destructure
-      - bindings    - variable binding established when unifying with this operator.
-   Returns the new state."
-  [old-state task bindings]
-  (assert (every? #(s/valid? ::spec/positive-proposition %) old-state))
-  (let [a-list (mapv #(uni/subst % bindings) (:operator/a-list task))
-        d-list (mapv #(uni/subst % bindings) (:operator/d-list task))]
-    (cond-> old-state
-      (not-empty d-list) (->> (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
-      (not-empty a-list) (->> (into a-list) set))))
+(defn operator-update-state!
+  "Update the project db's :problem/planning-state by unification with the  a-list and d-list.
+      - operator    - the operator in the planning domain from which the d-list and a-list are obtained.
+      - bindings    - variable binding established when unifying with this operator's d-list and a-list."
+  [pid operator bindings]
+  (let [a-list (mapv #(uni/subst % bindings) (:operator/a-list operator))
+        d-list (mapv #(uni/subst % bindings) (:operator/d-list operator))
+        new-state (cond-> (db/get-planning-state pid)
+                    (not-empty d-list) (->> (remove (fn [fact] (some #(uni/unify fact %) d-list))) set)
+                    (not-empty a-list) (->> (into a-list) set))]
+    (db/put-planning-state pid new-state)))
 
 (defn surrogate?
   "Return true if state has a predicate unifying with (surrogate ?x)."
@@ -139,35 +134,46 @@
         state))
     (throw (ex-info "Couldn't find PID in human project." {:state state}))))
 
+;;; (ou/chat-pair-aux {:pid :sur-fountain-pens :surrogate? true :agent-query "Describe your most significant scheduling problem in a few sentences."} {})
 (defn chat-pair-aux
   "Run one query/response pair of chat elements with a human or a surrogate.
    Returns promise which will resolve to the original obj argument except:
      1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
      2) :response is added. Typically its value is a string."
-  [{:keys [pid state agent-query] :as obj}]
-  (log/info "Chat pair: surrogate? =" (surrogate? state))
+  [{:keys [pid surrogate? agent-query] :as obj} {:keys [tries preprocess-fn] :or {tries 1 preprocess-fn identity}}]
+  (reset! diag obj)
   (let [aid (db/get-assistant-id pid nil)
         tid (db/get-thread-id pid nil)
-        agent-type (if (surrogate? state) :surrogate :human)
-        prom (if (= :surrogate agent-type)
+        prom (if surrogate?
                (px/submit! (fn []
                              (try
-                               (llm/query-on-thread :tid tid :aid aid :query-text agent-query)   ; This can timeout.
+                               (llm/query-on-thread :tid tid            ; This can timeout.
+                                                    :aid aid
+                                                    :query-text agent-query
+                                                    :tries tries
+                                                    :preprocess-fn preprocess-fn)
                                (catch Exception e {:error e}))))
                (ws/send-to-chat (-> obj
                                     (assoc :msg agent-query)
-                                    (assoc :dispatch-key :tbd-says))))]                                             ; This cannot timeout.
-    (p/await prom))); You can't put anything else here or a promise will be passed! ; ToDo: Fix this. Put a catch before the p/await!.
+                                    (assoc :promise? true)
+                                    (assoc :dispatch-key :tbd-says))))] ; This cannot timeout.
+    (-> prom
+       (p/catch (fn [e]
+                  (reset! diag (datafy e))
+                  (log/error "Failed in chag-pair-aux:" (datafy e))))
+        p/await)))
 
 (defn chat-pair
   "Call to run the chat and put the query and response into the project's database.
-   Returns the argument object with :response set to some text."
-  ([obj] (chat-pair obj []))
-  ([{:keys [pid state agent-query] :as obj} msg-keys]
-   (let [response-text (chat-pair-aux obj)]
+   Returns the argument object with :response set to some text.
+   Note that this also updates the UI (ws/refresh-client)"
+  ([obj] (chat-pair obj {}))
+  ([{:keys [pid surrogate? agent-query client-id domain-id] :as obj}, {:keys [tags] :or {tags []} :as opts}]
+   (let [response-text (chat-pair-aux obj opts)]
      (if (string? response-text)
-       (let [user-role (if (surrogate? state) :surrogate :human)]
-         (db/add-msg pid :system agent-query (conj msg-keys :query))
-         (db/add-msg pid user-role response-text (conj msg-keys :response))
+       (let [user-role (if surrogate? :surrogate :human)]
+         (db/add-msg pid :system agent-query (conj tags :query))
+         (db/add-msg pid user-role response-text (conj tags :response))
+         (ws/refresh-client client-id pid (domain-conversation domain-id)) ; ToDo: fix this.
          (assoc obj :response response-text))
        (throw (ex-info "Unknown response from operator" {:response response-text}))))))
