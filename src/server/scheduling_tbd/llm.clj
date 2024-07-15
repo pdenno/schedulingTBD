@@ -227,16 +227,19 @@
       (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
             msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data) ; ToDo: 20 is a guess.
             response (response-msg query-text msg-list)]
-        (cond (> now timeout)                        (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text})),
+        (cond (> now timeout)                        (do (log/warn "Timeout")
+                                                         (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text}))),
 
               (and (= "completed" (:status r))
                    (not-empty response))              (markdown2html response),
 
               (and (= "completed" (:status r))
-                   (empty? response))                 (throw (ex-info "query-on-thread empty response:" {:status (:status r)})),
+                   (empty? response))                 (do (log/warn "empty resposne")
+                                                          (throw (ex-info "query-on-thread empty response:" {:status (:status r)}))),
 
 
-              (#{"expired" "failed"} (:status r))     (throw (ex-info "query-on-thread failed:" {:status (:status r)})),
+              (#{"expired" "failed"} (:status r))     (do (log/warn "failed/expired last_error = " (:last_error r))
+                                                          (throw (ex-info "query-on-thread failed:" {:status (:status r)}))),
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
@@ -249,7 +252,6 @@
               (or (not (contains? obj :tries))
                   (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
     (assert (< (:tries obj) 10))
-    (log/info "preprocess-fn = " preprocess-fn)
     (if (> (:tries obj) 0)
       (try (let [raw (reset! diag (query-on-thread-aux obj))
                  res (preprocess-fn raw)]

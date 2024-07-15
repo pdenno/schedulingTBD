@@ -287,7 +287,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                        :preprocess-fn (fn [resp] (-> resp remove-preamble edn/read-string))
                        :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
           (reset! past-rev result)
-          (log/info "***************" rev "="  @past-rev))))
+          #_(log/info "***************" rev "="  @past-rev))))
     (post-process @past-rev (name pid))))
 
 (defn put-process-sequence!

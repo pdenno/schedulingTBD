@@ -232,7 +232,7 @@
                                     (log/error "Plan execution error: cause =" (:cause err) ", data =" (:data err))
                                     (reset! diag {:err err :partials partials :s-tasks s-tasks :opts opts})
                                     (if (empty? next-plan)
-                                      (throw (ex-info "No plans remain." {:diag @diag}))
+                                      (throw (ex-info "No plans remain." {}))
                                       next-plan))
                                   partials)]
                    (recur partials
@@ -279,7 +279,7 @@
     (when response-to-user
       (ws/refresh-client client-id pid conv-id)
        (Thread/sleep 1000) ; Allow refresh-client to complete.
-      (ws/send-to-chat {:promise? false, :client-id client-id, :msg response-to-user}))))
+      (ws/send-to-chat {:dispatch-key :tbd-says :promise? false, :client-id client-id, :msg response-to-user}))))
 
 ;;; (plan/resume-conversation {:pid :sur-craft-beer :client-id (ws/recent-client!) :conv-id :data})
 ;;; (plan/resume-conversation {:pid :sur-fountain-pens :conv-id :data :client-id (ws/recent-client!)})

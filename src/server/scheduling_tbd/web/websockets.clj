@@ -258,32 +258,24 @@
     (log/error "domain-expert-says: no p-key (e.g. no question in play)")))
 
 ;;;-------------------- Sending questions etc. to a client --------------------------
-(defn use-promise?
-  "Return true if a promise should be generated for the argument type of dispatch."
-  [dispatch-key] ; The complete list of these is ::spec/outbound-dispatch-key.
-  (#{:tbd-says} dispatch-key))
-
 (defn send-to-chat
   "Send the argument structure to the client.
    If :promise?=true, return a promise that is resolved when the domain-expert responds to the message.
    The only key of the argument map that is required is :client-id. :dispatch-key defaults to :tbd-says.
    :promise? defaults to true only when the dispatch key is :tbd-says."
-  [{:keys [client-id dispatch-key] :or {dispatch-key :tbd-says} :as content}]
-  (let [promise? (if (contains? content :promise?) (:promise? content) (use-promise? dispatch-key))
-        content (cond-> content ; Just so that we can uses s/assert below!
-                  (not (contains? content :dispatch-key))  (assoc :dispatch-key :tbd-says))]
-    (s/assert ::spec/chat-msg-obj content)
-    (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
-    (if-let [out (->> client-id (get @socket-channels) :out)]
-      (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
-            msg-obj (cond-> content
-                      p-key               (assoc :p-key p-key)
-                      true                (assoc :timestamp (now)))]
-        (when-not (= :alive? dispatch-key)
-          (log/info "send-to-chat: msg-obj =" msg-obj))
-        (go (>! out (str msg-obj)))
-        prom)
-      (log/error "Could not find out async channel for client" client-id))))
+  [{:keys [client-id dispatch-key promise?] :as content}]
+  (s/assert ::spec/chat-msg-obj content)
+  (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
+  (if-let [out (->> client-id (get @socket-channels) :out)]
+    (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
+          msg-obj (cond-> content
+                    p-key               (assoc :p-key p-key)
+                    true                (assoc :timestamp (now)))]
+      (when-not (= :alive? dispatch-key)
+        (log/info "send-to-chat: msg-obj =" msg-obj))
+      (go (>! out (str msg-obj)))
+      prom)
+    (log/error "Could not find out async channel for client" client-id)))
 
 ;;; A map from keys to functions used to call responses from clients.
 ;;; This is defonce so that it doesn't get blown away when websockets.clj is reloaded.

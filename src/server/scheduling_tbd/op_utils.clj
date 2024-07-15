@@ -5,12 +5,10 @@
    [clojure.core.unify    :as uni]
    [clojure.datafy        :refer [datafy]]
    [clojure.pprint        :refer [cl-format]]
-   [clojure.spec.alpha    :as s]
    [promesa.core          :as p]
    [promesa.exec          :as px]
    [scheduling-tbd.db     :as db]
    [scheduling-tbd.llm    :as llm]
-   [scheduling-tbd.specs  :as spec]
    [scheduling-tbd.sutil  :as sutil :refer [find-fact domain-conversation]]
    [scheduling-tbd.web.websockets  :as ws]
    [taoensso.timbre       :as log]))
@@ -136,16 +134,17 @@
         state))
     (throw (ex-info "Couldn't find PID in human project." {:state state}))))
 
+;;; (ou/chat-pair-aux {:pid :sur-fountain-pens :surrogate? true :agent-query "Describe your most significant scheduling problem in a few sentences."} {})
 (defn chat-pair-aux
   "Run one query/response pair of chat elements with a human or a surrogate.
    Returns promise which will resolve to the original obj argument except:
      1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
      2) :response is added. Typically its value is a string."
-  [{:keys [pid state agent-query] :as obj} {:keys [tries preprocess-fn] :or {tries 1 preprocess-fn identity}}]
+  [{:keys [pid surrogate? agent-query] :as obj} {:keys [tries preprocess-fn] :or {tries 1 preprocess-fn identity}}]
+  (reset! diag obj)
   (let [aid (db/get-assistant-id pid nil)
         tid (db/get-thread-id pid nil)
-        agent-type (if (surrogate? state) :surrogate :human)
-        prom (if (= :surrogate agent-type)
+        prom (if surrogate?
                (px/submit! (fn []
                              (try
                                (llm/query-on-thread :tid tid            ; This can timeout.
@@ -156,11 +155,12 @@
                                (catch Exception e {:error e}))))
                (ws/send-to-chat (-> obj
                                     (assoc :msg agent-query)
+                                    (assoc :promise? true)
                                     (assoc :dispatch-key :tbd-says))))] ; This cannot timeout.
     (-> prom
-;;        (p/catch (fn [e]
-;;                   (reset! diag (datafy e))
-;;                   (log/error "Failed in chag-pair-aux:" (datafy e))))
+       (p/catch (fn [e]
+                  (reset! diag (datafy e))
+                  (log/error "Failed in chag-pair-aux:" (datafy e))))
         p/await)))
 
 (defn chat-pair
@@ -168,10 +168,10 @@
    Returns the argument object with :response set to some text.
    Note that this also updates the UI (ws/refresh-client)"
   ([obj] (chat-pair obj {}))
-  ([{:keys [pid state agent-query client-id domain-id] :as obj}, {:keys [tags] :or {tags []} :as opts}]
+  ([{:keys [pid surrogate? agent-query client-id domain-id] :as obj}, {:keys [tags] :or {tags []} :as opts}]
    (let [response-text (chat-pair-aux obj opts)]
      (if (string? response-text)
-       (let [user-role (if (surrogate? state) :surrogate :human)]
+       (let [user-role (if surrogate? :surrogate :human)]
          (db/add-msg pid :system agent-query (conj tags :query))
          (db/add-msg pid user-role response-text (conj tags :response))
          (ws/refresh-client client-id pid (domain-conversation domain-id)) ; ToDo: fix this.

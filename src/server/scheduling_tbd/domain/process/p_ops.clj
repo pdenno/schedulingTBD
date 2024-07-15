@@ -4,6 +4,7 @@
    [clojure.edn                               :as edn]
    [scheduling-tbd.db                         :as db]
    [scheduling-tbd.domain.process.p-interview :as inv]
+   [scheduling-tbd.minizinc                   :as mzn]
    [scheduling-tbd.op-utils                   :as ou :refer [chat-pair db-action defoperator defaction make-human-project surrogate?]]
    [scheduling-tbd.sutil                      :as sutil :refer [register-planning-domain find-fact]]
    [scheduling-tbd.web.websockets             :as ws]
@@ -180,11 +181,12 @@
 (defaction :!query-process-durs [{:keys [client-id response pid] :as obj}]
   (log/info "!query-process-durs (action): response =" response "obj =" obj)
   (let [more-state (inv/analyze-process-durs-response obj)
-        new-code (inv/mzn-process-steps more-state)
+        new-code (mzn/minimal-mzn-for-process pid)
         minizinc-enum-announce
         (str "Okay, we now know enough to get started on a MiniZinc solution. "
-             "In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. "
-             "The 'enum values' name the steps of your process in the order they are executed for each product.")]
+             "In the code pane (upper right of the app) we created a simplistic scheduling system."
+             "It only illustrates the idea of running one job through each of the tasks you mentioned"
+             "(excepting any tasks that weren't part of making the product, those we'll deal with later.")]
     (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
     (db/put-code pid new-code)
     ;; ToDo: This should really be just for humans. Maybe use the DB's message tags to decide that. (or to decide what to send).

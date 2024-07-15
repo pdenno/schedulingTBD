@@ -456,11 +456,13 @@
        (let [files (-> base-dir (str "/projects/") clojure.java.io/file .listFiles)]
          (mapv #(-> % .getName keyword) files))
        (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases.") {})))
-     ;; Otherwise we list using system db. These are the 'legitmate' projects (they aren't :project/deleted? = true).
-     (d/q '[:find [?proj-id ...]
-            :where
-            [?e :project/id  ?proj-id]]
-          @(connect-atm :system)))))
+     ;; Otherwise we list using system db. These are the 'legitmate' projects in the project datebase
+     (-> (d/q '[:find [?proj-id ...]
+                :where
+                [?e :project/id  ?proj-id]]
+              @(connect-atm :system))
+         sort
+         vec))))
 
 (defn get-thread-id
   "Get the thread object of the argument PID."

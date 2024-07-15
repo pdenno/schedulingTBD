@@ -18,7 +18,6 @@
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core    :as p]
-   [scheduling-tbd.util :refer [now]]
    [stbd-app.components.attachment-modal :as attach :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
@@ -29,6 +28,8 @@
 (def ^:diag diag (atom nil))
 
 ;;; ----------------------------- formatting ChatScope messages --------------------------------------
+;;; BTW: (.now js/Date) is an integer.
+;;;      (js/Date. (.now js/Date)) is an #Inst.
 (def today "A string like 'Sat May 04 2024'" (-> (js/Date. (.now js/Date)) str (subs 0 15)))
 (def start-of-day-millis (-> today js/Date.parse))
 
@@ -38,7 +39,7 @@
   "Return a string 'just now', '2 minutes ago' etc. for the argument Instant relative to now."
   [instant]
   (let [msg-epoch-millis (inst-ms instant)
-        now-epoch-millis (now)
+        now-epoch-millis (.now js/Date)
         diff (- now-epoch-millis msg-epoch-millis)]
     (cond (< diff 60000) "just now"
           (<= 60000  diff 120000)   "1 minute ago"
@@ -61,7 +62,7 @@
   [msgs]
   (let [new-date (atom today)]
     (reduce (fn [r msg]
-              (let [{:message/keys [content from time] :or {time (js/Date. (now))}} msg
+              (let [{:message/keys [content from time] :or {time (js/Date. (.now js/Date))}} msg
                     content (msg-with-title content from)
                     msg-date (-> time inst2date (subs 0 15))]
                 (as-> r ?r
@@ -97,7 +98,7 @@
 ;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
-  ([pid] (get-conversation pid nil))
+  ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
   ([pid conv-id]
    (-> (dba/get-conversation-http pid conv-id)
        (p/then (fn [{:keys [conv conv-id]}]
@@ -112,6 +113,14 @@
 
 (register-fn :get-conversation get-conversation)
 
+(defn add-msg
+  "Add messages to the msgs-atm.
+   This is typically used for individual messages that come through :tbd-says or :sur-says,
+   as opposed to bulk update through get-conversation."
+  [msgs text from]
+  (let [msg-id (inc (or (apply max (->> msgs (map :message/id) (filter identity))) 0))]
+    (reset! msgs-atm (conj msgs {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))}))))
+
 (defnc Chat [{:keys [chat-height proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state [])
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
@@ -119,7 +128,6 @@
         [active-conv set-active-conv]   (hooks/use-state nil) ; active-conv is a keyword
         [busy? set-busy?]               (hooks/use-state nil)
         resize-fns (make-resize-fns set-box-height)]
-    (log/info "box-height = " box-height)
     (letfn [(change-conversation-click [to]
               (when-not busy?
                 (if-let [pid (:project/id @common-info)]
@@ -141,8 +149,8 @@
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
-        (register-fn :set-tbd-text (fn [text] (set-msg-list (conj @msgs-atm {:message/content text :message/from :system}))))
-        (register-fn :set-sur-text (fn [text] (set-msg-list (conj @msgs-atm {:message/content text :message/from :surrogate}))))
+        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg @msgs-atm text :system))))
+        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg @msgs-atm text :surrogate))))
         (register-fn :set-active-conv set-active-conv)
         (register-fn :set-busy? set-busy?)
         (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
