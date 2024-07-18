@@ -69,7 +69,6 @@
                 {:axiom/head (different ?x ?y)
                  :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}
 
-
                 {:axiom/head (done analyze-process ?p)
                  :axiom/rhsides [{:axiom/rhs
                                   ((done !describe-challenge ?p)

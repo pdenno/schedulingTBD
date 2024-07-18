@@ -163,16 +163,10 @@
 ;;; ----- :!query-process-durs -----------------------------------------------------------
 (defoperator :!query-process-durs [{:keys [state] :as obj}]
   (log/info "---------------------- !query-process-durs: state = "state)
-  (let [agent-query (if (surrogate? state)
-                      (format (str "I suppose processing times for each of the steps you just mentioned might vary from product to product. "
-                                   "But generally speaking, how long does each step take? "
-                                   "Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time "
-                                   "so it looks like this:\n"
-                                   "1. %s (some amount of time)\n"
-                                   "2. %s (some amount of time)...")
-                              (-> (find-fact '(process-step ?proj 1 ?process) state) (nth 3))
-                              (-> (find-fact '(process-step ?proj 2 ?process) state) (nth 3)))
-                      "Provide typical process durations for the tasks on the right.\n(When done hit \"Submit\".)")]
+  (let [agent-query (str "I suppose processing times for each of the steps you just mentioned might vary from product to product. "
+                         "But generally speaking, how long does each step take? "
+                         "Please produce a list just like the one you did for process steps, one process per line, but append to "
+                         "each line the typical processing time in parentheses.")]
     (-> obj
         (assoc :agent-query agent-query)
         (chat-pair {:tags [:!query-process-durs]})

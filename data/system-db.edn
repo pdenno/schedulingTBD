@@ -1,11 +1,11 @@
 [
 #:system{:agents
-         [#:agent{:assistant-id "asst_5rQpFqdjpMnQN11VBOjduCw1",
-                  :id :text-function-agent,
-                  :thread-id "thread_BRf8CpxyiAjsuc5MK7F3qCjZ"}
-          #:agent{:assistant-id "asst_3euKnxjb7b2FNZGmz6Ep7Zb0",
-                  :id :process-dur-agent,
-                  :thread-id "thread_SwCzuA30WsUHFZmfcCwKwKmo"}],
+         [#:agent{:assistant-id "asst_DZIhqEzQjuNZdUdDAO212fJF",
+                  :id :process-dur-agent-openai,
+                  :thread-id "thread_iiX0d61Mqo5DmQx7qaorP7Ap"}
+          #:agent{:assistant-id "asst_AuwZvI8YwCCxQ94rwE0WqXZT",
+                  :id :text-function-agent-openai,
+                  :thread-id "thread_ivXla7iZ9reKzB1VSAQLtwNo"}],
          :default-project-id :sur-fountain-pens,
          :name "SYSTEM"}
 
@@ -49,16 +49,24 @@
           :id :sur-craft-beer,
           :name "Sur Craft Beer"}
 
-#:project{:dir "/opt/scheduling/projects/sur-plate-glass",
+#:project{:dir "/opt/scheduling/projects/sur-plate-glass/db/",
           :id :sur-plate-glass,
-          :name "Sur Plate Glass"}
+          :name "SUR Plate Glass"}
 
 #:project{:dir "/opt/scheduling/projects/sur-injection-molds",
           :id :sur-injection-molds,
           :name "Sur Injection Molds"}
 
-#:project{:dir "/opt/scheduling/projects/sur-fountain-pens",
+#:project{:dir "/opt/scheduling/projects/sur-fountain-pens/db/",
           :id :sur-fountain-pens,
-          :name "Sur Fountain Pens"}
+          :name "SUR Fountain Pens"}
+
+#:project{:dir "/opt/scheduling/projects/sur-stoneware/db/",
+          :id :sur-stoneware,
+          :name "SUR Stoneware"}
+
+#:project{:dir "/opt/scheduling/projects/sur-ice-cream/db/",
+          :id :sur-ice-cream,
+          :name "SUR Ice Cream"}
 
 ]

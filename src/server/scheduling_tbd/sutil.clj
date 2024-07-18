@@ -7,7 +7,9 @@
    [datahike.pull-api       :as dp]
    [taoensso.timbre         :as log]))
 
-(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
+;(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
+(def default-llm-provider "Default provider to use. Choices are #{:openai :azure}." (atom :openai)) ; Values are azure and :openai
+
 (defn api-credentials [provider]
   (let [res (case provider
                 :openai {:api-key (System/getenv "OPENAI_API_KEY")}
@@ -187,9 +189,9 @@
 (defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
 (defn get-domain [id] (get @planning-domains id))
 
-(defn error-for-chat
+(defn chat-status
   "Create a string to explain in the chat the error we experienced."
-  ([s] (error-for-chat s nil))
+  ([s] (chat-status s nil))
   ([s err]
    (if (instance? Throwable err)
      (let [m (Throwable->map err)]

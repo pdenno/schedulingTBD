@@ -22,7 +22,7 @@
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
-   [stbd-app.ws         :as ws]
+   [stbd-app.ws         :as ws :refer [remember-promise]]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
@@ -86,14 +86,15 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(def msgs-atm "This has to be out here for :get-msg-list to work!" (atom nil))
+(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as as function.
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
 (defn update-msg-list
   "Update the dates on the msg list."
   []
-  (log/info "update-msg-list")
-  ((lookup-fn :set-cs-msg-list) ((lookup-fn :get-msg-list))))
+  (when (and (not ((lookup-fn :get-busy?))) (> (count @msgs-atm) 0))
+    (log/info "update-msg-list: msg-count = " (count @msgs-atm))
+    ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
 ;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
 ;;; In the other cases, it takes whatever the DB says is current.
@@ -117,9 +118,24 @@
   "Add messages to the msgs-atm.
    This is typically used for individual messages that come through :tbd-says or :sur-says,
    as opposed to bulk update through get-conversation."
-  [msgs text from]
-  (let [msg-id (inc (or (apply max (->> msgs (map :message/id) (filter identity))) 0))]
-    (reset! msgs-atm (conj msgs {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))}))))
+  [text from]
+  (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))]
+    (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
+    ((lookup-fn :set-cs-msg-list) @msgs-atm)))
+
+(register-fn :interviewer-busy?     (fn [{:keys [value]}]
+                                      ((lookup-fn :set-busy?) value)))
+
+(register-fn :tbd-says              (fn [{:keys [p-key msg]}]
+                                      (when p-key (remember-promise p-key))
+                                      (log/info "tbd-says msg:" msg "before =" (count @msgs-atm))
+                                      (add-msg msg :system)
+                                      (log/info "tbd-says msg:" msg "after =" (count @msgs-atm))))
+
+(register-fn :sur-says              (fn [{:keys [p-key msg]}]
+                                      (when p-key (remember-promise p-key))
+                                      (log/info "sur-says msg:" msg)
+                                      (add-msg msg :surrogate)))
 
 (defnc Chat [{:keys [chat-height proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state [])
@@ -149,9 +165,10 @@
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
-        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg @msgs-atm text :system))))
-        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg @msgs-atm text :surrogate))))
+        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
+        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
         (register-fn :set-active-conv set-active-conv)
+        (register-fn :get-busy? (fn [] busy?))
         (register-fn :set-busy? set-busy?)
         (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
         (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs))))  ; These two used to update message time.

@@ -353,12 +353,16 @@
 
 ;;; ---------------------------------- agents ----------------------------------------------
 (defn add-agent!
-  "Create a agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
+  "Create an agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
    Store what is needed to identify it in system DB."
-  [{:keys [id instruction]}]
-  (let [assist (llm/make-assistant :name (name id) :instructions instruction :metadata {:usage :agent})
+  [{:keys [id instructions llm-provider]}]
+  (let [assist (llm/make-assistant :name (name id)
+                                   :llm-provider llm-provider
+                                   :instructions instructions
+                                   :metadata {:usage :agent})
         aid    (:id assist)
         thread (llm/make-thread {:assistant-id aid
+                                 :llm-provider llm-provider
                                  :metadata {:usage :agent}})
         tid    (:id thread)
         conn   (connect-atm :system)
@@ -370,17 +374,14 @@
                                                  :agent/assistant-id aid
                                                  :agent/thread-id tid}}]})))
 
-;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
-(def process-dur-agent
-  "Instructions and training for :process-dur-agent to help it get started."
-  {:id :process-dur-agent
-   :instruction (slurp "data/instructions/process-dur-agent.txt")})
+;;; (db/add-agent! :process-dur-agent
+(def known-agents
+  "The actual agent :id is the one provided here with -<llm-provider> added."
+  [{:id :process-dur-agent
+    :instructions (slurp "data/instructions/process-dur-agent.txt")}
 
-(def text-function-agent
-  {:id :text-function-agent
-   :instruction (slurp "data/instructions/text-function-agent.txt")})
-
-(def known-agents [process-dur-agent text-function-agent])
+   {:id :text-function-agent
+    :instructions (slurp "data/instructions/text-function-agent.txt")}])
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 ;;; Atom for the configuration map used for connecting to the project db.
@@ -559,7 +560,7 @@
   "Write the complete state to the project database. Argument is a vector or set. "
   [pid state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
-  (log/info "put-planning-state: state =" state)
+  ;;(log/info "put-planning-state: state =" state)
   (if (empty? state)
     (throw (ex-info "state is empty" {:pid pid}))
     (let [state-set (set state)
@@ -571,7 +572,7 @@
   "Add the argument vector of ground proposition to state, a set. Return the new state."
   [pid more-state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
-  (log/info "add-planning-state: more-state = " more-state)
+  ;;(log/info "add-planning-state: more-state = " more-state)
   (let [new-state (into (get-planning-state pid) more-state)
         conn (connect-atm pid)
         eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
@@ -646,7 +647,12 @@
         (d/transact conn db-schema-sys)
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
       (when new-agents?
-        (doseq [a known-agents] (add-agent! a)))
+        (doseq [llm-provider [:openai]]
+          (doseq [a known-agents]
+            (-> a
+                (update :id #(-> % name (str "-" (name llm-provider)) keyword))
+                (assoc :llm-provider llm-provider)
+                add-agent!))))
       cfg)
     (log/error "Not recreating system DB: No backup file.")))
 
