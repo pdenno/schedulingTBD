@@ -99,7 +99,7 @@
                 (reset! error-info-2 {:event arg})
                 (log/error "Error on socket: arg=" arg))) ; ToDo: investigate why it gets these.
         ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
-        (reset! ping-process (js/window.setInterval (fn [] (ping!)) 2000)))
+        (reset! ping-process (js/window.setInterval (fn [] (ping!)) 30000 #_2000)))
     (throw (ex-info "Websocket Connection Failed:" {:client-id client-id}))))
 
 (defn check-channel

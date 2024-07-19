@@ -300,7 +300,7 @@
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
    Recreate the system database if sys-db-cfg.rebuild-db? = true."
   []
-  (let [him-cfg (db-cfg-map :him)]
+  (let [him-cfg (db-cfg-map {:type :him})]
     (sutil/register-db :him him-cfg)
     (when rebuild-him? (create-him-db him-cfg))
     him-cfg))

@@ -89,11 +89,11 @@
 (def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as as function.
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
-(defn update-msg-list
+(defn update-msg-times
   "Update the dates on the msg list."
   []
   (when (and (not ((lookup-fn :get-busy?))) (> (count @msgs-atm) 0))
-    (log/info "update-msg-list: msg-count = " (count @msgs-atm))
+    (log/info "update-msg-times: msg-count = " (count @msgs-atm))
     ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
 ;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
@@ -142,7 +142,7 @@
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
         [active-conv set-active-conv]   (hooks/use-state nil) ; active-conv is a keyword
-        [busy? set-busy?]               (hooks/use-state nil)
+        [busy? set-busy?]               (hooks/use-state nil) ; Have to go through common-info
         resize-fns (make-resize-fns set-box-height)]
     (letfn [(change-conversation-click [to]
               (when-not busy?
@@ -168,11 +168,11 @@
         (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
         (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
         (register-fn :set-active-conv set-active-conv)
-        (register-fn :get-busy? (fn [] busy?))
-        (register-fn :set-busy? set-busy?)
+        (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (do (set-busy? val)))) ; Yes. Need to do both.
+        (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
         (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
         (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs))))  ; These two used to update message time.
-        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-list)) 60000)))
+        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
       (hooks/use-effect [msg-list]
         (reset! msgs-atm msg-list)
         (set-cs-msg-list (msgs2cs msg-list)))

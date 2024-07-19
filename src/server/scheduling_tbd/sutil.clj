@@ -24,6 +24,8 @@
 
 (defonce databases-atm (atom {}))
 
+(defn db-ids [] (-> @databases-atm keys sort vec))
+
 (defn register-db
   "Add a DB configuration."
   [k config]
@@ -49,22 +51,21 @@
   "Return a datahike configuration map for argument database (or its base).
      id   - a keyword uniquely identifying the DB in the scope of DBs.
      type - the type of DB configuration being make: (:project, :system, or :him, so far)"
-  ([type] (if (= :project type)
-            (throw (ex-info "projects need an ID." {}))
-            (db-cfg-map type type)))
-  ([type id]
-   (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB")) ; "/opt/scheduling" typically.
-                      (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
-                                           "\nCreate directories 'projects' and 'system' under it.") {})))
-         db-dir (->> (case type
-                       :system           "/system"
-                       :project          (str "/projects/" (name id) "/db/")
-                       :planning-domains "/planning-domains"
-                       :him              "/etc/other-dbs/him")
-                     (str base-dir))]
-     (-> db-template
-         (assoc-in [:store :path] db-dir)
-         (assoc    :base-dir base-dir)))))
+  [{:keys [type id in-mem?]}]
+  (when (and (= :project type) (not id)) (throw (ex-info "projects need an ID." {})))
+  (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB")) ; "/opt/scheduling" typically.
+                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
+                                          "\nCreate directories 'projects' and 'system' under it.") {})))
+        db-dir (->> (case type
+                      :system           "/system"
+                      :project          (str "/projects/" (name id) "/db/")
+                      :planning-domains "/planning-domains"
+                      :him              "/etc/other-dbs/him")
+                    (str base-dir))]
+    (cond-> db-template
+      true            (assoc :base-dir base-dir)     ; This is not a datahike thing.
+      (not in-mem?)   (assoc :store {:backend :file :path db-dir})
+      in-mem?         (assoc :store {:backend :mem :id (name id)}))))
 
 (defn connect-atm
   "Return a connection atom for the DB."
@@ -228,7 +229,8 @@
 (defn string2sym [s] (-> s str/lower-case (str/replace #"\s+" "-") symbol))
 
 (defn domain-conversation
+  "A planning domain is associated with exactly one conversation."
   [domain-id]
   (let [res (-> domain-id get-domain :domain/conversation)]
-    (assert (#{:process :data :resource} res))
+    (assert (#{:process :data :resource} res)) ; ToDo: So far, only these three conversations. But that will change.
     res))

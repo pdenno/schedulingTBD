@@ -92,7 +92,7 @@
         done (list 'done (-> op-tag name symbol) (-> pid name symbol))]
     ;; This is done for side effects.
     (cond (some #(uni/unify head %) inject-failures)      (throw (ex-info "run-operator injected failure" {:op-head op-tag}))
-          (some #(= done %) state)                        (when verbose? (log/info "+++Operator" op-tag "pass-through (done prepreposition)"))
+          (some #(= done %) state)                        (when verbose? (log/info "+++Operator" op-tag "pass-through (a 'done' fact)"))
           (@operator-method? op-tag)                      (do (operator-meth (-> opts
                                                                                  (assoc :state state)
                                                                                  (assoc :tag op-tag)

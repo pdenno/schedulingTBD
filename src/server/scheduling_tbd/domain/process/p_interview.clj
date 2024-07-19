@@ -9,7 +9,7 @@
    [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
    [datahike.api                  :as d]
-   [scheduling-tbd.db             :as db]
+   [scheduling-tbd.db             :as db :refer [put-process-sequence!]]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm register-planning-domain yes-no-unknown string2sym]]
    [taoensso.timbre               :as log]))
@@ -289,15 +289,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
           (reset! past-rev result)
           #_(log/info "***************" rev "="  @past-rev))))
     (post-process @past-rev (name pid))))
-
-(defn put-process-sequence!
-  "Write project/process-sequence to the project's database.
-   The 'infos' argument is a vector of maps such as produced by analyze-process-durs-response."
-  [pid full-obj]
-  (reset! diag full-obj)
-  (let [conn (connect-atm pid)
-        eid (db/project-exists? pid)]
-    (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
 
 (defn analyze-process-durs-response
   "Used predominantly with surrogates, study the response to a query about process durations,

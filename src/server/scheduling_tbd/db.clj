@@ -392,11 +392,7 @@
    (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
   [pid]
   (assert (keyword? pid))
-  (when (d/q '[:find ?e .
-               :in $ ?pid
-               :where
-               [?e :project/id ?pid]]
-             @(connect-atm :system) pid)
+  (when (some #(= % pid) (sutil/db-ids)) ; (sutil/db-ids) includes non-project IDs.
     (d/q '[:find ?e .
            :in $ ?pid
            :where
@@ -592,6 +588,14 @@
                  proc-id)]
     (resolve-db-id {:db/id eid} conn)))
 
+(defn put-process-sequence!
+  "Write project/process-sequence to the project's database.
+   The 'infos' argument is a vector of maps such as produced by analyze-process-durs-response."
+  [pid full-obj]
+  (let [conn (connect-atm pid)
+        eid (project-exists? pid)]
+    (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
+
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
   [id & {:keys [target-dir] :or {target-dir "data/projects/"}}]
@@ -638,7 +642,7 @@
    By default this creates new agents."
   [& {:keys [target-dir new-agents?] :or {target-dir "data/" new-agents? true}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
-    (let [cfg (db-cfg-map :system)]
+    (let [cfg (db-cfg-map {:type :system})]
       (log/info "Recreating the system database.")
       (when (d/database-exists? cfg) (d/delete-database cfg))
       (d/create-database cfg)
@@ -661,7 +665,7 @@
   [id]
   (let [backup-file (format "data/projects/%s.edn" (name id))]
     (if (.exists (io/file backup-file))
-      (let [cfg (db-cfg-map :project id)
+      (let [cfg (db-cfg-map {:type :project :id id})
             files-dir (-> cfg :base-dir (str "/projects/" (name id) "/files"))]
         (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
           (d/delete-database cfg))
@@ -732,16 +736,15 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to current conversation of the database with :project/id = id."
-  ([pid from msg] (add-msg pid from msg []))
-  ([pid from msg tags]
-   (reset! diag [pid from msg tags])
+  ([pid from text] (add-msg pid from text []))
+  ([pid from text tags]
    (assert (#{:system :human :surrogate :developer-injected} from))
-   (assert (string? msg))
-   ;;(log/info "add-msg: pid =" pid "msg =" msg)
+   (assert (string? text))
+   ;;(log/info "add-msg: pid =" pid "text =" text)
    (if-let [conn (connect-atm pid)]
      (let [msg-id (inc (max-msg-id pid))]
        (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
-                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
+                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
                                                              (not-empty tags) (assoc :message/tags tags))}]}))
      (throw (ex-info "Could not connect to DB." {:pid pid})))))
 
@@ -765,20 +768,20 @@
    Return the PID of the project."
   ([proj-info] (create-proj-db! proj-info {} {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
-  ([proj-info additional-info opts]
+  ([proj-info additional-info {:keys [in-mem? force?] :as opts}]
    (s/assert ::project-info proj-info)
-   (let [{id :project/id pname :project/name} ; BTW, never name something 'name'.
-         (if (:force? opts) proj-info (unique-proj proj-info))
-         cfg (db-cfg-map :project id)
+   (let [{id :project/id pname :project/name} (if force? proj-info (unique-proj proj-info))
+         cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
          dir (-> cfg :store :path)
          files-dir (-> cfg :base-dir (str "/" pname  "/files"))]
-     (when-not (-> dir io/as-file .isDirectory)
-       (-> cfg :store :path io/make-parents)
-       (-> cfg :store :path io/as-file .mkdir))
-     (when-not (-> files-dir io/as-file .isDirectory)
-       (io/make-parents files-dir)
-       (-> files-dir io/as-file .mkdir))
-     (add-project-to-system id pname dir)
+     (when-not in-mem?
+       (when-not (-> dir io/as-file .isDirectory)
+         (-> cfg :store :path io/make-parents)
+         (-> cfg :store :path io/as-file .mkdir))
+       (when-not (-> files-dir io/as-file .isDirectory)
+         (io/make-parents files-dir)
+         (-> files-dir io/as-file .mkdir))
+       (add-project-to-system id pname dir))
      (when (d/database-exists? cfg) (d/delete-database cfg))
      (d/create-database cfg)
      (register-db id cfg)
@@ -827,14 +830,14 @@
   "Make a config for each project and register it."
   []
   (doseq [id (list-projects {:from-storage? true})]
-    (register-db id (db-cfg-map :project id))))
+    (register-db id (db-cfg-map {:type :project :id id}))))
 
 (defn init-dbs
   "Register DBs using "
   []
   (register-project-dbs)
-  (register-db :system (db-cfg-map :system))
-  {:sys-cfg (db-cfg-map :system)})
+  (register-db :system (db-cfg-map {:type :system}))
+  {:sys-cfg (db-cfg-map {:type :system})})
 
 (defstate sys&proj-database-cfgs
   :start (init-dbs))

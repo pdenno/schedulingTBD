@@ -281,6 +281,7 @@
 (defn ^:diag list-thread-messages
   "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
   ([tid] (list-thread-messages tid 20 {:llm-provider @default-llm-provider}))
+  ([tid limit] (list-thread-messages tid limit {:llm-provider @default-llm-provider}))
   ([tid limit {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
    (->> (openai/list-messages {:thread-id tid :limit limit} (api-credentials llm-provider))
         :data

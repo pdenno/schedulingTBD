@@ -266,16 +266,16 @@
       :resource (->> (filter #(= (first %) 'resource) state)
                      (mapv #(list 'characterize-resource (second %)))))))
 
+;;; ToDo: Client can't handle the :tbd-says???
 (defn plan9-post-actions
   "ws/send-to-chat depending on how planning went."
   [result client-id pid conv-id]
   (log/info "plan9-post-action: result =" result)
-  (let [response-to-user (case (:result result)
+  #_(let [response-to-user (case (:result result)
                            :success (chat-status "That's all the conversation we do right now.")
                            :stopped (chat-status "We stopped intentionally after 50 interactions.")
                            :failure (chat-status (str "We stopped owing to " (:reason result)))
                            nil)]
-    ;; ToDo: Even this isn't sufficent at times!
     (when response-to-user
       (ws/send-to-chat {:dispatch-key :tbd-says :promise? false, :client-id client-id, :msg response-to-user}))))
 
@@ -307,14 +307,33 @@
     (finally
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
+(defn ^:diag replay
+  "Perform all the client chat interactions as though run as a parallel agent.
+   This works by creating an in-memory DB and incrementally adding to it between ws/client-refresh calls.
+   If :individual?, then use *-says messages instead of ws/client-refresh.
+   Note that this just plays over whatever project and conversation is current."
+  [pid & {:keys [conv-id refresh? client-id] :or {conv-id :process client-id (ws/recent-client!)}}]
+  (let [msgs (db/get-conversation pid conv-id)
+        replay-id (->> pid name (str "replay-") keyword)
+        replay-proj (db/create-proj-db! {:project/id replay-id :project/name (name replay-id)} {} {:in-mem? true :force? true})]
+    (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+    (try
+      (doseq [ix (-> msgs count range)]
+        (let [{:message/keys [from content tags]} (nth msgs ix)]
+          (db/add-msg replay-proj from content tags) ; ToDo: Loses the time.
+          (ws/refresh-client client-id replay-id conv-id)
+          (Thread/sleep 1000)))
+      (finally
+        (do (ws/send-to-chat {:dispatch-key :tbd-says
+                              :promise? false,
+                              :client-id client-id,
+                              :msg "That's all the conversation we do right now. (replay)"})
+            (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))))
+
+;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-planner!
   []
   (ws/register-ws-dispatch :resume-conversation-plan resume-conversation))
 
-(defn quit-planner!
-  "Quit the planner. It can be restarted with a shell command through mount."
-  [])
-
 (defstate planning
-  :start (init-planner!)
-  :stop  (quit-planner!))
+  :start (init-planner!))

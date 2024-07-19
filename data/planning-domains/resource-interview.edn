@@ -2,6 +2,7 @@
 ;;; Note that I haven't yet implemented axioms; this would borrow from explainlib, I think.
 
 {:domain/id :resource-interview
+ :domain/conversation :resource
  :domain/description "A planning domain to run an interview about uploaded tables of data, or surrogate-created data." ; I think!
  :domain/elems [{:method/head (characterize-resources ?proj)
                  :method/rhsides [{:method/case-name "uploaded-table"
