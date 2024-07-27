@@ -295,6 +295,14 @@
 
 (def rebuild-him? "True if mount/init should rebuild the How It's Made database." false)
 
+;;; ------------------- Command line -----------------------
+(defn ^:diag list-him-segments
+  "Return a sorted vector of the segments."
+  []
+  (-> (d/q '[:find [?name ...] :where [_ :segment/name ?name]] @(connect-atm :him))
+      sort
+      vec))
+
 ;;; ------------------- Starting and stopping ---------------
 (defn init-him
   "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).

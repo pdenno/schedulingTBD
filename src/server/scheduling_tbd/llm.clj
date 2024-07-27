@@ -309,7 +309,7 @@
 (defn ^:diag delete-surrogates!
   "Delete from the openai account all assistants that match the argument filter function.
    The default function check for metadata :usage='surrogate'."
-  [{:keys [selection-fn llm-provider] :or {selection-fn #(= "surrogate" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
+  [& {:keys [selection-fn llm-provider] :or {selection-fn #(= "surrogate" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
   (doseq [a (->> (list-assistants) :data (filterv selection-fn))]
     (log/info "Deleting assistant" (:name a) (:id a))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))

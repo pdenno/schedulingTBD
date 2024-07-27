@@ -99,12 +99,14 @@
 ;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
+  "Using an HTTP GET, get the conversation, and also the code, if any."
   ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
   ([pid conv-id]
    (-> (dba/get-conversation-http pid conv-id)
-       (p/then (fn [{:keys [conv conv-id]}]
+       (p/then (fn [{:keys [conv conv-id code]}]
                  (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "count =" (count conv))
                  (reset! msgs-atm conv)
+                 (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) conv-id)
                  (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})

@@ -121,7 +121,38 @@
                                      :time #inst "2024-07-15T18:40:26.133-00:00"}]}
            #:conversation{:id :data}
            #:conversation{:id :resource}],
-          :code "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nset of int: Hour = 0..365;\nenum Task = {nibManufacturing, barrelCapManufacturing, internalMechanisms, assembly, qualityControl, packaging};\narray [Product, Task] of int: taskDuration = [|1, 2, 1, 1, 1, 0.50|];\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var Hour: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var Hour: taskEnds;\n\n% We'll use this below to ensure a resource can only be used by one product at a time.\narray [Task, Hour] of var Product: busyWith;\n\n% We assume no tasks are running now, so the first task of the first (and only) job can start now.\nconstraint taskStarts[1, nibManufacturing] = 0;       % Product 1 starts immediately.\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, nibManufacturing] == taskStarts[p, barrelCapManufacturing]);\nconstraint forall (p in Product) (taskEnds[p, barrelCapManufacturing] == taskStarts[p, internalMechanisms]);\nconstraint forall (p in Product) (taskEnds[p, internalMechanisms] == taskStarts[p, assembly]);\nconstraint forall (p in Product) (taskEnds[p, assembly] == taskStarts[p, qualityControl]);\nconstraint forall (p in Product) (taskEnds[p, qualityControl] == taskStarts[p, packaging]);\n\n\n% Next task must start right after previous task ends. No place to put WIP.\n%\nconstraint forall (p in Product) (taskEnds[p, mill   ] == taskStarts[p, ferment]);\nconstraint forall (p in Product) (taskEnds[p, ferment] == taskStarts[p, bright]);\n\n% A task ends taskDuration days after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% A resource(task) can only be used with one product at a time.\nconstraint forall (t in Task, p in Product, d in Hour where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])\n                    (busyWith[t,d] == p);\n\n% Hours elapsed when the final task ends.\nsolve minimize sum (p in Product) (taskEnds[nProducts]);",
+           :code "int : nProducts = 1;
+set of int: Product = 1..nProducts;
+set of int: Hour = 0..365;
+enum Task = {nibManufacturing, barrelCapManufacturing, internalMechanisms, assembly, qualityControl, packaging};
+array [Product, Task] of float: taskDuration = [|1, 2, 1, 1, 1, 0.50|];
+
+% We assume a task uses one major resource; resources are synonymous with tasks.
+array [Product, Task] of var Hour: taskStarts; % 'var' means it is a decision variable.
+array [Product, Task] of var Hour: taskEnds;
+
+% We'll use this below to ensure a resource can only be used by one product at a time.
+array [Task, Hour] of var Product: busyWith;
+
+% We assume no tasks are running now, so the first task of the first (and only) job can start now.
+constraint taskStarts[1, nibManufacturing] = 0;       % Product 1 starts immediately.
+
+% Every other task can start after the previous task ends.
+constraint forall (p in Product) (taskEnds[p, nibManufacturing] == taskStarts[p, barrelCapManufacturing]);
+constraint forall (p in Product) (taskEnds[p, barrelCapManufacturing] == taskStarts[p, internalMechanisms]);
+constraint forall (p in Product) (taskEnds[p, internalMechanisms] == taskStarts[p, assembly]);
+constraint forall (p in Product) (taskEnds[p, assembly] == taskStarts[p, qualityControl]);
+constraint forall (p in Product) (taskEnds[p, qualityControl] == taskStarts[p, packaging]);
+
+% A task ends taskDuration days after it starts.
+constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);
+
+% A resource(task) can only be used with one product at a time.
+constraint forall (t in Task, p in Product, d in Hour where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])
+                    (busyWith[t,d] == p);
+
+% Hours elapsed when the final task ends.
+solve minimize sum (p in Product) (taskEnds[nProducts, packaging]);",
           :processes
           #:process{:desc
                     "1. Material Receipt and Inspection (2 hours)\n2. Component Manufacturing (4 hours)\n   - Nibs (1 hour)\n   - Barrels and Caps (2 hours)\n   - Internal Mechanisms (1 hour)\n3. Assembly (1 hour)\n4. Quality Control (1 hour)\n5. Packaging (30 minutes)\n6. Shipping and Distribution (2 hours)",
