@@ -121,11 +121,12 @@
                                      :time #inst "2024-07-15T18:40:26.133-00:00"}]}
            #:conversation{:id :data}
            #:conversation{:id :resource}],
-           :code "int : nProducts = 1;
+           :code
+"int : nProducts = 1;
 set of int: Product = 1..nProducts;
-enum Task = {nibManufacturing, barrelCapManufacturing, internalMechanisms, assembly, qualityControl, packaging}
+enum Task = {nibManufacturing, barrelCapManufacturing, internalMechanisms, assembly, qualityControl, packaging};
 % Durations are in units of hours and may be rounded.
-array [Product, Task] of float: taskDuration = [|1, 2, 1, 1, 1, 1/2|];
+array [Product, Task] of float: taskDuration = [|1.000, 2.000, 1.000, 1.000, 1.000, 0.500|];
 
 float : minTime = 0;
 % It shouldn't take longer than doing only one thing at a time.
@@ -136,7 +137,7 @@ array [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a
 array [Product, Task] of var minTime..maxTime: taskEnds;
 
 % This is used in the constraint below.
-predicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \/ s2 + d2 <= s1;
+predicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;
 
 % Ensure that no two Products aren't using the same resource (task) at the same time.
 constraint forall (t in Task)
@@ -161,7 +162,7 @@ constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] 
 
 % Minimize time elapsed when the final task ends (maxspan).
 solve minimize max (p in Product) (taskEnds[p, packaging]);",
-          :processes
+           :processes
           #:process{:desc
                     "1. Material Receipt and Inspection (2 hours)\n2. Component Manufacturing (4 hours)\n   - Nibs (1 hour)\n   - Barrels and Caps (2 hours)\n   - Internal Mechanisms (1 hour)\n3. Assembly (1 hour)\n4. Quality Control (1 hour)\n5. Packaging (30 minutes)\n6. Shipping and Distribution (2 hours)",
                     :id :sur-fountain-pens,
