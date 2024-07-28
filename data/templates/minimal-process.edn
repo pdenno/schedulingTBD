@@ -1,0 +1,51 @@
+{:name "Minimal process hours"
+ :description "A complete basic MiniZinc spec to run a single job through each task in serial order."
+ :sub-keys [:dur-uom :dur-type :task-enum-list :task-duration-array :first-task-name :last-task-name :task-serial-constraints]
+ :test-data {:dur-uom "hours",
+             :dur-type "int",
+             :task-enum-list "{nibManufacturing, barrelCapManufacturing, internalMechanisms, assembly, qualityControl, packaging};",
+             :task-duration-array "[|1, 1, 1, 1, 1, 1|]",
+             :first-task-name "nibManufacturing",
+             :last-task-name "packaging"
+             :task-serial-constraints
+"constraint forall (p in Product) (taskEnds[p, nibManufacturing] <= taskStarts[p, barrelCapManufacturing]);
+constraint forall (p in Product) (taskEnds[p, barrelCapManufacturing] <= taskStarts[p, internalMechanisms]);
+constraint forall (p in Product) (taskEnds[p, internalMechanisms] <= taskStarts[p, assembly]);
+constraint forall (p in Product) (taskEnds[p, assembly] <= taskStarts[p, qualityControl]);
+constraint forall (p in Product) (taskEnds[p, qualityControl] <= taskStarts[p, packaging]);"}
+ :mzn-text
+"int : nProducts = 1;
+set of int: Product = 1..nProducts;
+enum Task = $$$TASK-ENUM-LIST$$$;
+% Durations are in units of $$$DUR-UOM$$$ and may be rounded.
+array [Product, Task] of $$$DUR-TYPE$$$: taskDuration = $$$TASK-DURATION-ARRAY$$$;
+
+$$$DUR-TYPE$$$ : minTime = 0;
+% It shouldn't take longer than doing only one thing at a time.
+$$$DUR-TYPE$$$ : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);
+
+% We assume a task uses one major resource; resources are synonymous with tasks.
+array [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.
+array [Product, Task] of var minTime..maxTime: taskEnds;
+
+% This is used in the constraint below.
+predicate no_overlap(var $$$DUR-TYPE$$$:s1, $$$DUR-TYPE$$$:d1, var $$$DUR-TYPE$$$:s2, $$$DUR-TYPE$$$:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;
+
+% Ensure that no two Products aren't using the same resource (task) at the same time.
+constraint forall (t in Task)
+             (forall  (i,k in Product where i < k)
+                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));
+
+% We assume no tasks are running now, so the first task of some product can start now.
+constraint exists (p in Product) (taskStarts[p, $$$FIRST-TASK-NAME$$$] = 0);
+
+% Starting some time in the past is not allowed.
+constraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);
+
+% Every other task can start after the previous task ends.
+$$$TASK-SERIAL-CONSTRAINTS$$$
+% A task ends taskDuration time units after it starts.
+constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);
+
+% Minimize time elapsed when the final task ends (maxspan).
+solve minimize max (p in Product) (taskEnds[p, $$$LAST-TASK-NAME$$$]);"}

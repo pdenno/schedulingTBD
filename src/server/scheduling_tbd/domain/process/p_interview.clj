@@ -220,6 +220,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (s/def ::rev-2 (fn [v] (every? #(s/valid? ::rev-2-map %) v)))
 (s/def ::rev-3 (fn [v] (every? #(s/valid? ::rev-3-map %) v)))
 (s/def ::rev-4 (fn [v] (every? #(s/valid? ::rev-4-map %) v)))
+
 (s/def ::rev-5 (fn [v] (every? #(s/valid? ::rev-5-map %) v)))
 
 (defn remove-preamble

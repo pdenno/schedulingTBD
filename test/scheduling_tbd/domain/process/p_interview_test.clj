@@ -53,6 +53,7 @@
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
   (safe-alias 'mzn    'scheduling-tbd.minizinc)
+  (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
   (safe-alias 'ou     'scheduling-tbd.op-utils)
   (safe-alias 'opt    'scheduling-tbd.operators-test)
   (safe-alias 'plan   'scheduling-tbd.planner)
