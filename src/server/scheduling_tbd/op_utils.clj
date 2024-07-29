@@ -160,7 +160,7 @@
     (-> prom
        (p/catch (fn [e]
                   (reset! diag (datafy e))
-                  (log/error "Failed in chag-pair-aux:" (datafy e))))
+                  (log/error "Failed in chat-pair-aux:" (datafy e))))
         p/await)))
 
 (defn chat-pair

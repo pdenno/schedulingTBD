@@ -299,7 +299,7 @@
   "Because the ws go loop can drop, we use this as part of reconnecting."
   [{:keys [client-id]}]
   ;;(log/info "client confirms alive:" client-id)
-  (swap! socket-channels #(assoc-in % [client-id :alive] true))
+  (swap! socket-channels #(assoc-in % [client-id :alive?] true))
   nil)
 
 (defn init-dispatch-table!

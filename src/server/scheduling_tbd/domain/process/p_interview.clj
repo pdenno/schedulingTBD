@@ -8,10 +8,9 @@
    [clojure.pprint                :refer [cl-format]]
    [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
-   [datahike.api                  :as d]
-   [scheduling-tbd.db             :as db :refer [put-process-sequence!]]
+   [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [connect-atm register-planning-domain yes-no-unknown string2sym]]
+   [scheduling-tbd.sutil          :as sutil :refer [default-llm-provider register-planning-domain yes-no-unknown]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
@@ -278,9 +277,10 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (defn run-process-dur-agent-steps
   "Run the steps of the process agent, checking work after each step."
   [response pid]
-  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent)
+  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent @default-llm-provider)
         past-rev (atom response)]
-    (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]]
+    (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]] ; These are also spec defs, thus ns-qualified.
+      (log/info "Starting rev " (name rev))
       (when @past-rev
         (let [result (llm/query-on-thread
                       {:aid aid :tid tid :role "user"
@@ -291,7 +291,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
           #_(log/info "***************" rev "="  @past-rev))))
     (post-process @past-rev (name pid))))
 
-(defn analyze-process-durs-response
+(defn analyze-process-durs-response!
   "Used predominantly with surrogates, study the response to a query about process durations,
    writing findings to the project database and returning state propositions."
   [{:keys [response pid] :as _obj}]
@@ -299,7 +299,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         full-obj {:process/id pid
                   :process/desc response
                   :process/sub-processes process-objects}]
-    (put-process-sequence! pid full-obj)
+    (db/put-process-sequence! pid full-obj)
     (let [extreme-span? (extreme-dur-span? pid pid) ; This look at the DB just updated.
           proj-sym (-> pid name symbol)]
       ;;(log/info "extreme-span? =" extreme-span?)

@@ -4,6 +4,13 @@
    ["@codemirror/commands" :refer [history #_historyKeymap emacsStyleKeymap]]
    ["@codemirror/view" :as view :refer [EditorView  #_lineNumbers]]
    ["@codemirror/state" :refer [EditorState Compartment ChangeSet Transaction]]
+   ["@mui/icons-material/ArrowBack$default" :as ArrowBack]
+   ["@mui/icons-material/RunCircle$default" :as RunCircle]
+   ["@mui/icons-material/Save$default" :as Save]
+   ["@mui/material/ButtonGroup$default" :as ButtonGroup]
+   ["@mui/material/Button$default" :as Button]
+   ["@mui/material/IconButton$default" :as IconButton]
+   ["@mui/material/Stack$default" :as Stack]
    [applied-science.js-interop :as j]
    [helix.core :as helix :refer [defnc $]]
    [helix.hooks :as hooks]
@@ -92,7 +99,8 @@
     (when-let [dom (j/get view :dom)]
       (when width  (j/assoc-in! dom    [:style :width]  (str width  "px")))
       (when height
-        (j/assoc-in! dom [:style :height] (str height "px"))))))
+        ;; 42 is height of buttons and purpose of life.
+        (j/assoc-in! dom [:style :height] (str (- height 42) "px"))))))
 
 (defn resize-finish
   "In order for scroll bars to appear (and long text not to run past the end of the editor vieport),
@@ -104,8 +112,12 @@
           ^Transaction trans  (.update state (j/lit {:effects [effect]}))]
       (.dispatch view trans))))
 
+(defn handle-whatever [& _args])
+(def chat-bg-style (clj->js {:bgcolor "#f0e699" #_"yellow"}))
+
 (defnc Editor
   [{:keys [text name height]}]
+  ;;(log/info "Editor height =" height) ; This changes when window size changes, not the share.
   (let [ed-ref (hooks/use-ref nil)
         view-dom (atom nil)]
     (hooks/use-effect :once ; [name]
@@ -114,7 +126,11 @@
               view (new EditorView (j/obj :state editor-state :parent parent))]
           (reset! view-dom (j/get view :dom))
           (swap! util/component-refs #(assoc % name {:ref parent :view view})))))
-    (hooks/use-effect [text]
-      (set-editor-text text))
-    (d/div {:ref ed-ref :id name} ; style works but looks ugly because it wraps editor tightly.
-      @view-dom)))
+    (hooks/use-effect [text] (set-editor-text text))
+    ($ Stack {:direction "column"}
+       ($ ButtonGroup {:sx chat-bg-style}
+          ($ IconButton {:onClick handle-whatever} ($ RunCircle))
+          ($ IconButton {:onClick handle-whatever} ($ Save))
+          ($ IconButton {:onClick handle-whatever} ($ ArrowBack)))
+       (d/div {:ref ed-ref :id name} ; style works but looks ugly because it wraps editor tightly.
+              @view-dom))))

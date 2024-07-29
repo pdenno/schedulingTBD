@@ -3,7 +3,7 @@
   (:require
    [clojure.edn                               :as edn]
    [scheduling-tbd.db                         :as db]
-   [scheduling-tbd.domain.process.p-interview :as inv]
+   [scheduling-tbd.domain.process.p-interview :as pinv]
    [scheduling-tbd.minizinc                   :as mzn]
    [scheduling-tbd.op-utils                   :as ou :refer [chat-pair db-action defoperator defaction make-human-project surrogate?]]
    [scheduling-tbd.sutil                      :as sutil :refer [register-planning-domain find-fact]]
@@ -43,7 +43,7 @@
 (defaction :!describe-challenge [{:keys [state response client-id] :as _obj}]
   (log/info "*******db-action (!describe-challenge): response =" response "state =" state)
   (let [surrogate? (surrogate? state)
-        analysis-state (inv/analyze-intro-response response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
+        analysis-state (pinv/analyze-intro-response response state)] ; return state props proj-id and proj-name if human, otherwise argument state.
     (when-not surrogate? (make-human-project analysis-state))
     ;;--------  Now human/surrogate can be treated nearly identically ---------
     (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
@@ -156,7 +156,7 @@
 
 (defaction :!query-process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
-  (let [more-state (inv/analyze-process-steps-response obj)]
+  (let [more-state (pinv/analyze-process-steps-response obj)]
     (log/info "---------------------- !query-process-steps: more-state = " more-state)
     (db/add-planning-state pid more-state)))
 
@@ -173,17 +173,22 @@
         db-action)))
 
 (defaction :!query-process-durs [{:keys [client-id response pid] :as obj}]
-  (log/info "!query-process-durs (action): response =" response "obj =" obj)
-  (let [more-state (inv/analyze-process-durs-response obj)
-        new-code (mzn/minimal-mzn-for-process pid)
-        minizinc-enum-announce
-        (str "Okay, we now know enough to get started on a MiniZinc solution. "
-             "In the code pane (upper right of the app) we created a simplistic scheduling system."
-             "It only illustrates the idea of running one job through each of the tasks you mentioned"
-             "(excepting any tasks that weren't part of making the product, those we'll deal with later.")]
-    (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
-    (db/put-code pid new-code)
-    ;; ToDo: This should really be just for humans. Maybe use the DB's message tags to decide that. (or to decide what to send).
-    (db/add-msg pid :system minizinc-enum-announce [:info-to-user :minizinc])
-    (ws/refresh-client client-id pid :process)
-    (db/add-planning-state pid more-state)))
+  (log/info "!query-process-durs (action): response = \n" response)
+  (let [more-state (pinv/analyze-process-durs-response! obj)]
+    (if (-> (db/get-process pid pid) :process/sub-processes not-empty)
+      (let [new-code (mzn/minimal-mzn-for-process pid)
+            study-the-code-msg
+            (str "Okay, we now know enough to get started on a MiniZinc solution. "
+                 "In the code pane (upper right of the app) we created a simplistic scheduling system."
+                 "It only illustrates the idea of running one job through each of the tasks you mentioned"
+                 "(excepting any tasks that weren't part of making the product, those we'll deal with later.")]
+        (ws/send-to-chat {:client-id client-id :dispatch-key :update-code :text new-code})
+        (db/put-code pid new-code)
+        ;; ToDo: This should really be just for humans. Maybe use the DB's message tags to decide that. (or to decide what to send).
+        (db/add-msg pid :system study-the-code-msg [:info-to-user :minizinc])
+        (ws/refresh-client client-id pid :process)
+        (db/add-planning-state pid more-state))
+      (ws/send-to-chat
+       {:client-id client-id
+        :dispatch-key :tbd-says
+        :text "There was a problem defining a process corresponding to what you said."}))))

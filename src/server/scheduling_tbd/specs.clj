@@ -54,3 +54,8 @@
 (s/def ::dispatch-key outbound-dispatch-key?)
 (s/def ::msg (s/and string? #(not-empty %)))
 (s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key ::msg]))
+
+(s/def :agent/id keyword?)
+(s/def :agent/base-type keyword?)
+(s/def :agent/thread-id string?)
+(s/def ::agent (s/keys :req [:agent/id :agent/base-type :agent/thread-id :agent/assistant-id]))

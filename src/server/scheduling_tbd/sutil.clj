@@ -214,7 +214,7 @@
   "Do heuristic light modification to the argument text to make it more like HTML.
    Specifically:
      - Change: **bold** to <b>bold</b>.
-   This is mostly for use with OpenAI tools."
+   This is mostly for use with chatbots that return markup."
   [s]
   (let [lines (for [line (str/split-lines s)]
                 (let [[success pre bold post] (re-matches #"(.*)\*\*(.+)\*\*(.*)" line)] ; ToDo: I can't put \- in the bold stuff.
@@ -225,8 +225,6 @@
         others (butlast lines)]
     (str (apply str others)
          (subs last 0 (dec (count last))))))
-
-(defn string2sym [s] (-> s str/lower-case (str/replace #"\s+" "-") symbol))
 
 (defn domain-conversation
   "A planning domain is associated with exactly one conversation."

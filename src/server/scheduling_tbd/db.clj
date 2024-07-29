@@ -14,7 +14,7 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.llm   :as llm]
    [scheduling-tbd.specs :as spec]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id]]
+   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id default-llm-provider]]
    [scheduling-tbd.util  :as util :refer [now]]
    [taoensso.timbre :as log :refer [debug]]))
 
@@ -29,6 +29,12 @@
    :agent/assistant-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant id (a string) associated with this surrogate."}
+   :agent/base-type
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Indicates the purpose and instructions given."}
+   :agent/llm-provider
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Currently either :openai or :azure."}
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
@@ -375,7 +381,7 @@
                                                  :agent/thread-id tid}}]})))
 
 ;;; (db/add-agent! :process-dur-agent
-(def known-agents
+(def known-agent-templates
   "The actual agent :id is the one provided here with -<llm-provider> added."
   [{:id :process-dur-agent
     :instructions (slurp "data/instructions/process-dur-agent.txt")}
@@ -652,7 +658,7 @@
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
       (when new-agents?
         (doseq [llm-provider [:openai]]
-          (doseq [a known-agents]
+          (doseq [a known-agent-templates]
             (-> a
                 (update :id #(-> % name (str "-" (name llm-provider)) keyword))
                 (assoc :llm-provider llm-provider)
@@ -811,19 +817,28 @@
           nil)))
     (log/warn "Delete-project: Project not found:" pid)))
 
+(defn ^:diag  known-agents
+  "Return a set of all the agents recorded in the system DB."
+  []
+  (-> (d/q '[:find [?id ...] :where [_ :agent/id ?id]] @(connect-atm :system))
+      set))
+
 (defn get-agent
   "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)."
-  [agent-id]
-  (assert (#{:process-dur-agent :table-agent} agent-id))
-  (-> (d/q '[:find ?aid ?tid
-             :keys aid tid
-             :in $ ?agent-id
-             :where
-             [?e :agent/id ?agent-id]
-             [?e :agent/assistant-id ?aid]
-             [?e :agent/thread-id ?tid]]
-           @(connect-atm :system) agent-id)
-      first))
+  ([base-type] (get-agent base-type @default-llm-provider))
+  ([base-type llm-provider]
+   (if-let [res (-> (d/q '[:find ?aid ?tid
+                           :keys aid tid
+                           :in $ ?base-type ?llm-provider
+                           :where
+                           [?e :agent/base-type ?base-type]
+                           [?e :agent/llm-provider ?llm-provider]
+                           [?e :agent/assistant-id ?aid]
+                           [?e :agent/thread-id ?tid]]
+                         @(connect-atm :system) base-type llm-provider)
+                    first)]
+     res
+     (throw (ex-info "get-agent: no such agent." {:base-type base-type :llm-provider llm-provider})))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs

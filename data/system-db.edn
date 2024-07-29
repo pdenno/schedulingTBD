@@ -1,11 +1,15 @@
 [
 #:system{:agents
-         [#:agent{:assistant-id "asst_DZIhqEzQjuNZdUdDAO212fJF",
+         [#:agent{:assistant-id "asst_1VMFlO75EFDgeF3OcvI5Zs7q",
+                  :base-type :process-dur-agent,
                   :id :process-dur-agent-openai,
-                  :thread-id "thread_iiX0d61Mqo5DmQx7qaorP7Ap"}
-          #:agent{:assistant-id "asst_AuwZvI8YwCCxQ94rwE0WqXZT",
+                  :llm-provider :openai,
+                  :thread-id "thread_kurGSRoFSASBxfCPA740lOSe"}
+          #:agent{:assistant-id "asst_WqMHIQxhqIi8piOByQawM1YQ",
+                  :base-type :text-function-agent,
                   :id :text-function-agent-openai,
-                  :thread-id "thread_ivXla7iZ9reKzB1VSAQLtwNo"}],
+                  :llm-provider :openai,
+                  :thread-id "thread_G6Y1ZfjaOAACr2pxmlavVE9a"}],
          :default-project-id :sur-fountain-pens,
          :name "SYSTEM"}
 
@@ -68,5 +72,9 @@
 #:project{:dir "/opt/scheduling/projects/sur-ice-cream/db/",
           :id :sur-ice-cream,
           :name "SUR Ice Cream"}
+
+#:project{:dir "/opt/scheduling/projects/sur-artificial-limbs/db/",
+          :id :sur-artificial-limbs,
+          :name "SUR Artificial Limbs"}
 
 ]

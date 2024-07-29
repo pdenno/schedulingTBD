@@ -226,11 +226,10 @@
     role     - #{'user' 'assistant'},
     query-text - a string.
    Returns text but uses promesa internally to deal with errors."
-  [& {:keys [tid aid role query-text timeout-secs llm-provider] :or {timeout-secs 60 role "user" llm-provider @default-llm-provider} :as _obj}] ; "user" when "assistant" is surrogate.
-  ;;(log/info "query-on-thread: query-text =" query-text)
+  [& {:keys [tid aid role query-text timeout-secs llm-provider]
+      :or {timeout-secs 60 role "user" llm-provider @default-llm-provider} :as _obj}] ; "user" when "assistant" is surrogate.
   (assert (#{"user" "assistant"} role))
-  (assert (string? query-text))
-  (assert (not-empty query-text))
+  (assert (and (string? query-text) (not-empty query-text)))
   (let [creds (api-credentials llm-provider)
         ;; Apparently the thread_id links the run to msg.
         _msg (openai/create-message {:thread_id tid :role role :content query-text} creds)
@@ -260,6 +259,8 @@
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
+(def diag2 (atom nil))
+
 (defn query-on-thread
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
@@ -274,7 +275,9 @@
                  res (preprocess-fn raw)]
              (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
            (catch Exception e
-             (log/warn "query-on-thread failed (might try again):" (-> e datafy :cause))
+             (let [d-e (datafy e)]
+               (log/warn "query-on-thread failed (tries = " (:tries obj) "): "
+                         (or (:cause d-e) (-> d-e :via first :message))))
              (query-on-thread (update obj :tries dec))))
       (log/warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
 
