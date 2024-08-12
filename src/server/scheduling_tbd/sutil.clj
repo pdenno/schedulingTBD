@@ -226,9 +226,11 @@
     (str (apply str others)
          (subs last 0 (dec (count last))))))
 
+(def diag (atom nil))
+
 (defn domain-conversation
   "A planning domain is associated with exactly one conversation."
   [domain-id]
   (let [res (-> domain-id get-domain :domain/conversation)]
-    (assert (#{:process :data :resource} res)) ; ToDo: So far, only these three conversations. But that will change.
+    (assert (#{:process :data :resource} res))
     res))

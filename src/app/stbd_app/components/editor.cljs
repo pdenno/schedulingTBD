@@ -1,21 +1,22 @@
 (ns stbd-app.components.editor
   (:require
+   [ajax.core        :refer [POST]]
    ["@codemirror/language" :refer [foldGutter syntaxHighlighting defaultHighlightStyle]]
    ["@codemirror/commands" :refer [history #_historyKeymap emacsStyleKeymap]]
    ["@codemirror/view" :as view :refer [EditorView  #_lineNumbers]]
    ["@codemirror/state" :refer [EditorState Compartment ChangeSet Transaction]]
    ["@mui/icons-material/ArrowBack$default" :as ArrowBack]
-   ["@mui/icons-material/RunCircle$default" :as RunCircle]
+   ["@mui/icons-material/ArrowForward$default" :as ArrowForward]
    ["@mui/icons-material/Save$default" :as Save]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
-   ["@mui/material/Button$default" :as Button]
    ["@mui/material/IconButton$default" :as IconButton]
    ["@mui/material/Stack$default" :as Stack]
    [applied-science.js-interop :as j]
    [helix.core :as helix :refer [defnc $]]
    [helix.hooks :as hooks]
    [helix.dom :as d]
-   ;["@mui/system/sizing" :as sizing] ; ToDo: Investigate
+   ;;["@mui/system/sizing" :as sizing] ; ToDo: Investigate
+   [stbd-app.components.run-dialog :refer [RunDialog]]
    [stbd-app.components.share :as share]
    [stbd-app.rm-mode.parser :as parser]
    [stbd-app.rm-mode.state :as state]
@@ -129,8 +130,9 @@
     (hooks/use-effect [text] (set-editor-text text))
     ($ Stack {:direction "column"}
        ($ ButtonGroup {:sx chat-bg-style}
-          ($ IconButton {:onClick handle-whatever} ($ RunCircle))
+          ($ RunDialog)
           ($ IconButton {:onClick handle-whatever} ($ Save))
-          ($ IconButton {:onClick handle-whatever} ($ ArrowBack)))
+          ($ IconButton {:onClick handle-whatever} ($ ArrowBack))
+          ($ IconButton {:onClick handle-whatever} ($ ArrowForward)))
        (d/div {:ref ed-ref :id name} ; style works but looks ugly because it wraps editor tightly.
               @view-dom))))

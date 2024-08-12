@@ -38,5 +38,3 @@ constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] 
 
 % Minimize time elapsed when the final task ends (maxspan).
 solve minimize max (p in Product) (taskEnds[p, packaging]);
-
-%output ["Start product " ++ show(p) ++ " at time " ++ show(taskStarts[p, nibManufacturing]) ++ "\n" | p in Product];

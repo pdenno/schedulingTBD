@@ -104,7 +104,7 @@
                (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
                (ws/send-to-chat (assoc chat-args :msg "We had a problem answering this questions."))))))))
 
-(defn ^:diag get-surrogate-messages-openai
+(defn ^:diag get-surrogate-messages-provider
   [pid]
   (when-let [tid (d/q '[:find ?tid .
                         :where
@@ -113,6 +113,25 @@
                       @(sutil/connect-atm pid))]
     (llm/list-thread-messages tid 100)))
 
+(defn ^:diag list-surrogates
+  "Return a set of the surrogate (its ID string) of each project that has one."
+  []
+  (->> (db/list-projects)
+       (map #(d/q '[:find ?aid .
+                    :where
+                    [_ :project/surrogate ?e]
+                    [?e :surrogate/assistant-id ?aid]]
+                  @(connect-atm %)))
+       (filterv identity)
+       set))
+
+(defn ^:diag delete-surrogates!
+  "Delete surrogates that aren't used in projects."
+  []
+  (let [in-a-project? (list-surrogates)]
+    (llm/delete-surrogates!
+     {:selection-fn #(and (= "surrogate" (-> % :metadata (get :usage)))
+                          (not (in-a-project? (:id %))))})))
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []

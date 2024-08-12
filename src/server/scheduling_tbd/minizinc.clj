@@ -163,9 +163,7 @@
    the minimal-process.edn key :test-data, the keys of which are :sub-keys."
   [pid]
   (let [template (-> "data/templates/minimal-process.edn" slurp edn/read-string)
-        procs (->> pid
-                   db/get-project
-                   :project/processes
+        procs (->> (db/get-process pid :initial-unordered)
                    :process/sub-processes
                    (remove #(:process/supply-chain? %))
                    vec)

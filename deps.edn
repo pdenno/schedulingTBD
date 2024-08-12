@@ -14,8 +14,8 @@
            metosin/ring-http-response          {:mvn/version "0.9.4"}
            mount/mount                         {:mvn/version "0.1.18"}
            net.clojars.wkok/openai-clojure     {:mvn/version "0.18.1"}
-           org.apache.logging.log4j/log4j-api  {:mvn/version "2.23.1"} ; ToDo: Move logging to :dev.
-           org.apache.logging.log4j/log4j-core {:mvn/version "2.23.1"} ; ToDo: Move logging to :dev.
+           org.apache.logging.log4j/log4j-api  {:mvn/version "2.23.1"}
+           org.apache.logging.log4j/log4j-core {:mvn/version "2.23.1"}
            org.clj-commons/hickory             {:mvn/version "0.7.4"}
            org.clojure/clojure                 {:mvn/version "1.11.3"}
            org.clojure/core.unify              {:mvn/version "0.6.0"}

@@ -133,25 +133,34 @@
         :doc "A string that can be edn/read-string into a set of predicates"}
 
    ;; ---------------------- process (about production process types)
-   :process/duration-comment
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a comment about the duration of a process."}
    :process/desc
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a description of this this process; perhaps stated in an interview."}
    :process/duration
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "a reference to a duration (dur) object; typically an estimate"}
+   :process/duration-comment
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a comment about the duration of a process."}
    :process/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc (str "A string, perhaps from an interview uniquely identifying the process."
                   "The top-level production process will have a process-type/id = :project/id.")}
+   :process/interview-class
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "a keyword identifying what sort of conversation lead to this process description, for example :initial-unordered for early in the interview."}
+   :process/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "original text naming the process."}
    :process/pre-processes
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "a process/id identifying a process that must occur before this task "}
    :process/resource
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "a keyword naming a resource (type or instance) used in this task"}
+   :process/step-number
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
+        :doc "a positive integer indicating the order of the process step in the :process/sub-processes vector."}
    :process/sub-processes
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "process objects that occur within the scope of this project object"}
@@ -217,7 +226,7 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "an object with keys :problem/domain, :problem/goal-string, and :problem/state-string at least."}
    :project/processes
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+      #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the project's process objects; everything about processes."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
@@ -582,16 +591,16 @@
     new-state))
 
 (defn get-process
-  "Return the process structure for the argument pid and process-id."
-  [pid proc-id]
+  "Return the process structure for the argument pid and interview-class."
+  [pid interview-class]
   (assert (keyword? pid))
-  (assert (keyword? proc-id))
+  (assert (keyword? interview-class))
   (let [conn (connect-atm pid)
         eid (d/q '[:find ?eid .
-                   :in $ ?proc-id
-                   :where [?eid :process/id ?proc-id]]
+                   :in $ ?class
+                   :where [?eid :process/interview-class ?class]]
                  @conn
-                 proc-id)]
+                 interview-class)]
     (resolve-db-id {:db/id eid} conn)))
 
 (defn put-process-sequence!
@@ -805,7 +814,7 @@
      (log/info "Created project database for" id)
      id)))
 
-(defn delete-project
+(defn ^:diag delete-project!
   "Remove project from the system."
   [pid]
   (if (some #(= % pid) (list-projects))

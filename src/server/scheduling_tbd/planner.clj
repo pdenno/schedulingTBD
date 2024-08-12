@@ -184,6 +184,7 @@
                                                         (update :plan #(conj % op-head)))]
                                     (into [new-partial] (rest partials)))
                                   (catch Exception e ; Drop this path  ToDo: Also need to unwind state.
+                                    (log/error "update-planning:" (datafy e))
                                     (into [(assoc part :error e)] (rest partials))))
 
           ;; Update the task list with the tasks from the RHS

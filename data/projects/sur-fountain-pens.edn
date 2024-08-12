@@ -1,218 +1,270 @@
 [
- #:project{:conversations
+#:project{:conversations
           [#:conversation{:id :process,
                           :messages
-                          [#:message{:content "Describe your most significant scheduling problem in a few sentences.",
+                          [#:message{:content
+                                     "Describe your most significant scheduling problem in a few sentences.",
                                      :from :system,
                                      :id 1,
-                                     :tags [:!describe-challenge :query],
-                                     :time #inst "2024-07-15T18:06:23.936-00:00"}
+                                     :tags
+                                     [:!describe-challenge :query],
+                                     :time
+                                     #inst "2024-08-12T23:43:38.736-00:00"}
                            #:message{:content
-                                     "Our most significant scheduling problem revolves around coordinating the delivery of raw materials with our production cycles. We often face delays in receiving materials such as metal for nibs and resins for barrels, which disrupts our manufacturing schedule. This mismatch causes bottlenecks in production and inventory overflow or shortages, leading to delayed order fulfillment and customer dissatisfaction. Aligning the supply chain timelines with our manufacturing needs and adjusting our production planning accordingly is crucial but challenging.",
+                                     "Our most significant scheduling problem at the fountain pen manufacturing facility arises from the need to balance the complex assembly process with fluctuating supply chain availability. This impacts our ability to maintain consistent production levels. We often encounter issues where critical components, such as nibs and converters, are delayed or out of stock, which causes bottlenecks in production lines. Additionally, coordinating between different departments (manufacturing, assembly, quality control, and shipping) to ensure timely production and dispatch is another layer of complexity that often leads to scheduling conflicts and inefficiencies.",
                                      :from :surrogate,
                                      :id 2,
-                                     :tags [:!describe-challenge :response],
-                                     :time #inst "2024-07-15T18:06:23.991-00:00"}
-                           #:message{:content "Great, we'll call your project SUR Fountain Pens.",
+                                     :tags
+                                     [:!describe-challenge :response],
+                                     :time
+                                     #inst "2024-08-12T23:43:38.771-00:00"}
+                           #:message{:content
+                                     "Great, we'll call your project SUR Fountain Pens.",
                                      :from :system,
                                      :id 3,
-                                     :tags [:!describe-challenge :informative],
-                                     :time #inst "2024-07-15T18:06:24.880-00:00"}
+                                     :tags
+                                     [:!describe-challenge
+                                      :informative],
+                                     :time
+                                     #inst "2024-08-12T23:43:39.568-00:00"}
                            #:message{:content
                                      "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
                                      :from :system,
                                      :id 4,
-                                     :tags [:!remark-raw-material-challenge :informative],
-                                     :time #inst "2024-07-15T18:06:24.967-00:00"}
-                           #:message{:content "Please briefly describe your production processes.",
+                                     :tags
+                                     [:!remark-raw-material-challenge
+                                      :informative],
+                                     :time
+                                     #inst "2024-08-12T23:43:39.685-00:00"}
+                           #:message{:content
+                                     "Please briefly describe your production processes.",
                                      :from :system,
                                      :id 5,
                                      :tags [:query],
-                                     :time #inst "2024-07-15T18:06:37.149-00:00"}
+                                     :time
+                                     #inst "2024-08-12T23:43:50.514-00:00"}
                            #:message{:content
-                                     "Our production process for fountain pens involves several key steps:\n\n1. <b>Material Receipt and Inspection:</b> We receive raw materials like metals for the nibs, resins for the pen bodies, and ink. These materials are inspected for quality upon arrival.\n\n2. <b>Component Manufacturing:</b> \n   - <b>Nibs:</b> Metal is precision cut and shaped into nibs.\n   - <b>Barrels and Caps:</b> Resin is molded into the shapes of the pen barrels and caps.\n   - <b>Internal Mechanisms:</b> Other components like clips, the filling mechanism, and converters are produced.\n\n3. <b>Assembly:</b> The individual components (nibs, barrels, caps, and internal mechanisms) are assembled into complete pens.\n\n4. <b>Quality Control:</b> Completed pens undergo testing to ensure they write well and have no defects in functionality or appearance.\n\n5. <b>Packaging:</b> Pens that pass quality control are packaged along with appropriate branding materials.\n\n6. <b>Shipping and Distribution:</b> Packaged pens are stocked in the warehouse and then shipped to distributors or directly to customers.\n\nEach of these steps needs to be carefully scheduled and coordinated to optimize efficiency and output quality.",
+                                     "Our fountain pen production process is divided into several key stages:\n\n1. <b>Material Preparation</b>: We source and prepare materials such as metals for nibs, resins for barrels, and inks.\n\n2. <b>Component Fabrication</b>: Individual parts like nibs, barrels, caps, and ink converters are manufactured. This involves precision machining and tooling.\n\n3. <b>Assembly</b>: Components are assembled into pens. This includes fitting nibs into the grip section, assembling the barrel, and attaching the cap.\n\n4. <b>Quality Control (QC)</b>: Each pen undergoes a series of tests to ensure it meets our quality standards. This involves checking the ink flow, nib alignment, and overall aesthetics.\n\n5. <b>Packaging</b>: Once approved by QC, pens are packaged along with ink cartridges or converters, instructions, and warranty information.\n\n6. <b>Shipping</b>: Packaged pens are then stored in inventory before being shipped to distributors or direct customers worldwide.\n\nEach stage has its own timeline and requires coordination with different departments, making the scheduling of each phase critical to avoid production delays.",
                                      :from :surrogate,
                                      :id 6,
                                      :tags [:response],
-                                     :time #inst "2024-07-15T18:06:37.203-00:00"}
+                                     :time
+                                     #inst "2024-08-12T23:43:50.543-00:00"}
                            #:message{:content
                                      "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
                                      :from :system,
                                      :id 7,
-                                     :tags [:query :query-product-or-service],
-                                     :time #inst "2024-07-15T18:06:41.279-00:00"}
+                                     :tags
+                                     [:query
+                                      :query-product-or-service],
+                                     :time
+                                     #inst "2024-08-12T23:43:53.380-00:00"}
                            #:message{:content "PRODUCT",
                                      :from :surrogate,
                                      :id 8,
-                                     :tags [:query-product-or-service :response],
-                                     :time #inst "2024-07-15T18:06:41.310-00:00"}
+                                     :tags
+                                     [:query-product-or-service
+                                      :response],
+                                     :time
+                                     #inst "2024-08-12T23:43:53.406-00:00"}
                            #:message{:content
                                      "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
                                      :from :system,
                                      :id 9,
-                                     :tags [:!query-production-mode :query],
-                                     :time #inst "2024-07-15T18:06:43.975-00:00"}
+                                     :tags
+                                     [:!query-production-mode :query],
+                                     :time
+                                     #inst "2024-08-12T23:43:59.319-00:00"}
                            #:message{:content "MAKE-TO-ORDER",
                                      :from :surrogate,
                                      :id 10,
-                                     :tags [:!query-production-mode :response],
-                                     :time #inst "2024-07-15T18:06:44.033-00:00"}
+                                     :tags
+                                     [:!query-production-mode
+                                      :response],
+                                     :time
+                                     #inst "2024-08-12T23:43:59.338-00:00"}
                            #:message{:content
                                      "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
                                      :from :system,
                                      :id 11,
-                                     :tags [:!query-activity-location-type :query],
-                                     :time #inst "2024-07-15T18:06:48.414-00:00"}
+                                     :tags
+                                     [:!query-activity-location-type
+                                      :query],
+                                     :time
+                                     #inst "2024-08-12T23:44:02.291-00:00"}
                            #:message{:content "OUR-FACILITY",
                                      :from :surrogate,
                                      :id 12,
-                                     :tags [:!query-activity-location-type :response],
-                                     :time #inst "2024-07-15T18:06:48.470-00:00"}
+                                     :tags
+                                     [:!query-activity-location-type
+                                      :response],
+                                     :time
+                                     #inst "2024-08-12T23:44:02.356-00:00"}
                            #:message{:content
                                      "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
                                      :from :system,
                                      :id 13,
                                      :tags [:!query-shop-type :query],
-                                     :time #inst "2024-07-15T18:06:51.279-00:00"}
+                                     :time
+                                     #inst "2024-08-12T23:44:05.566-00:00"}
                            #:message{:content "FLOW-SHOP",
                                      :from :surrogate,
                                      :id 14,
-                                     :tags [:!query-shop-type :response],
-                                     :time #inst "2024-07-15T18:06:51.338-00:00"}
+                                     :tags
+                                     [:!query-shop-type :response],
+                                     :time
+                                     #inst "2024-08-12T23:44:05.628-00:00"}
                            #:message{:content
-                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
+                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. The list you create should look like this:\n\n1. (some step)\n2. (some other step)...\n\n",
                                      :from :system,
                                      :id 15,
-                                     :tags [:query :query-process-steps],
-                                     :time #inst "2024-07-15T18:06:56.968-00:00"}
+                                     :tags
+                                     [:query :query-process-steps],
+                                     :time
+                                     #inst "2024-08-12T23:44:10.260-00:00"}
                            #:message{:content
-                                     "1. Material Receipt and Inspection\n2. Component Manufacturing\n   - Nibs\n   - Barrels and Caps\n   - Internal Mechanisms\n3. Assembly\n4. Quality Control\n5. Packaging\n6. Shipping and Distribution",
+                                     "1. Material Preparation\n2. Nib Fabrication\n3. Barrel Fabrication\n4. Cap Fabrication\n5. Ink Converter Fabrication\n6. Assembly\n7. Quality Control\n8. Packaging\n9. Shipping",
                                      :from :surrogate,
                                      :id 16,
-                                     :tags [:query-process-steps :response],
-                                     :time #inst "2024-07-15T18:06:57.009-00:00"}
+                                     :tags
+                                     [:query-process-steps :response],
+                                     :time
+                                     #inst "2024-08-12T23:44:10.293-00:00"}
                            #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. null (some amount of time)\n2. null (some amount of time)...",
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
                                      :from :system,
                                      :id 17,
-                                     :tags [:!query-process-durs :query],
-                                     :time #inst "2024-07-15T18:07:01.212-00:00"}
+                                     :tags
+                                     [:!query-process-durs :query],
+                                     :time
+                                     #inst "2024-08-12T23:44:16.520-00:00"}
                            #:message{:content
-                                     "1. Material Receipt and Inspection (2 hours)\n2. Component Manufacturing (4 hours)\n   - Nibs (1 hour)\n   - Barrels and Caps (2 hours)\n   - Internal Mechanisms (1 hour)\n3. Assembly (1 hour)\n4. Quality Control (1 hour)\n5. Packaging (30 minutes)\n6. Shipping and Distribution (2 hours)",
+                                     "1. Material Preparation (2 hours)\n2. Nib Fabrication (1 hour)\n3. Barrel Fabrication (1.5 hours)\n4. Cap Fabrication (1 hour)\n5. Ink Converter Fabrication (0.5 hours)\n6. Assembly (2 hours)\n7. Quality Control (1 hour)\n8. Packaging (0.5 hours)\n9. Shipping (1 hour)",
                                      :from :surrogate,
                                      :id 18,
-                                     :tags [:!query-process-durs :response],
-                                     :time #inst "2024-07-15T18:07:01.243-00:00"}
+                                     :tags
+                                     [:!query-process-durs :response],
+                                     :time
+                                     #inst "2024-08-12T23:44:16.584-00:00"}
                            #:message{:content
-                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. The 'enum values' name the steps of your process in the order they are executed for each product.",
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
                                      :from :system,
                                      :id 19,
                                      :tags [:info-to-user :minizinc],
-                                     :time #inst "2024-07-15T18:08:23.743-00:00"}
+                                     :time
+                                     #inst "2024-08-12T23:45:38.219-00:00"}
                            #:message{:content
-                                     " In the processing times you provided, are these for batches or individual products, and if batches, what batch size did you assume?",
+                                     "Earlier, you listed the process steps typically used in making product (e.g. 1. Material Preparation, 2. Nib Fabrication, etc.) and for each you specified typical durations.Now we'd like you to tell us what raw materials and intermediate product go into those process steps.For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling.You might then place the dough in molds and bake to produce wafers.With that done, you would add some filling to one wafer and place another wafer on top.Were the cookie baker to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n   1. Make Dough (flour, water, eggs, sugar, chocolate chips)\n   2. Make Filling (sugar, water vanilla flavoring)\n   3. Bake Wafers (use dough from Make Dough)\n   4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n   5. Package (use cookies from Assemble Cookies)\n\nNotice that the information in parentheses at each step includes raw materials and intermediate products prior steps.Implict is this list is that Make Dough and Make Filling can occur simultaneously.Produce a list like this for your product, starting with your process steps list.",
                                      :from :system,
                                      :id 20,
-                                     :time #inst "2024-07-15T18:40:26.071-00:00"}
+                                     :tags
+                                     [:!query-process-durs :query],
+                                     :time
+                                     #inst "2024-08-12T23:45:49.987-00:00"}
                            #:message{:content
-                                     "The processing times provided are for batches. I assumed a standard batch size of 100 units for these estimates. This batch size aligns with our typical production runs for fountain pens, balancing efficiency and the ability to respond to varying customer demands.",
+                                     "1. Material Preparation (metal, resin, ink)\n2. Nib Fabrication (use metal from Material Preparation)\n3. Barrel Fabrication (use resin from Material Preparation)\n4. Cap Fabrication (use resin from Material Preparation)\n5. Ink Converter Fabrication (use resin and metal from Material Preparation)\n6. Assembly (use nib from Nib Fabrication, use barrel from Barrel Fabrication, use cap from Cap Fabrication, use converter from Ink Converter Fabrication)\n7. Quality Control (use assembled pens from Assembly)\n8. Packaging (use approved pens from Quality Control)\n9. Shipping (use packaged pens from Packaging)",
                                      :from :surrogate,
                                      :id 21,
-                                     :time #inst "2024-07-15T18:40:26.133-00:00"}]}
+                                     :tags
+                                     [:!query-process-durs :response],
+                                     :time
+                                     #inst "2024-08-12T23:45:50.013-00:00"}]}
            #:conversation{:id :data}
            #:conversation{:id :resource}],
-           :code
-"int : nProducts = 1;
-set of int: Product = 1..nProducts;
-enum Task = {nibManufacturing, barrelCapManufacturing, internalMechanisms, assembly, qualityControl, packaging};
-% Durations are in units of hours and may be rounded.
-array [Product, Task] of float: taskDuration = [|1.000, 2.000, 1.000, 1.000, 1.000, 0.500|];
-
-float : minTime = 0;
-% It shouldn't take longer than doing only one thing at a time.
-float : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);
-
-% We assume a task uses one major resource; resources are synonymous with tasks.
-array [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.
-array [Product, Task] of var minTime..maxTime: taskEnds;
-
-% This is used in the constraint below.
-predicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;
-
-% Ensure that no two Products aren't using the same resource (task) at the same time.
-constraint forall (t in Task)
-             (forall  (i,k in Product where i < k)
-                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));
-
-% We assume no tasks are running now, so the first task of some product can start now.
-constraint exists (p in Product) (taskStarts[p, nibManufacturing] = 0);
-
-% Starting some time in the past is not allowed.
-constraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);
-
-% Every other task can start after the previous task ends.
-constraint forall (p in Product) (taskEnds[p, nibManufacturing] == taskStarts[p, barrelCapManufacturing]);
-constraint forall (p in Product) (taskEnds[p, barrelCapManufacturing] == taskStarts[p, internalMechanisms]);
-constraint forall (p in Product) (taskEnds[p, internalMechanisms] == taskStarts[p, assembly]);
-constraint forall (p in Product) (taskEnds[p, assembly] == taskStarts[p, qualityControl]);
-constraint forall (p in Product) (taskEnds[p, qualityControl] == taskStarts[p, packaging]);
-
-% A task ends taskDuration time units after it starts.
-constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);
-
-% Minimize time elapsed when the final task ends (maxspan).
-solve minimize max (p in Product) (taskEnds[p, packaging]);",
-           :processes
-          #:process{:desc
-                    "1. Material Receipt and Inspection (2 hours)\n2. Component Manufacturing (4 hours)\n   - Nibs (1 hour)\n   - Barrels and Caps (2 hours)\n   - Internal Mechanisms (1 hour)\n3. Assembly (1 hour)\n4. Quality Control (1 hour)\n5. Packaging (30 minutes)\n6. Shipping and Distribution (2 hours)",
-                    :id :sur-fountain-pens,
-                    :sub-processes
-                    [#:process{:duration #:quantity{:units :hours, :value-string "2"},
-                               :id :sur-fountain-pens--materialInspection,
-                               :supply-chain? true,
-                               :var-name "materialInspection"}
-                     #:process{:duration #:quantity{:units :hours, :value-string "1"},
-                               :id :sur-fountain-pens--nibManufacturing,
-                               :pre-processes [:sur-fountain-pens--materialInspection],
-                               :var-name "nibManufacturing"}
-                     #:process{:duration #:quantity{:units :hours, :value-string "2"},
-                               :id :sur-fountain-pens--barrelCapManufacturing,
-                               :pre-processes [:sur-fountain-pens--nibManufacturing],
-                               :var-name "barrelCapManufacturing"}
-                     #:process{:duration #:quantity{:units :hours, :value-string "1"},
-                               :id :sur-fountain-pens--internalMechanisms,
-                               :pre-processes [:sur-fountain-pens--barrelCapManufacturing],
-                               :var-name "internalMechanisms"}
-                     #:process{:duration #:quantity{:units :hours, :value-string "1"},
-                               :id :sur-fountain-pens--assembly,
-                               :pre-processes [:sur-fountain-pens--internalMechanisms],
-                               :var-name "assembly"}
-                     #:process{:duration #:quantity{:units :hours, :value-string "1"},
-                               :id :sur-fountain-pens--qualityControl,
-                               :pre-processes [:sur-fountain-pens--assembly],
-                               :var-name "qualityControl"}
-                     #:process{:duration #:quantity{:units :minutes, :value-string "30"},
-                               :id :sur-fountain-pens--packaging,
-                               :pre-processes [:sur-fountain-pens--qualityControl],
-                               :var-name "packaging"}
-                     #:process{:duration #:quantity{:units :hours, :value-string "2"},
-                               :id :sur-fountain-pens--shippingDistribution,
-                               :pre-processes [:sur-fountain-pens--packaging],
-                               :supply-chain? true,
-                               :var-name "shippingDistribution"}]},
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {materialPrep, nibFabrication, barrelFabrication, capFabrication, inkConverterFabrication, assembly, qualityControl, packaging};\n% Durations are in units of hours and may be rounded.\narray [Product, Task] of float: taskDuration = [|2.000, 1.000, 1.500, 1.000, 0.500, 2.000, 1.000, 0.500|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, materialPrep] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, materialPrep] == taskStarts[p, nibFabrication]);\nconstraint forall (p in Product) (taskEnds[p, nibFabrication] == taskStarts[p, barrelFabrication]);\nconstraint forall (p in Product) (taskEnds[p, barrelFabrication] == taskStarts[p, capFabrication]);\nconstraint forall (p in Product) (taskEnds[p, capFabrication] == taskStarts[p, inkConverterFabrication]);\nconstraint forall (p in Product) (taskEnds[p, inkConverterFabrication] == taskStarts[p, assembly]);\nconstraint forall (p in Product) (taskEnds[p, assembly] == taskStarts[p, qualityControl]);\nconstraint forall (p in Product) (taskEnds[p, qualityControl] == taskStarts[p, packaging]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packaging]);",
+          :processes
+          [#:process{:id :sur-fountain-pens,
+                     :interview-class :initial-unordered,
+                     :sub-processes
+                     [#:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "2"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--materialPrep,
+                                :name "Material Preparation",
+                                :step-number 1,
+                                :var-name "materialPrep"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--nibFabrication,
+                                :name "Nib Fabrication",
+                                :step-number 2,
+                                :var-name "nibFabrication"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1.5"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--barrelFabrication,
+                                :name "Barrel Fabrication",
+                                :step-number 3,
+                                :var-name "barrelFabrication"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--capFabrication,
+                                :name "Cap Fabrication",
+                                :step-number 4,
+                                :var-name "capFabrication"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "0.5"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--inkConverterFabrication,
+                                :name "Ink Converter Fabrication",
+                                :step-number 5,
+                                :var-name "inkConverterFabrication"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "2"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--assembly,
+                                :name "Assembly",
+                                :step-number 6,
+                                :var-name "assembly"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--qualityControl,
+                                :name "Quality Control",
+                                :step-number 7,
+                                :var-name "qualityControl"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "0.5"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--packaging,
+                                :name "Packaging",
+                                :step-number 8,
+                                :var-name "packaging"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-fountain-pens--initial-unordered--shipping,
+                                :name "Shipping",
+                                :step-number 9,
+                                :supply-chain? true,
+                                :var-name "shipping"}]}],
           :current-conversation :process,
           :planning-problem
           #:problem{:domain :process-interview,
-                    :goal-string "(characterize-process sur-fountain-pens)",
+                    :goal-string
+                    "(characterize-process sur-fountain-pens)",
                     :state-string
-                    "#{(done !do-nothing sur-fountain-pens) (done !remark-raw-material-challenge sur-fountain-pens) (done !query-product-or-service sur-fountain-pens) (provides-product sur-fountain-pens) (proj-id sur-fountain-pens) (proj-name \"SUR Fountain Pens\") (done !query-production-mode sur-fountain-pens) (cites-raw-material-challenge sur-fountain-pens) (flow-shop sur-fountain-pens) (done !describe-process sur-fountain-pens) (has-production-facility sur-fountain-pens) (surrogate sur-fountain-pens) (done !describe-challenge sur-fountain-pens) (done !query-process-durs sur-fountain-pens) (done !query-activity-location-type sur-fountain-pens) (production-mode sur-fountain-pens make-to-order) (have-process-durs sur-fountain-pens) (done !query-process-steps sur-fountain-pens) (done !query-shop-type sur-fountain-pens)}"},
+                    "#{(done !do-nothing sur-fountain-pens) (done !remark-raw-material-challenge sur-fountain-pens) (done !query-product-or-service sur-fountain-pens) (provides-product sur-fountain-pens) (proj-id sur-fountain-pens) (proj-name \"SUR Fountain Pens\") (done !query-production-mode sur-fountain-pens) (cites-raw-material-challenge sur-fountain-pens) (flow-shop sur-fountain-pens) (done !describe-process sur-fountain-pens) (has-production-facility sur-fountain-pens) (done !query-process-ordering sur-fountain-pens) (surrogate sur-fountain-pens) (done !describe-challenge sur-fountain-pens) (done !query-process-durs sur-fountain-pens) (done !query-activity-location-type sur-fountain-pens) (production-mode sur-fountain-pens make-to-order) (have-process-durs sur-fountain-pens) (done !query-process-steps sur-fountain-pens) (done !query-shop-type sur-fountain-pens)}"},
           :name "SUR Fountain Pens",
           :surrogate
-          #:surrogate{:assistant-id "asst_hGh6z4Q7So9AF0TqeDVhT1HA",
+          #:surrogate{:assistant-id "asst_Kk9KbWqxmyTY9xsjUCyP9Cqc",
                       :id :sur-fountain-pens,
                       :subject-of-expertise "fountain pens",
                       :system-instruction
                       "You manage a company that makes fountain pens.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_tJroQiTvzHQ5arI8W3xjmNBc"},
+                      :thread-id "thread_C0hkMfIsQ0mfTRxhQadguMPh"},
           :id :sur-fountain-pens}
+
 ]

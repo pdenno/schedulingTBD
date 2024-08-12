@@ -22,7 +22,7 @@
    Note that this can CHANGE :project/current-conversation."
   [request]
   (let [{:keys [project-id conv-id]} (-> request :query-params keywordize-keys)]
-    (log/info "get-conversation (1): project-id = " project-id "conv-id =" conv-id)
+    ;;(log/info "get-conversation (1): project-id = " project-id "conv-id =" conv-id)
     (when conv-id (db/change-conversation {:pid (keyword project-id) :conv-id (keyword conv-id)}))
     (let [project-id (keyword project-id)
           eid (db/project-exists? project-id)
@@ -34,7 +34,7 @@
           empty-conv  [#:message{:id 1 :content "No discussion here yet.", :from :system, :time (now)}]
           msgs        (if (and eid conv-id) (db/get-conversation project-id conv-id) empty-conv)
           code    (if eid (db/get-code project-id) "")]
-      (log/info "get-conversation (2):" project-id "conv-id =" conv-id "message count =" (count msgs))
+      ;;(log/info "get-conversation (2):" project-id "conv-id =" conv-id "message count =" (count msgs))
       (http/ok {:project-id project-id :conv msgs :conv-id conv-id :code code}))))
 
 (def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
@@ -65,7 +65,6 @@
 
 (defn upload-file
   [request]
-  (reset! diag request)
   (let [dir-root (System/getenv "SCHEDULING_TBD_DB")
         params (get request :multipart-params)
         project-id (-> params (get "project-id") edn/read-string name)
@@ -80,3 +79,9 @@
         (catch Throwable _e
           (http/internal-server-error "Error reading multipart.")))
       (http/internal-server-error "Did not find multipart file."))))
+
+(defn run-minizinc
+  [request]
+  (reset! diag request)
+  (log/info "Call to run-minizinc")
+  (http/ok {:mzn-output "Success!"}))

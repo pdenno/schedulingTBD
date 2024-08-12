@@ -226,7 +226,7 @@
     role     - #{'user' 'assistant'},
     query-text - a string.
    Returns text but uses promesa internally to deal with errors."
-  [& {:keys [tid aid role query-text timeout-secs llm-provider]
+  [& {:keys [aid tid role query-text timeout-secs llm-provider]
       :or {timeout-secs 60 role "user" llm-provider @default-llm-provider} :as _obj}] ; "user" when "assistant" is surrogate.
   (assert (#{"user" "assistant"} role))
   (assert (and (string? query-text) (not-empty query-text)))
@@ -259,17 +259,29 @@
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
+(defn assistant-on-provider?
+  "Retrieve the assistant object from OpenAI using its ID, a string you can
+   find on the list-assistants, or while logged into the OpenAI website."
+  [id & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (openai/retrieve-assistant {:assistant_id id} (api-credentials llm-provider)))
+
 (def diag2 (atom nil))
 
 (defn query-on-thread
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
     :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
-  [& {:keys [test-fn preprocess-fn] :or {test-fn (fn [_] true), preprocess-fn identity} :as obj}]
+  [& {:keys [aid llm-provider test-fn preprocess-fn]
+      :or {test-fn (fn [_] true), preprocess-fn identity
+           llm-provider @default-llm-provider}
+      :as obj}]
   (let [obj (cond-> obj ; All recursive calls will contains? :tries.
               (or (not (contains? obj :tries))
                   (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
     (assert (< (:tries obj) 10))
+    (try (assistant-on-provider? aid {:llm-provider llm-provider})
+         (catch Exception _e
+           (log/error "Assistant does not exist!:" aid)))
     (if (> (:tries obj) 0)
       (try (let [raw (reset! diag (query-on-thread-aux obj))
                  res (preprocess-fn raw)]
@@ -295,25 +307,26 @@
         (map  (fn [m] (update m :created_at #(str (java.util.Date. (* 1000 %))))))
         (mapv (fn [m] (update m :role keyword))))))
 
-(defn ^:diag get-assistant-openai
-  "Retrieve the assistant object from OpenAI using its ID, a string you can
-   find on the list-assistants, or while logged into the OpenAI website."
-  [id & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
-  (openai/retrieve-assistant {:assistant_id id} (api-credentials llm-provider)))
-
-(defn list-assistants [& {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
-  (openai/list-assistants {:limit 30} (api-credentials llm-provider)))
+(defn list-assistants
+  "Return a vector of assistants. :limit (max number returned) default to 90."
+  [& {:keys [llm-provider limit] :or {llm-provider @default-llm-provider
+                                      limit 90}}]
+  (-> (openai/list-assistants {:limit limit} (api-credentials llm-provider))
+      :data))
 
 (defn delete-assistant!
   "Delete the assistant having the given ID, a string."
   [id & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
   (openai/delete-assistant {:assistant_id id} (api-credentials llm-provider)))
 
+;;; There is a function in db.clj that calls this with a selection-fn that avoids deleting surrogates used in projects.
 (defn ^:diag delete-surrogates!
   "Delete from the openai account all assistants that match the argument filter function.
-   The default function check for metadata :usage='surrogate'."
-  [& {:keys [selection-fn llm-provider] :or {selection-fn #(= "surrogate" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
-  (doseq [a (->> (list-assistants) :data (filterv selection-fn))]
+   The default selection-function checks for metadata :usage='surrogate'.
+   If, for example, you want to not delete surrogates that are used in projects, you will have to override this."
+  [& {:keys [selection-fn llm-provider] :or {selection-fn #(= "surrogate" (-> % :metadata (get :usage)))
+                                             llm-provider @default-llm-provider}}]
+  (doseq [a (->> (list-assistants) (filterv selection-fn))]
     (log/info "Deleting assistant" (:name a) (:id a))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))
 
@@ -321,7 +334,7 @@
   "Delete from the openai account all assistants that match the argument filter function.
    The default function check for metadata :usage='surrogate'."
   [{:keys [selection-fn llm-provider] :or {selection-fn #(= "agent" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
-  (doseq [a (->> (list-assistants) :data (filterv selection-fn))]
+  (doseq [a (->> (list-assistants)  (filterv selection-fn))]
     (log/info "Deleting assistant" (:name a) (:id a))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))
 

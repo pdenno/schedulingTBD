@@ -1,7 +1,6 @@
 (ns scheduling-tbd.web.handler
   "HTTP router and handlers. Currently you have to user/restart (or similar) for changes to be seen."
   (:require
-   [ajax.core :refer [GET POST]] ; for debugging
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
@@ -30,8 +29,8 @@
    [scheduling-tbd.web.websockets   :as wsock]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
-   [spec-tools.spell :as spell]
-   [taoensso.timbre  :as log]))
+   ;;[spec-tools.swagger.core :as swag2] ; Experimental
+   [spec-tools.spell :as spell]))
 
 ;;; Reitit: (pronounced "rate it") a routing library.
 ;;;   - https://github.com/metosin/reitit, (docs)
@@ -39,6 +38,7 @@
 ;;;   - https://www.slideshare.net/metosin/reitit-clojurenorth-2019-141438093 (slides for the above)
 
 ;;; Notes:
+;;;   * This stuff is a bit out of touch with best practice, which probably uses Malli: https://github.com/metosin/malli/tree/master
 ;;;   * You can specify keywords and keywords will be conveyed to the web app, but the swagger API will show them as strings.
 ;;;   * If the swagger UI (the page you get when you GET index.html) displays "Failed to load API definition", try :no-doc true
 ;;;     on the most recent definition (or many of them until things start working).
@@ -54,6 +54,40 @@
 ;;;       3) If it is get diag atoms for the offending request or response and run s/valid? and s/explain by hand.
 ;;;       4) If none of that is the problem, study what the wrappers are doing by uncommenting ev/print-context-diffs and running the code.
 ;;;   * I once had what appeared to be non-printing text in a s/def expression mess things up. Really.
+
+;;;========================================================================= End Experimental =============================================
+;;;(s/def ::id string?)
+;;;(s/def ::name string?)
+;;;(s/def ::street string?)
+;;;(s/def ::city #{:tre :hki})
+;;;(s/def ::address (s/keys :req-un [::street ::city]))
+;;;(s/def ::user (s/keys :req-un [::id ::name ::address]))
+
+
+#_(swag2/swagger-spec
+  {:swagger "2.0"
+   :info {:version "1.0.0"
+          :title "Sausages"
+          :description "Sausage description"
+          :termsOfService "http://helloreverb.com/terms/"
+          :contact {:name "My API Team"
+                    :email "foo@example.com"
+                    :url "http://www.metosin.fi"}
+          :license {:name "Eclipse Public License"
+                    :url "http://www.eclipse.org/legal/epl-v10.html"}}
+   :tags [{:name "user"
+           :description "User stuff"}]
+   :paths {"/api/ping" {:get {:responses {:default {:description ""}}}}
+           "/user/:id" {:post {:summary "User Api"
+                               :description "User Api description"
+                               :tags ["user"]
+                               ::swagger/parameters {:path (s/keys :req [::id])
+                                                     :body ::user}
+                               ::swagger/responses {200 {:schema ::user
+                                                         :description "Found it!"}
+                                                    404 {:description "Ohnoes."}}}}}})
+
+;;;========================================================================= End Experimental =============================================
 
 ;;; =========== Pages (just homepage, thus far.)  =======
 (def selmer-opts {:custom-resource-path (io/resource "html")})
@@ -105,11 +139,25 @@
 
 (s/def ::conv (s/coll-of map?))
 (s/def ::code string?)
+(s/def ::mzn-output string?)
 (s/def ::get-conversation-response (s/keys :req-un [::project-id ::conv] :opt-un [::code ::conv-id]))
 (s/def ::project-id (st/spec {:spec #(or (string? %) (keyword? %))
                               :name "project-id"
                               :description "A kebab-case string (will be keywordized) unique to the system DB identifying a project."
                               :json-schema/default "sur-craft-beer"}))
+
+(s/def ::run-minizinc-request (st/spec {:spec (s/keys :req-un [::client-id ::project-id])
+                                        :name "project-id"
+                                        :description "A string uniquely identifying the project to the system DB."
+                                        :json-schema/default {:project-id "sur-craft-beer"
+                                                              :client-id "2f30f002-37b7-4dd1-bc01-5484273012f0"
+                                                              :body {:code (-> "data/examples/small2-pred.mzn" slurp)}}}))
+
+(s/def ::run-minizinc-response (st/spec {:spec (s/keys :req-un [[::mzn-output]])
+                                        :name "run-minizinc-response"
+                                        :description "Returned string from running minizinc"
+                                        :json-schema/default {:mzn-output "Some output"}}))
+
 
 ;;; -------- (devl/ajax-test "/api/ws" {:client-id "my-fake-uuid"}) ; ToDo: ajax-test not working here. Not investigated
 (s/def ::ws-connection-request (s/keys :req-un [::client-id]))
@@ -153,6 +201,13 @@
    ["/api"
     {:swagger {;:no-doc true
                :tags ["SchedulingTBD functions"]}}
+
+    ["/run-minizinc" ; In Swagger you can test this with real files.
+     {:post {;:no-doc true
+             :summary "Run the posted minizinc"
+             :parameters {:query ::run-minizinc-request}
+             :responses {200 {:body ::run-minizinc-response}}
+             :handler resp/run-minizinc}}]
 
     ["/get-conversation"
      {:get {;:no-doc true
@@ -203,7 +258,7 @@
   "The swagger examples meaningful and therefore good tests.
    However, keep in mind that they don't test calls from CLJS!"
   (ring/routes
-   (swagger-ui/create-swagger-ui-handler
+   (swagger-ui/create-swagger-ui-handler ;; Creates a ring handler which can be used to serve swagger-ui.
     {:path "/"
      :config {:validatorUrl nil
               :operationsSorter "alpha"}})

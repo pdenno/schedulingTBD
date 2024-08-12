@@ -18,7 +18,7 @@
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core    :as p]
-   [stbd-app.components.attachment-modal :as attach :refer [AttachmentModal]]
+   [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
@@ -209,7 +209,7 @@
           :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!
                  ($ Stack {:direction "row" :spacing "0px"}
                     ($ ButtonGroup
-                       ($ AttachmentModal {:post-attach-fn #(log/info "attach-fn: args =" %)}))
+                       ($ AttachmentModal {:post-attach-fn #(log/info "attach-fn: args =" %)})) ; This has the attachment modal
                     ($ MessageInput {:placeholder "Type message here...."
                                      :onSend #(do (log/info "onSend:" %)
                                                   (process-user-input %))
