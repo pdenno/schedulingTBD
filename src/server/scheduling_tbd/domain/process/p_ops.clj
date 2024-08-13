@@ -205,11 +205,11 @@
 
 (defoperator :!query-process-ordering [{:keys [pid] :as obj}]
   (let [prompt
-        (str "Earlier, you listed the process steps typically used in making product (e.g. 1. ~A, 2. ~A, etc.) and for each you specified typical durations." ; <============== ~A
-             "Now we'd like you to tell us what raw materials and intermediate product go into those process steps."
-             "For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling."
-             "You might then place the dough in molds and bake to produce wafers."
-             "With that done, you would add some filling to one wafer and place another wafer on top."
+        (str "Earlier, you listed the process steps typically used in making product (e.g. 1. ~A, 2. ~A, etc.) and for each you specified typical durations. "
+             "Now we'd like you to tell us what raw materials and intermediate product go into those process steps. "
+             "For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. "
+             "You might then place the dough in molds and bake to produce wafers. "
+             "With that done, you would add some filling to one wafer and place another wafer on top. "
              "Were the cookie baker to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n"
 
              "   1. Make Dough (flour, water, eggs, sugar, chocolate chips)\n"
@@ -218,8 +218,8 @@
              "   4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n"
              "   5. Package (use cookies from Assemble Cookies)\n\n"
 
-             "Notice that the information in parentheses at each step includes raw materials and intermediate products prior steps."
-             "Implict is this list is that Make Dough and Make Filling can occur simultaneously."
+             "Notice that the information in parentheses at each step includes raw materials and intermediate products prior steps. "
+             "Implict is this list is that Make Dough and Make Filling can occur simultaneously. "
              "Produce a list like this for your product, starting with your process steps list.")
         step-names (->> (db/get-process pid :initial-unordered)
                         :process/sub-processes
