@@ -42,6 +42,10 @@
   (let [{:keys [in]} (get @socket-channels client-id)]
     (go (>! in (str {:dispatch-key :stop})))))
 
+(def inactive-channels-process
+  "This is used to ensure that there is at most one close-ws-channels. That's not essential, but it seems correct to have at most one."
+  (atom nil))
+
 (defn close-ws-channels [client-id]
   (when (contains? @socket-channels client-id)
     (let [{:keys [in out err]} (get @socket-channels client-id)]
@@ -49,14 +53,15 @@
       ;; Set exit? and send something so go loop will be jogged and see it.
       (swap! socket-channels #(assoc-in % [client-id :exit?] true))
       ;;(go (>! in (str {:dispatch-key :stop}))) ; <===================================================== ToDo: Needs investigation.
-      ;; Keep delay high to be sure :stop is seen. (p/submit! is probably helpful here; promises are executed async an out of order.
+      ;; Keep delay high to be sure :stop is seen. (p/submit! is probably helpful here; promises are executed async and out of order.
       (-> (p/delay 3000)
           (p/then (fn [_]
                     (async/close! in)
                     (async/close! out)
                     (async/close! err)
                     (Thread/sleep 1000)
-                    (swap! socket-channels #(dissoc % client-id))))))))
+                    (swap! socket-channels #(dissoc % client-id))
+                    (reset! inactive-channels-process nil)))))))
 
 (declare clear-promises! clear-keys select-promise)
 
@@ -167,9 +172,10 @@
    Returns a map with value for key :ring.websocket/listener."
   [request]
   ;;(log/info "Establishing ws handler for" (-> request :query-params keywordize-keys :client-id))
-  (future (close-inactive-channels)) ; ToDo: There could be several of these running. Does it matter? Probably want an atom for it.
+  (when-not @inactive-channels-process (reset! inactive-channels-process (future (close-inactive-channels))))
   (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]
+      (swap! ping-dates #(assoc % client-id (now)))
       (error-listener client-id)   ; This and next are go loops,
       (dispatching-loop client-id) ; which means they are non-blocking.
       {:ring.websocket/listener (wsa/websocket-listener in out err)})
@@ -293,7 +299,7 @@
   "Because the ws go loop can drop, we use this as part of reconnecting."
   [{:keys [client-id]}]
   ;;(log/info "client confirms alive:" client-id)
-  (swap! socket-channels #(assoc-in % [client-id :alive] true))
+  (swap! socket-channels #(assoc-in % [client-id :alive?] true))
   nil)
 
 (defn init-dispatch-table!

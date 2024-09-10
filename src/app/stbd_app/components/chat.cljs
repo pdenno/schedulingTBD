@@ -18,11 +18,11 @@
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core    :as p]
-   [stbd-app.components.attachment-modal :as attach :refer [AttachmentModal]]
+   [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
-   [stbd-app.ws         :as ws]
+   [stbd-app.ws         :as ws :refer [remember-promise]]
    [taoensso.timbre     :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
@@ -86,24 +86,27 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(def msgs-atm "This has to be out here for :get-msg-list to work!" (atom nil))
+(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as as function.
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
-(defn update-msg-list
+(defn update-msg-times
   "Update the dates on the msg list."
   []
-  (log/info "update-msg-list")
-  ((lookup-fn :set-cs-msg-list) ((lookup-fn :get-msg-list))))
+  (when (and (not ((lookup-fn :get-busy?))) (> (count @msgs-atm) 0))
+    (log/info "update-msg-times: msg-count = " (count @msgs-atm))
+    ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
 ;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
+  "Using an HTTP GET, get the conversation, and also the code, if any."
   ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
   ([pid conv-id]
    (-> (dba/get-conversation-http pid conv-id)
-       (p/then (fn [{:keys [conv conv-id]}]
+       (p/then (fn [{:keys [conv conv-id code]}]
                  (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "count =" (count conv))
                  (reset! msgs-atm conv)
+                 (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) conv-id)
                  (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
@@ -117,16 +120,31 @@
   "Add messages to the msgs-atm.
    This is typically used for individual messages that come through :tbd-says or :sur-says,
    as opposed to bulk update through get-conversation."
-  [msgs text from]
-  (let [msg-id (inc (or (apply max (->> msgs (map :message/id) (filter identity))) 0))]
-    (reset! msgs-atm (conj msgs {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))}))))
+  [text from]
+  (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))]
+    (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
+    ((lookup-fn :set-cs-msg-list) @msgs-atm)))
+
+(register-fn :interviewer-busy?     (fn [{:keys [value]}]
+                                      ((lookup-fn :set-busy?) value)))
+
+(register-fn :tbd-says              (fn [{:keys [p-key msg]}]
+                                      (when p-key (remember-promise p-key))
+                                      (log/info "tbd-says msg:" msg "before =" (count @msgs-atm))
+                                      (add-msg msg :system)
+                                      (log/info "tbd-says msg:" msg "after =" (count @msgs-atm))))
+
+(register-fn :sur-says              (fn [{:keys [p-key msg]}]
+                                      (when p-key (remember-promise p-key))
+                                      (log/info "sur-says msg:" msg)
+                                      (add-msg msg :surrogate)))
 
 (defnc Chat [{:keys [chat-height proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state [])
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
         [active-conv set-active-conv]   (hooks/use-state nil) ; active-conv is a keyword
-        [busy? set-busy?]               (hooks/use-state nil)
+        [busy? set-busy?]               (hooks/use-state nil) ; Have to go through common-info
         resize-fns (make-resize-fns set-box-height)]
     (letfn [(change-conversation-click [to]
               (when-not busy?
@@ -149,13 +167,14 @@
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
-        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg @msgs-atm text :system))))
-        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg @msgs-atm text :surrogate))))
+        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
+        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
         (register-fn :set-active-conv set-active-conv)
-        (register-fn :set-busy? set-busy?)
+        (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (do (set-busy? val)))) ; Yes. Need to do both.
+        (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
         (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
         (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs))))  ; These two used to update message time.
-        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-list)) 60000)))
+        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
       (hooks/use-effect [msg-list]
         (reset! msgs-atm msg-list)
         (set-cs-msg-list (msgs2cs msg-list)))
@@ -190,7 +209,7 @@
           :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!
                  ($ Stack {:direction "row" :spacing "0px"}
                     ($ ButtonGroup
-                       ($ AttachmentModal {:post-attach-fn #(log/info "attach-fn: args =" %)}))
+                       ($ AttachmentModal {:post-attach-fn #(log/info "attach-fn: args =" %)})) ; This has the attachment modal
                     ($ MessageInput {:placeholder "Type message here...."
                                      :onSend #(do (log/info "onSend:" %)
                                                   (process-user-input %))

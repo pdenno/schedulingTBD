@@ -8,7 +8,7 @@
    [mount.core                :as mount :refer [defstate]]
    [scheduling-tbd.db         :as db]
    [scheduling-tbd.op-utils   :as ou]
-   [scheduling-tbd.sutil      :as sutil :refer [connect-atm error-for-chat find-fact domain-conversation]]
+   [scheduling-tbd.sutil      :as sutil :refer [connect-atm chat-status find-fact domain-conversation]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre           :as log]))
 
@@ -184,6 +184,7 @@
                                                         (update :plan #(conj % op-head)))]
                                     (into [new-partial] (rest partials)))
                                   (catch Exception e ; Drop this path  ToDo: Also need to unwind state.
+                                    (log/error "update-planning:" (datafy e))
                                     (into [(assoc part :error e)] (rest partials))))
 
           ;; Update the task list with the tasks from the RHS
@@ -211,16 +212,16 @@
   (let [elems  (-> (sutil/get-domain domain-id) :domain/elems)]
     (loop [partials [{:plan [] :path-tasks [(first goals)]}] ; ToDo: Only planning first of goals so far.
            cnt 1]
-      (log/info "plan =" (-> partials first :plan))
-      (log/info "path-tasks =" (-> partials first :path-tasks))
+      ;;(log/info "plan =" (-> partials first :plan))
+      ;;(log/info "path-tasks =" (-> partials first :path-tasks))
       (let [state (db/get-planning-state pid)
             task (-> partials first :path-tasks first) ; <===== ToDo: Might want bindings on task???
             matching (matching-tasks task elems)
             s-tasks (satisfying-tasks task elems state matching)]
-        (log/info "task =" task)
-        (log/info "state =" state)
-        (log/info "matching =" matching)
-        (log/info "satisfying =" s-tasks)
+        ;;(log/info "task =" task)
+        ;;(log/info "state =" state)
+        ;;(log/info "matching =" matching)
+        ;;(log/info "satisfying =" s-tasks)
         (when (empty? s-tasks) (stop-here {:task task :partials partials :elems elems}))
         (cond
           (empty? partials)                         {:result :failure :reason :no-successful-plans}
@@ -229,7 +230,7 @@
           :else  (let [partials (update-planning partials s-tasks opts)
                        partials (if-let [err (-> partials first :error datafy)]
                                   (let [next-plan (-> partials rest vec)]
-                                    (log/error "Plan execution error: cause =" (:cause err) ", data =" (:data err))
+                                    ;;(log/error "Plan execution error: cause =" (:cause err) ", data =" (:data err))
                                     (reset! diag {:err err :partials partials :s-tasks s-tasks :opts opts})
                                     (if (empty? next-plan)
                                       (throw (ex-info "No plans remain." {}))
@@ -247,9 +248,9 @@
         matching (matching-tasks task elems)
         state (db/get-planning-state pid)
         satisfying (satisfying-tasks task elems state matching)]
-        (log/info "matching =" matching)
-        (log/info "satisfying =" satisfying)
-        satisfying))
+    (log/info "matching =" matching)
+    (log/info "satisfying =" satisfying)
+    satisfying))
 
 ;;; ToDo: Need to rework project/problem. Maybe the DB can define the problem, but
 ;;;       I think the way it is doing it now is going to require too much maintenance.
@@ -266,19 +267,17 @@
       :resource (->> (filter #(= (first %) 'resource) state)
                      (mapv #(list 'characterize-resource (second %)))))))
 
+;;; ToDo: Client can't handle the :tbd-says???
 (defn plan9-post-actions
   "ws/send-to-chat depending on how planning went."
   [result client-id pid conv-id]
   (log/info "plan9-post-action: result =" result)
-  ;(db/put-planning-state pid (:state result))
-  (let [response-to-user (case (:result result)
-                           :success (error-for-chat "That's all the conversation we do right now.")
-                           :stopped (error-for-chat "We stopped intentionally after 50 interactions.")
-                           :failure (error-for-chat (str "We stopped owing to " (:reason result))) nil)]
-    ;; ToDo: Even this isn't sufficent at times!
+  #_(let [response-to-user (case (:result result)
+                           :success (chat-status "That's all the conversation we do right now.")
+                           :stopped (chat-status "We stopped intentionally after 50 interactions.")
+                           :failure (chat-status (str "We stopped owing to " (:reason result)))
+                           nil)]
     (when response-to-user
-      (ws/refresh-client client-id pid conv-id)
-       (Thread/sleep 1000) ; Allow refresh-client to complete.
       (ws/send-to-chat {:dispatch-key :tbd-says :promise? false, :client-id client-id, :msg response-to-user}))))
 
 ;;; (plan/resume-conversation {:pid :sur-craft-beer :client-id (ws/recent-client!) :conv-id :data})
@@ -307,17 +306,35 @@
         (let [res (plan9 goals {:domain-id conv-id :client-id client-id :pid pid :conv-id conv-id :surrogate? surrogate?})]
           (plan9-post-actions res client-id pid conv-id))))
     (finally
-      (log/info "Set busy? false")
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
+(defn ^:diag replay
+  "Perform all the client chat interactions as though run as a parallel agent.
+   This works by creating an in-memory DB and incrementally adding to it between ws/client-refresh calls.
+   If :individual?, then use *-says messages instead of ws/client-refresh.
+   Note that this just plays over whatever project and conversation is current."
+  [pid & {:keys [conv-id refresh? client-id] :or {conv-id :process client-id (ws/recent-client!)}}]
+  (let [msgs (db/get-conversation pid conv-id)
+        replay-id (->> pid name (str "replay-") keyword)
+        replay-proj (db/create-proj-db! {:project/id replay-id :project/name (name replay-id)} {} {:in-mem? true :force? true})]
+    (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+    (try
+      (doseq [ix (-> msgs count range)]
+        (let [{:message/keys [from content tags]} (nth msgs ix)]
+          (db/add-msg replay-proj from content tags) ; ToDo: Loses the time.
+          (ws/refresh-client client-id replay-id conv-id)
+          (Thread/sleep 1000)))
+      (finally
+        (do (ws/send-to-chat {:dispatch-key :tbd-says
+                              :promise? false,
+                              :client-id client-id,
+                              :msg "That's all the conversation we do right now. (replay)"})
+            (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))))
+
+;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-planner!
   []
   (ws/register-ws-dispatch :resume-conversation-plan resume-conversation))
 
-(defn quit-planner!
-  "Quit the planner. It can be restarted with a shell command through mount."
-  [])
-
 (defstate planning
-  :start (init-planner!)
-  :stop  (quit-planner!))
+  :start (init-planner!))

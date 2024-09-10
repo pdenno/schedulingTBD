@@ -2,14 +2,11 @@
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
    [clojure.pprint        :refer [cl-format pprint]]
-   [clojure.string        :as str]
    [clojure.test          :refer [deftest is testing]]
    [promesa.core          :as p]
    [scheduling-tbd.domain.process.p-interview :as inv]
    [scheduling-tbd.db    :as db]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm]]
-   [scheduling-tbd.llm    :as llm :refer [query-llm]]
-   [taoensso.timbre          :as log]))
+   [scheduling-tbd.llm    :as llm :refer [query-llm]]))
 
 ;;; (ns-unalias (find-ns 'scheduling-tbd.domain.process.interview-test) 'inv)
 ;;; (ns-unmap  'scheduling-tbd.domain.process.interview-test 'inv)
@@ -55,7 +52,8 @@
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
-  (safe-alias 'mz     'scheduling-tbd.minizinc)
+  (safe-alias 'mzn    'scheduling-tbd.minizinc)
+  (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
   (safe-alias 'ou     'scheduling-tbd.op-utils)
   (safe-alias 'opt    'scheduling-tbd.operators-test)
   (safe-alias 'plan   'scheduling-tbd.planner)

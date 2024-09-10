@@ -85,12 +85,9 @@
   nil)
 
 (def top-share-fns
-  "These, for convenience, keep track of what methods need be called on resizing."
-  {:left-share   {:on-stop-drag-lf (partial editor/resize-finish "data-editor")}
-   :right-share  {:on-resize-up    (partial editor/resize "code-editor")
-                  :on-resize-dn    (partial editor/resize "result")
-                  :on-stop-drag-up (partial editor/resize-finish "code-editor")
-                  :on-stop-drag-dn (partial editor/resize-finish "result")}})
+  "These, for convenience, keep track of what methods need be called on resizing. The are only needed for CodeMirror things, I think."
+  {:right-share  {:on-resize-up    (partial editor/resize "code-editor")
+                  :on-stop-drag-up (partial editor/resize-finish "code-editor")}})
 
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
@@ -133,7 +130,6 @@
                                      :height code-side-height})
                       :dn ($ Box)
                       :share-fns (:right-share top-share-fns)})
-           :share-fns (:left-share top-share-fns)
            :lf-pct 0.50
            :init-width width}))))
 

@@ -7,7 +7,9 @@
    [datahike.pull-api       :as dp]
    [taoensso.timbre         :as log]))
 
-(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
+;(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
+(def default-llm-provider "Default provider to use. Choices are #{:openai :azure}." (atom :openai)) ; Values are azure and :openai
+
 (defn api-credentials [provider]
   (let [res (case provider
                 :openai {:api-key (System/getenv "OPENAI_API_KEY")}
@@ -21,6 +23,8 @@
     res))
 
 (defonce databases-atm (atom {}))
+
+(defn db-ids [] (-> @databases-atm keys sort vec))
 
 (defn register-db
   "Add a DB configuration."
@@ -47,22 +51,21 @@
   "Return a datahike configuration map for argument database (or its base).
      id   - a keyword uniquely identifying the DB in the scope of DBs.
      type - the type of DB configuration being make: (:project, :system, or :him, so far)"
-  ([type] (if (= :project type)
-            (throw (ex-info "projects need an ID." {}))
-            (db-cfg-map type type)))
-  ([type id]
-   (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB")) ; "/opt/scheduling" typically.
-                      (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
-                                           "\nCreate directories 'projects' and 'system' under it.") {})))
-         db-dir (->> (case type
-                       :system           "/system"
-                       :project          (str "/projects/" (name id) "/db/")
-                       :planning-domains "/planning-domains"
-                       :him              "/etc/other-dbs/him")
-                     (str base-dir))]
-     (-> db-template
-         (assoc-in [:store :path] db-dir)
-         (assoc    :base-dir base-dir)))))
+  [{:keys [type id in-mem?]}]
+  (when (and (= :project type) (not id)) (throw (ex-info "projects need an ID." {})))
+  (let [base-dir (or (-> (System/getenv) (get "SCHEDULING_TBD_DB")) ; "/opt/scheduling" typically.
+                     (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases."
+                                          "\nCreate directories 'projects' and 'system' under it.") {})))
+        db-dir (->> (case type
+                      :system           "/system"
+                      :project          (str "/projects/" (name id) "/db/")
+                      :planning-domains "/planning-domains"
+                      :him              "/etc/other-dbs/him")
+                    (str base-dir))]
+    (cond-> db-template
+      true            (assoc :base-dir base-dir)     ; This is not a datahike thing.
+      (not in-mem?)   (assoc :store {:backend :file :path db-dir})
+      in-mem?         (assoc :store {:backend :mem :id (name id)}))))
 
 (defn connect-atm
   "Return a connection atom for the DB."
@@ -187,9 +190,9 @@
 (defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
 (defn get-domain [id] (get @planning-domains id))
 
-(defn error-for-chat
+(defn chat-status
   "Create a string to explain in the chat the error we experienced."
-  ([s] (error-for-chat s nil))
+  ([s] (chat-status s nil))
   ([s err]
    (if (instance? Throwable err)
      (let [m (Throwable->map err)]
@@ -211,7 +214,7 @@
   "Do heuristic light modification to the argument text to make it more like HTML.
    Specifically:
      - Change: **bold** to <b>bold</b>.
-   This is mostly for use with OpenAI tools."
+   This is mostly for use with chatbots that return markup."
   [s]
   (let [lines (for [line (str/split-lines s)]
                 (let [[success pre bold post] (re-matches #"(.*)\*\*(.+)\*\*(.*)" line)] ; ToDo: I can't put \- in the bold stuff.
@@ -223,9 +226,10 @@
     (str (apply str others)
          (subs last 0 (dec (count last))))))
 
-(defn string2sym [s] (-> s str/lower-case (str/replace #"\s+" "-") symbol))
+(def diag (atom nil))
 
 (defn domain-conversation
+  "A planning domain is associated with exactly one conversation."
   [domain-id]
   (let [res (-> domain-id get-domain :domain/conversation)]
     (assert (#{:process :data :resource} res))

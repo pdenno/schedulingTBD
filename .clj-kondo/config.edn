@@ -20,7 +20,7 @@
 
            ;; https://clojure-lsp.io/settings/#clojure-lspunused-public-var
            :clojure-lsp/unused-public-var {:level :warning
-                                           :exclude #{scheduling-tbd.db/backup-proj-dbs    ; These are things that can be called by the developer.
+                                           #_#_:exclude #{scheduling-tbd.db/backup-proj-dbs    ; These are things that can be called by the developer.
                                                       scheduling-tbd.db/backup-system-db   ; I suppose another way to do this is just put ^:diag on them.
                                                       scheduling-tbd.db/proj-base-cfg      ; But, as indicated below, ^:diag isn't working.
                                                       scheduling-tbd.db/delete-project

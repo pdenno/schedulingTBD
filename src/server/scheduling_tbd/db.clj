@@ -14,7 +14,7 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.llm   :as llm]
    [scheduling-tbd.specs :as spec]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id]]
+   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id default-llm-provider]]
    [scheduling-tbd.util  :as util :refer [now]]
    [taoensso.timbre :as log :refer [debug]]))
 
@@ -29,6 +29,12 @@
    :agent/assistant-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant id (a string) associated with this surrogate."}
+   :agent/base-type
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Indicates the purpose and instructions given."}
+   :agent/llm-provider
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Currently either :openai or :azure."}
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
@@ -127,25 +133,34 @@
         :doc "A string that can be edn/read-string into a set of predicates"}
 
    ;; ---------------------- process (about production process types)
-   :process/duration-comment
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a comment about the duration of a process."}
    :process/desc
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a description of this this process; perhaps stated in an interview."}
    :process/duration
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "a reference to a duration (dur) object; typically an estimate"}
+   :process/duration-comment
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a comment about the duration of a process."}
    :process/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc (str "A string, perhaps from an interview uniquely identifying the process."
                   "The top-level production process will have a process-type/id = :project/id.")}
+   :process/interview-class
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "a keyword identifying what sort of conversation lead to this process description, for example :initial-unordered for early in the interview."}
+   :process/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "original text naming the process."}
    :process/pre-processes
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "a process/id identifying a process that must occur before this task "}
    :process/resource
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "a keyword naming a resource (type or instance) used in this task"}
+   :process/step-number
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
+        :doc "a positive integer indicating the order of the process step in the :process/sub-processes vector."}
    :process/sub-processes
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "process objects that occur within the scope of this project object"}
@@ -211,7 +226,7 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "an object with keys :problem/domain, :problem/goal-string, and :problem/state-string at least."}
    :project/processes
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+      #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the project's process objects; everything about processes."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
@@ -353,12 +368,16 @@
 
 ;;; ---------------------------------- agents ----------------------------------------------
 (defn add-agent!
-  "Create a agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
+  "Create an agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
    Store what is needed to identify it in system DB."
-  [{:keys [id instruction]}]
-  (let [assist (llm/make-assistant :name (name id) :instructions instruction :metadata {:usage :agent})
+  [{:keys [id instructions llm-provider]}]
+  (let [assist (llm/make-assistant :name (name id)
+                                   :llm-provider llm-provider
+                                   :instructions instructions
+                                   :metadata {:usage :agent})
         aid    (:id assist)
         thread (llm/make-thread {:assistant-id aid
+                                 :llm-provider llm-provider
                                  :metadata {:usage :agent}})
         tid    (:id thread)
         conn   (connect-atm :system)
@@ -370,17 +389,14 @@
                                                  :agent/assistant-id aid
                                                  :agent/thread-id tid}}]})))
 
-;;; When you change this, do a (llm/recreate-agent! inv/process-agent) and then maybe (db/backup-system-db)
-(def process-dur-agent
-  "Instructions and training for :process-dur-agent to help it get started."
-  {:id :process-dur-agent
-   :instruction (slurp "data/instructions/process-dur-agent.txt")})
+;;; (db/add-agent! :process-dur-agent
+(def known-agent-templates
+  "The actual agent :id is the one provided here with -<llm-provider> added."
+  [{:id :process-dur-agent
+    :instructions (slurp "data/instructions/process-dur-agent.txt")}
 
-(def text-function-agent
-  {:id :text-function-agent
-   :instruction (slurp "data/instructions/text-function-agent.txt")})
-
-(def known-agents [process-dur-agent text-function-agent])
+   {:id :text-function-agent
+    :instructions (slurp "data/instructions/text-function-agent.txt")}])
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 ;;; Atom for the configuration map used for connecting to the project db.
@@ -391,11 +407,7 @@
    (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
   [pid]
   (assert (keyword? pid))
-  (when (d/q '[:find ?e .
-               :in $ ?pid
-               :where
-               [?e :project/id ?pid]]
-             @(connect-atm :system) pid)
+  (when (some #(= % pid) (sutil/db-ids)) ; (sutil/db-ids) includes non-project IDs.
     (d/q '[:find ?e .
            :in $ ?pid
            :where
@@ -559,7 +571,7 @@
   "Write the complete state to the project database. Argument is a vector or set. "
   [pid state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
-  (log/info "put-planning-state: state =" state)
+  ;;(log/info "put-planning-state: state =" state)
   (if (empty? state)
     (throw (ex-info "state is empty" {:pid pid}))
     (let [state-set (set state)
@@ -571,7 +583,7 @@
   "Add the argument vector of ground proposition to state, a set. Return the new state."
   [pid more-state]
   (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
-  (log/info "add-planning-state: more-state = " more-state)
+  ;;(log/info "add-planning-state: more-state = " more-state)
   (let [new-state (into (get-planning-state pid) more-state)
         conn (connect-atm pid)
         eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
@@ -579,17 +591,25 @@
     new-state))
 
 (defn get-process
-  "Return the process structure for the argument pid and process-id."
-  [pid proc-id]
+  "Return the process structure for the argument pid and interview-class."
+  [pid interview-class]
   (assert (keyword? pid))
-  (assert (keyword? proc-id))
+  (assert (keyword? interview-class))
   (let [conn (connect-atm pid)
         eid (d/q '[:find ?eid .
-                   :in $ ?proc-id
-                   :where [?eid :process/id ?proc-id]]
+                   :in $ ?class
+                   :where [?eid :process/interview-class ?class]]
                  @conn
-                 proc-id)]
+                 interview-class)]
     (resolve-db-id {:db/id eid} conn)))
+
+(defn put-process-sequence!
+  "Write project/process-sequence to the project's database.
+   The 'infos' argument is a vector of maps such as produced by analyze-process-durs-response."
+  [pid full-obj]
+  (let [conn (connect-atm pid)
+        eid (project-exists? pid)]
+    (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
 
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
@@ -637,7 +657,7 @@
    By default this creates new agents."
   [& {:keys [target-dir new-agents?] :or {target-dir "data/" new-agents? true}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
-    (let [cfg (db-cfg-map :system)]
+    (let [cfg (db-cfg-map {:type :system})]
       (log/info "Recreating the system database.")
       (when (d/database-exists? cfg) (d/delete-database cfg))
       (d/create-database cfg)
@@ -646,7 +666,12 @@
         (d/transact conn db-schema-sys)
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
       (when new-agents?
-        (doseq [a known-agents] (add-agent! a)))
+        (doseq [llm-provider [:openai]]
+          (doseq [a known-agent-templates]
+            (-> a
+                (update :id #(-> % name (str "-" (name llm-provider)) keyword))
+                (assoc :llm-provider llm-provider)
+                add-agent!))))
       cfg)
     (log/error "Not recreating system DB: No backup file.")))
 
@@ -655,7 +680,7 @@
   [id]
   (let [backup-file (format "data/projects/%s.edn" (name id))]
     (if (.exists (io/file backup-file))
-      (let [cfg (db-cfg-map :project id)
+      (let [cfg (db-cfg-map {:type :project :id id})
             files-dir (-> cfg :base-dir (str "/projects/" (name id) "/files"))]
         (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
           (d/delete-database cfg))
@@ -726,16 +751,15 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to current conversation of the database with :project/id = id."
-  ([pid from msg] (add-msg pid from msg []))
-  ([pid from msg tags]
-   (reset! diag [pid from msg tags])
+  ([pid from text] (add-msg pid from text []))
+  ([pid from text tags]
    (assert (#{:system :human :surrogate :developer-injected} from))
-   (assert (string? msg))
-   ;;(log/info "add-msg: pid =" pid "msg =" msg)
+   (assert (string? text))
+   ;;(log/info "add-msg: pid =" pid "text =" text)
    (if-let [conn (connect-atm pid)]
      (let [msg-id (inc (max-msg-id pid))]
        (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
-                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content msg}
+                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
                                                              (not-empty tags) (assoc :message/tags tags))}]}))
      (throw (ex-info "Could not connect to DB." {:pid pid})))))
 
@@ -759,20 +783,20 @@
    Return the PID of the project."
   ([proj-info] (create-proj-db! proj-info {} {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
-  ([proj-info additional-info opts]
+  ([proj-info additional-info {:keys [in-mem? force?] :as opts}]
    (s/assert ::project-info proj-info)
-   (let [{id :project/id pname :project/name} ; BTW, never name something 'name'.
-         (if (:force? opts) proj-info (unique-proj proj-info))
-         cfg (db-cfg-map :project id)
+   (let [{id :project/id pname :project/name} (if force? proj-info (unique-proj proj-info))
+         cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
          dir (-> cfg :store :path)
          files-dir (-> cfg :base-dir (str "/" pname  "/files"))]
-     (when-not (-> dir io/as-file .isDirectory)
-       (-> cfg :store :path io/make-parents)
-       (-> cfg :store :path io/as-file .mkdir))
-     (when-not (-> files-dir io/as-file .isDirectory)
-       (io/make-parents files-dir)
-       (-> files-dir io/as-file .mkdir))
-     (add-project-to-system id pname dir)
+     (when-not in-mem?
+       (when-not (-> dir io/as-file .isDirectory)
+         (-> cfg :store :path io/make-parents)
+         (-> cfg :store :path io/as-file .mkdir))
+       (when-not (-> files-dir io/as-file .isDirectory)
+         (io/make-parents files-dir)
+         (-> files-dir io/as-file .mkdir))
+       (add-project-to-system id pname dir))
      (when (d/database-exists? cfg) (d/delete-database cfg))
      (d/create-database cfg)
      (register-db id cfg)
@@ -790,7 +814,7 @@
      (log/info "Created project database for" id)
      id)))
 
-(defn delete-project
+(defn ^:diag delete-project!
   "Remove project from the system."
   [pid]
   (if (some #(= % pid) (list-projects))
@@ -802,33 +826,42 @@
           nil)))
     (log/warn "Delete-project: Project not found:" pid)))
 
+(defn ^:diag  known-agents
+  "Return a set of all the agents recorded in the system DB."
+  []
+  (-> (d/q '[:find [?id ...] :where [_ :agent/id ?id]] @(connect-atm :system))
+      set))
+
 (defn get-agent
   "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)."
-  [agent-id]
-  (assert (#{:process-dur-agent :table-agent} agent-id))
-  (-> (d/q '[:find ?aid ?tid
-             :keys aid tid
-             :in $ ?agent-id
-             :where
-             [?e :agent/id ?agent-id]
-             [?e :agent/assistant-id ?aid]
-             [?e :agent/thread-id ?tid]]
-           @(connect-atm :system) agent-id)
-      first))
+  ([base-type] (get-agent base-type @default-llm-provider))
+  ([base-type llm-provider]
+   (if-let [res (-> (d/q '[:find ?aid ?tid
+                           :keys aid tid
+                           :in $ ?base-type ?llm-provider
+                           :where
+                           [?e :agent/base-type ?base-type]
+                           [?e :agent/llm-provider ?llm-provider]
+                           [?e :agent/assistant-id ?aid]
+                           [?e :agent/thread-id ?tid]]
+                         @(connect-atm :system) base-type llm-provider)
+                    first)]
+     res
+     (throw (ex-info "get-agent: no such agent." {:base-type base-type :llm-provider llm-provider})))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs
   "Make a config for each project and register it."
   []
   (doseq [id (list-projects {:from-storage? true})]
-    (register-db id (db-cfg-map :project id))))
+    (register-db id (db-cfg-map {:type :project :id id}))))
 
 (defn init-dbs
   "Register DBs using "
   []
   (register-project-dbs)
-  (register-db :system (db-cfg-map :system))
-  {:sys-cfg (db-cfg-map :system)})
+  (register-db :system (db-cfg-map {:type :system}))
+  {:sys-cfg (db-cfg-map {:type :system})})
 
 (defstate sys&proj-database-cfgs
   :start (init-dbs))

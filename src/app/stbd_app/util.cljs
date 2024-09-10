@@ -40,7 +40,6 @@
                  {pid :project/id} resp]
              (cond-> info
                (not (contains? resp :conv-id))     (assoc :conversation/id :process)
-               (contains? resp :busy?)             (assoc :conversation/busy? (:busy? resp))
                current-project   (assoc :project/id current-project)
                project-id        (assoc :project/id project-id)
                pid               (assoc :project/id pid)

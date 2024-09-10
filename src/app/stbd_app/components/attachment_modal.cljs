@@ -16,7 +16,6 @@
    ["@mui/material/Input$default" :as Input]
    ["@mui/material/Stack$default" :as Stack]
    ["@mui/material/Typography$default" :as Typography]
-   ["@mui/material/Modal$default" :as Modal]
    ["@mui/material/Dialog$default" :as Dialog]
    [stbd-app.util   :refer [common-info]]
    [stbd-app.ws     :as ws]

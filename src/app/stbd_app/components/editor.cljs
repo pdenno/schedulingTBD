@@ -1,14 +1,22 @@
 (ns stbd-app.components.editor
   (:require
+   [ajax.core        :refer [POST]]
    ["@codemirror/language" :refer [foldGutter syntaxHighlighting defaultHighlightStyle]]
    ["@codemirror/commands" :refer [history #_historyKeymap emacsStyleKeymap]]
    ["@codemirror/view" :as view :refer [EditorView  #_lineNumbers]]
    ["@codemirror/state" :refer [EditorState Compartment ChangeSet Transaction]]
+   ["@mui/icons-material/ArrowBack$default" :as ArrowBack]
+   ["@mui/icons-material/ArrowForward$default" :as ArrowForward]
+   ["@mui/icons-material/Save$default" :as Save]
+   ["@mui/material/ButtonGroup$default" :as ButtonGroup]
+   ["@mui/material/IconButton$default" :as IconButton]
+   ["@mui/material/Stack$default" :as Stack]
    [applied-science.js-interop :as j]
    [helix.core :as helix :refer [defnc $]]
    [helix.hooks :as hooks]
    [helix.dom :as d]
-   ;["@mui/system/sizing" :as sizing] ; ToDo: Investigate
+   ;;["@mui/system/sizing" :as sizing] ; ToDo: Investigate
+   [stbd-app.components.run-dialog :refer [RunDialog]]
    [stbd-app.components.share :as share]
    [stbd-app.rm-mode.parser :as parser]
    [stbd-app.rm-mode.state :as state]
@@ -92,7 +100,8 @@
     (when-let [dom (j/get view :dom)]
       (when width  (j/assoc-in! dom    [:style :width]  (str width  "px")))
       (when height
-        (j/assoc-in! dom [:style :height] (str height "px"))))))
+        ;; 42 is height of buttons and purpose of life.
+        (j/assoc-in! dom [:style :height] (str (- height 42) "px"))))))
 
 (defn resize-finish
   "In order for scroll bars to appear (and long text not to run past the end of the editor vieport),
@@ -104,8 +113,12 @@
           ^Transaction trans  (.update state (j/lit {:effects [effect]}))]
       (.dispatch view trans))))
 
+(defn handle-whatever [& _args])
+(def chat-bg-style (clj->js {:bgcolor "#f0e699" #_"yellow"}))
+
 (defnc Editor
   [{:keys [text name height]}]
+  ;;(log/info "Editor height =" height) ; This changes when window size changes, not the share.
   (let [ed-ref (hooks/use-ref nil)
         view-dom (atom nil)]
     (hooks/use-effect :once ; [name]
@@ -114,7 +127,12 @@
               view (new EditorView (j/obj :state editor-state :parent parent))]
           (reset! view-dom (j/get view :dom))
           (swap! util/component-refs #(assoc % name {:ref parent :view view})))))
-    (hooks/use-effect [text]
-      (set-editor-text text))
-    (d/div {:ref ed-ref :id name} ; style works but looks ugly because it wraps editor tightly.
-      @view-dom)))
+    (hooks/use-effect [text] (set-editor-text text))
+    ($ Stack {:direction "column"}
+       ($ ButtonGroup {:sx chat-bg-style}
+          ($ RunDialog)
+          ($ IconButton {:onClick handle-whatever} ($ Save))
+          ($ IconButton {:onClick handle-whatever} ($ ArrowBack))
+          ($ IconButton {:onClick handle-whatever} ($ ArrowForward)))
+       (d/div {:ref ed-ref :id name} ; style works but looks ugly because it wraps editor tightly.
+              @view-dom))))

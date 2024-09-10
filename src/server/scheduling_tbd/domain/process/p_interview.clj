@@ -8,10 +8,9 @@
    [clojure.pprint                :refer [cl-format]]
    [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
-   [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [connect-atm register-planning-domain yes-no-unknown string2sym]]
+   [scheduling-tbd.sutil          :as sutil :refer [default-llm-provider register-planning-domain yes-no-unknown]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
@@ -128,6 +127,15 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
     (cl-format nil "enum Task = {~{~a~^, ~}};" procs)))
 
 ;;; -------------------------------- response analysis  -----------------------------------------------
+;;; ToDo: Could be several more "cites" in the intro paragraph. For example, consider this, from sur-plate-glass:
+;;; "Our most significant scheduling problem revolves around coordinating the manufacturing process with the fluctuating availability of raw materials,
+;;; particularly high-quality silica sand and soda ash, and accommodating the variable demand from our customers.
+;;; We struggle with optimizing machine utilization time and reducing downtime, while also managing delivery schedules that are dependent
+;;; on these unpredictable elements. Additionally, managing the workforce to align with these changes,
+;;; ensuring we have enough skilled workers available when needed, adds another layer of complexity to our operations.",
+;;;
+;;; This might get into skills classification, delivery schedules, downtime, machine utilization.
+
 ;;; ToDo: This was written before I decided that domain.clj ought to require db and use it. Refactor this and its caller, !initial-question ?
 (defn analyze-intro-response
   "Analyze the response to the initial question, adding to the init-state vector."
@@ -147,7 +155,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                                (~'proj-name ~proj-name)]))
                      ;; Otherwise, it is a surrogate; proj-id and proj-name are already known.
                      init-state)]
-    (if (= :yes (text-cites-raw-material-challenge? response))
+    (if (= :yes (text-cites-raw-material-challenge? response)) ; ToDo: Maybe rework this to additionally handle skills classification, delivery schedules, downtime, machine utilization.
         (conj proj-state (list 'cites-raw-material-challenge (-> pid name symbol)))
         proj-state)))
 
@@ -167,15 +175,16 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
          (filterv identity))))
 
 (defn extreme-dur-span?
-  "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more."
-  [pid process-id]
+  "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more.
+   This always looks at :process/inverview-class = :initial-unordered."
+  [pid]
   (let [units (atom #{})]
     (letfn [(get-units [obj]
               (cond (map? obj)    (doseq [[k v] (seq obj)]
                                      (when (= k :quantity/units) (swap! units conj v))
                                      (get-units v))
                     (vector? obj) (doseq [v obj] (get-units v))))]
-      (-> (db/get-process pid process-id) get-units)
+      (-> (db/get-process pid :initial-unordered) get-units)
       (let [units @units]
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
@@ -192,7 +201,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (s/def :rev-2/DURATION string?)
 (s/def :rev-2/COMMENT string?)
 (s/def ::rev-2-map (s/keys :req-un [:rev-2/PROCESS-STEP :rev-2/PROCESS :rev-2/DURATION] :opt-un [:rev-2/COMMENT]))
-
 
 (s/def :rev-3/AMOUNT-STRING string?)
 (s/def :rev-3/UNITS keyword?)
@@ -215,7 +223,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (s/def ::rev-5-map #(and (s/valid? ::rev-4-map %)
                          (string? (:VAR %))))
 
-;;; clj-kondo/LSP won't know about most of these because the call to s/valid? is programmatic.
 (s/def ::rev-1 (fn [v] (every? #(s/valid? ::rev-1-map %) v)))
 (s/def ::rev-2 (fn [v] (every? #(s/valid? ::rev-2-map %) v)))
 (s/def ::rev-3 (fn [v] (every? #(s/valid? ::rev-3-map %) v)))
@@ -237,7 +244,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Switch from LLM keys to keys used in DB."
   [obj]
   (let [db-key {:PROCESS-STEP  :PROCESS-STEP
-                :PROCESS       :PROCESS
+                :PROCESS       :process/name
                 :DURATION      :process/duration
                 :QUANTITY-LOW  :quantity-range/low
                 :QUANTITY-HIGH :quantity-range/high
@@ -258,28 +265,14 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
               :else             obj))]
       (sk obj))))
 
-(defn post-process
-  "Make the process-agent's LLM output suitable for the project's DB (process object etc.)"
-  [process-maps super-process]
-  (let [db-style (->> process-maps
-                      (map switch-keys)
-                      (map #(assoc % :process/id (->> % :process/var-name (str super-process "--") keyword)))
-                      (mapv #(dissoc % :PROCESS)))]
-    (reduce (fn [res ix]
-              (let [process-map (nth db-style ix)]
-                (if (== ix 0)
-                  (conj res process-map) ; ToDo: process/pre-processes is sort of a guess! Maybe do this later?
-                  (conj res (assoc process-map :process/pre-processes [(-> (nth db-style (dec ix)) :process/id)])))))
-            []
-            (-> db-style count range))))
-
 ;;; (inv/run-process-agent-steps data2)
 (defn run-process-dur-agent-steps
   "Run the steps of the process agent, checking work after each step."
   [response pid]
-  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent)
+  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent @default-llm-provider)
         past-rev (atom response)]
-    (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]]
+    (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]] ; These are also spec defs, thus ns-qualified.
+      (log/info "Starting rev " (name rev))
       (when @past-rev
         (let [result (llm/query-on-thread
                       {:aid aid :tid tid :role "user"
@@ -287,28 +280,29 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                        :preprocess-fn (fn [resp] (-> resp remove-preamble edn/read-string))
                        :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
           (reset! past-rev result)
-          #_(log/info "***************" rev "="  @past-rev))))
-    (post-process @past-rev (name pid))))
+          (log/info "***************" rev "="  @past-rev))))
+    @past-rev))
 
-(defn put-process-sequence!
-  "Write project/process-sequence to the project's database.
-   The 'infos' argument is a vector of maps such as produced by analyze-process-durs-response."
-  [pid full-obj]
-  (reset! diag full-obj)
-  (let [conn (connect-atm pid)
-        eid (db/project-exists? pid)]
-    (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
+(defn post-process
+  "Make the process-agent's LLM output suitable for a project's DB process object."
+  [process-maps pid]
+  (let [cnt (atom 0)
+        sub-processes (->> process-maps
+                           (map switch-keys)
+                           (map #(assoc % :process/id (->> % :process/var-name (str (name pid) "--initial-unordered--") keyword)))
+                           (reduce (fn [r m] (conj r (assoc m :process/step-number (swap! cnt inc)))) []))]
+    {:process/id pid
+     :process/interview-class :initial-unordered
+     :process/sub-processes sub-processes}))
 
-(defn analyze-process-durs-response
+(defn analyze-process-durs-response!
   "Used predominantly with surrogates, study the response to a query about process durations,
    writing findings to the project database and returning state propositions."
   [{:keys [response pid] :as _obj}]
   (let [process-objects (run-process-dur-agent-steps response pid)
-        full-obj {:process/id pid
-                  :process/desc response
-                  :process/sub-processes process-objects}]
-    (put-process-sequence! pid full-obj)
-    (let [extreme-span? (extreme-dur-span? pid pid) ; This look at the DB just updated.
+        full-obj (post-process process-objects pid)]
+    (db/put-process-sequence! pid full-obj)
+    (let [extreme-span? (extreme-dur-span? pid) ; This look at the DB just updated.
           proj-sym (-> pid name symbol)]
       ;;(log/info "extreme-span? =" extreme-span?)
       (cond-> [(list 'have-process-durs proj-sym)]

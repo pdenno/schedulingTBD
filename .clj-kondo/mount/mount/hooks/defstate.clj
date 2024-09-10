@@ -1,5 +1,4 @@
-;;; See https://gist.github.com/ethpran/e1741a5c408aec831b5e3a7e24f40fea
-(ns mount.core.defstate
+(ns hooks.defstate
   (:require [clj-kondo.hooks-api :as api]))
 
 (defn defstate [{:keys [:node]}]
@@ -33,8 +32,10 @@
          :col     (:col (meta n))})
       :else
       {:node (api/list-node
-                  (list*
-                    (api/token-node 'fn*)
-                    (api/vector-node [n])
+                  (list
+                    (api/token-node 'def)
                     n
-                    args))})))
+                    (api/list-node
+                      (list*
+                        (api/token-node 'do)
+                        args))))})))

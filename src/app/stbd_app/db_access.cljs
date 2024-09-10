@@ -46,6 +46,7 @@
                                                      {:status status :status-text status-text})))})
      prom)))
 
+
 ;;; This is used by the server/planner to update the conversation.
 ;;; Unlike chat/get-conversation, the function for (lookup-fn :get-conversation),
 ;;; it doesn't resume-conversation because planning is already underway.

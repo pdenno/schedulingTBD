@@ -47,7 +47,8 @@
                 {:method/head (analyze-process ?p)
                  :method/rhsides [{:method/preconds [(proj-id ?p)]
                                    :method/task-list [(!query-process-steps ?p)
-                                                      (!query-process-durs ?p)]}]}
+                                                      (!query-process-durs ?p)
+                                                      (!query-process-ordering ?p)]}]}
 
                 {:operator/head (!query-process-steps ?p)  ; This is parallel expert warm up.
                  :operator/preconds [(flow-shop ?p)]
@@ -56,6 +57,10 @@
                 {:operator/head (!query-process-durs ?p)
                  :operator/preconds [(flow-shop ?p)]
                  :operator/a-list [(done !query-process-durs ?p)]} ; <================ These are going to be automatic.
+
+                {:operator/head (!query-process-ordering ?p)
+                 :operator/preconds [(flow-shop ?p) (done !query-process-steps ?p)]
+                 :operator/a-list [(done !query-process-ordering ?p)]}
 
 ;;; ------------------------- verify-process --------------------------------------
                 {:method/head (verify-process ?p)
@@ -68,7 +73,6 @@
                 ;; (:- (different ?x ?y) ((not (same ?x ?y))))
                 {:axiom/head (different ?x ?y)
                  :axiom/rhsides [{:axiom/rhs ((not (same ?x ?y)))}]}
-
 
                 {:axiom/head (done analyze-process ?p)
                  :axiom/rhsides [{:axiom/rhs

@@ -60,22 +60,6 @@
                                       ((lookup-fn :set-current-project) new-proj-map)
                                       ((lookup-fn :get-conversation) (:project/id new-proj-map))))
 
-(register-fn :interviewer-busy?     (fn [{:keys [value]}]
-                                      #_(when value (log/info "====Starting interview===="))
-                                      ((lookup-fn :set-busy?) value)
-                                      (update-common-info! {:busy? value})
-                                      #_(when-not value (log/info "---Stopping interview----"))))
-
-(register-fn :tbd-says              (fn [{:keys [p-key msg]}]
-                                      (when p-key (remember-promise p-key))
-                                      (log/info "tbd-says msg:" msg)
-                                        ((lookup-fn :add-tbd-text) msg)))
-
-(register-fn :sur-says              (fn [{:keys [p-key msg]}]
-                                      (when p-key (remember-promise p-key))
-                                      (log/info "sur-says msg:" msg)
-                                        ((lookup-fn :add-sur-text) msg)))
-
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
   [{:keys [dispatch-key] :as msg}]
@@ -115,7 +99,7 @@
                 (reset! error-info-2 {:event arg})
                 (log/error "Error on socket: arg=" arg))) ; ToDo: investigate why it gets these.
         ;; Ping to keep-alive the web-socket. 10 sec is not enough; 3 is too little???
-        (reset! ping-process (js/window.setInterval (fn [] (ping!)) 2000)))
+        (reset! ping-process (js/window.setInterval (fn [] (ping!)) 30000 #_2000)))
     (throw (ex-info "Websocket Connection Failed:" {:client-id client-id}))))
 
 (defn check-channel
