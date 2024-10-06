@@ -11,6 +11,8 @@ float : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);
 % We assume a task uses one major resource; resources are synonymous with tasks.
 array [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.
 array [Product, Task] of var minTime..maxTime: taskEnds;
+array [Product] string: name;
+array [Product] float: cost;
 
 % This is used in the constraint below.
 predicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \/ s2 + d2 <= s1;

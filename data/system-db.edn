@@ -1,15 +1,25 @@
 [
 #:system{:agents
-         [#:agent{:assistant-id "asst_1VMFlO75EFDgeF3OcvI5Zs7q",
+         [#:agent{:assistant-id "asst_U0V60ipbq5bfrfxHZ1b4VYs9",
                   :base-type :process-dur-agent,
                   :id :process-dur-agent-openai,
                   :llm-provider :openai,
-                  :thread-id "thread_kurGSRoFSASBxfCPA740lOSe"}
-          #:agent{:assistant-id "asst_WqMHIQxhqIi8piOByQawM1YQ",
+                  :thread-id "thread_akhvfTpll5FJB0LkAzf5WYMV"}
+          #:agent{:assistant-id "asst_lOhY4ECUMS7AuP2qBzHQJXR3",
                   :base-type :text-function-agent,
                   :id :text-function-agent-openai,
                   :llm-provider :openai,
-                  :thread-id "thread_G6Y1ZfjaOAACr2pxmlavVE9a"}],
+                  :thread-id "thread_CKkWdhlpVa00gIEPcKlVGJ4C"}
+          #:agent{:assistant-id "asst_moIg7NB5vB4Vu6GiXppwaCX9",
+                  :base-type :process-ordering-agent,
+                  :id :process-ordering-agent-openai,
+                  :llm-provider :openai,
+                  :thread-id "thread_i4iUu2azPsDMe1jFHW1Cpsuc"}
+          #:agent{:assistant-id "asst_Tqd6tY1JNtq5NTwUsTguYqlo",
+                  :base-type :process-interview-agent,
+                  :id :process-interview-agent-openai,
+                  :llm-provider :openai,
+                  :thread-id "thread_KiS90oqNofWQYpEUwnRYpghN"}],
          :default-project-id :sur-fountain-pens,
          :name "SYSTEM"}
 
@@ -76,5 +86,9 @@
 #:project{:dir "/opt/scheduling/projects/sur-artificial-limbs/db/",
           :id :sur-artificial-limbs,
           :name "SUR Artificial Limbs"}
+
+#:project{:dir "/opt/scheduling/projects/sur-inline-skates/db/",
+          :id :sur-inline-skates,
+          :name "SUR Inline Skates"}
 
 ]

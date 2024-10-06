@@ -1,0 +1,8 @@
+{:type "json_schema",
+ :json_schema {:name "interview_response",
+               :strict true,
+               :schema {:type "object",
+                        :properties {:question {:type "string"},
+                                   :status   {:type "string"}}
+                        :required ["status" "question"], ; I get an error saying :required has to have all properties if I leave it out!
+                        :additionalProperties false}}}   ; Can I put it in additionalProperties?

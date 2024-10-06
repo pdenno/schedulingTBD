@@ -370,10 +370,12 @@
 (defn add-agent!
   "Create an agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
    Store what is needed to identify it in system DB."
-  [{:keys [id instructions llm-provider]}]
+  [{:keys [id base-type instructions llm-provider response-format]
+    :or {llm-provider @default-llm-provider}}]
   (let [assist (llm/make-assistant :name (name id)
                                    :llm-provider llm-provider
                                    :instructions instructions
+                                   :response-format response-format
                                    :metadata {:usage :agent})
         aid    (:id assist)
         thread (llm/make-thread {:assistant-id aid
@@ -386,17 +388,26 @@
                     @(connect-atm :system))]
     (d/transact conn {:tx-data [{:db/id eid
                                  :system/agents {:agent/id id
+                                                 :agent/base-type base-type
+                                                 :agent/llm-provider llm-provider
                                                  :agent/assistant-id aid
                                                  :agent/thread-id tid}}]})))
 
-;;; (db/add-agent! :process-dur-agent
+;;; (db/add-agent! {:id :process-dur-agent,,,}
 (def known-agent-templates
   "The actual agent :id is the one provided here with -<llm-provider> added."
-  [{:id :process-dur-agent
-    :instructions (slurp "data/instructions/process-dur-agent.txt")}
+  [{:id :process-interview-agent
+    :instruction-path     "data/instructions/interviewer-process.txt"
+    :response-format-path "data/instructions/interviewer-response-format.edn"}
+
+   {:id :process-dur-agent
+    :instruction-path  "data/instructions/process-dur-agent.txt"}
+
+   {:id :process-ordering-agent
+    :instruction-path "data/instructions/process-ordering-agent.txt"}
 
    {:id :text-function-agent
-    :instructions (slurp "data/instructions/text-function-agent.txt")}])
+    :instruction-path "data/instructions/text-function-agent.txt"}])
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 ;;; Atom for the configuration map used for connecting to the project db.
@@ -667,11 +678,14 @@
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
       (when new-agents?
         (doseq [llm-provider [:openai]]
-          (doseq [a known-agent-templates]
-            (-> a
-                (update :id #(-> % name (str "-" (name llm-provider)) keyword))
-                (assoc :llm-provider llm-provider)
-                add-agent!))))
+          (doseq [{:keys [id instruction-path response-format-path]} known-agent-templates]
+            (cond-> {}
+              true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
+              true (assoc :base-type id)
+              true (assoc :llm-provider llm-provider)
+              true (assoc :instructions (slurp instruction-path))
+              #_#_response-format-path (assoc :response-format (-> response-format-path slurp edn/read-string))
+              true add-agent!))))
       cfg)
     (log/error "Not recreating system DB: No backup file.")))
 

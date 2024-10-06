@@ -40,7 +40,7 @@ constraint forall (t in Task)
 constraint exists (p in Product) (taskStarts[p, $$$FIRST-TASK-NAME$$$] = 0);
 
 % Starting some time in the past is not allowed.
-constraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);
+constraint forall (p in Product where p > 1) (taskStarts[p, $$$FIRST-TASK-NAME$$$] > 0);
 
 % Every other task can start after the previous task ends.
 $$$TASK-SERIAL-CONSTRAINTS$$$

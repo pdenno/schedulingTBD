@@ -174,6 +174,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
                  (list 'fails-process-step line)))))
          (filterv identity))))
 
+;;; ----------------- analyze-process-durs-response (done with :process-dur-agent) ----------------------------
 (defn extreme-dur-span?
   "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more.
    This always looks at :process/inverview-class = :initial-unordered."
@@ -189,7 +190,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-;;; ----------------- analyze-process-durs-response (done with :process-dur-agent) ----------------------------
 ;;; These are named by the output of the given revision.
 (s/def :rev-1/PROCESS string?)
 (s/def :rev-1/PROCESS-STEP number?)
@@ -283,7 +283,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
           (log/info "***************" rev "="  @past-rev))))
     @past-rev))
 
-(defn post-process
+(defn post-process-durs
   "Make the process-agent's LLM output suitable for a project's DB process object."
   [process-maps pid]
   (let [cnt (atom 0)
@@ -300,7 +300,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
    writing findings to the project database and returning state propositions."
   [{:keys [response pid] :as _obj}]
   (let [process-objects (run-process-dur-agent-steps response pid)
-        full-obj (post-process process-objects pid)]
+        full-obj (post-process-durs process-objects pid)]
     (db/put-process-sequence! pid full-obj)
     (let [extreme-span? (extreme-dur-span? pid) ; This look at the DB just updated.
           proj-sym (-> pid name symbol)]
@@ -317,8 +317,11 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
       :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
                        "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))
 
-;;; --------------------------------------- unimplemented (from the plan) -----------------------------
+;;; --------------------------------------- process-ordering -----------------------------
 (defn ^:diag analyze-process-ordering-response
   "Return state addition for analyzing a Y/N user response about process ordering."
-  [_response]
-  [])
+  [{:keys [response pid] :as _obj}]
+  #_(let [process-objects (run-process-ordering-agent-steps response pid)
+        #_#_full-obj (post-process-ordering process-objects pid)]
+    #_(db/put-process-sequence! pid full-obj)
+    process-objects))

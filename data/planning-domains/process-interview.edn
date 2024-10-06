@@ -60,7 +60,7 @@
 
                 {:operator/head (!query-process-ordering ?p)
                  :operator/preconds [(flow-shop ?p) (done !query-process-steps ?p)]
-                 :operator/a-list [(done !query-process-ordering ?p)]}
+                 :operator/a-list [#_(done !query-process-ordering ?p)]} ; <===================== Temporary
 
 ;;; ------------------------- verify-process --------------------------------------
                 {:method/head (verify-process ?p)

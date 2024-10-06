@@ -3,9 +3,7 @@
    Functions with names beginning with a '$' are available to the user (e.g. $filter).
    Others (such as bi/key and bi/strcat) implement other parts of the expression language
    but are not available directly to the user except through the operators (e.g. the dot, and &
-   respectively for navigation to a property and concatenation).
-
-   N.B. LSP annotates many operators here as '0 references'; of course, they are used."
+   respectively for navigation to a property and concatenation)."
   (:require
    [clojure.datafy               :refer [datafy]]
    [clojure.edn                  :as edn]
@@ -29,11 +27,9 @@
 
 (def preferred-llms
   "These names (keywords) are the models we use, and the models we've been using lately."
-  {:openai {:gpt-3.5     "gpt-3.5-turbo-0125"
-            :gpt-4       "gpt-4-turbo-2024-04-09" ; "gpt-4o" "gpt-4o-2024-05-13" "gpt-4-0125-preview"
-            :davinci     "davinci-002"}
-   :azure {:gpt-3.5     "mygpt-35"
-            :gpt-4      "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
+  {:openai {:gpt-4       "gpt-4o-2024-08-06" ; was gpt-4-turbo-2024-04-09"... others "gpt-4o" "gpt-4o-2024-05-13" "gpt-4o-2024-08-06" "gpt-4-0125-preview"
+            :mini        "gpt-4o-mini"}
+   :azure  {:gpt-4       "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
 
 (defn pick-llm
   "Return a string recognizable by OpenAI naming a model of the class provide.
@@ -179,17 +175,18 @@
      :instructions - a string, the systems instructions; defaults to 'You are a helpful assistant.',
      :model - a string; defaults to whatever is the chosen 'gpt-4',
      :tools - a vector containing maps; defaults to [{:type 'code_interpreter'}]."
-  [& {:keys [name model-class instructions tools metadata llm-provider]
+  [& {:keys [name model-class instructions tools metadata llm-provider response-format]
       :or {model-class :gpt-4
            llm-provider @default-llm-provider
            metadata {}
            tools [{:type "code_interpreter"}]} :as obj}]
   (s/valid? ::assistant-args obj)
-  (openai/create-assistant {:name         name
-                            :model        (pick-llm model-class llm-provider)
-                            :metadata     metadata
-                            :instructions instructions
-                            :tools        tools} ; Will be good for csv and xslx, at least.
+  (openai/create-assistant {:name            name
+                            :model           (pick-llm model-class llm-provider)
+                            :response_format response-format
+                            :metadata        metadata
+                            :instructions    instructions
+                            :tools           tools} ; Will be good for csv and xslx, at least.
                            (api-credentials llm-provider)))
 
 (defn make-thread
