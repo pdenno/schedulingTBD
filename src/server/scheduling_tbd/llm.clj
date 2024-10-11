@@ -27,13 +27,14 @@
 
 (def preferred-llms
   "These names (keywords) are the models we use, and the models we've been using lately."
-  {:openai {:gpt-4       "gpt-4o-2024-08-06" ; was gpt-4-turbo-2024-04-09"... others "gpt-4o" "gpt-4o-2024-05-13" "gpt-4o-2024-08-06" "gpt-4-0125-preview"
+  {:openai {:gpt         "gpt-4o-2024-08-06" ; was gpt-4-turbo-2024-04-09"... others "gpt-4o" "gpt-4o-2024-05-13" "gpt-4o-2024-08-06" "gpt-4-0125-preview"
+            :analysis    "o1-preview"
             :mini        "gpt-4o-mini"}
-   :azure  {:gpt-4       "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
+   :azure  {:gpt         "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
 
 (defn pick-llm
   "Return a string recognizable by OpenAI naming a model of the class provide.
-   For example (pick-llm :gpt-4) --> 'gpt-4-0125-preview'."
+   For example (pick-llm :gpt) --> 'gpt-4-0125-preview'."
   ([k] (pick-llm k @default-llm-provider))
   ([k provider]
    (assert (contains? (get @llms-used provider) k))
@@ -46,7 +47,7 @@
 (defn query-llm
   "Given the vector of messages that is the argument, return a string (default)
    or Clojure map (:raw-string? = false) that is read from the string created by the LLM."
-  [messages & {:keys [model-class raw-text? llm-provider] :or {model-class :gpt-4 raw-text? true llm-provider @default-llm-provider}}]
+  [messages & {:keys [model-class raw-text? llm-provider] :or {model-class :gpt raw-text? true llm-provider @default-llm-provider}}]
   (assert (every? #(s/valid? ::query-llm-msg %) messages))
   (log/info "llm-provider = " llm-provider)
   (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class llm-provider)
@@ -114,7 +115,7 @@
     (let [prompt (conj good-var-partial
                        {:role "user"
                         :content (cl-format nil "[~A]" purpose)})
-          res (query-llm prompt {:model-class :gpt-4 :raw-text? false})]
+          res (query-llm prompt {:model-class :gpt :raw-text? false})]
       (if-let [var-name (:name res)]
         (cond-> var-name
           (= :kebab-case string-type) (csk/->kebab-case-string)
@@ -157,7 +158,7 @@
 (defn select-llm-models-azure
   "Since in Azure you have to create the model, this is just hard-coded."
   []
-  (swap! llms-used #(assoc % :azure {:gpt-3.5 "mygpt-35" :gpt-4 "mygpt-4"})))
+  (swap! llms-used #(assoc % :azure {:gpt-3.5 "mygpt-35" :gpt "mygpt-4"})))
 
 (defn select-llm-models!
   "Set the open-ai-models atom to models in each class"
@@ -176,17 +177,17 @@
      :model - a string; defaults to whatever is the chosen 'gpt-4',
      :tools - a vector containing maps; defaults to [{:type 'code_interpreter'}]."
   [& {:keys [name model-class instructions tools metadata llm-provider response-format]
-      :or {model-class :gpt-4
+      :or {model-class :gpt
            llm-provider @default-llm-provider
-           metadata {}
-           tools [{:type "code_interpreter"}]} :as obj}]
+           ;;tools [{:type "code_interpreter"}] ; <===== ToDo: Possible breaking change.
+           metadata {}} :as obj}]
   (s/valid? ::assistant-args obj)
   (openai/create-assistant {:name            name
                             :model           (pick-llm model-class llm-provider)
                             :response_format response-format
                             :metadata        metadata
                             :instructions    instructions
-                            :tools           tools} ; Will be good for csv and xslx, at least.
+                            :tools           tools}
                            (api-credentials llm-provider)))
 
 (defn make-thread

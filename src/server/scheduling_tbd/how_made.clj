@@ -221,7 +221,7 @@
   (if (segment-exists? seg-name)
     (if-let [challenge (-> (str "a company that makes " seg-name)
                              pretend-you-manage-prompt
-                             (llm/query-llm {:model-class :gpt-4})
+                             (llm/query-llm {:model-class :gpt})
                              (p/await))]
       (do (log/info "Intro Response: " challenge)
           (d/transact (connect-atm :him) {:tx-data [{:segment/name seg-name

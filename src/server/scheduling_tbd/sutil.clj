@@ -5,6 +5,7 @@
    [clojure.string          :as str]
    [datahike.api            :as d]
    [datahike.pull-api       :as dp]
+   [jsonista.core           :as json]
    [taoensso.timbre         :as log]))
 
 ;(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
@@ -234,3 +235,8 @@
   (let [res (-> domain-id get-domain :domain/conversation)]
     (assert (#{:process :data :resource} res))
     res))
+
+(defn output-struct2clj
+  "Translate the openai output structure to a map with keyword keys."
+  [str]
+  (update-keys (json/read-value str) keyword))

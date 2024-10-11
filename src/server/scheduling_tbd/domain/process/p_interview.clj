@@ -90,7 +90,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   [user-text]
   (as-> (conj project-name-partial
               {:role "user" :content (str "[ " user-text " ]")}) ?r
-    (query-llm ?r {:model-class :gpt-4 :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
+    (query-llm ?r {:model-class :gpt :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
     (:project-name ?r)
     (if (string? ?r) ?r (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text})))))
 
@@ -117,7 +117,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   [text]
   (-> (conj raw-material-challenge-partial
             {:role "user" :content (format "[%s]" text)})
-      (query-llm {:model-class :gpt-4})
+      (query-llm {:model-class :gpt})
       yes-no-unknown))
 
 (defn mzn-process-steps
@@ -268,8 +268,8 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 ;;; (inv/run-process-agent-steps data2)
 (defn run-process-dur-agent-steps
   "Run the steps of the process agent, checking work after each step."
-  [response pid]
-  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent @default-llm-provider)
+  [response]
+  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)
         past-rev (atom response)]
     (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]] ; These are also spec defs, thus ns-qualified.
       (log/info "Starting rev " (name rev))
@@ -299,7 +299,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
   "Used predominantly with surrogates, study the response to a query about process durations,
    writing findings to the project database and returning state propositions."
   [{:keys [response pid] :as _obj}]
-  (let [process-objects (run-process-dur-agent-steps response pid)
+  (let [process-objects (run-process-dur-agent-steps response)
         full-obj (post-process-durs process-objects pid)]
     (db/put-process-sequence! pid full-obj)
     (let [extreme-span? (extreme-dur-span? pid) ; This look at the DB just updated.
@@ -311,7 +311,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (defn ^:diag check-instructions
   "It might be the case that the system instructions were too long. This asks what it knows about."
   []
-  (let [{:keys [aid tid]} (db/get-agent :process-dur-agent)]
+  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)]
     (llm/query-on-thread
      {:aid aid :tid tid :role "user"
       :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "

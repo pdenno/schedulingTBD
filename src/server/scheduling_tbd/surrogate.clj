@@ -3,6 +3,7 @@
   (:require
    [clojure.string           :as str]
    [datahike.api             :as d]
+   [datahike.pull-api        :as dp]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.llm       :as llm]
@@ -21,7 +22,6 @@
    You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.
    Your answers typically are short, just a few sentences each.
    If you don’t have information to answer my questions, you provide a plausible answer nonetheless." role))
-
 
 #_(defn similar-surrogate?
   "Return a :project/id of a project named similar to the argument if one exists.
@@ -66,6 +66,13 @@
                                                              :surrogate/assistant-id aid
                                                              :surrogate/thread-id (:id thread)}}]})
         (db/get-assistant-id pid))))
+
+(defn get-surrogate
+  "Get the surrogate object from the project."
+  [pid]
+  (let [conn @(connect-atm :sur-ice-cream)]
+    (when-let [ent (d/q '[:find ?e . :where [_ :project/surrogate ?e]] conn)]
+      (dp/pull conn '[*] ent))))
 
 ;;; (sur/start-surrogate {:product "fountain pens" :client-id (ws/recent-client!)})
 (defn start-surrogate

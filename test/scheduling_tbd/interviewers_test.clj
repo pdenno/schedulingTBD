@@ -2,7 +2,7 @@
   (:require
    [clojure.edn                 :as edn]
    [scheduling-tbd.db           :as db]
-   [scheduling-tbd.interviewer  :as inv]
+   [scheduling-tbd.interviewers :as inv]
    [scheduling-tbd.llm          :as llm]
    [scheduling-tbd.sutil        :as sutil :refer [connect-atm default-llm-provider]]
    [taoensso.timbre :as log :refer [debug]]))
@@ -37,7 +37,6 @@
   (safe-alias 'pinv   'scheduling-tbd.domain.process.p-interview)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'how    'scheduling-tbd.how-made)
-  (safe-alias 'iv     'scheduling-tbd.interviewers)  
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
   (safe-alias 'mzn    'scheduling-tbd.minizinc)
@@ -53,9 +52,6 @@
   (safe-alias 'util   'scheduling-tbd.util)
   (safe-alias 'ws     'scheduling-tbd.web.websockets)
   (safe-alias 'openai 'wkok.openai-clojure.api))
-
-(defn tryme0 []
-  (inv/create-interviewer (slurp "data/instructions/interviewer-process.txt")))
 
 (defn tryme []
   (let [aid (:agent/assistant-id (db/get-agent :base-type :process-interview-agent))

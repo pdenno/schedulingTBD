@@ -9,7 +9,6 @@
   "Replace some namespaces with aliases"
   [form]
   (let [ns-alia {"scheduling-tbd.sutil"         "sutil"
-                 "scheduling-tbd.shop"          "shop"
                  "promesa.core"                 "p"
                  "clojure.spec.alpha"           "s"
                  "java.lang.Math"               "Math"}

@@ -11,6 +11,7 @@
    [clojure.spec.alpha           :as s]
    [clojure.string               :as str]
    [datahike.api                 :as d]
+   [datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.llm   :as llm]
    [scheduling-tbd.specs :as spec]
@@ -35,6 +36,9 @@
    :agent/llm-provider
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "Currently either :openai or :azure."}
+   :agent/model-class
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "One of the classes of LLM model defined in the system. See llm.clj."}
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
@@ -65,7 +69,27 @@
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
    To eliminate confusion and need for back pointers, each project has its own db."
-  {;; ---------------------- box
+  {;; ---------------------- agent
+   :agent/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "A unique ID for each agent to ensure only one of each type is available."}
+   :agent/assistant-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant id (a string) associated with this surrogate."}
+   :agent/base-type
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Indicates the purpose and instructions given."}
+   :agent/llm-provider
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Currently either :openai or :azure."}
+   :agent/model-class
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "One of the classes of LLM model defined in the system. See llm.clj."}
+   :agent/thread-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
+
+   ;; ---------------------- box
    :box/string-val
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "boxed value"}
@@ -198,6 +222,9 @@
         :doc "a instant object indicating when the process ended."}
 
    ;; ---------------------- project
+   :project/agents
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "an agent (OpenAI Assistant, etc.) that outputs a vector of clojure maps in response to queries."}
    :project/code
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Code associated with the project."}
@@ -370,33 +397,37 @@
 (defn add-agent!
   "Create an agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
    Store what is needed to identify it in system DB."
-  [{:keys [id base-type instructions llm-provider response-format]
-    :or {llm-provider @default-llm-provider}}]
+  [{:keys [id base-type instructions llm-provider response-format project-thread? model-class]
+    :or {llm-provider @default-llm-provider model-class :gpt}}]
   (let [assist (llm/make-assistant :name (name id)
                                    :llm-provider llm-provider
                                    :instructions instructions
                                    :response-format response-format
                                    :metadata {:usage :agent})
         aid    (:id assist)
-        thread (llm/make-thread {:assistant-id aid
-                                 :llm-provider llm-provider
-                                 :metadata {:usage :agent}})
+        thread (when-not project-thread?
+                 (llm/make-thread {:assistant-id aid
+                                   :llm-provider llm-provider
+                                   :metadata {:usage :agent}}))
         tid    (:id thread)
         conn   (connect-atm :system)
         eid    (d/q '[:find ?eid .
                       :where [?eid :system/name "SYSTEM"]]
                     @(connect-atm :system))]
     (d/transact conn {:tx-data [{:db/id eid
-                                 :system/agents {:agent/id id
-                                                 :agent/base-type base-type
-                                                 :agent/llm-provider llm-provider
-                                                 :agent/assistant-id aid
-                                                 :agent/thread-id tid}}]})))
+                                 :system/agents (cond-> {:agent/id id
+                                                         :agent/base-type base-type
+                                                         :agent/llm-provider llm-provider
+                                                         :agent/model-class model-class
+                                                         :agent/assistant-id aid}
+                                                  tid (assoc :agent/thread-id tid))}]})))
 
 ;;; (db/add-agent! {:id :process-dur-agent,,,}
 (def known-agent-templates
   "The actual agent :id is the one provided here with -<llm-provider> added."
   [{:id :process-interview-agent
+    :project-thread?  true
+    :model-class :analysis
     :instruction-path     "data/instructions/interviewer-process.txt"
     :response-format-path "data/instructions/interviewer-response-format.edn"}
 
@@ -678,13 +709,16 @@
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
       (when new-agents?
         (doseq [llm-provider [:openai]]
-          (doseq [{:keys [id instruction-path response-format-path]} known-agent-templates]
+          (doseq [{:keys [id instruction-path response-format-path project-thread? model-class]
+                   :or {model-class :gpt}} known-agent-templates]
             (cond-> {}
               true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
               true (assoc :base-type id)
               true (assoc :llm-provider llm-provider)
               true (assoc :instructions (slurp instruction-path))
-              #_#_response-format-path (assoc :response-format (-> response-format-path slurp edn/read-string))
+              true (assoc :model-class model-class)
+              project-thread? (assoc :project-thread? true)
+              response-format-path (assoc :response-format (-> response-format-path slurp edn/read-string))
               true add-agent!))))
       cfg)
     (log/error "Not recreating system DB: No backup file.")))
@@ -846,22 +880,29 @@
   (-> (d/q '[:find [?id ...] :where [_ :agent/id ?id]] @(connect-atm :system))
       set))
 
+
 (defn get-agent
-  "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)."
-  ([base-type] (get-agent base-type @default-llm-provider))
-  ([base-type llm-provider]
-   (if-let [res (-> (d/q '[:find ?aid ?tid
-                           :keys aid tid
-                           :in $ ?base-type ?llm-provider
-                           :where
-                           [?e :agent/base-type ?base-type]
-                           [?e :agent/llm-provider ?llm-provider]
-                           [?e :agent/assistant-id ?aid]
-                           [?e :agent/thread-id ?tid]]
-                         @(connect-atm :system) base-type llm-provider)
-                    first)]
-     res
-     (throw (ex-info "get-agent: no such agent." {:base-type base-type :llm-provider llm-provider})))))
+  "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)
+   from either the system DB, or if :pid is provided, the project DB.
+   If :db-attrs? then return the object with DB-native attributes, not :aid :tid."
+  [& {:keys [base-type llm-provider pid db-attrs?] :or {llm-provider @default-llm-provider}}]
+  (let [conn (if pid @(connect-atm pid) @(connect-atm :system))
+        ent (d/q '[:find ?e .
+                   :in $ ?base-type ?llm-provider
+                   :where
+                   [?e :agent/base-type ?base-type]
+                   [?e :agent/llm-provider ?llm-provider]]
+                 conn base-type llm-provider)]
+    (when ent
+      (as-> (dp/pull conn '[*] ent) ?res
+        (if db-attrs?
+          ?res
+          (reduce-kv (fn [m k v]
+                       (cond (= k :agent/thread-id) (assoc m :tid v)
+                             (= k :agent/assistant-id) (assoc m :aid v)
+                             :else m))
+                     {}
+                     ?res))))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs
