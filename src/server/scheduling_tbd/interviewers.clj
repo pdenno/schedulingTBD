@@ -2,6 +2,7 @@
     "This provides functions to prune a planning domain and run an interview."
   (:require
    [clojure.datafy            :refer [datafy]]
+   [clojure.spec.alpha        :as s]
    [datahike.api              :as d]
    [jsonista.core             :as json]
    [mount.core                :as mount :refer [defstate]]
@@ -70,36 +71,60 @@
   "Call to run the chat and put the query and response into the project's database.
    Returns the argument object with :response set to some text.
    Note that this also updates the UI (ws/refresh-client)"
-  [query {:keys [pid surrogate? agent-query client-id domain-id tags]
-          :or {tags []} :as ctx}] ; ToDo: How do I implement tags? I suppose I need an agent to classify the question.
+  [query {:keys [pid surrogate? client-id tags topic]
+          :or {tags [] topic :process} :as ctx}] ; ToDo: How do I implement tags? I suppose I need an agent to classify the question.
   (let [response-text (chat-pair-aux query ctx)]
     (if (string? response-text)
       (let [user-role (if surrogate? :surrogate :human)]
         (db/add-msg pid :system query (conj tags :query))
         (db/add-msg pid user-role response-text (conj tags :response))
-        (ws/refresh-client client-id pid :process #_(domain-conversation domain-id)) ; ToDo: fix this.
+        (ws/refresh-client client-id pid topic)
         response-text)
       (throw (ex-info "Unknown response from operator" {:response response-text})))))
 
-(defn tell-interviewer
-  "Send a message to an interviewer agent and wait for response; translate it."
-  [msg {:keys [iview-aid iview-tid] :as ctx}]
-  (assert (map? msg))
-  (let [msg-string (json/write-value-as-string msg)]
-    (log/info "Interviewer told:" msg-string)
-    (let [res (-> (llm/query-on-thread {:aid iview-aid :tid iview-tid :role "user" :query-text msg-string}) output-struct2clj)]
-      (log/info "Interviewer returns:" res)
-      res)))
+(s/def ::interviewer-cmd (s/and (s/keys :req-un [::command]
+                                        :opt-un [::response ::told_what ::conclusions ::advice])
+                                #(case (:command %)
+                                   "NEXT-QUESTION"      true
+                                   "HUMAN-RESPONDS"     (contains? % :response)
+                                   "ANALYSIS-CONCLUDES" (contains? % :conclusions)
+                                   "HUMAN-TOLD"         (contains? % :told_what)
+                                   "COURSE-CORRECTION"  (contains? % :advice))))
+(s/def ::command string?)
+(s/def ::response string?)
+(s/def ::conclusions string?)
+(s/def ::told_what string?)
+(s/def ::advice string?)
 
-(defn next-cmd
-  "Oversee the interview and determine whether the interviewer should just continue doing its thing, {:command :NEXT-QUESTION},
-   or whether intervention or stopping is more appropriate.
-   The argument interviewer-ack is a 'structured output' response from an interviewer agent."
+(defn tell-interviewer
+  "Send a command to an interviewer agent and wait for response; translate it."
+  [cmd {:keys [iview-aid iview-tid] :as _ctx}]
+  (s/assert ::interviewer-cmd cmd)
+  (log/info "Interviewer told:" cmd)
+  (let [cmd-string (json/write-value-as-string cmd)
+        res (-> {:aid iview-aid :tid iview-tid :role "user" :query-text cmd-string}
+                llm/query-on-thread
+                output-struct2clj)]
+    (log/info "Interviewer returns:" res)
+    res))
+
+(defn initial-advice
+  "Return in an :ANALYSIS-CONCLUDES command map a list of conclusions used to set the context of the conversation just before
+   the interviewer agent starts interviewing. This might, for example, tell the interviewer what the interviewee manufactures
+   and whether the interviewee is an actual human or a surrogate."
+  [expert]
+  {:command :ANALYSIS-CONCLUDES
+   :conclusions (str "1) They make "
+                     (:surrogate/subject-of-expertise expert)
+                     ". 2) You are talking to surrogate humans (machine agents).")})
+
+(defn run-one-step
+  "Run one step of an interview process.
+   This involves sending one or more commands (conforming to ::interviewer-cmd) to the interviewer agent and awaiting response."
   [iview-ack {:keys [pid action] :as ctx}] ; interviewer ack
   (let [expert (sur/get-surrogate pid)]
     (case action
-      :init? {:command :ANALYSIS-CONCLUDES
-              :conclusions (str "1) They make " (:surrogate/subject-of-expertise expert) ". 2) You are talking to surrogate humans (machine agents).")}
+      :init? (initial-advice expert) ; <======================================================== Move this to resume-conversation? Use db/get-conversation-eids.
       (let [{:keys [status question]} iview-ack]
         (if question ; Interviewer poses a question. Get response from surrogate, inform interviewer
           (let [expert-response (chat-pair question ctx)]
@@ -108,7 +133,8 @@
             {:command :NEXT-QUESTION}) ; <==== ToDo: Analyze human/surrogate response before doing this.
           {:command :NEXT-QUESTION})))))
 
-(def active? (atom false))
+(def ^:diag active? (atom false))
+
 
 (defn resume-conversation
   "Start the interview loop. :resume-conversation-plan is a dispatch key from client.
@@ -123,13 +149,13 @@
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
       (let [ctx (merge iview-agent {:surrogate? true} ctx)]
         (loop [cnt 0
-               cmd (next-cmd nil ctx #_(assoc ctx :action :init?))] ; Might be restarting, not a new surrogate.
+               cmd (run-one-step nil ctx #_(assoc ctx :action :init?))] ; Might be restarting, not a new surrogate.
           (if (or (> cnt 6) (= cmd :stop))
             :done
             (when @active?
               (let [iview-ack (tell-interviewer cmd ctx)]
                 (recur (inc cnt)
-                       (next-cmd iview-ack ctx))))))))
+                       (run-one-step iview-ack ctx))))))))
       (finally
         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 

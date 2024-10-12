@@ -8,6 +8,8 @@
    [jsonista.core           :as json]
    [taoensso.timbre         :as log]))
 
+(def ^:diag diag (atom nil))
+
 ;(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
 (def default-llm-provider "Default provider to use. Choices are #{:openai :azure}." (atom :openai)) ; Values are azure and :openai
 
@@ -227,8 +229,6 @@
     (str (apply str others)
          (subs last 0 (dec (count last))))))
 
-(def diag (atom nil))
-
 (defn domain-conversation
   "A planning domain is associated with exactly one conversation."
   [domain-id]
@@ -237,6 +237,6 @@
     res))
 
 (defn output-struct2clj
-  "Translate the openai output structure to a map with keyword keys."
+  "Translate the OpenAI API output structure (a string) to a map with keyword keys."
   [str]
   (update-keys (json/read-value str) keyword))

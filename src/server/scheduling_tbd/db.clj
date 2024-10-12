@@ -467,6 +467,14 @@
           [?eid :conversation/id ?conv-id]]
         @(connect-atm pid) conv-id)))
 
+(defn get-conversation-eids
+  "Return a vector of the EIDs of the argument conversation's messages."
+  [pid conv-id]
+  (when-let [eid (conversation-exists? pid conv-id)]
+    (->> (dp/pull @(connect-atm pid) '[*] eid)
+         :conversation/messages
+         (mapv :db/id))))
+
 (defn change-conversation
   [{:keys [pid conv-id] :as obj}]
   (try
