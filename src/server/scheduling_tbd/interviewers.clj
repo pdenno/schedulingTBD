@@ -11,7 +11,7 @@
    [scheduling-tbd.db         :as db]
    [scheduling-tbd.llm        :as llm]
    [scheduling-tbd.surrogate  :as sur]
-   [scheduling-tbd.sutil      :as sutil :refer [connect-atm chat-status domain-conversation output-struct2clj]]
+   [scheduling-tbd.sutil      :as sutil :refer [connect-atm output-struct2clj]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.timbre           :as log]))
 
@@ -85,11 +85,12 @@
 (s/def ::interviewer-cmd (s/and (s/keys :req-un [::command]
                                         :opt-un [::response ::told_what ::conclusions ::advice])
                                 #(case (:command %)
-                                   "NEXT-QUESTION"      true
+                                   "SUPPLY-QUESTION"    true
                                    "HUMAN-RESPONDS"     (contains? % :response)
                                    "ANALYSIS-CONCLUDES" (contains? % :conclusions)
                                    "HUMAN-TOLD"         (contains? % :told_what)
-                                   "COURSE-CORRECTION"  (contains? % :advice))))
+                                   "COURSE-CORRECTION"  (contains? % :advice)
+                                   nil)))
 (s/def ::command string?)
 (s/def ::response string?)
 (s/def ::conclusions string?)
@@ -108,6 +109,7 @@
     (log/info "Interviewer returns:" res)
     res))
 
+;;; ToDo: Would be different for different interviews. For example, the resource interview would want to see the process interview.
 (defn initial-advice
   "Return in an :ANALYSIS-CONCLUDES command map a list of conclusions used to set the context of the conversation just before
    the interviewer agent starts interviewing. This might, for example, tell the interviewer what the interviewee manufactures
@@ -115,26 +117,45 @@
   [expert]
   {:command :ANALYSIS-CONCLUDES
    :conclusions (str "1) They make "
-                     (:surrogate/subject-of-expertise expert)
-                     ". 2) You are talking to surrogate humans (machine agents).")})
+                     (:surrogate/subject-of-expertise expert) ". "
+                     "2) You are talking to surrogate humans (machine agents).")})
 
-(defn run-one-step
-  "Run one step of an interview process.
-   This involves sending one or more commands (conforming to ::interviewer-cmd) to the interviewer agent and awaiting response."
-  [iview-ack {:keys [pid action] :as ctx}] ; interviewer ack
-  (let [expert (sur/get-surrogate pid)]
-    (case action
-      :init? (initial-advice expert) ; <======================================================== Move this to resume-conversation? Use db/get-conversation-eids.
-      (let [{:keys [status question]} iview-ack]
-        (if question ; Interviewer poses a question. Get response from surrogate, inform interviewer
-          (let [expert-response (chat-pair question ctx)]
-            (log/info "Expert responds:" expert-response)
-            (tell-interviewer {:command :HUMAN-RESPONDS :response expert-response} ctx)
-            {:command :NEXT-QUESTION}) ; <==== ToDo: Analyze human/surrogate response before doing this.
-          {:command :NEXT-QUESTION})))))
+(defn answers-question?
+  "Return true if the answer to the Q/A pair appears to answer the question."
+  [_q-txt _a-txt]
+  true) ; ToDo: Write an agent.
+
+(defn answers-yes?
+  "Return true if the answer (a-txt) seems to answer yes to whatever I asked (q-txt)."
+  [_q-txt _a-txt]
+  true) ; ToDo: Write an agent.
+
+(defn response-category
+  "Return a keyword indicating the class of the interviewee response to the interviewer's prior statement."
+  [_viewer-txt _viewee-txt]
+  :other) ; ToDo: Write an agent.
+
+;;; This could get weird. Maybe I don't want to keep asking the same question.
+;;; What would be ideal? Waiting a minute an ask "Shall we continue the interview?"
+(defn loop-for-answer
+  "Run a discussion with the experts that does not answer the argument question.
+   Return the answer once it is responsive to the question."
+  [question ctx]
+  (loop [viewee-response-txt (chat-pair question ctx)]
+    (if (answers-question? question viewee-response-txt)
+      {:question question :answer viewee-response-txt}
+      (recur :NYI))))
+
+(defn next-question
+  "Call loop-for-answer until the answer is responsive to a question that we obtain from the interviewer here.
+   Return the Q/A pair or {:status 'DONE'}."
+  [ctx]
+  (let [{:keys [question] :as res} (tell-interviewer {:command "SUPPLY-QUESTION"} ctx)]
+    (if question ; Interviewer poses a question. Loop through chat-pair until it looks like an answer.
+      (loop-for-answer question ctx)
+      res)))
 
 (def ^:diag active? (atom false))
-
 
 (defn resume-conversation
   "Start the interview loop. :resume-conversation-plan is a dispatch key from client.
@@ -147,15 +168,16 @@
           iview-agent (interview-agent conv-id pid)]
       ;; The conversation loop.
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-      (let [ctx (merge iview-agent {:surrogate? true} ctx)]
+      (when (== 0 (-> pid (db/get-conversation-eids conv-id) count))
+        (-> pid sur/get-surrogate initial-advice (tell-interviewer ctx)))
+      (let [ctx (merge iview-agent {:surrogate? true} ctx)] ; ToDo: Not always surrogate?=true.
         (loop [cnt 0
-               cmd (run-one-step nil ctx #_(assoc ctx :action :init?))] ; Might be restarting, not a new surrogate.
-          (if (or (> cnt 6) (= cmd :stop))
+               response nil]
+          (if (or (= "DONE" (:status response)) (> cnt 16))
             :done
             (when @active?
-              (let [iview-ack (tell-interviewer cmd ctx)]
-                (recur (inc cnt)
-                       (run-one-step iview-ack ctx))))))))
+              (recur (inc cnt)
+                     (next-question ctx)))))))
       (finally
         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
