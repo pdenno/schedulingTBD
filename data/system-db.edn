@@ -1,24 +1,24 @@
 [
 #:system{:agents
-         [#:agent{:assistant-id "asst_pc9uerOLPuQ2hbaRBQjwp6Cj",
+         [#:agent{:assistant-id "asst_DHHUngRnNMpesB2Jyopqfxh0",
                   :base-type :process-dur-agent,
                   :id :process-dur-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_BqgJOW6U6UqUiClmEMYvCNag"}
-          #:agent{:assistant-id "asst_PeEvPkyjiMOucVoyYbPY9jiJ",
+                  :thread-id "thread_w66SQ3oxrpLZP8N0nbY6wQUX"}
+          #:agent{:assistant-id "asst_nIXfqnbgEbgiWiu0IQOtcxgn",
                   :base-type :text-function-agent,
                   :id :text-function-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_J1iqdz31cUJmTaQh3zvSyp6V"}
-          #:agent{:assistant-id "asst_eCzH3oHA6ECZNiAZo2f9MPiv",
+                  :thread-id "thread_ay3GqhoF9aEJezoI4tdSRSIY"}
+          #:agent{:assistant-id "asst_McOjcjfc31FV8SEms1K5RRan",
                   :base-type :process-ordering-agent,
                   :id :process-ordering-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_PHSg1USF844A1EF455e0sXVb"}
-          #:agent{:assistant-id "asst_ascb1glYbYd3r9MviKLgkOxd",
+                  :thread-id "thread_AnPv425ZdqzBN7hPF2nTAW1Q"}
+          #:agent{:assistant-id "asst_akOuxilzlq9eDKJA0I9OddSl",
                   :base-type :process-interview-agent,
                   :id :process-interview-agent-openai,
                   :llm-provider :openai,

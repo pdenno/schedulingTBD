@@ -429,7 +429,7 @@
     :project-thread?  true
     :model-class :analysis
     :instruction-path     "data/instructions/interviewer-process.txt"
-    :response-format-path "data/instructions/interviewer-response-format.edn"}
+    :response-format-path (-> "data/instructions/interviewer-response-format.edn" slurp edn/read-string)}
 
    {:id :process-dur-agent
     :instruction-path  "data/instructions/process-dur-agent.txt"}
@@ -526,35 +526,10 @@
          sort
          vec))))
 
-(defn get-thread-id
-  "Get the thread object of the argument PID."
-  ([pid] (get-thread-id pid true))
-  ([pid fail-when-missing?]
-   (let [eid (project-exists? pid)
-         res (when eid
-               (-> (resolve-db-id {:db/id eid}
-                                  (connect-atm pid)
-                                  :keep-set #{:project/surrogate :surrogate/thread-id})
-                   :project/surrogate
-                   :surrogate/thread-id))]
-     (cond res                         res
-           (not fail-when-missing?)    nil
-           :else                       (throw (ex-info "Did not find thread-id." {:pid pid}))))))
-
-(defn get-assistant-id
-  "Get the thread object of the argument PID."
-  ([pid] (get-assistant-id pid true))
-  ([pid fail-when-missing?]
-   (let [eid (project-exists? pid)
-         res (when eid
-               (-> (resolve-db-id {:db/id eid}
-                                  (connect-atm pid)
-                                  :keep-set #{:project/surrogate :surrogate/assistant-id})
-                   :project/surrogate
-                   :surrogate/assistant-id))]
-     (cond res                         res
-           (not fail-when-missing?)    nil
-           :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))
+(defn get-surrogate-info [pid]
+  (when (project-exists? pid)
+    (when-let [eid (d/q '[:find ?sur . :where [_ :project/surrogate ?sur]]  @(connect-atm pid))]
+      (dp/pull @(connect-atm :sur-ice-cream) '[*] eid))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
   #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time})
@@ -717,7 +692,7 @@
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
       (when new-agents?
         (doseq [llm-provider [:openai]]
-          (doseq [{:keys [id instruction-path response-format-path project-thread? model-class]
+          (doseq [{:keys [id instruction-path response-format project-thread? model-class]
                    :or {model-class :gpt}} known-agent-templates]
             (cond-> {}
               true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
@@ -726,7 +701,7 @@
               true (assoc :instructions (slurp instruction-path))
               true (assoc :model-class model-class)
               project-thread? (assoc :project-thread? true)
-              response-format-path (assoc :response-format (-> response-format-path slurp edn/read-string))
+              response-format (assoc :response-format response-format)
               true add-agent!))))
       cfg)
     (log/error "Not recreating system DB: No backup file.")))
@@ -888,6 +863,24 @@
   (-> (d/q '[:find [?id ...] :where [_ :agent/id ?id]] @(connect-atm :system))
       set))
 
+(defn agent-info
+  "Return a map of agent info (keys :aid :tid, :role, and sometimes, :expertise) for a ordinary agent or surrogate."
+  [agent]
+  (cond (contains? agent :agent/id)       (reduce-kv (fn [m k v]
+                                                       (cond (= k :agent/assistant-id) (assoc m :aid v)
+                                                             (= k :agent/thread-id)    (assoc m :tid v)
+                                                             (= k :agent/base-type)    (assoc m :role v)
+                                                             :else m))
+                                                     {}
+                                                     agent)
+        (contains? agent :surrogate/id)   (reduce-kv (fn [m k v]
+                                                       (cond (= k :surrogate/assistant-id)         (assoc m :aid v)
+                                                             (= k :surrogate/thread-id)            (assoc m :tid v)
+                                                             (= k :surrogate/id)                   (assoc m :role :surrogate)
+                                                             (= k :surrogate/subject-of-expertise) (assoc m :expertise v)
+                                                             :else m))
+                                                     {}
+                                                     agent)))
 
 (defn get-agent
   "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)
@@ -902,15 +895,8 @@
                    [?e :agent/llm-provider ?llm-provider]]
                  conn base-type llm-provider)]
     (when ent
-      (as-> (dp/pull conn '[*] ent) ?res
-        (if db-attrs?
-          ?res
-          (reduce-kv (fn [m k v]
-                       (cond (= k :agent/thread-id) (assoc m :tid v)
-                             (= k :agent/assistant-id) (assoc m :aid v)
-                             :else m))
-                     {}
-                     ?res))))))
+      (let [a-map (dp/pull conn '[*] ent)]
+        (if db-attrs? a-map (agent-info a-map))))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs

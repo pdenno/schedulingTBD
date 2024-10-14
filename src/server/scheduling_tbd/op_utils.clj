@@ -142,13 +142,12 @@
      2) :response is added. Typically its value is a string."
   [{:keys [pid surrogate? agent-query] :as obj} {:keys [tries preprocess-fn] :or {tries 1 preprocess-fn identity}}]
   (reset! diag obj)
-  (let [aid (db/get-assistant-id pid nil)
-        tid (db/get-thread-id pid nil)
+  (let [{:surrogate/keys [assistant-id thread-id]}  (db/get-surrogate-info pid)
         prom (if surrogate?
                (px/submit! (fn []
                              (try
-                               (llm/query-on-thread :tid tid            ; This can timeout.
-                                                    :aid aid
+                               (llm/query-on-thread :aid assistant-id   ; This can timeout.
+                                                    :tid thread-id
                                                     :query-text agent-query
                                                     :tries tries
                                                     :preprocess-fn preprocess-fn)

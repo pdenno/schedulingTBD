@@ -40,39 +40,33 @@
       :problem/goal-string ~(format "(characterize-process %s)" (name pid))
       :problem/state-string ~(format "#{(proj-id %s) (surrogate %s) (proj-name \"%s\")}" pid-sym pid-sym pname)}))
 
-(defn ensure-surrogate
-  "If a surrogate with given expertise exists (if its project exists), return it (the project object resolved from the DB).
-   Otherwise create and store a project with the given expertise and the OpenAI assistant object.
-   In either case, it returns the Openai assistant object ID associated with the pid.
-     pid - the project ID (keyword) of a project with an established DB."
-  [pid pname force?]
-  (or (if force? nil (db/get-assistant-id pid nil))
-      (let [conn-atm (connect-atm pid)
-            eid (db/project-exists? pid)
-            proj-info (resolve-db-id {:db/id eid} conn-atm :keep-set #{:project/name})
-            [_ _ expertise] (re-matches #"(SUR )?(.*)" (:project/name proj-info)) ; ToDo: Ugh!
-            expertise (str/lower-case expertise)
-            instructions (system-instruction expertise)
-            assist (llm/make-assistant :name (str expertise " surrogate") :instructions instructions :metadata {:usage :surrogate})
-            aid    (:id assist)
-            thread (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}})
-            prob (surrogate-init-problem pid pname)] ; Surrogates have just one thread.
-        ;(log/info "Made assistant" aid "for instructions" instructions)
-        (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)
-                                         :project/planning-problem prob
-                                         :project/surrogate {:surrogate/id pid
-                                                             :surrogate/subject-of-expertise expertise
-                                                             :surrogate/system-instruction instructions
-                                                             :surrogate/assistant-id aid
-                                                             :surrogate/thread-id (:id thread)}}]})
-        (db/get-assistant-id pid))))
-
-(defn get-surrogate
-  "Get the surrogate object from the project."
-  [pid]
-  (let [conn @(connect-atm :sur-ice-cream)]
-    (when-let [ent (d/q '[:find ?e . :where [_ :project/surrogate ?e]] conn)]
-      (dp/pull conn '[*] ent))))
+(defn ensure-project-and-surrogate
+  "If a surrogate with given expertise exists, return the DB map of it.
+   Otherwise create and store a project with the given expertise and return the DB map of its surrogate."
+  [pid pname force-new?]
+  (if force-new?
+    (let [conn-atm (connect-atm pid)
+          eid (db/project-exists? pid)
+          proj-info (resolve-db-id {:db/id eid} conn-atm :keep-set #{:project/name})
+          [_ _ expertise] (re-matches #"(SUR )?(.*)" (:project/name proj-info)) ; ToDo: Ugh!
+          expertise (str/lower-case expertise)
+          instructions (system-instruction expertise)
+          assist (llm/make-assistant :name (str expertise " surrogate")
+                                     :instructions instructions
+                                     :metadata {:usage :surrogate})
+          aid    (:id assist)
+          thread (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}})
+          prob (surrogate-init-problem pid pname)] ; Surrogates have just one thread.
+                                        ;(log/info "Made assistant" aid "for instructions" instructions)
+      (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)
+                                       :project/planning-problem prob
+                                       :project/surrogate {:surrogate/id pid
+                                                           :surrogate/subject-of-expertise expertise
+                                                           :surrogate/system-instruction instructions
+                                                           :surrogate/assistant-id aid
+                                                           :surrogate/thread-id (:id thread)}}]})
+      (db/get-surrogate-info pid))
+    (db/get-surrogate-info pid)))
 
 ;;; (sur/start-surrogate {:product "fountain pens" :client-id (ws/recent-client!)})
 (defn start-surrogate
@@ -87,7 +81,7 @@
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})]
     (try
-      (ensure-surrogate pid pname force?)
+      (ensure-project-and-surrogate pid pname force?)
       (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
                         :new-proj-map {:project/name pname :project/id pid}})
       (catch Exception e
@@ -98,18 +92,18 @@
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."
   [{:keys [client-id pid question] :as obj}]
   (log/info "SUR follow-up:" obj)
-  (let [chat-args {:client-id client-id :dispatch-key :sur-says}]
-    (when-let [aid (db/get-assistant-id pid nil)]
-      (when-let [tid (db/get-thread-id pid nil)]
-        (try (when-let [answer (llm/query-on-thread :tid tid :aid aid :query-text question)]
-               (log/info "SUR's answer:" answer)
-               (when (string? answer)
-                 (ws/send-to-chat (assoc chat-args :msg answer))
-                 (db/add-msg pid :system question)
-                 (db/add-msg pid :surrogate answer)))
-             (catch Exception e
-               (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
-               (ws/send-to-chat (assoc chat-args :msg "We had a problem answering this questions."))))))))
+  (let [chat-args {:client-id client-id :dispatch-key :sur-says}
+        {:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-info pid)]
+    (when (and assistant-id thread-id)
+      (try (when-let [answer (llm/query-on-thread :aid assistant-id :tid thread-id :query-text question)]
+             (log/info "SUR's answer:" answer)
+             (when (string? answer)
+               (ws/send-to-chat (assoc chat-args :msg answer))
+               (db/add-msg pid :system question)
+               (db/add-msg pid :surrogate answer)))
+           (catch Exception e
+             (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
+             (ws/send-to-chat (assoc chat-args :msg "We had a problem answering this questions.")))))))
 
 (defn ^:diag get-surrogate-messages-provider
   [pid]

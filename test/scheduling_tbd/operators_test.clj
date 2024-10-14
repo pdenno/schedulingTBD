@@ -14,13 +14,12 @@
 ;;; (opt/surrogate-initial-question)
 (deftest surrogate-initial-question
   (testing "Some of the activity of making a surrogate and asking the first question."
+    (sur/ensure-surrogate :sur-plate-glass "SUR plate glass")
     (let [pid :sur-plate-glass
-          expertise "plate glass"
-          itext (format sur/system-instruction expertise) ; Not used here, I just want to print it.
-          aid (sur/ensure-surrogate pid (str "SUR " expertise))
-          tid (db/get-thread-id pid nil)
+          itext (format sur/system-instruction "plate glass") ; Not used here, I just want to print it.
+          {:surrogate/keys [assistant-id thread-id]} (db/surrogate-info pid)
           qtext "Describe your most significant scheduling problem in a few sentences."
-          prom (px/submit! (fn [] (llm/query-on-thread :tid tid :aid aid :query-text qtext)))
+          prom (px/submit! (fn [] (llm/query-on-thread :aid assistant-id :tid thread-id :query-text qtext)))
           res (p/await prom)]
     (log/info "itext =" itext)
     (log/info "qtext =" qtext)
