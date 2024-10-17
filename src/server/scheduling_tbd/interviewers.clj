@@ -2,6 +2,7 @@
     "This provides functions to prune a planning domain and run an interview."
   (:require
    [clojure.datafy            :refer [datafy]]
+   [clojure.edn               :as edn]
    [clojure.spec.alpha        :as s]
    [datahike.api              :as d]
    [jsonista.core             :as json]
@@ -133,8 +134,12 @@
 
 (defn answers-question?
   "Return true if the answer to the Q/A pair appears to answer the question."
-  [_q-txt _a-txt]
-  true) ; ToDo: Write an agent.
+  [q-txt a-txt]
+  (let [{:keys [aid tid]} (db/get-agent :base-type :answers-the-question?)]
+    (-> (llm/query-on-thread
+         {:aid aid :tid tid
+          :query-text (format "QUESTION: %s \nANSWER: %s" q-txt a-txt)})
+        edn/read-string)))
 
 (defn answers-yes-or-more
   "Return true if the answer (a-txt) seems to answer yes to whatever I asked (q-txt)."
@@ -191,7 +196,16 @@
         res
         (log/warn "loop-for answer should have returns status = DONE:" res)))))
 
-(def ^:diag active? (atom true))
+(defn prior-responses
+  "Construct a prior-response command structure for the argument project."
+  [pid conv-id]
+  (let [msgs (db/get-conversation pid conv-id)]
+    (->
+
+
+
+
+(def ^:diag active? (atom false))
 
 (defn resume-conversation
   "Start the interview loop. :resume-conversation-plan is a dispatch key from client.

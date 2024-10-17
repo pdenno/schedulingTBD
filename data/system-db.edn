@@ -1,28 +1,34 @@
 [
 #:system{:agents
-         [#:agent{:assistant-id "asst_DHHUngRnNMpesB2Jyopqfxh0",
+         [#:agent{:assistant-id "asst_xWFiFL88PZWBDRJLDSYRyH3o",
                   :base-type :process-dur-agent,
                   :id :process-dur-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_w66SQ3oxrpLZP8N0nbY6wQUX"}
-          #:agent{:assistant-id "asst_nIXfqnbgEbgiWiu0IQOtcxgn",
+                  :thread-id "thread_JPEcV6t8v1bGWScljv5XjP7C"}
+          #:agent{:assistant-id "asst_zRrC2KpDKAHHns9Z69jwJ7GH",
                   :base-type :text-function-agent,
                   :id :text-function-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_ay3GqhoF9aEJezoI4tdSRSIY"}
-          #:agent{:assistant-id "asst_McOjcjfc31FV8SEms1K5RRan",
+                  :thread-id "thread_KRjhvwliJdznhBViIjni9xbW"}
+          #:agent{:assistant-id "asst_ouviBi7Dt8Xj5BkTwoshEOlq",
                   :base-type :process-ordering-agent,
                   :id :process-ordering-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_AnPv425ZdqzBN7hPF2nTAW1Q"}
-          #:agent{:assistant-id "asst_akOuxilzlq9eDKJA0I9OddSl",
+                  :thread-id "thread_VSoAsZ71B4WqrdjmusunzX5Z"}
+          #:agent{:assistant-id "asst_gdCzps6om6lG5kjtXKKczZBA",
                   :base-type :process-interview-agent,
                   :id :process-interview-agent-openai,
                   :llm-provider :openai,
-                  :model-class :analysis}],
+                  :model-class :analysis}
+          #:agent{:assistant-id "asst_K3JpK4Sz6iNvZhyEj5kTPB7J",
+                  :base-type :answers-the-question?,
+                  :id :answers-the-question?-openai,
+                  :llm-provider :openai,
+                  :model-class :gpt,
+                  :thread-id "thread_PwaBgo8RlAszX0qFXmu1ETmI"}],
          :default-project-id :sur-fountain-pens,
          :name "SYSTEM"}
 

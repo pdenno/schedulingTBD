@@ -107,6 +107,9 @@
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resource}."}
+   :conversation/state-vector
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "keywords indicating the state of the conversation (i.e. what has been discussed."}
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages of the conversation."}
@@ -127,6 +130,9 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
         :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, "
                   "which aren't stored, some values can be skipped.")}
+   :message/question-name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "A label (from interview instructions) associated with this question or answer."}
    :message/tags
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "Optional keywords used to classify the message."}
@@ -254,7 +260,7 @@
         :doc "an object with keys :problem/domain, :problem/goal-string, and :problem/state-string at least."}
    :project/processes
       #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the project's process objects; everything about processes."}
+           :doc "the project's process objects; everything about processes."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
@@ -431,6 +437,10 @@
     :instruction-path     "data/instructions/interviewer-process.txt"
     :response-format-path (-> "data/instructions/interviewer-response-format.edn" slurp edn/read-string)}
 
+   {:id :answers-the-question?
+    :instruction-path     "data/instructions/answers-the-question.txt"
+    :response-format-path (-> "data/instructions/boolean-response-format.edn" slurp edn/read-string)}
+
    {:id :process-dur-agent
     :instruction-path  "data/instructions/process-dur-agent.txt"}
 
@@ -532,7 +542,7 @@
       (dp/pull @(connect-atm :sur-ice-cream) '[*] eid))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time})
+  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/question-name})
 
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
@@ -888,15 +898,17 @@
    If :db-attrs? then return the object with DB-native attributes, not :aid :tid."
   [& {:keys [base-type llm-provider pid db-attrs?] :or {llm-provider @default-llm-provider}}]
   (let [conn (if pid @(connect-atm pid) @(connect-atm :system))
-        ent (d/q '[:find ?e .
-                   :in $ ?base-type ?llm-provider
-                   :where
-                   [?e :agent/base-type ?base-type]
-                   [?e :agent/llm-provider ?llm-provider]]
-                 conn base-type llm-provider)]
-    (when ent
+        ent (when base-type
+              (d/q '[:find ?e .
+                     :in $ ?base-type ?llm-provider
+                     :where
+                     [?e :agent/base-type ?base-type]
+                     [?e :agent/llm-provider ?llm-provider]]
+                   conn base-type llm-provider))]
+    (if ent
       (let [a-map (dp/pull conn '[*] ent)]
-        (if db-attrs? a-map (agent-info a-map))))))
+        (if db-attrs? a-map (agent-info a-map)))
+      (throw (ex-info "No such agent" {:base-type base-type :llm-provider llm-provider})))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs

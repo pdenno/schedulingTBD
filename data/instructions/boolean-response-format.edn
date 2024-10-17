@@ -1,0 +1,4 @@
+{:type "json_schema",
+ :json_schema {:name "boolean answer",
+               :strict true,
+               :schema {:type "boolean"}}}

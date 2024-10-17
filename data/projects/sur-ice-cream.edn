@@ -1,11 +1,11 @@
 [
 #:project{:agents
-          [#:agent{:assistant-id "asst_akOuxilzlq9eDKJA0I9OddSl",
+          [#:agent{:assistant-id "asst_JNB08c6ATf8rLkE57IdRVJk6",
                    :base-type :process-interview-agent,
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :analysis,
-                   :thread-id "thread_RvG8XlkAGmBPtJbBeMXge8oW"}],
+                   :thread-id "thread_K5ZkcMJnar5OA6D5lk30wDCx"}],
           :conversations
           [#:conversation{:id :process,
                           :messages
@@ -13,111 +13,140 @@
                                      "Describe your most significant scheduling problem in a few sentences.",
                                      :from :system,
                                      :id 1,
+                                     :question-name :initial-question,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-14T13:13:28.478-00:00"}
+                                     #inst "2024-10-15T10:16:25.489-00:00"}
                            #:message{:content
-                                     "One of the most significant scheduling problems we face is balancing the production schedule with fluctuating demand while minimizing waste. This involves coordinating raw material deliveries, production line availability, and labor shifts to ensure that we can produce enough ice cream to meet both regular orders and unexpected demand spikes without overproducing. Additionally, we must account for seasonal changes and promotional activities that require rapid adjustments in our scheduling.",
+                                     "One of the most significant scheduling problems we face is balancing the production schedule with fluctuating demand while ensuring all necessary ingredients are available. Seasonal variations can lead to a sudden spike in demand for certain flavors, requiring us to adjust production quickly. Coordinating with suppliers to ensure we have enough raw materials in the right quality at the right time adds another layer of complexity. Additionally, managing equipment maintenance without disrupting the production flow is a constant challenge.",
                                      :from :surrogate,
                                      :id 2,
+                                     :question-name :initial-question,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-14T13:13:28.516-00:00"}
+                                     #inst "2024-10-15T10:16:25.511-00:00"}
                            #:message{:content
                                      "Would you characterize your company's work as primarily providing a product, a service or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
                                      :from :system,
                                      :id 3,
+                                     :question-name :work-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-14T13:13:39.227-00:00"}
+                                     #inst "2024-10-15T10:16:39.517-00:00"}
                            #:message{:content "PRODUCT",
                                      :from :surrogate,
                                      :id 4,
+                                     :question-name :work-type,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-14T13:13:39.246-00:00"}
+                                     #inst "2024-10-15T10:16:39.561-00:00"}
                            #:message{:content
-                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\n\n - In MAKE-TO-STOCK you make product to replenish inventory; the quantity made might be based on forecasted demand.\n - In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\n - ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\n\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because, though the customer may have specified the engine type and seating capacity it wants, it is relying on the manufacturer to determine how to best accommodate the engine and arrange the seats.\n\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logistics.\n\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.",
+                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER.\n\n - In MAKE-TO-STOCK you make product to replenish inventory; the quantity made might be based on forecasted demand.\n - In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings.\n - ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need.\n\nFor example, a commercial aircraft might be ENGINEER-TO-ORDER because, though the customer may have specified the engine type and seating capacity it wants,\nit is relying on the manufacturer to determine how to best accommodate the engine and arrange the seats.\nOther examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logistics.\n\nRespond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production.",
                                      :from :system,
                                      :id 5,
+                                     :question-name
+                                     :production-motivation,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-14T13:13:52.954-00:00"}
+                                     #inst "2024-10-15T10:16:50.469-00:00"}
                            #:message{:content "MAKE-TO-STOCK",
                                      :from :surrogate,
                                      :id 6,
+                                     :question-name
+                                     :production-motivation,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-14T13:13:53.002-00:00"}
+                                     #inst "2024-10-15T10:16:50.485-00:00"}
                            #:message{:content
-                                     "What type of production system do you use? Is it a FLOW-SHOP, where all jobs follow the same sequence of steps through production resources; a JOB-SHOP, where each job might follow its own route, depending on its unique requirements; or a SINGLE-MACHINE system, where resources are applied to one job at a time?",
+                                     "Which of the following best describes your production system: FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE?\n\n - FLOW-SHOP: A production system where all jobs follow the same sequence of steps through production resources.\n - JOB-SHOP: A production system where each job might follow its own route, depending on its unique requirements.\n - SINGLE-MACHINE: A production system that simultaneously applies its resources to one job at a time.\n\nPlease respond with FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE.",
                                      :from :system,
                                      :id 7,
+                                     :question-name
+                                     :production-system-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-14T13:14:03.909-00:00"}
+                                     #inst "2024-10-15T10:17:03.271-00:00"}
                            #:message{:content "FLOW-SHOP",
                                      :from :surrogate,
                                      :id 8,
+                                     :question-name
+                                     :production-system-type,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-14T13:14:03.948-00:00"}
+                                     #inst "2024-10-15T10:17:03.288-00:00"}
                            #:message{:content
-                                     "Please list the major steps of your process, one per line.\nIf there are significant components to be made, list each one as a separate step.\nDon't worry about ordering steps that might be done simultaneously; we'll deal with that later.\nIf you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
+                                     "Please list the major steps of your process, one per line. \nIf there are significant components to be made, list each one as a separate step. \nDon't worry about ordering steps that might be done simultaneously; we'll deal with that later. \nIf you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
                                      :from :system,
                                      :id 9,
+                                     :question-name :process-steps,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-14T13:14:20.500-00:00"}
+                                     #inst "2024-10-15T10:17:18.530-00:00"}
                            #:message{:content
-                                     "1. Prepare Ice Cream Mix\n2. Pasteurize Mix\n3. Homogenize Mix\n4. Age Mix\n5. Flavor Addition\n6. Freeze Mix\n7. Add Inclusions (e.g., nuts, fruits, chocolate chips)\n8. Package Ice Cream\n9. Harden Ice Cream\n10. Label and Prepare for Distribution",
+                                     "1. Receive and Inspect Ingredients\n2. Mix Ingredients\n3. Pasteurize Mixture\n4. Homogenize Mixture\n5. Age Mixture\n6. Flavor and Color Mixture\n7. Freeze Mixture\n8. Add Inclusions (e.g., nuts, chocolate chips)\n9. Fill and Mold Mixtures\n10. Harden Ice Cream\n11. Package\n12. Store in Cold Storage",
                                      :from :surrogate,
                                      :id 10,
+                                     :question-name :process-steps,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-14T13:14:20.539-00:00"}
+                                     #inst "2024-10-15T10:17:18.568-00:00"}
                            #:message{:content
                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product.\nBut generally speaking, how long does each step take?\nPlease produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
                                      :from :system,
                                      :id 11,
+                                     :question-name :process-durations,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-14T13:14:33.603-00:00"}
+                                     #inst "2024-10-15T10:17:33.170-00:00"}
                            #:message{:content
-                                     "1. Prepare Ice Cream Mix (2 hours)\n2. Pasteurize Mix (30 minutes)\n3. Homogenize Mix (15 minutes)\n4. Age Mix (4 hours)\n5. Flavor Addition (15 minutes)\n6. Freeze Mix (30 minutes)\n7. Add Inclusions (10 minutes)\n8. Package Ice Cream (20 minutes)\n9. Harden Ice Cream (4 hours)\n10. Label and Prepare for Distribution (15 minutes)",
+                                     "1. Receive and Inspect Ingredients (1-2 hours)\n2. Mix Ingredients (30-45 minutes)\n3. Pasteurize Mixture (30-45 minutes)\n4. Homogenize Mixture (15-30 minutes)\n5. Age Mixture (4-8 hours)\n6. Flavor and Color Mixture (15-30 minutes)\n7. Freeze Mixture (10-20 minutes)\n8. Add Inclusions (5-10 minutes)\n9. Fill and Mold Mixtures (15-30 minutes)\n10. Harden Ice Cream (1-3 hours)\n11. Package (30-60 minutes)\n12. Store in Cold Storage (Varies, typically long-term)",
                                      :from :surrogate,
                                      :id 12,
+                                     :question-name :process-durations,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-14T13:14:33.630-00:00"}
+                                     #inst "2024-10-15T10:17:33.186-00:00"}
                            #:message{:content
-                                     "What is the batch size for each of the process steps you've listed? Please produce a list just like the one you did for process steps and durations, one process per line, but append to each line the typical batch size in parentheses.",
+                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of\nthe tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step\ncreated enough product for 1000 packages. In that case, you could reply with just \"1000 package\". If however, some\nsteps create different amounts, you could list those separately. Or you could just copy and paste the steps list and\nfor each step tell us how much is typically made in that step, like this:\n\n1. Make Cookie Dough (1000 packages)\n2. Make Filling      (2000 packages)\n3. Bake Wafers       (1000 packages)\n4. Assemble Cookies  (1000 packages)\n5. Package           (1000 packages)",
                                      :from :system,
                                      :id 13,
+                                     :question-name :batch-size,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-14T13:14:51.627-00:00"}
+                                     #inst "2024-10-15T10:17:53.135-00:00"}
                            #:message{:content
-                                     "1. Prepare Ice Cream Mix (2 hours) (500 gallons)\n2. Pasteurize Mix (30 minutes) (500 gallons)\n3. Homogenize Mix (15 minutes) (500 gallons)\n4. Age Mix (4 hours) (500 gallons)\n5. Flavor Addition (15 minutes) (500 gallons)\n6. Freeze Mix (30 minutes) (300 gallons)\n7. Add Inclusions (10 minutes) (300 gallons)\n8. Package Ice Cream (20 minutes) (300 gallons)\n9. Harden Ice Cream (4 hours) (300 gallons)\n10. Label and Prepare for Distribution (15 minutes) (300 gallons)",
+                                     "1. Receive and Inspect Ingredients (500 gallons)\n2. Mix Ingredients (500 gallons)\n3. Pasteurize Mixture (500 gallons)\n4. Homogenize Mixture (500 gallons)\n5. Age Mixture (500 gallons)\n6. Flavor and Color Mixture (500 gallons)\n7. Freeze Mixture (500 gallons)\n8. Add Inclusions (500 gallons equivalent, depending on inclusions added)\n9. Fill and Mold Mixtures (500 gallons equivalent, but molds may vary)\n10. Harden Ice Cream (500 gallons equivalent)\n11. Package (500 gallons equivalent, varies by packaging size, e.g., pints, quarts)\n12. Store in Cold Storage (500 gallons equivalent)",
                                      :from :surrogate,
                                      :id 14,
+                                     :question-name :batch-size,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-14T13:14:51.674-00:00"}
+                                     #inst "2024-10-15T10:17:53.151-00:00"}
                            #:message{:content
-                                     "Earlier, you listed the process steps typically used in making your product and for each, you specified typical durations and batch sizes.\nNow we'd like you to tell us the order of these steps, considering any that might be done simultaneously or require specific sequencing.\nThe list should look like this:\n \n 1. [Step Name]\n 2. [Step Name]\n  \n If some steps can be done at the same time, feel free to group them using 'and' between step numbers.",
+                                     "Earlier, you listed the process steps typically used in making product (e.g. 1. Receive and Inspect Ingredients, 2. Mix Ingredients, etc.) and for each you specified typical durations.\nNow we'd like you to tell us what raw materials and intermediate product go into those process steps.\nFor example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling.\nYou might then place the dough in molds and bake to produce wafers.\nWith that done, you would add some filling to one wafer and place another wafer on top.\nWere the cookie bakers to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n   1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n   2. Make Filling (sugar, water vanilla flavoring)\n   3. Bake Wafers (use dough from Make Cookie Dough)\n   4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n   5. Package (use cookies from Assemble Cookies)\n\nPlease list what raw materials or intermediate products are involved in each step of your process.",
                                      :from :system,
                                      :id 15,
+                                     :question-name :process-ordering,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-14T13:15:09.556-00:00"}
+                                     #inst "2024-10-15T10:18:19.150-00:00"}
                            #:message{:content
-                                     "1. Prepare Ice Cream Mix\n2. Pasteurize Mix\n3. Homogenize Mix\n4. Age Mix\n5. Flavor Addition\n6. Freeze Mix\n7. Add Inclusions\n8. Package Ice Cream\n9 and 10. Harden Ice Cream and Label and Prepare for Distribution",
+                                     "1. Receive and Inspect Ingredients (milk, cream, sugar, stabilizers, emulsifiers, flavorings, inclusions like nuts or chocolate chips)\n2. Mix Ingredients (combine milk, cream, sugar, stabilizers, emulsifiers)\n3. Pasteurize Mixture (use mixture from Mix Ingredients)\n4. Homogenize Mixture (use pasteurized mixture from Pasteurize Mixture)\n5. Age Mixture (use homogenized mixture from Homogenize Mixture)\n6. Flavor and Color Mixture (use aged mixture from Age Mixture, add flavorings and colorings)\n7. Freeze Mixture (use flavored and colored mixture from Flavor and Color Mixture)\n8. Add Inclusions (use partially frozen mixture from Freeze Mixture, add inclusions)\n9. Fill and Mold Mixtures (use mixture with inclusions from Add Inclusions)\n10. Harden Ice Cream (use filled and molded mixtures from Fill and Mold Mixtures)\n11. Package (use hardened ice cream from Harden Ice Cream)\n12. Store in Cold Storage (use packaged ice cream from Package)",
                                      :from :surrogate,
                                      :id 16,
+                                     :question-name :process-ordering,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-14T13:15:09.587-00:00"}]}
+                                     #inst "2024-10-15T10:18:19.166-00:00"}],
+                          :state-vector
+                          [:batch-size
+                           :initial-question
+                           :process-durations
+                           :process-ordering
+                           :process-steps
+                           :production-motivation
+                           :production-system-type
+                           :work-type]}
            #:conversation{:id :data}
            #:conversation{:id :resource}],
           :current-conversation :process,
@@ -130,11 +159,11 @@
                     :state-string
                     "#{(proj-id sur-ice-cream) (surrogate sur-ice-cream) (proj-name \"SUR Ice Cream\")}"},
           :surrogate
-          #:surrogate{:assistant-id "asst_1eBdoLMeUC5E1I288kENtIul",
+          #:surrogate{:assistant-id "asst_q6I9IYFFduOPlHTSuoCOvfyZ",
                       :id :sur-ice-cream,
                       :subject-of-expertise "ice cream",
                       :system-instruction
                       "You manage a company that makes ice cream.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_VFwA6YPmhBLDWiEewHPoS1UI"}}
+                      :thread-id "thread_OjNsG3yB806gLGJynORn7UGV"}}
 
 ]

@@ -47,10 +47,11 @@
 (defn query-llm
   "Given the vector of messages that is the argument, return a string (default)
    or Clojure map (:raw-string? = false) that is read from the string created by the LLM."
-  [messages & {:keys [model-class raw-text? llm-provider] :or {model-class :gpt raw-text? true llm-provider @default-llm-provider}}]
+  [messages & {:keys [model-class raw-text? llm-provider response-format] :or {model-class :gpt raw-text? true llm-provider @default-llm-provider}}]
   (assert (every? #(s/valid? ::query-llm-msg %) messages))
   (log/info "llm-provider = " llm-provider)
   (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class llm-provider)
+                                                :response_format response-format
                                                 :messages messages}
                                                (api-credentials llm-provider))
                 :choices
@@ -224,9 +225,12 @@
     role     - #{'user' 'assistant'},
     query-text - a string.
    Returns text but uses promesa internally to deal with errors."
-  [& {:keys [aid tid role query-text timeout-secs llm-provider]
-      :or {timeout-secs 60 role "user" llm-provider @default-llm-provider} :as _obj}] ; "user" when "assistant" is surrogate.
+  [aid tid role query-text timeout-secs llm-provider]
+  (assert (string? aid))
+  (assert (string? tid))
   (assert (#{"user" "assistant"} role))
+  (assert (number? timeout-secs))
+  (assert (keyword? llm-provider))
   (assert (and (string? query-text) (not-empty query-text)))
   (let [creds (api-credentials llm-provider)
         ;; Apparently the thread_id links the run to msg.
@@ -269,10 +273,11 @@
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
     :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
-  [& {:keys [aid llm-provider test-fn preprocess-fn]
+  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn]
       :or {test-fn (fn [_] true), preprocess-fn identity
-           llm-provider @default-llm-provider}
-      :as obj}]
+           llm-provider @default-llm-provider
+           timeout-secs 60
+           role "user"} :as obj}]
   (let [obj (cond-> obj ; All recursive calls will contains? :tries.
               (or (not (contains? obj :tries))
                   (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
@@ -281,7 +286,7 @@
          (catch Exception _e
            (log/error "Assistant does not exist!:" aid)))
     (if (> (:tries obj) 0)
-      (try (let [raw (reset! diag (query-on-thread-aux obj))
+      (try (let [raw (reset! diag (query-on-thread-aux aid tid role query-text timeout-secs llm-provider))
                  res (preprocess-fn raw)]
              (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
            (catch Exception e
@@ -349,34 +354,25 @@
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
 
-(defn known-agent?
-  "Return the set of known agents."
-  []
-  (-> (d/q '[:find [?id ...]
-             :where [_ :agent/id ?id]]
-           @(connect-atm :system))
-      set))
 
 (defn query-agent
   "Make a query to a named agent."
-  [agent-id query & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
-  (assert ((known-agent?) agent-id))
+  [base-type query & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
   (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
                                      :keys aid tid
-                                     :in $ ?agent-id
+                                     :in $ ?base-type ?provider
                                      :where
-                                     [?e :agent/id ?agent-id]
+                                     [?e :agent/base-type ?base-type]
+                                     [?e :agent/llm-provider ?provider]
                                      [?e :agent/assistant-id ?aid]
                                      [?e :agent/thread-id ?tid]]
                                    @(connect-atm :system)
-                                   agent-id)
+                                   base-type llm-provider)
                               first)]
     (if-not (and aid tid)
       (throw (ex-info "Could not find the agent requested. (Not created for this LLM provider?:" {:llm-provider llm-provider}))
       (let [result (-> (query-on-thread {:aid aid :tid tid :query-text query})
-                       (str/replace #"\s+" " "))
-            #_#_[success? useful] (re-matches #"```clojure(.*)```" result)
-            #_#_result (if success? useful result)]
+                       (str/replace #"\s+" " "))]
         (try (->> (edn/read-string result)
                   (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
              (catch Exception _e
