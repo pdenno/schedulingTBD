@@ -80,6 +80,8 @@
                                    "COURSE-CORRECTION"  (contains? % :advice)
                                    nil)))
 
+;;; Note that in OpenAI every thread has its own separate context window, which stores the conversation history specific to
+;;; that thread, preventing cross-contamination with other threads.
 (defn interview-agent
   "Return a map with project agent info (aid, tid). The agent is shared by all projects, but the threads are project-specific.
    If a thread has not yet been created for this project, this creates it and stores that in the DB before returning the info."
@@ -196,14 +198,26 @@
         res
         (log/warn "loop-for answer should have returns status = DONE:" res)))))
 
+
+;;; ToDo: It isn't obvious that the interview agent needs to see this. Only useful when the thread was destroyed?
 (defn prior-responses
   "Construct a prior-response command structure for the argument project."
   [pid conv-id]
-  (let [msgs (db/get-conversation pid conv-id)]
-    (->
-
-
-
+  (let [msgs (->> (db/get-conversation pid conv-id)
+                  (filter #(= :surrogate (:message/from %)))
+                  (mapv #(reduce-kv (fn [m k v] (cond (= k :message/content)         (assoc m :answer v)
+                                                      (= k :message/question-name)   (assoc m :question-name (name v))
+                                                      :else m))
+                                    {} %)))
+        responses (d/q '[:find [?elem ...]
+                         :in $ conv-id
+                         :where
+                         [?c :conversation/id ?conv-id]
+                         [?c :conversation/state-vector ?elem]]
+                       @(connect-atm :sur-ice-cream) conv-id)]
+    {:command "PRIOR-RESPONSES"
+     :responses-to (mapv name responses)
+     :responses msgs}))
 
 (def ^:diag active? (atom false))
 

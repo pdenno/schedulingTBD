@@ -1,6 +1,7 @@
 (ns scheduling-tbd.interviewer-test
   (:require
    [clojure.edn                 :as edn]
+   [clojure.pprint              :refer [pprint]]
    [scheduling-tbd.db           :as db]
    [scheduling-tbd.interviewers :as inv]
    [scheduling-tbd.llm          :as llm]
@@ -92,3 +93,74 @@
       :llm-provider :openai
       :response-format (-> response-path slurp edn/read-string)
       :instructions (slurp instruction-path)})))
+
+;;; ================================================= Throw-away-able updating of project.edn =====================================
+(def qnames [:process-steps
+             :work-type
+             :batch-size
+             :initial-question
+             :production-motivation
+             :production-location
+             :process-ordering
+             :production-system-type
+             :process-durations])
+
+
+(def ^:diag tag2qname
+  {:!describe-challenge :initial-question
+   :query-product-or-service :work-type
+   :!query-product-or-service :work-type
+   :query-production-mode :production-motivation
+   :!query-production-mode :production-motivation
+   :query-activity-location-type :production-location
+   :!query-activity-location-type :production-location
+   :query-shop-type :production-system-type
+   :!query-shop-type :production-system-type
+   :query-process-steps :process-steps
+   :!query-process-steps :process-steps
+   :query-process-durs :process-durations
+   :!remark-raw-material-challenge :remark-raw-material-challenge
+   :!query-process-durs :process-durations})
+
+(def qname? (-> tag2qname vals set))
+
+(defn ^:diag rename-tag-to-qname
+  "If a tag matches any tag2qname, replace it with that qname."
+  [project-map]
+  (letfn [(rename-tag [obj]
+            (cond (and (map? obj) (contains? obj :message/id))  (reduce-kv (fn [m k v]
+                                                                             (if (= k :message/tags)
+                                                                               (assoc m k (mapv #(if-let [new-tag (get tag2qname %)] new-tag %) v))
+                                                                               (assoc m k v)))
+                                                                           {}
+                                                                           obj)
+                  (map? obj)                                     (reduce-kv (fn [m k v] (assoc m k (rename-tag v))) {} obj)
+                  (vector? obj)                                  (mapv rename-tag obj)
+                  :else                                          obj))]
+    (rename-tag project-map)))
+
+(defn ^:diag add-qname
+  [project-map]
+  (letfn [(add-qn [obj]
+            (cond (and (map? obj) (contains? obj :message/id))  (if-let [qname (some #(when (qname? %) %) (:message/tags obj))]
+                                                                  (assoc obj :message/question-name qname)
+                                                                  obj)
+                  (map? obj)                                     (reduce-kv (fn [m k v] (assoc m k (add-qn v))) {} obj)
+                  (vector? obj)                                  (mapv add-qn obj)
+                  :else                                          obj))]
+    (add-qn project-map)))
+
+
+(defn update-project [pid]
+  (as-> pid ?o
+    (db/get-project ?o)
+    (rename-tag-to-qname ?o)
+    (add-qname ?o)
+    (vector ?o)
+    (with-out-str (pprint ?o))
+    (spit (str "data/new-projects/" (name pid) ".edn") ?o)))
+
+(defn update-projects! []
+  "Write new project DBs"
+  (doseq [p (db/list-projects)]
+    (update-project p)))
