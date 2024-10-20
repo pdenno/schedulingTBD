@@ -47,17 +47,17 @@
   (if force-new?
     (let [conn-atm (connect-atm pid)
           eid (db/project-exists? pid)
+          user (-> (System/getenv) (get "USER"))
           proj-info (resolve-db-id {:db/id eid} conn-atm :keep-set #{:project/name})
           [_ _ expertise] (re-matches #"(SUR )?(.*)" (:project/name proj-info)) ; ToDo: Ugh!
           expertise (str/lower-case expertise)
           instructions (system-instruction expertise)
           assist (llm/make-assistant :name (str expertise " surrogate")
                                      :instructions instructions
-                                     :metadata {:usage :surrogate})
+                                     :metadata {:usage :stbd-surrogate :user user})
           aid    (:id assist)
-          thread (llm/make-thread {:assistant-id aid :metadata {:usage :surrogate}})
+          thread (llm/make-thread {:assistant-id aid :metadata {:usage :stbd-surrogate :user user}})
           prob (surrogate-init-problem pid pname)] ; Surrogates have just one thread.
-                                        ;(log/info "Made assistant" aid "for instructions" instructions)
       (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)
                                        :project/planning-problem prob
                                        :project/surrogate {:surrogate/id pid

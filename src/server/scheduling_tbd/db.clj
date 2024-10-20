@@ -23,7 +23,7 @@
   "Defines content that manages project DBs and their analysis including:
      - The project's name and db directory
      - Planning domains, methods, operators, and axioms"
-  {;; ---------------------- agent
+  {;; ---------------------- agent (system agents shared by projects)
    :agent/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A unique ID for each agent to ensure only one of each type is available."}
@@ -63,7 +63,12 @@
         :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
    :system/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}})
+        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}
+   ;; ---------------------- openai (about all stbd-related assistants on the running account)
+   :system/openai-assistants
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
+        :doc "All stbd-related assistants in existance. (See recreate-system-db for how this is updated.)"}})
+
 
 ;;;========================================================== Project DBs ==========================================
 (def db-schema-proj+
@@ -405,16 +410,17 @@
    Store what is needed to identify it in system DB."
   [{:keys [id base-type instructions llm-provider response-format project-thread? model-class]
     :or {llm-provider @default-llm-provider model-class :gpt}}]
-  (let [assist (llm/make-assistant :name (name id)
+  (let [user (-> (System/getenv) (get "USER"))
+        assist (llm/make-assistant :name (name id)
                                    :llm-provider llm-provider
                                    :instructions instructions
                                    :response-format response-format
-                                   :metadata {:usage :agent})
+                                   :metadata {:usage :stbd-agent :user user})
         aid    (:id assist)
         thread (when-not project-thread?
                  (llm/make-thread {:assistant-id aid
                                    :llm-provider llm-provider
-                                   :metadata {:usage :agent}}))
+                                   :metadata {:usage :stbd-agent :user user}}))
         tid    (:id thread)
         conn   (connect-atm :system)
         eid    (d/q '[:find ?eid .
@@ -429,20 +435,20 @@
                                                   tid (assoc :agent/thread-id tid))}]})))
 
 ;;; (db/add-agent! {:id :process-dur-agent,,,}
-(def known-agent-templates
+(def known-agent-info
   "The actual agent :id is the one provided here with -<llm-provider> added."
   [{:id :process-interview-agent
     :project-thread?  true
     :model-class :analysis
-    :instruction-path     "data/instructions/interviewer-process.txt"
-    :response-format-path (-> "data/instructions/interviewer-response-format.edn" slurp edn/read-string)}
+    :instruction-path "data/instructions/interviewer-process.txt"
+    :response-format (-> "data/instructions/interviewer-response-format.edn" slurp edn/read-string)}
 
    {:id :answers-the-question?
-    :instruction-path     "data/instructions/answers-the-question.txt"
-    :response-format-path (-> "data/instructions/boolean-response-format.edn" slurp edn/read-string)}
+    :instruction-path "data/instructions/answers-the-question.txt"
+    :response-format (-> "data/instructions/boolean-response-format.edn" slurp edn/read-string)}
 
    {:id :process-dur-agent
-    :instruction-path  "data/instructions/process-dur-agent.txt"}
+    :instruction-path "data/instructions/process-dur-agent.txt"}
 
    {:id :process-ordering-agent
     :instruction-path "data/instructions/process-ordering-agent.txt"}
@@ -451,9 +457,6 @@
     :instruction-path "data/instructions/text-function-agent.txt"}])
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
-;;; Atom for the configuration map used for connecting to the project db.
-(defonce proj-base-cfg (atom nil))
-
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
    (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
@@ -690,7 +693,8 @@
 (defn recreate-system-db!
   "Recreate the system database from an EDN file
    By default this creates new agents."
-  [& {:keys [target-dir new-agents?] :or {target-dir "data/" new-agents? true}}]
+  [& {:keys [target-dir new-agents? update-assistants?]
+      :or {target-dir "data/" new-agents? true update-assistants? true}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
     (let [cfg (db-cfg-map {:type :system})]
       (log/info "Recreating the system database.")
@@ -699,22 +703,30 @@
       (register-db :system cfg)
       (let [conn (connect-atm :system)]
         (d/transact conn db-schema-sys)
-        (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
-      (when new-agents?
-        (doseq [llm-provider [:openai]]
-          (doseq [{:keys [id instruction-path response-format project-thread? model-class]
-                   :or {model-class :gpt}} known-agent-templates]
-            (cond-> {}
-              true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
-              true (assoc :base-type id)
-              true (assoc :llm-provider llm-provider)
-              true (assoc :instructions (slurp instruction-path))
-              true (assoc :model-class model-class)
-              project-thread? (assoc :project-thread? true)
-              response-format (assoc :response-format response-format)
-              true add-agent!))))
-      cfg)
-    (log/error "Not recreating system DB: No backup file.")))
+        (d/transact conn (-> "data/system-db.edn" slurp edn/read-string))
+        ;; Update the list of known openai assistants (implementing what we call agents).
+        ;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
+        (when update-assistants?
+          (let [eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
+                old-ones (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]] @conn)
+                new-ones (llm/list-assistants)]
+            (d/transact conn {:tx-data (vec (for [o old-ones] [:db/retract eid :system/openai-assistants o]))})
+            (d/transact conn {:tx-data (vec (for [n new-ones] [:db/add     eid :system/openai-assistants n]))})))
+        (when new-agents? ; This is just about system agents, of course.
+          (doseq [llm-provider [:openai]]
+            (doseq [{:keys [id instruction-path response-format project-thread? model-class]
+                     :or {model-class :gpt}} known-agent-info]
+              (cond-> {}
+                true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
+                true (assoc :base-type id)
+                true (assoc :llm-provider llm-provider)
+                true (assoc :instructions (slurp instruction-path))
+                true (assoc :model-class model-class)
+                project-thread? (assoc :project-thread? true)
+                response-format (assoc :response-format response-format)
+                true add-agent!))))
+        cfg))
+      (log/error "Not recreating system DB: No backup file.")))
 
 (defn recreate-project-db!
   "Recreate a DB for each project using EDN files."
@@ -739,7 +751,7 @@
     (log/error "Not recreating DB because backup file does not exist:" backup-file))))
 
 (def keep-db? #{:him})
-(defn recreate-dbs!
+(defn ^:diag recreate-dbs!
   "Recreate the system DB on storage from backup.
    For each project it lists, recreate it from backup if such backup exists."
   []

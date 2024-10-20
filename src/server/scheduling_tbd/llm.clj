@@ -310,12 +310,24 @@
         (map  (fn [m] (update m :created_at #(str (java.util.Date. (* 1000 %))))))
         (mapv (fn [m] (update m :role keyword))))))
 
+(defn our-assistant?
+  "Returns true if assistant metadata :usage key indiciates it is ours."
+  [usage]
+  (#{"stbd-surrogate" "surrogate" "agent" "stbd-agent"} usage))
+
+;;; When you call list-assistants with :after or with :limit=1, you get an object with keys (:object :data :first_id :last_id :has_more)
+;;; :after takes the id of an assistant (a string).
 (defn list-assistants
-  "Return a vector of assistants. :limit (max number returned) default to 90."
-  [& {:keys [llm-provider limit] :or {llm-provider @default-llm-provider
-                                      limit 90}}]
-  (-> (openai/list-assistants {:limit limit} (api-credentials llm-provider))
-      :data))
+  "Return a vector of all assistants (their id) on the account that are related to this project (stbd).
+   The elements are sorted by creating timestamp, most recent first."
+  [& {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (let [creds (api-credentials llm-provider)]
+    (loop [ours []
+           response (openai/list-assistants {:limit 1} creds)]
+      (if (:has_more response)
+        (recur (into ours (->> response :data (filter #(-> % :metadata :usage our-assistant?)) (map :id)))
+               (openai/list-assistants {:limit 99 :after (:last_id response)} creds)) ; 99 is max in openai.
+        (into ours (->> response :data (filter #(-> % :metadata :usage our-assistant?)) (map :id)))))))
 
 (defn delete-assistant!
   "Delete the assistant having the given ID, a string."
@@ -325,9 +337,9 @@
 ;;; There is a function in db.clj that calls this with a selection-fn that avoids deleting surrogates used in projects.
 (defn ^:diag delete-surrogates!
   "Delete from the openai account all assistants that match the argument filter function.
-   The default selection-function checks for metadata :usage='surrogate'.
+   The default selection-function checks for metadata :usage='stbd-surrogate'.
    If, for example, you want to not delete surrogates that are used in projects, you will have to override this."
-  [& {:keys [selection-fn llm-provider] :or {selection-fn #(= "surrogate" (-> % :metadata (get :usage)))
+  [& {:keys [selection-fn llm-provider] :or {selection-fn #(= "stbd-surrogate" (-> % :metadata (get :usage)))
                                              llm-provider @default-llm-provider}}]
   (doseq [a (->> (list-assistants) (filterv selection-fn))]
     (log/info "Deleting assistant" (:name a) (:id a))
@@ -335,8 +347,8 @@
 
 (defn ^:diag delete-agents!
   "Delete from the openai account all assistants that match the argument filter function.
-   The default function check for metadata :usage='surrogate'."
-  [{:keys [selection-fn llm-provider] :or {selection-fn #(= "agent" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
+   The default function check for metadata :usage='stbd-surrogate'."
+  [{:keys [selection-fn llm-provider] :or {selection-fn #(= "stbd-agent" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
   (doseq [a (->> (list-assistants)  (filterv selection-fn))]
     (log/info "Deleting assistant" (:name a) (:id a))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))

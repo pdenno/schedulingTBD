@@ -246,7 +246,7 @@
         (write-challenge-intro seg-name)))))
 
 ;;;--------------------- Starting, stopping, recreating etc.  ---------------------
-(defn write-db-backup
+(defn ^:diag write-db-backup
   "Write a file of current db content.
    Example-usage (write-db-backup \"my-him-db.edn\")
    Example-usage (write-db-backup) writes to data/him-db.edn which is kept in the repository."
@@ -278,7 +278,7 @@
          [?e :segment/name ?name]]
        @(connect-atm :him)))
 
-(defn create-project!
+(defn ^:diag create-project!
   "Add the project to the system and create a project DB for it.
    Example usage (create-project! 'Aluminium Foil') -- really!."
   [seg-name]
@@ -305,8 +305,7 @@
 
 ;;; ------------------- Starting and stopping ---------------
 (defn init-him
-  "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
-   Recreate the system database if sys-db-cfg.rebuild-db? = true."
+  "Recreate the system database when rebuild-db? = true."
   []
   (let [him-cfg (db-cfg-map {:type :him})]
     (sutil/register-db :him him-cfg)

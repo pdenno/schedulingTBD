@@ -91,8 +91,9 @@
         interview-agent-atm (atom (or (db/get-agent :base-type agent-type :pid pid :db-attrs? true)
                                       (db/get-agent :base-type agent-type :db-attrs? true)))]
     (when-not (:agent/thread-id @interview-agent-atm)
-      (let [aid (:agent/assistant-id @interview-agent-atm)
-            tid (:id (llm/make-thread {:assistant-id aid :llm-provider :openai :metadata {:usage :project-agent}}))]
+      (let [user (-> (System/getenv) (get "USER"))
+            aid (:agent/assistant-id @interview-agent-atm)
+            tid (:id (llm/make-thread {:assistant-id aid :llm-provider :openai :metadata {:usage :stbd-project-agent :user user}}))]
         (swap! interview-agent-atm #(assoc % :agent/thread-id tid))
         (let [eid (d/q '[:find ?eid . :where [?eid :project/id _]] @(connect-atm pid))]
           (d/transact (connect-atm pid) {:tx-data [{:db/id eid :project/agents (dissoc @interview-agent-atm :db/id)}]}))))

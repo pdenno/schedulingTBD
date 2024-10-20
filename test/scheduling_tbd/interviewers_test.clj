@@ -1,10 +1,12 @@
 (ns scheduling-tbd.interviewer-test
   (:require
    [clojure.edn                 :as edn]
-   [clojure.pprint              :refer [pprint]]
+   [clojure.pprint              :refer [pprint cl-format]]
+   [datahike.api                :as d]
    [scheduling-tbd.db           :as db]
    [scheduling-tbd.interviewers :as inv]
    [scheduling-tbd.llm          :as llm]
+
    [scheduling-tbd.sutil        :as sutil :refer [connect-atm default-llm-provider]]
    [taoensso.timbre :as log :refer [debug]]))
 
@@ -164,3 +166,23 @@
   "Write new project DBs"
   (doseq [p (db/list-projects)]
     (update-project p)))
+
+(defn tryme []
+  (let [conn (connect-atm :system)
+        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
+        found (d/q '[:find [?s ...]
+                     :in $ ?eid
+                     :where [?eid :system/openai-assistants ?s]]
+                   @conn eid)]
+    (println "eid = " eid)
+    (println "found = " found)
+    (doseq [f found]
+      (println "f = " f)
+      (d/transact conn {:tx-data [[:db/delete eid :system/openai-assistants f]]}))))
+
+(defn tryme2 []
+  (let [conn (connect-atm :system)
+        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
+        found (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]]  @conn)]
+    (doseq [f found]
+      (d/transact conn {:tx-data [[:db/retract eid :system/openai-assistants f]]}))))
