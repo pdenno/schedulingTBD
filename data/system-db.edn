@@ -1,38 +1,39 @@
 [
 #:system{:agents
-         [#:agent{:assistant-id "asst_sgC7iNlzUFHaPm1mNZYiMHVt",
+         [#:agent{:assistant-id "asst_IcAUcoqJyir89HGFdGGwSACK",
                   :base-type :process-dur-agent,
                   :id :process-dur-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_Kxjvf2lqVihjinCFricQGP3V"}
-          #:agent{:assistant-id "asst_ZQN4Kxo0ggi0e7KRFMciv5Km",
+                  :thread-id "thread_gu1nIDcKF2xHqMNt7PWHuNwI"}
+          #:agent{:assistant-id "asst_jxR1y1SAQbJXiQlR8dI9456T",
                   :base-type :text-function-agent,
                   :id :text-function-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_FPkX5H7nOj55f7Qm9EFIk3sZ"}
-          #:agent{:assistant-id "asst_mC6QwZmwBekHuHlZfY7WImqN",
+                  :thread-id "thread_MeKUZdysvxTUhm5ZfEjjXVcc"}
+          #:agent{:assistant-id "asst_EkSadFKGK5TmqbTavWYcKf2z",
                   :base-type :process-ordering-agent,
                   :id :process-ordering-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_aY5uHyZ4olF3W4ZnTMbDfLPB"}
-          #:agent{:assistant-id "asst_D05NkbDcbbfGr1ndSCEWoWwW",
+                  :thread-id "thread_AzHPt9wOCoqUXKZjc4MlaOCY"}
+          #:agent{:assistant-id "asst_BYywTajTMvToh5GXxS1VpBPM",
                   :base-type :process-interview-agent,
                   :id :process-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :analysis}
-          #:agent{:assistant-id "asst_EYTpa3yIVg4wIbXEWtt2zgSQ",
+          #:agent{:assistant-id "asst_ju2ZsnDorM9lMsbOw5LbDaHg",
                   :base-type :answers-the-question?,
                   :id :answers-the-question?-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_ovNRO7ytaq16NpKsEffOIUwd"}],
-         :default-project-id :sur-fountain-pens,
+                  :thread-id "thread_CHvq9GQWSQ9ns0lHrU20sKs1"}],
+         :default-project-id :sur-ice-cream,
          :name "SYSTEM",
          :openai-assistants
          ["asst_0TglI0PmJ9ADXmED6AdoH0Kt"
+          "asst_0Tk3A6tHmwfNyuS7yY9DWcsk"
           "asst_0nfAuZPZWSueLiMRSIqNjF0g"
           "asst_13vELrQWj1VVwSD9mn51Mb0Z"
           "asst_1UJprgjFz5GhmzfGluvtXEf4"
@@ -45,6 +46,7 @@
           "asst_2dImx4yPhaxExNItN96r6sz0"
           "asst_2iCZQuUYdo3m1JbagwD82IPb"
           "asst_2iE8OpYny5vAumsjys8bAKP4"
+          "asst_2kdrF4BzhvzcsJT117mQoxya"
           "asst_2w18wZInagasGVP8rZey4vpd"
           "asst_3euKnxjb7b2FNZGmz6Ep7Zb0"
           "asst_3pLcNBw3JSeIGF9tQaIVUFVm"
@@ -68,11 +70,13 @@
           "asst_6mjLG3ejreVd1Ij07GfPQVw7"
           "asst_73zkfIbNdYHvJTEvahW8jT0S"
           "asst_7dH8u0HPEZYY43nUXhF2sZJo"
+          "asst_7uVKaNjH8dVont2x9FbIBj6r"
           "asst_8BiK2WQci9aspaev7k64QqSX"
           "asst_8DTP2vCKLLDoyR8CumfgJlkJ"
           "asst_8GhJWYYr538F9TqP7HlM4da9"
           "asst_8Ku6PrHwoLrrUSTatWht9mcj"
           "asst_8XbHfT8UwqRXUbf9SiqhD6Rj"
+          "asst_8qtMJlrMzWEwqgJ5NL2JD5uF"
           "asst_8slf0l07DhkbG5YMTMxxXojM"
           "asst_9DCMEmrGOSZZJykRA0tcFUuY"
           "asst_9L7fCLB0SWsmeXcIyCECXT9B"
@@ -93,6 +97,8 @@
           "asst_BINWP1h3rVTqQNXLTx8aE09B"
           "asst_Bd75NQVLCjUnhueRnYfhEAvi"
           "asst_C0awAWHjtWKDoQAiZ2UCCSgm"
+          "asst_C9eKEAJWeBYy5vF67yvY72GH"
+          "asst_CC3zZ4bHpqNU5EAyguhSQJbX"
           "asst_CTN6mk1ZLGSIQHcSemFklx6u"
           "asst_ChmJWG2oXiCErbHjf9XJ957s"
           "asst_CmQscDgnxUxlAsjgoluSWSGm"
@@ -159,9 +165,13 @@
           "asst_LOFtLQOcf1D34xA69xyU07el"
           "asst_LZpGTD7lhnBvnis0qr63aGjo"
           "asst_Lexekl8qYRltzeaC7hFAC8QQ"
+          "asst_M4PKA9AgFacqqt8LluK5dIai"
+          "asst_MHVWBMEDjMLWNUc0w4jajSxL"
           "asst_MZPAo8LLa13gPjgofkHSZDYY"
           "asst_McOjcjfc31FV8SEms1K5RRan"
+          "asst_MitwqeKSMOZj6txPAKULRBAr"
           "asst_NHceRvgNYUeud8dLiHUxR9NY"
+          "asst_Nk7EsxcqCNdKccyOnEj3zvGU"
           "asst_NnHvWeT1PKOx8bietYmDWncP"
           "asst_NuGhENR3gkV43eotzjQCDinM"
           "asst_O5Z37PikQUZPjxfwfdXiEAF8"
@@ -170,12 +180,15 @@
           "asst_OW3mkY0MM7XGbloJ2wrlyFMA"
           "asst_OXb3DXG91AR5Dq8uOa1GZOwT"
           "asst_Op7pgaxZGr8sv2L8tAmutXBq"
+          "asst_OpPOdxNteHGVU2I1IJwoG1gV"
           "asst_Oxfl4Ww7PUUsqCCKP4NHzZ0n"
           "asst_P6RtrkxfSA0iAwSfOzcWohVd"
           "asst_PBF7TLT5PykWgHManeDRaZwJ"
           "asst_PeEvPkyjiMOucVoyYbPY9jiJ"
           "asst_PsREUIVup3xrQCvhIL9irMc6"
           "asst_Q3hBdK7vfj3Ql4iCgGrSZT5d"
+          "asst_Q9MxHsMSRXAsq3k2QEjDKN3F"
+          "asst_Qh7HeEcr6nVjtbwn2t6E5qjf"
           "asst_QirUW8IxQFKGVKbu9HpeGOl1"
           "asst_R2OkFMrVHljeSg7HK7SE0uE9"
           "asst_RGKW2O99gBirBV7okeYJIYem"
@@ -192,6 +205,7 @@
           "asst_U8QSNjpw5i5BPKFj3e7Yb1bm"
           "asst_Uj0frK6e93GgVI3mUYIKn5r8"
           "asst_UpoGv1tt6WqgTNneBnCYmbik"
+          "asst_UrNQkXHJnhQgkFMTZutwxGcX"
           "asst_VDSeLFNc0kmyTUHJE1YzhjMu"
           "asst_VFnXgaY3BQ3DncHEQWxdR6UR"
           "asst_VH0aN8WRHNIMvjyEXknTLyMm"
@@ -199,6 +213,7 @@
           "asst_VPeFKsEgNm1eMSgSUQZB8Ybi"
           "asst_VchdvsDTHBrTTvs9ETak1vCj"
           "asst_VhfzbpSBxpaghWAKvsA1JLP8"
+          "asst_VjJK76SJdfrkdatzK8Jgi0Rh"
           "asst_VqBugIyLYVluBvlcFAZHrZ0W"
           "asst_W2Lkc4ghgpzvpYJO0YyxPNYP"
           "asst_W8YHq6hnunaPgZWS0bY5DlhU"
@@ -216,6 +231,7 @@
           "asst_YVbbwrwHb7fD9W2sGiQPABnc"
           "asst_Z8WQsO44VNHirbcO66ZpeXmO"
           "asst_ZKN5sDlWu8vDAlQeinONduuJ"
+          "asst_ZMqZwtumwYzkuGwjijI0JM0A"
           "asst_ZP6xLofsfBhHpCDpwKy27ztL"
           "asst_ZQN4Kxo0ggi0e7KRFMciv5Km"
           "asst_ZYmxDnrVdRh5IFoYrLmHks79"
@@ -224,7 +240,10 @@
           "asst_akOuxilzlq9eDKJA0I9OddSl"
           "asst_amfqoo9TUtQBuwiYGJWPAGkJ"
           "asst_ascb1glYbYd3r9MviKLgkOxd"
+          "asst_b1bCA5mnGi1MBOzj1f4e61un"
           "asst_bABeHoqpmjgY1pN3E8Kecwui"
+          "asst_bJiyNVY61OEzXR7A69kqoqJd"
+          "asst_bKKxuAEZM34IU6DEkRpXd1IA"
           "asst_bUn7v7Fd93zMM1k9lVWWbWfO"
           "asst_bZiqc4iRdiMyvgY0Wd7S7fJO"
           "asst_be5qDTOVde2Ob9I5ACGpAfsv"
@@ -235,7 +254,9 @@
           "asst_dkN9D28MdZVhT7nIRsrrk2Bi"
           "asst_dmmxvFhYxXS4CLwjjWDrjcAt"
           "asst_dn97rZEjwcwHtW9W5Rc4qZ5z"
+          "asst_dppDiKr2Rnoc5IJt3scNDnfc"
           "asst_dz0gWRRabXUiXkclVS72Lbu8"
+          "asst_eAvWUy0MYGhN1NpC25ivgXPu"
           "asst_eCzH3oHA6ECZNiAZo2f9MPiv"
           "asst_eh4sfOLpvDzrjlKjtrn0ySE1"
           "asst_ehheuBlRb2U4w1caV4aWIy0z"
@@ -246,8 +267,10 @@
           "asst_g2Tg298pvcH7Il8JV9XOuhkx"
           "asst_g91VMowymiHxQYwm3n3QAgsi"
           "asst_gdCzps6om6lG5kjtXKKczZBA"
+          "asst_gpvJnkmkF2SdS2PXYc6IJG3k"
           "asst_h0tfYK1WcV6L7nE5oRelqYvF"
           "asst_h3TVbkThBCFJ0OJOgjrucVoq"
+          "asst_hDL5ME6VYxnc0QVBfdhmhnB0"
           "asst_hRahVweeZyEECn6cZAjHmrVD"
           "asst_haT7Vj1GltLsgvw7bmvaILRe"
           "asst_heEfih3jRnSCM3I0KxUGL4uv"
@@ -255,25 +278,36 @@
           "asst_hfcqJ4FC7tviMSicYlYKmums"
           "asst_hj9hnzwtbHxZq6jekN5nLY4o"
           "asst_hpo9lkZTxC75ExrlrSSeohK1"
+          "asst_huzpjt5mvTs1ryEdAdqFeCm7"
           "asst_hweCfQ6arHNK4R60RkvGYnnI"
+          "asst_hxj1VwYBC3smds4TTsLxSBHV"
+          "asst_i7OTWHRtxfWMyxFbQ4pBRbuF"
+          "asst_iG5YVdbNFf2sfxZ6GvgAa387"
+          "asst_iPj0dZ176RUVKNpExkeVc9fu"
           "asst_iQei5tvmlerRoBFoQ6oioceX"
           "asst_ic2Xdal5oZstPMBTJCagq9Ex"
           "asst_ig5GW7LdnYgAEQNf4K4g449X"
           "asst_isS7NgxnnwbFjWVQjpSVEMFZ"
           "asst_jRE8dwCvajIufk7JMPTjazYn"
+          "asst_jRJw3RwnZR33VUUXPBj0QpCo"
           "asst_jXxyYHhw8M1pWykaLJNKv79h"
           "asst_jnQwxTeF5WWGYOAwxUAE2dIg"
           "asst_kXqVu4HpeNjFDrcJqs9P7Ch9"
+          "asst_l1XShlzcIJIj3sSFzUt3b1HE"
           "asst_lBtmewh8oeGFKnHvr3cKcJSp"
           "asst_lFcJ8XsLOO05jfm7x3ppWqSr"
           "asst_lOhY4ECUMS7AuP2qBzHQJXR3"
+          "asst_lZkKon4wLEcTW7yKfYGhpces"
           "asst_lddg7cSYUm15H2kuYpQi2DT8"
+          "asst_leylWRmtWrnmgFhBtiy18Es8"
           "asst_lqbuZhlRmfcwspcQMXDLBKXe"
           "asst_mC6QwZmwBekHuHlZfY7WImqN"
           "asst_mL037kNutu9YFPu5vrLTAx7Z"
           "asst_mOLDF370cpt7izSkDUzJs8ZZ"
           "asst_mW3Zct5kABDA2dAM53DaVjau"
           "asst_mZIbIrJfDRTncxppopMoY7v9"
+          "asst_mdSlWRHnufxlJaGxjTwf0vlm"
+          "asst_me9LtwAdaexD7NKxcNBQlj6i"
           "asst_mknWgNS0aU1tX41badE4ZfJf"
           "asst_mm6y9puURoyEI6j0Bu4uQDgb"
           "asst_moIg7NB5vB4Vu6GiXppwaCX9"
@@ -289,11 +323,14 @@
           "asst_oAkcKGp3drsi9bsbEp5d1YNa"
           "asst_oQs8Ik6021sSNgegXx0eAqIH"
           "asst_oczYJnnpyGCgUF6z4ecJJ0w1"
+          "asst_ohD3azMSN9ZA5ls2FGtl63yN"
           "asst_oiJUD18fR0MmDOs9h1hf72hN"
           "asst_oo6IyAylWnVCPZMUe0VtR0Rg"
           "asst_otSSju6bm0t4IGRHZfooPZO5"
           "asst_ouviBi7Dt8Xj5BkTwoshEOlq"
           "asst_p0UJHuq0da8SX1I2hvXtQrZu"
+          "asst_pIMWmUHm4MjFSiYnfhmck9yz"
+          "asst_pKE3epqE66WVo4WZxylAkD2B"
           "asst_pLu6bdRTL8GOqcNHchmOrtD4"
           "asst_pc9uerOLPuQ2hbaRBQjwp6Cj"
           "asst_pjk2y11UnXHYVeU09RPEoBO5"
@@ -301,17 +338,22 @@
           "asst_pp5f1Yc13hkCbzcc7RJcSF1a"
           "asst_puyOomrCM2FfDapayMBJelv2"
           "asst_q6I9IYFFduOPlHTSuoCOvfyZ"
+          "asst_qHItSvwZ1Rwue8kBMP47yF3n"
           "asst_qHTOfu6aGQkhS2B3ArbZ3DOR"
           "asst_qJIJP8pVzINP8wUd7EpF9Hkn"
           "asst_qLsYAtmQqU2CumD1W52UU0uX"
+          "asst_qyRtKGjaZkI0BRRxHQvOxYL0"
           "asst_rFYsvauWSxRu3dZiDjoYuonT"
           "asst_rJvpJDLIoiGrDPgDOOCmqQXr"
+          "asst_rVpxjtclCun0wLKPUYg44ME9"
           "asst_rWzSX60DZAz9f9VVAoPYxH3K"
+          "asst_rZqItdsCbXYM2kUcyz0rbPGz"
           "asst_raO8UMnk86vSlLsq9cOYKPA6"
           "asst_rc0KIrl7VZzhCPud5mGFTd2T"
           "asst_rcLmMiIoL8PqD0jV3yPzgfiM"
           "asst_ruK5yKVpMfrkBHHsnflVcC1w"
           "asst_s6akW3dBcTrpg95y9XrjPXYM"
+          "asst_sMBRPDL1CUPDc6let7PUI0mE"
           "asst_sSaczyzH5qOHQHY3Qz8vspkM"
           "asst_saqP7GxuWkEg9KvrI0rZit5q"
           "asst_sgC7iNlzUFHaPm1mNZYiMHVt"
@@ -334,6 +376,8 @@
           "asst_vCOrufRdVy0h1AxDSLZ465v2"
           "asst_vCVwYmT6ynHcYCMIg6Qnc86E"
           "asst_vPIkVBe08Y60p0dznja55kcE"
+          "asst_vPTpOkNrOFUH6WWZGe0NR2po"
+          "asst_vWJRaALnwyAOnX2f24m45jr3"
           "asst_vbUQsam9DvRSFuW68nmKkaQC"
           "asst_wE6Mfqlfr7HzZOM63T3nTkUO"
           "asst_wMY6Ic3N9JThpv5Q08lw13NW"
@@ -344,6 +388,7 @@
           "asst_xWFiFL88PZWBDRJLDSYRyH3o"
           "asst_xWhIrscrTqT8aibxA0PFwcNL"
           "asst_xeN8kmaagevQlofyLkKX4scB"
+          "asst_xhwW218pOAUjXiY6dOYUmQGx"
           "asst_xiy2rmJfXoTwiCu4Hr2Iik4w"
           "asst_xpWbznubhrGmwAdSbiDqXbK0"
           "asst_xqh0ck2LLt8D8Jk9mVDBUb3O"
@@ -358,6 +403,7 @@
           "asst_zXNgxDT9EEM105Yw4g2Y5bzg"
           "asst_zYN3D7T0df7ErkjpiegchOxk"
           "asst_zeJThzfald6NEmfUvJEJD6D0"
+          "asst_zksm12LhIrI9DM6zNYvB8SqQ"
           "asst_zzRA4XV37wAwDfRwoEF5cxHB"]}
 
 #:project{:dir
@@ -408,10 +454,6 @@
           :id :sur-injection-molds,
           :name "Sur Injection Molds"}
 
-#:project{:dir "/opt/scheduling/projects/sur-fountain-pens/db/",
-          :id :sur-fountain-pens,
-          :name "SUR Fountain Pens"}
-
 #:project{:dir "/opt/scheduling/projects/sur-stoneware/db/",
           :id :sur-stoneware,
           :name "SUR Stoneware"}
@@ -420,12 +462,16 @@
           :id :sur-ice-cream,
           :name "SUR Ice Cream"}
 
-#:project{:dir "/opt/scheduling/projects/sur-artificial-limbs/db/",
-          :id :sur-artificial-limbs,
-          :name "SUR Artificial Limbs"}
-
 #:project{:dir "/opt/scheduling/projects/sur-inline-skates/db/",
           :id :sur-inline-skates,
           :name "SUR Inline Skates"}
+
+#:project{:dir "/opt/scheduling/projects/sur-fountain-pens/db/",
+          :id :sur-fountain-pens,
+          :name "SUR Fountain Pens"}
+
+#:project{:dir "/opt/scheduling/projects/sur-garage-doors/db/",
+          :id :sur-garage-doors,
+          :name "SUR Garage Doors"}
 
 ]

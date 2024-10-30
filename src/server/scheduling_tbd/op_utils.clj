@@ -3,14 +3,9 @@
   (:refer-clojure :exclude [send])
   (:require
    [clojure.core.unify    :as uni]
-   [clojure.datafy        :refer [datafy]]
    [clojure.pprint        :refer [cl-format]]
-   [promesa.core          :as p]
-   [promesa.exec          :as px]
    [scheduling-tbd.db     :as db]
-   [scheduling-tbd.llm    :as llm]
    [scheduling-tbd.sutil  :as sutil :refer [find-fact domain-conversation]]
-   [scheduling-tbd.web.websockets  :as ws]
    [taoensso.timbre       :as log]))
 
 ;;; Two method types are associated with each plan operator. For both method types, a 'tag' (keyword) selects the
@@ -34,9 +29,9 @@
 
 (def debugging? (atom false))
 (def ^:diag diag (atom nil))
-(defonce operator-method? (atom #{})) ; "A set of operator symbols, one for each method defined by defoperator."
+#_(defonce operator-method? (atom #{})) ; "A set of operator symbols, one for each method defined by defoperator."
 
-(defmacro defoperator
+#_(defmacro defoperator
   "Macro to wrap planner operator methods."
   {:clj-kondo/lint-as 'clojure.core/defmacro ; See https://github.com/clj-kondo/clj-kondo/blob/master/doc/config.md#inline-macro-configuration
    :arglists '([arg-map] & body)} ; You can put more in :arglists, e.g.  :arglists '([[in out] & body] [[in out err] & body])}
@@ -49,7 +44,7 @@
            (do (when @debugging?     (println (cl-format nil "<-- ~A (op) returns ~S" ~tag res#)))
                res#)))))
 
-(defn operator-meth-dispatch
+#_(defn operator-meth-dispatch
   "Parameters to operator-meth have form [plan-step proj-id domain & other-args]
    This dispatch function choose a method by return (:operator plan-step)."
   [obj]
@@ -57,7 +52,7 @@
     tag
     (throw (ex-info "operator-meth-dispatch: No dispatch value for plan-step" {:obj obj}))))
 
-(defmulti operator-meth #'operator-meth-dispatch)
+#_(defmulti operator-meth #'operator-meth-dispatch)
 
 ;;; --------  db-actions is similar but adds a second object, the response from the operator -----------------------------------
 (defmacro defaction
@@ -83,7 +78,7 @@
 
 (defmulti db-action #'db-action-dispatch)
 
-(defn run-operator!
+#_(defn run-operator!
   "Run the action associated with the operator, updating planning-state in the DB."
   [{:operator/keys [head] :as _task} {:keys [inject-failures pid verbose?] :or {verbose? true} :as opts}]
   (when verbose? (log/info "\n\n\n***** run-operator! head =" head))
@@ -103,7 +98,7 @@
 
 ;;; ToDo: The idea of Skolem's in the add-list needs thought. Is there need for a universal fact?
 ;;;       For the time being, I'm just adding uniquely
-(defn operator-update-state!
+#_(defn operator-update-state!
   "Update the project db's :problem/planning-state by unification with the  a-list and d-list.
       - operator    - the operator in the planning domain from which the d-list and a-list are obtained.
       - bindings    - variable binding established when unifying with this operator's d-list and a-list."
@@ -135,7 +130,7 @@
     (throw (ex-info "Couldn't find PID in human project." {:state state}))))
 
 ;;; (ou/chat-pair-aux {:pid :sur-fountain-pens :surrogate? true :agent-query "Describe your most significant scheduling problem in a few sentences."} {})
-(defn chat-pair-aux
+#_(defn chat-pair-aux
   "Run one query/response pair of chat elements with a human or a surrogate.
    Returns promise which will resolve to the original obj argument except:
      1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
@@ -162,7 +157,7 @@
                   (log/error "Failed in chat-pair-aux:" (datafy e))))
         p/await)))
 
-(defn chat-pair
+#_(defn chat-pair
   "Call to run the chat and put the query and response into the project's database.
    Returns the argument object with :response set to some text.
    Note that this also updates the UI (ws/refresh-client)"

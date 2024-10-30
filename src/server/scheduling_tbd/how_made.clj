@@ -290,7 +290,9 @@
         :project/id   (-> pname str/lower-case (str/replace #"\s+" "-") keyword)}
        {}
        {:force? true :make-current? false})
-      (proj-db/add-msg :him (:segment/challenge-intro intro) :user))
+      (proj-db/add-msg {:pid :him
+                        :text (:segment/challenge-intro intro)
+                        :from :user}))
     (log/error "HIM segment by that name not found:" seg-name)))
 
 (def rebuild-him? "True if mount/init should rebuild the How It's Made database." false)

@@ -43,6 +43,17 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
 
+   ;; ---------------------- agent-files files that assistants can use
+   :agent-file/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "A unique ID for each agent to ensure only one of each type is available."}
+   :agent-file/file-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An ID to the file provided by the LLM provider."}
+   :agent-file/doc
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Documentation about the file."}
+
    ;; ---------------------- project
    :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
@@ -439,7 +450,7 @@
   "The actual agent :id is the one provided here with -<llm-provider> added."
   [{:id :process-interview-agent
     :project-thread?  true
-    :model-class :analysis
+    #_#_:model-class :analysis
     :instruction-path "data/instructions/interviewer-process.txt"
     :response-format (-> "data/instructions/interviewer-response-format.edn" slurp edn/read-string)}
 
@@ -455,6 +466,14 @@
 
    {:id :text-function-agent
     :instruction-path "data/instructions/text-function-agent.txt"}])
+
+(defn agent-exists?
+  "Return true if agent still exists (LLM-providers typiclly don't keep them forever)."
+  [aid]
+  (d/q '[:find ?eid .
+         :in $ ?aid
+         :where [?eid :system/openai-assistants ?aid]]
+       @(connect-atm :system) aid))
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 (defn project-exists?
@@ -542,7 +561,7 @@
 (defn get-surrogate-info [pid]
   (when (project-exists? pid)
     (when-let [eid (d/q '[:find ?sur . :where [_ :project/surrogate ?sur]]  @(connect-atm pid))]
-      (dp/pull @(connect-atm :sur-ice-cream) '[*] eid))))
+      (dp/pull @(connect-atm pid) '[*] eid))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
   #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/question-name})
@@ -560,15 +579,6 @@
           (sort-by :message/id)
           vec)
      [])))
-
-#_(defn get-problem
-  "Return the planning problem. We add new keys for the things that end in -string,
-   that is, for :problem/goal-string and :problem/state-string :goal and :state are added respectively."
-  [pid]
-  (as-> (get-project pid #{:db/id :project/conversations :project/surrogate :project/code}) ?x
-    (:project/planning-problem ?x)
-    (assoc ?x :goal (-> ?x :problem/goal-string edn/read-string))
-    (assoc ?x :state (-> ?x :problem/state-string edn/read-string))))
 
 (defn get-code
   "Return the code string for the argument project (or an empty string if it does not exist)."
@@ -666,14 +676,14 @@
     (log/info "Writing project to" filename)
     (spit filename s)))
 
-(defn backup-proj-dbs
+(defn ^:diag backup-proj-dbs
   "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir.
    Example usage: (backup-proj-dbs)."
   [& {:keys [target-dir] :or {target-dir "data/projects/"}}]
   (doseq [id (list-projects)]
     (backup-proj-db id {:target-dir target-dir})))
 
-(defn backup-system-db
+(defn ^:diag backup-system-db
   "Backup the system database to an edn file."
   [& {:keys [target-dir] :or {target-dir "data/"}}]
       (let [conn-atm (connect-atm :system)
@@ -690,9 +700,40 @@
       (log/info "Writing system DB to" filename)
       (spit filename s)))
 
+;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
+(defn update-assistants!
+  "List what assistants the LLM-provider's currently maintains that have metadata indicating that
+   they are part of our project (where they are called agents). Store this in the sytems DB."
+  []
+  (let [conn (connect-atm :system)
+        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
+        old-ones (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]] @conn)
+        new-ones (llm/list-assistants)]
+    (d/transact conn {:tx-data (vec (for [o old-ones] [:db/retract eid :system/openai-assistants o]))})
+    (d/transact conn {:tx-data (vec (for [n new-ones] [:db/add     eid :system/openai-assistants n]))})))
+
+(defn recreate-system-agents!
+  "Recreate the system agents for the agent infos given (db/known-agent-info if called with no args)."
+  ([] (recreate-system-agents! known-agent-info))
+  ([infos]
+   (doseq [llm-provider [:openai]]
+     (doseq [{:keys [id instruction-path response-format project-thread? model-class]
+              :or {model-class :gpt}} infos]
+       (cond-> {}
+         true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
+         true (assoc :base-type id)
+         true (assoc :llm-provider llm-provider)
+         true (assoc :instructions (slurp instruction-path))
+         true (assoc :model-class model-class)
+         project-thread? (assoc :project-thread? true)
+         response-format (assoc :response-format response-format)
+         true add-agent!)))))
+
 (defn recreate-system-db!
   "Recreate the system database from an EDN file
-   By default this creates new agents."
+   By default this creates new agents.
+     :update-assistants! - if true, list extant OpenAI assistants. (OpenAI doesn't keep them forever.)
+     :new-agents? - Make new agents based on instructions."
   [& {:keys [target-dir new-agents? update-assistants?]
       :or {target-dir "data/" new-agents? true update-assistants? true}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
@@ -704,27 +745,8 @@
       (let [conn (connect-atm :system)]
         (d/transact conn db-schema-sys)
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string))
-        ;; Update the list of known openai assistants (implementing what we call agents).
-        ;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
-        (when update-assistants?
-          (let [eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
-                old-ones (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]] @conn)
-                new-ones (llm/list-assistants)]
-            (d/transact conn {:tx-data (vec (for [o old-ones] [:db/retract eid :system/openai-assistants o]))})
-            (d/transact conn {:tx-data (vec (for [n new-ones] [:db/add     eid :system/openai-assistants n]))})))
-        (when new-agents? ; This is just about system agents, of course.
-          (doseq [llm-provider [:openai]]
-            (doseq [{:keys [id instruction-path response-format project-thread? model-class]
-                     :or {model-class :gpt}} known-agent-info]
-              (cond-> {}
-                true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
-                true (assoc :base-type id)
-                true (assoc :llm-provider llm-provider)
-                true (assoc :instructions (slurp instruction-path))
-                true (assoc :model-class model-class)
-                project-thread? (assoc :project-thread? true)
-                response-format (assoc :response-format response-format)
-                true add-agent!))))
+        (when update-assistants? (update-assistants!))
+        (when new-agents? (recreate-system-agents!)); This is just about system agents, of course.
         cfg))
       (log/error "Not recreating system DB: No backup file.")))
 
@@ -762,7 +784,7 @@
   (doseq [pid (list-projects)]
     (recreate-project-db! pid)))
 
-(defn unknown-projects
+(defn ^:diag unknown-projects
   "Return a vector of directories that the system DB does not know."
   []
   (set/difference
@@ -804,17 +826,17 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to current conversation of the database with :project/id = id."
-  ([pid from text] (add-msg pid from text []))
-  ([pid from text tags]
-   (assert (#{:system :human :surrogate :developer-injected} from))
-   (assert (string? text))
-   ;;(log/info "add-msg: pid =" pid "text =" text)
-   (if-let [conn (connect-atm pid)]
-     (let [msg-id (inc (max-msg-id pid))]
-       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
-                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
-                                                             (not-empty tags) (assoc :message/tags tags))}]}))
-     (throw (ex-info "Could not connect to DB." {:pid pid})))))
+  [{:keys[pid from text tags question-type]}]
+  (assert (#{:system :human :surrogate :developer-injected} from))
+  (assert (string? text))
+  ;;(log/info "add-msg: pid =" pid "text =" text)
+  (if-let [conn (connect-atm pid)]
+    (let [msg-id (inc (max-msg-id pid))]
+      (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
+                                   :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
+                                                            (not-empty tags) (assoc :message/tags tags)
+                                                            question-type    (assoc :message/question-name question-type))}]}))
+    (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
@@ -832,13 +854,14 @@
    The project-info map must include :project/id and :project/name.
      proj-info  - map containing at least :project/id and :project/name.
      additional - a vector of maps to add to the database.
-     opts -  {:force? - overwrite project with same name}
+     opts -  {:force-this-name? - overwrite project with same name}
+   This always destroys DBs with the same name as that calculated here.
    Return the PID of the project."
   ([proj-info] (create-proj-db! proj-info {} {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
-  ([proj-info additional-info {:keys [in-mem? force?] :as opts}]
+  ([proj-info additional-info {:keys [in-mem? force-this-name?] :as opts}]
    (s/assert ::project-info proj-info)
-   (let [{id :project/id pname :project/name} (if force? proj-info (unique-proj proj-info))
+   (let [{id :project/id pname :project/name} (if force-this-name? proj-info (unique-proj proj-info))
          cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
          dir (-> cfg :store :path)
          files-dir (-> cfg :base-dir (str "/" pname  "/files"))]
@@ -867,7 +890,7 @@
      (log/info "Created project database for" id)
      id)))
 
-(defn ^:diag delete-project!
+(defn delete-project!
   "Remove project from the system."
   [pid]
   (if (some #(= % pid) (list-projects))
@@ -879,7 +902,7 @@
           nil)))
     (log/warn "Delete-project: Project not found:" pid)))
 
-(defn ^:diag  known-agents
+(defn ^:diag known-agents
   "Return a set of all the agents recorded in the system DB."
   []
   (-> (d/q '[:find [?id ...] :where [_ :agent/id ?id]] @(connect-atm :system))
@@ -908,7 +931,8 @@
   "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)
    from either the system DB, or if :pid is provided, the project DB.
    If :db-attrs? then return the object with DB-native attributes, not :aid :tid."
-  [& {:keys [base-type llm-provider pid db-attrs?] :or {llm-provider @default-llm-provider}}]
+  [& {:keys [base-type llm-provider pid db-attrs?] :or {llm-provider @default-llm-provider} :as obj}]
+  (reset! diag obj)
   (let [conn (if pid @(connect-atm pid) @(connect-atm :system))
         ent (when base-type
               (d/q '[:find ?e .
@@ -917,10 +941,9 @@
                      [?e :agent/base-type ?base-type]
                      [?e :agent/llm-provider ?llm-provider]]
                    conn base-type llm-provider))]
-    (if ent
+    (when ent
       (let [a-map (dp/pull conn '[*] ent)]
-        (if db-attrs? a-map (agent-info a-map)))
-      (throw (ex-info "No such agent" {:base-type base-type :llm-provider llm-provider})))))
+        (if db-attrs? a-map (agent-info a-map))))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs

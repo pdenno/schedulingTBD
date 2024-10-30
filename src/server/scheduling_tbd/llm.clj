@@ -7,13 +7,12 @@
   (:require
    [clojure.datafy               :refer [datafy]]
    [clojure.edn                  :as edn]
+   [clojure.java.io              :as io]
    [clojure.spec.alpha           :as s]
    [datahike.api                 :as d]
    [scheduling-tbd.sutil         :refer [api-credentials default-llm-provider markdown2html connect-atm]]
    [scheduling-tbd.util          :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
-   [camel-snake-kebab.core       :as csk]
-   [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
    [taoensso.timbre              :as log]
@@ -85,44 +84,6 @@
       (catch Exception e
         (log/error "Failure in llm-directly:" e)
         (ws/send-to-chat (assoc chat-args :msg "There was a problem answering that."))))))
-
-;;; ------------------------------- naming variables --------------------------------------
-(def good-var-partial
-    [{:role "system"    :content "You are a helpful assistant."}
-     {:role "user"      :content "Produce a Clojure map containing one key, :name, the value of which is a camelCase string used to name a programming variable and matching the requirements described in the text in square brackets."}
-
-     {:role "user"      :content "[less than 15 chars for how long a task will take]"}
-     {:role "assistant" :content "{:name \"taskDuration\"}"}
-
-     {:role "user"      :content "[less than 10 chars for the number of users]"}
-     {:role "assistant" :content "{:name \"numUsers\"}"}
-
-     {:role "user"      :content "[less than 10 chars for an array of tasks indexed by the resource doing the task and day in which it is doing it]"}
-     {:role "assistant" :content "{:name \"busyWith\"}"}
-
-     {:role "user"      :content "[less than 10 chars for an array of tasks indexed by the resource doing the task and day in which it is doing it]"}
-     {:role "assistant" :content "{:name \"resBusyWithOnDay\"}"}
-     {:role "user"      :content "WRONG: \"resBusyWithOnDay\" contains more contains 10 chars."}])
-
-(defn name-var
-  "Return a Clojure map {:name <some-string>} where <some-string> is a good name for a variable matching the requirements defined
-   by the clojure map provided.
-   The argument map has the following keys:
-     :purpose - describes how the variable will be used; this usually beings 'less than n chars for ....'.
-     :string-type - one of :camelCase, :kebab-case :snake_case,
-     :capitalize? - either true or false."
-  [{:keys [purpose string-type capitalize?] :or {string-type :camelCase}}]
-  (when purpose
-    (let [prompt (conj good-var-partial
-                       {:role "user"
-                        :content (cl-format nil "[~A]" purpose)})
-          res (query-llm prompt {:model-class :gpt :raw-text? false})]
-      (if-let [var-name (:name res)]
-        (cond-> var-name
-          (= :kebab-case string-type) (csk/->kebab-case-string)
-          (= :snake-case string-type) (csk/->snake_case_string)
-          capitalize?                 (str/capitalize))
-        (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
 
 (defn list-openai-models
   "List id and create date of all available models.
@@ -261,14 +222,6 @@
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
-(defn assistant-on-provider?
-  "Retrieve the assistant object from OpenAI using its ID, a string you can
-   find on the list-assistants, or while logged into the OpenAI website."
-  [id & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
-  (openai/retrieve-assistant {:assistant_id id} (api-credentials llm-provider)))
-
-(def diag2 (atom nil))
-
 (defn query-on-thread
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
@@ -282,9 +235,6 @@
               (or (not (contains? obj :tries))
                   (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
     (assert (< (:tries obj) 10))
-    (try (assistant-on-provider? aid {:llm-provider llm-provider})
-         (catch Exception _e
-           (log/error "Assistant does not exist!:" aid)))
     (if (> (:tries obj) 0)
       (try (let [raw (reset! diag (query-on-thread-aux aid tid role query-text timeout-secs llm-provider))
                  res (preprocess-fn raw)]
@@ -390,6 +340,29 @@
              (catch Exception _e
                (log/error "query-agent failed:" result)
                nil))))))
+
+(defn immoderate?
+  "Return true if LLM flags text as immoderate."
+  [txt]
+  (-> (openai/create-moderation {:input txt}) :results first :flagged))
+
+;;; --------------------------------- Files -------------------------------
+(defn upload-file
+  "Upload a file and get back a file id response."
+  ([fname] (upload-file fname "assistants" @default-llm-provider))
+  ([fname purpose provider]
+    (let [creds (api-credentials provider)]
+      (openai/create-file {:purpose (name purpose)
+                           :file (io/file fname)}
+                          creds))))
+
+(defn delete-file
+  ([file-id] (delete-file file-id @default-llm-provider))
+  ([file-id provider]
+   (assert (string? file-id))
+   (let [creds (api-credentials provider)]
+     (openai/delete-file {:file-id file-id} creds))))
+
 
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []

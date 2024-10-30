@@ -1,4 +1,7 @@
 {:type "json_schema",
- :json_schema {:name "boolean answer",
+ :json_schema {:name "boolean_answer", ; No spaces allowed.
                :strict true,
-               :schema {:type "boolean"}}}
+               :schema {:type "object",
+                        :properties {:answer {:type "boolean"}}
+                        :required ["answer"],
+                        :additionalProperties false}}}

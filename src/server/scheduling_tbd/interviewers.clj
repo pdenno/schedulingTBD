@@ -35,11 +35,11 @@
                                     (assoc :dispatch-key :tbd-says)))
                (px/submit! (fn []
                              (try
-                               (llm/query-on-thread :aid sur-aid   ; This can timeout.
-                                                    :tid sur-tid
-                                                    :query-text query
-                                                    :tries tries
-                                                    :preprocess-fn preprocess-fn)
+                                 (llm/query-on-thread :aid sur-aid   ; This can timeout.
+                                                      :tid sur-tid
+                                                      :query-text query
+                                                      :tries tries
+                                                      :preprocess-fn preprocess-fn)
                                (catch Exception e {:error e})))))]
     (-> prom
        (p/catch (fn [e]
@@ -59,15 +59,26 @@
 (defn chat-pair
   "Call to run the chat and put the query and response into the project's database.
    Updates the UI and returns response text."
-  [query {:keys [pid responder-role client-id tags topic]
+  [query {:keys [pid responder-role client-id tags topic question-type]
           :or {tags [] topic :process} :as ctx}] ; ToDo: How do I implement tags? I suppose I need an agent to classify the question. Also no default for topic?
   (s/assert ::chat-pair-context ctx)
-  (let [response-text (chat-pair-aux query ctx)]
+  (let [response-text (chat-pair-aux query ctx)
+        q-type (keyword question-type)]
     (if (string? response-text)
-      (do (db/add-msg pid :system query (conj tags :query))
-          (db/add-msg pid responder-role response-text (conj tags :response))
-          (ws/refresh-client client-id pid topic)
-          response-text)
+      (if (llm/immoderate? response-text)
+        (ws/send-to-chat (assoc ctx :msg "I won't respond to that."))
+        (do (db/add-msg {:pid pid
+                         :from :system
+                         :text query
+                         :question-type q-type
+                         :tags (conj tags :query)})
+            (db/add-msg {:pid pid
+                         :from responder-role
+                         :text response-text
+                         :question-type q-type
+                         :tags (conj tags :response)})
+            (ws/refresh-client client-id pid topic)
+            response-text))
       (throw (ex-info "Unknown response from operator" {:response response-text})))))
 
 (s/def ::interviewer-cmd (s/and (s/keys :req-un [::command]
@@ -130,19 +141,25 @@
    the interviewer agent starts interviewing. This might, for example, tell the interviewer what the interviewee manufactures
    and whether the interviewee is an actual human or a surrogate."
   [expert]
-  {:command :ANALYSIS-CONCLUDES
+  {:command "ANALYSIS-CONCLUDES",
    :conclusions (str "1) They make "
                      (:surrogate/subject-of-expertise expert) ". "
                      "2) You are talking to surrogate humans (machine agents).")})
 
 (defn answers-question?
-  "Return true if the answer to the Q/A pair appears to answer the question."
+  "Return true if the answer to the Q/A pair appears to answer the question.
+   The answer text argument might be nil, for example when answer was immoderate.
+   In that case, return nil."
   [q-txt a-txt]
-  (let [{:keys [aid tid]} (db/get-agent :base-type :answers-the-question?)]
-    (-> (llm/query-on-thread
-         {:aid aid :tid tid
-          :query-text (format "QUESTION: %s \nANSWER: %s" q-txt a-txt)})
-        edn/read-string)))
+  (when (string? a-txt)
+    (let [{:keys [aid tid]} (db/get-agent :base-type :answers-the-question?)
+          res (-> (llm/query-on-thread
+                   {:aid aid :tid tid
+                    :query-text (format "QUESTION: %s \nANSWER: %s" q-txt a-txt)})
+                  json/read-value
+                  (get "answer"))]
+      (or res
+          (throw (ex-info "(Temporary) Surrogate Q/A is misaligned." {:q-txt q-txt :a-txt a-txt})))))) ; ToDo: Temporary
 
 (defn answers-yes-or-more
   "Return true if the answer (a-txt) seems to answer yes to whatever I asked (q-txt)."
@@ -182,23 +199,21 @@
                 {:keys [yes? more]} (answers-yes-or-more ask-continue continue?)]
             (cond more (recur more)
                   yes? (loop-for-answer question save-ctx)
-                  :else (do (log/info "I'm getting lost in the conversation")
-                            (loop-for-answer question save-ctx)))))))))
+                  :else (throw (ex-info "I'm getting lost in the conversation!" {})))))))))
+
 
 (defn next-question
   "Call loop-for-answer until the answer is responsive to a question that we obtain from the interviewer here.
    Return the Q/A pair or {:status 'DONE'}."
   [ctx]
-  (let [{:keys [question] :as res} (tell-interviewer {:command "SUPPLY-QUESTION"} ctx)]
-    (if question ; Interviewer poses a question. Loop through chat-pair until it looks like an answer.
-      (let [{:keys [command] :as cmd} (loop-for-answer question ctx)]
-        (if (= command "HUMAN-RESPONDS")
-          (tell-interviewer cmd ctx)
-          (log/warn "loop-for answer should have returns HUMAN-RESPONDS:" cmd)))
-      (if (= (:status res) "DONE")
-        res
-        (log/warn "loop-for answer should have returns status = DONE:" res)))))
-
+  (let [{:keys [question question-type status]} (tell-interviewer {:command "SUPPLY-QUESTION"} ctx)]
+    (cond (= status "DONE")             "DONE"
+          (and question question-type)  (let [{:keys [command] :as cmd} (loop-for-answer question (assoc ctx :question-type question-type))]
+                                          (if (= command "HUMAN-RESPONDS")
+                                            (tell-interviewer cmd ctx)
+                                            (log/warn "loop-for answer should have returns HUMAN-RESPONDS:" cmd)))
+          question                      (do (log/error "Question does not have type:" question)
+                                            "DONE"))))
 
 ;;; ToDo: It isn't obvious that the interview agent needs to see this. Only useful when the thread was destroyed?
 (defn prior-responses
@@ -220,7 +235,7 @@
      :responses-to (mapv name responses)
      :responses msgs}))
 
-(def ^:diag active? (atom false))
+(def ^:diag active? (atom true))
 
 (defn resume-conversation
   "Start the interview loop. :resume-conversation-plan is a dispatch key from client.
@@ -230,7 +245,7 @@
   (try
     (let [conv-id (or conv-id ; One of #{:process :resource :data} currently.
                       (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid)))
-          sur (sur/get-surrogate pid)
+          sur (db/get-surrogate-info pid)
           ctx (-> ctx
                   (merge (interview-agent conv-id pid))
                   (assoc :responder-role :surrogate)
@@ -238,17 +253,19 @@
                   (assoc :sur-tid (:surrogate/thread-id sur)))]
       ;; The conversation loop.
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-      (when (== 0 (-> pid (db/get-conversation-eids conv-id) count))
-        (-> pid sur/get-surrogate initial-advice (tell-interviewer ctx)))
+      (if (== 0 (-> pid (db/get-conversation-eids conv-id) count))
+        (-> sur initial-advice (tell-interviewer ctx))
+        (-> (prior-responses pid conv-id) (tell-interviewer ctx)))
       (loop [cnt 0
              response nil]
-        (if (or (= "DONE" (:status response)) (> cnt 16))
+        (if (or (= "DONE" (:status response)) (> cnt 10))
           :interview-completed
           (when @active?
             (recur (inc cnt)
                    (next-question ctx))))))
       (finally
         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+
 
 ;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-iviewers!

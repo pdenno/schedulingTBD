@@ -1,8 +1,11 @@
+;;; NOTE: You have to re-evaluate db.clj for changes here to be seen!
+
 {:type "json_schema",
  :json_schema {:name "interview_response",
                :strict true,
                :schema {:type "object",
-                        :properties {:question {:type "string"},
-                                   :status   {:type "string"}}
-                        :required ["status" "question"], ; I get an error saying :required has to have all properties if I leave it out!
+                        :properties {:question {:type ["string" "null"]},
+                                     :question-type {:type ["string" "null"]},
+                                     :status   {:type "string"}}
+                        :required ["status" "question" "question-type"], ; Bug in OpenAI, see https://community.openai.com/t/api-rejects-valid-json-schema/906163
                         :additionalProperties false}}}   ; Can I put it in additionalProperties?

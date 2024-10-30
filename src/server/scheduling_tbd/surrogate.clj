@@ -79,7 +79,7 @@
   (log/info "======= Start a surrogate: product =" product "=======================")
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
-        pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force? force?})]
+        pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})]
     (try
       (ensure-project-and-surrogate pid pname force?)
       (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
@@ -99,8 +99,8 @@
              (log/info "SUR's answer:" answer)
              (when (string? answer)
                (ws/send-to-chat (assoc chat-args :msg answer))
-               (db/add-msg pid :system question)
-               (db/add-msg pid :surrogate answer)))
+               (db/add-msg {:pid pid :from :system :text question})
+               (db/add-msg {:pid pid :from :surrogate :text answer})))
            (catch Exception e
              (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
              (ws/send-to-chat (assoc chat-args :msg "We had a problem answering this questions.")))))))

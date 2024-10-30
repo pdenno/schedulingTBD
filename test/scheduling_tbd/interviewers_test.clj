@@ -2,13 +2,13 @@
   (:require
    [clojure.edn                 :as edn]
    [clojure.pprint              :refer [pprint cl-format]]
+   [clojure.test                :refer [deftest is testing]]
    [datahike.api                :as d]
    [scheduling-tbd.db           :as db]
    [scheduling-tbd.interviewers :as inv]
    [scheduling-tbd.llm          :as llm]
-
    [scheduling-tbd.sutil        :as sutil :refer [connect-atm default-llm-provider]]
-   [taoensso.timbre :as log :refer [debug]]))
+   [taoensso.timbre :as log :refer [warn debug]]))
 
 ;;; THIS is the namespace I am hanging out in recently.
 
@@ -156,16 +156,34 @@
 (defn update-project [pid]
   (as-> pid ?o
     (db/get-project ?o)
-    (rename-tag-to-qname ?o)
-    (add-qname ?o)
+    ;;(rename-tag-to-qname ?o)
+    ;;(add-qname ?o)
     (vector ?o)
     (with-out-str (pprint ?o))
     (spit (str "data/new-projects/" (name pid) ".edn") ?o)))
 
+
+(defn add-state-vector [pid]
+  (let [conn (connect-atm pid)
+        eid (d/q '[:find ?eid . :where [?eid :conversation/id :process]] @conn)
+        new-ones [:initial-question
+                  :work-type
+                  :production-motivation
+                  :production-system-type
+                  :process-steps
+                  :process-durations
+                  :batch-size
+                  :process-ordering]]
+    (if eid
+      (d/transact conn {:tx-data (vec (for [n new-ones] [:db/add eid :conversation/state-vector n]))})
+      (log/error "No eid"))))
+
+
 (defn update-projects! []
   "Write new project DBs"
   (doseq [p (db/list-projects)]
-    (update-project p)))
+    #_(update-project p)
+    (add-state-vector p)))
 
 (defn tryme []
   (let [conn (connect-atm :system)
@@ -186,3 +204,33 @@
         found (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]]  @conn)]
     (doseq [f found]
       (d/transact conn {:tx-data [[:db/retract eid :system/openai-assistants f]]}))))
+
+#_(defn tell-one
+  "Diagnostic for one interaction with interviewer."
+  [cmd {:keys [pid conv-id] :as ctx}]
+  (let [sur (db/get-surrogate-info pid)
+        ctx (-> ctx
+                (merge (inv/interview-agent conv-id pid))
+                (assoc :responder-role :surrogate)
+                (assoc :sur-aid (:surrogate/assistant-id sur))
+                (assoc :sur-tid (:surrogate/thread-id sur)))]
+    (inv/tell-interviewer cmd ctx)))
+
+(defn tell-one
+  "Diagnostic for one interaction with interviewer."
+  [cmd {:keys [pid conv-id] :as ctx}]
+  (inv/tell-interviewer cmd
+                        (merge ctx (inv/interview-agent conv-id pid))))
+
+(deftest finished-process-test
+  (testing "Testing that :sur-ice-cream has finished all process questions."
+    (is (= {:status "DONE"}
+           (do (tell-one (inv/prior-responses :sur-ice-cream :process) {:pid :sur-ice-cream :conv-id :process})
+               (tell-one {:command "SUPPLY-QUESTION"} {:pid :sur-ice-cream :conv-id :process}))))))
+
+
+(defn huh?
+  ([] (huh? "What are your instructions?"))
+  ([q-txt]
+   (let [{:keys [iview-aid iview-tid]} (inv/interview-agent :process :sur-ice-cream)]
+     (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
