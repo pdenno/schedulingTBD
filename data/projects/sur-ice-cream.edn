@@ -1,68 +1,127 @@
 [
 #:project{:agents
-          [#:agent{:assistant-id "asst_leylWRmtWrnmgFhBtiy18Es8",
+          [#:agent{:assistant-id "asst_B5pEkOJ6lSN92j48NeM2iQSt",
                    :base-type :process-interview-agent,
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_26GikjWIfM3ZI4iIPZMD5hFC"}],
+                   :thread-id "thread_SOXv1PfbPWDzNzHn50cO294W"}],
           :conversations
           [#:conversation{:id :process,
                           :messages
                           [#:message{:content
-                                     "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
+                                     "Would you characterize your company's work as primarily providing a product, a service or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING",
                                      :from :system,
                                      :id 1,
+                                     :question-name :work-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-29T15:45:35.785-00:00"}
+                                     #inst "2024-10-29T18:29:57.515-00:00"}
                            #:message{:content "PRODUCT",
                                      :from :surrogate,
                                      :id 2,
+                                     :question-name :work-type,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-29T15:45:35.834-00:00"}
+                                     #inst "2024-10-29T18:29:57.540-00:00"}
                            #:message{:content
-                                     "Is your production setup more like a flow-shop, a job-shop, or a single-machine system?",
+                                     "Is your production primarily MAKE-TO-STOCK, MAKE-TO-ORDER, or ENGINEER-TO-ORDER?",
                                      :from :system,
                                      :id 3,
+                                     :question-name
+                                     :production-motivation,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-29T15:45:50.633-00:00"}
-                           #:message{:content "FLOW-SHOP",
+                                     #inst "2024-10-29T18:30:15.326-00:00"}
+                           #:message{:content "MAKE-TO-STOCK",
                                      :from :surrogate,
                                      :id 4,
+                                     :question-name
+                                     :production-motivation,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-29T15:45:50.665-00:00"}
+                                     #inst "2024-10-29T18:30:15.344-00:00"}
+                           #:message{:content
+                                     "Would you say your production system is best characterized as FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE?",
+                                     :from :system,
+                                     :id 5,
+                                     :question-name
+                                     :production-system-type,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-10-29T18:30:28.743-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :question-name
+                                     :production-system-type,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-10-29T18:30:28.778-00:00"}
+                           #:message{:content
+                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later.\n\nIf you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
+                                     :from :system,
+                                     :id 7,
+                                     :question-name :process-steps,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-10-29T18:30:44.253-00:00"}
+                           #:message{:content
+                                     "1. Blend Ingredients\n2. Pasteurize Mixture\n3. Homogenize Mixture\n4. Age Mixture\n5. Freeze Mixture\n6. Add Inclusions/Flavorings\n7. Fill Containers\n8. Package\n9. Warehouse Storage",
+                                     :from :surrogate,
+                                     :id 8,
+                                     :question-name :process-steps,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-10-29T18:30:44.282-00:00"}
                            #:message{:content
                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
                                      :from :system,
-                                     :id 5,
+                                     :id 9,
+                                     :question-name :process-durations,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-29T15:46:11.160-00:00"}
+                                     #inst "2024-10-29T18:31:00.527-00:00"}
                            #:message{:content
-                                     "Sure, here's a general outline of processing times for each step:\n\n1. Ingredient Mixing (30 minutes)\n2. Pasteurization (45 minutes)\n3. Homogenization (20 minutes)\n4. Cooling and Aging (4 to 24 hours, typically overnight)\n5. Flavoring and Color Addition (15 minutes)\n6. Freezing (30 minutes)\n7. Packaging (20 minutes)\n8. Hardening (12 hours) \n\nThese times may vary based on the specific product or batch size.",
+                                     "1. Blend Ingredients (30 minutes)\n2. Pasteurize Mixture (1 hour)\n3. Homogenize Mixture (30 minutes)\n4. Age Mixture (4 hours)\n5. Freeze Mixture (15 minutes)\n6. Add Inclusions/Flavorings (10 minutes)\n7. Fill Containers (20 minutes)\n8. Package (15 minutes)\n9. Warehouse Storage (Variable, typically 24 hours)",
                                      :from :surrogate,
-                                     :id 6,
+                                     :id 10,
+                                     :question-name :process-durations,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-29T15:46:11.187-00:00"}
+                                     #inst "2024-10-29T18:31:00.581-00:00"}
                            #:message{:content
-                                     "Earlier, you listed the process steps typically used in making product (e.g., 1. Ingredient Mixing, 2. Pasteurization, etc.) and for each you specified typical durations. Now we'd like you to tell us what raw materials and intermediate products go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n2. Make Filling (sugar, water vanilla flavoring)\n3. Bake Wafers (use dough from Make Cookie Dough)\n4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n5. Package (use cookies from Assemble Cookies)",
+                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just \"1000 packages\". If however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling (2000 packages)\n 3. Bake Wafers (1000 packages)\n 4. Assemble Cookies (1000 packages)\n 5. Package (1000 packages)",
                                      :from :system,
-                                     :id 7,
+                                     :id 11,
+                                     :question-name :batch-size,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-10-29T15:46:36.868-00:00"}
+                                     #inst "2024-10-29T18:31:20.599-00:00"}
                            #:message{:content
-                                     "Certainly, here's how the process steps align with raw materials and intermediate products in ice cream production:\n\n1. Ingredient Mixing (milk, cream, sugar, stabilizers, emulsifiers)\n2. Pasteurization (use mixture from Ingredient Mixing)\n3. Homogenization (use pasteurized mixture)\n4. Cooling and Aging (use homogenized mixture)\n5. Flavoring and Color Addition (use aged mixture, add flavor extracts, fruit purees, or other flavorings)\n6. Freezing (use flavored mixture)\n7. Packaging (use frozen mixture)\n8. Hardening (use packaged ice cream)",
+                                     "1. Blend Ingredients (500 gallons)\n2. Pasteurize Mixture (500 gallons)\n3. Homogenize Mixture (500 gallons)\n4. Age Mixture (500 gallons)\n5. Freeze Mixture (500 gallons)\n6. Add Inclusions/Flavorings (500 gallons)\n7. Fill Containers (1000 units)\n8. Package (1000 units)\n9. Warehouse Storage (1000 units)",
                                      :from :surrogate,
-                                     :id 8,
+                                     :id 12,
+                                     :question-name :batch-size,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-10-29T15:46:36.920-00:00"}]}
+                                     #inst "2024-10-29T18:31:20.626-00:00"}
+                           #:message{:content
+                                     "Earlier, you listed the process steps typically used in making product and for each you specified typical durations. Now we'd like you to tell us what raw materials and intermediate products go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list, it would look like this:\n\n 1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n 2. Make Filling (sugar, water, vanilla flavoring)\n 3. Bake Wafers (use dough from Make Cookie Dough)\n 4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n 5. Package (use cookies from Assemble Cookies)",
+                                     :from :system,
+                                     :id 13,
+                                     :question-name :process-ordering,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-10-29T18:31:50.273-00:00"}
+                           #:message{:content
+                                     "1. Blend Ingredients (cream, milk, sugar, stabilizers, emulsifiers)\n2. Pasteurize Mixture (use blended ingredients from Blend Ingredients)\n3. Homogenize Mixture (use pasteurized mixture from Pasteurize Mixture)\n4. Age Mixture (use homogenized mixture from Homogenize Mixture)\n5. Freeze Mixture (use aged mixture from Age Mixture)\n6. Add Inclusions/Flavorings (use frozen mixture from Freeze Mixture, chocolate chips, nuts, fruit pieces)\n7. Fill Containers (use mixture with inclusions from Add Inclusions/Flavorings)\n8. Package (use filled containers from Fill Containers)\n9. Warehouse Storage (use packaged units from Package)",
+                                     :from :surrogate,
+                                     :id 14,
+                                     :question-name :process-ordering,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-10-29T18:31:50.301-00:00"}]}
            #:conversation{:id :data}
            #:conversation{:id :resource}],
           :current-conversation :process,
@@ -75,11 +134,11 @@
                     :state-string
                     "#{(proj-id sur-ice-cream) (surrogate sur-ice-cream) (proj-name \"SUR Ice Cream\")}"},
           :surrogate
-          #:surrogate{:assistant-id "asst_b1bCA5mnGi1MBOzj1f4e61un",
+          #:surrogate{:assistant-id "asst_8TKUtyRO1AkdZJJw0N1CvRS3",
                       :id :sur-ice-cream,
                       :subject-of-expertise "ice cream",
                       :system-instruction
                       "You manage a company that makes ice cream.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_gC6zQlKw4HiSeetE3Q0oyUqU"}}
+                      :thread-id "thread_hqDjKmqKl7pMM3DhVuEd3JpH"}}
 
 ]

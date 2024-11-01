@@ -137,23 +137,34 @@
      :name - a string, no default.
      :instructions - a string, the systems instructions; defaults to 'You are a helpful assistant.',
      :model - a string; defaults to whatever is the chosen 'gpt-4',
-     :tools - a vector containing maps; defaults to [{:type 'code_interpreter'}]."
-  [& {:keys [name model-class instructions tools metadata llm-provider response-format]
+     :tools - a vector containing maps, for example [{:type 'code_interpreter'}]."
+  [& {:keys [name model-class instructions tools tool-resources metadata llm-provider response-format]
       :or {model-class :gpt
            llm-provider @default-llm-provider
-           ;;tools [{:type "code_interpreter"}] ; <===== ToDo: Possible breaking change.
-           metadata {}} :as obj}]
+           metadata {:usage :stbd-agent}} :as obj}]
   (s/valid? ::assistant-args obj)
   (openai/create-assistant {:name            name
                             :model           (pick-llm model-class llm-provider)
                             :response_format response-format
                             :metadata        metadata
                             :instructions    instructions
-                            :tools           tools}
+                            :tools           tools
+                            :tool_resources  tool-resources}
                            (api-credentials llm-provider)))
 
+;;; Not clear that this does anything! See notes 2024-10-31.
+#_(defn update-assistant
+  "Update an assistant with a file for file-search."
+  [& {:keys [aid fids llm-provider] :or {llm-provider @default-llm-provider}}]
+  (assert (string? aid))
+  (assert (every? #(string? %) fids))
+  (reset! diag (openai/modify-assistant {:assistant_id aid :file_ids fids}
+                                        (api-credentials llm-provider))))
+
 (defn make-thread
-  [& {:keys [assistant-id metadata llm-provider] :or {metadata {} llm-provider @default-llm-provider}}]
+  [& {:keys [assistant-id metadata llm-provider] :or
+      {metadata {:usage :stbd-agent}
+       llm-provider @default-llm-provider}}]
   (openai/create-thread {:assistant_id assistant-id
                          :metadata metadata}
                         (api-credentials llm-provider)))
@@ -260,7 +271,7 @@
         (map  (fn [m] (update m :created_at #(str (java.util.Date. (* 1000 %))))))
         (mapv (fn [m] (update m :role keyword))))))
 
-(defn our-assistant?
+(defn ours?
   "Returns true if assistant metadata :usage key indiciates it is ours."
   [usage]
   (#{"stbd-surrogate" "surrogate" "agent" "stbd-agent"} usage))
@@ -275,9 +286,9 @@
     (loop [ours []
            response (openai/list-assistants {:limit 1} creds)]
       (if (:has_more response)
-        (recur (into ours (->> response :data (filter #(-> % :metadata :usage our-assistant?)) (map :id)))
+        (recur (into ours (->> response :data (filter #(-> % :metadata :usage ours?)) (map :id)))
                (openai/list-assistants {:limit 99 :after (:last_id response)} creds)) ; 99 is max in openai.
-        (into ours (->> response :data (filter #(-> % :metadata :usage our-assistant?)) (map :id)))))))
+        (into ours (->> response :data (filter #(-> % :metadata :usage ours?)) (map :id)))))))
 
 (defn delete-assistant!
   "Delete the assistant having the given ID, a string."
@@ -349,20 +360,54 @@
 ;;; --------------------------------- Files -------------------------------
 (defn upload-file
   "Upload a file and get back a file id response."
-  ([fname] (upload-file fname "assistants" @default-llm-provider))
-  ([fname purpose provider]
-    (let [creds (api-credentials provider)]
-      (openai/create-file {:purpose (name purpose)
-                           :file (io/file fname)}
-                          creds))))
+  [& {:keys [fname purpose llm-provider]
+      :or {purpose "assistants"
+           llm-provider @default-llm-provider}}]
+  (openai/create-file {:purpose purpose
+                       :file (io/file fname)}
+                      (api-credentials llm-provider)))
 
-(defn delete-file
-  ([file-id] (delete-file file-id @default-llm-provider))
-  ([file-id provider]
-   (assert (string? file-id))
-   (let [creds (api-credentials provider)]
-     (openai/delete-file {:file-id file-id} creds))))
+(defn ^:diag delete-file
+  [& {:keys [file-id llm-provider]
+      :or {llm-provider @default-llm-provider}}]
+  (assert (string? file-id))
+  (openai/delete-file {:file-id file-id} (api-credentials llm-provider)))
 
+;;; --------------------------------- Vector stores -------------------------------
+(defn make-vector-store
+  [& {:keys [name file-ids metadata llm-provider]
+      :or {llm-provider @default-llm-provider
+           metadata {:usage :stbd-agent}}}]
+  (openai/create-vector-store
+   {:name name :file_ids file-ids :metadata metadata}
+   (api-credentials llm-provider)))
+
+(defn list-vector-stores
+  [& {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (let [creds (api-credentials llm-provider)]
+    (loop [ours []
+           response (openai/list-vector-stores {:limit 1} creds)]
+      (if (:has_more response)
+        (recur (into ours (->> response :data (filter #(-> % :metadata :usage ours?)) (map :id)))
+               (openai/list-vector-stores {:limit 99 :after (:last_id response)} creds)) ; 99 is max in openai.
+        (into ours (->> response :data (filter #(-> % :metadata :usage ours?)) (map :id)))))))
+
+(defn modify-vector-store
+  [& {:keys [vector-store-id name llm-provider] :or {llm-provider @default-llm-provider}}]
+  (openai/modify-vector-store {:vector_store_id vector-store-id :name name}
+                              (api-credentials llm-provider)))
+
+;;; Calls to openai/retieve-vector-store raises an error "Could not find route :retrieve-vector-store"openai/retrieve-vector-store
+;;; Instead of calling openai/retieve-vector-store, I think you can call modify-vector-store with params specifying just :vector_store_id.
+(defn retrieve-vector-store
+  [& {:keys [vector-store-id llm-provider] :or {llm-provider @default-llm-provider}}]
+  (modify-vector-store {:vector-store-id vector-store-id :llm-provider llm-provider}))
+
+
+(defn delete-vector-store
+  [& {:keys [vector-store-id llm-provider] :or {llm-provider @default-llm-provider}}]
+  (openai/delete-vector-store {:vector_store_id vector-store-id}
+                              (api-credentials llm-provider)))
 
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []

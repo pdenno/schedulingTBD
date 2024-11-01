@@ -416,17 +416,26 @@
 (def db-schema-proj (datahike-schema db-schema-proj+))
 
 ;;; ---------------------------------- agents ----------------------------------------------
+(s/def ::agent-args (s/keys :req-un [::base-type ::instructions]
+                            :opt-un [::response-format ::llm-provider ::model-class ::project-thread? ::tools]))
+(s/def ::base-type keyword?)
+(s/def ::instructions string?)
+(s/def ::response-format string?) ;; ToDo: Valid JSON schema.
+(s/def ::llm-provider #{:openai :azure})
+(s/def ::project-thread? boolean?)
+(s/def ::tools (s/and vector? (s/coll-of ::tool)))
+(s/def ::tool (s/keys :req-un [::type]))
+
 (defn add-agent!
   "Create an agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
-   Store what is needed to identify it in system DB."
-  [{:keys [id base-type instructions llm-provider response-format project-thread? model-class]
-    :or {llm-provider @default-llm-provider model-class :gpt}}]
+   Store what is needed to identify it in system DB. Return the OpenAI Assistent object."
+  [{:keys [id base-type llm-provider #_response-format project-thread? model-class #_tools]
+    :or {llm-provider @default-llm-provider model-class :gpt} :as args}]
+  (s/valid? ::agent-args args)
   (let [user (-> (System/getenv) (get "USER"))
-        assist (llm/make-assistant :name (name id)
-                                   :llm-provider llm-provider
-                                   :instructions instructions
-                                   :response-format response-format
-                                   :metadata {:usage :stbd-agent :user user})
+        assist (llm/make-assistant (-> args
+                                       (assoc :name (name id))
+                                       (assoc :metadata {:usage :stbd-agent :user user})))
         aid    (:id assist)
         thread (when-not project-thread?
                  (llm/make-thread {:assistant-id aid
@@ -443,7 +452,8 @@
                                                          :agent/llm-provider llm-provider
                                                          :agent/model-class model-class
                                                          :agent/assistant-id aid}
-                                                  tid (assoc :agent/thread-id tid))}]})))
+                                                  tid (assoc :agent/thread-id tid))}]})
+    assist))
 
 ;;; (db/add-agent! {:id :process-dur-agent,,,}
 (def known-agent-info
@@ -451,6 +461,8 @@
   [{:id :process-interview-agent
     :project-thread?  true
     #_#_:model-class :analysis
+    :tools [{:type "file_search"}]
+    :vec-store-files ["data/instructions/process-interview.pdf"]
     :instruction-path "data/instructions/interviewer-process.txt"
     :response-format (-> "data/instructions/interviewer-response-format.edn" slurp edn/read-string)}
 
@@ -717,17 +729,24 @@
   ([] (recreate-system-agents! known-agent-info))
   ([infos]
    (doseq [llm-provider [:openai]]
-     (doseq [{:keys [id instruction-path response-format project-thread? model-class]
+     (doseq [{:keys [id instruction-path response-format project-thread? model-class tools vec-store-files]
               :or {model-class :gpt}} infos]
-       (cond-> {}
-         true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
-         true (assoc :base-type id)
-         true (assoc :llm-provider llm-provider)
-         true (assoc :instructions (slurp instruction-path))
-         true (assoc :model-class model-class)
-         project-thread? (assoc :project-thread? true)
-         response-format (assoc :response-format response-format)
-         true add-agent!)))))
+       #_(let [#_#_fids (doall (mapv #(llm/upload-file %) files))])
+        (cond-> {}
+          true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
+          true (assoc :base-type id)
+          true (assoc :llm-provider llm-provider)
+          true (assoc :instructions (slurp instruction-path))
+          true (assoc :model-class model-class)
+          tools           (assoc :tools tools)
+          vec-store-files (let [file-objs (doall (mapv #(llm/upload-file %) vec-store-files))]
+                            (assoc :tool-resources  {"file_search" {"vector_store_ids" [(map :id file-objs)]}}))
+          project-thread? (assoc :project-thread? true)
+          response-format (assoc :response-format response-format)
+          true add-agent!)
+         #_(when files
+             (let [ff ]
+               (llm/update-assistant {:aid (:id agent) :fids (mapv :id ff)})))))))
 
 (defn recreate-system-db!
   "Recreate the system database from an EDN file

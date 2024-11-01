@@ -224,15 +224,9 @@
                   (mapv #(reduce-kv (fn [m k v] (cond (= k :message/content)         (assoc m :answer v)
                                                       (= k :message/question-name)   (assoc m :question-name (name v))
                                                       :else m))
-                                    {} %)))
-        responses (d/q '[:find [?elem ...]
-                         :in $ conv-id
-                         :where
-                         [?c :conversation/id ?conv-id]
-                         [?c :conversation/state-vector ?elem]]
-                       @(connect-atm :sur-ice-cream) conv-id)]
+                                    {} %)))]
     {:command "PRIOR-RESPONSES"
-     :responses-to (mapv name responses)
+     :already-answered (->>  msgs (map :question-name) set vec)
      :responses msgs}))
 
 (def ^:diag active? (atom true))

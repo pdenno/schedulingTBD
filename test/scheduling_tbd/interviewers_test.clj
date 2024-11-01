@@ -1,6 +1,7 @@
 (ns scheduling-tbd.interviewer-test
   (:require
    [clojure.edn                 :as edn]
+   [clojure.java.io             :as io]
    [clojure.pprint              :refer [pprint cl-format]]
    [clojure.test                :refer [deftest is testing]]
    [datahike.api                :as d]
@@ -229,8 +230,30 @@
                (tell-one {:command "SUPPLY-QUESTION"} {:pid :sur-ice-cream :conv-id :process}))))))
 
 
-(defn huh?
+(defn ^:diag huh?
   ([] (huh? "What are your instructions?"))
   ([q-txt]
    (let [{:keys [iview-aid iview-tid]} (inv/interview-agent :process :sur-ice-cream)]
      (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
+
+(def ^:diag diag (atom nil))
+
+;;; "vs_5bIXuiVz9aCYQt9F6HBIrzY5"
+(defn ^:diag tryme []
+  (let [flowchart (llm/upload-file {:fname "data/instructions/interviewers/process-interview-flowchart.pdf"})
+        vec-store (llm/make-vector-store :name "Process Interview Vector Store" :file-ids [(:id flowchart)])
+        agent (llm/make-assistant :name "Tryme agent"
+                                  :instructions (slurp "data/instructions/interviewers/process.txt")
+                                  :tools [{:type "file_search"}]
+                                  :tool-resources {"file_search" {"vector_store_ids" [(:id vec-store)]}})
+        thread (llm/make-thread :assistant-id (:id agent))]
+    (reset! diag {:aid (:id agent) :tid (:id thread)}) ; diag so that you can ask it questions off-line.
+    (llm/query-on-thread :aid (:aid @diag)
+                         :tid (:tid @diag)
+                         :query-text "Summarize what you see in the uploaded file 'Process Interview Flowchart'")))
+
+(deftest test-vector-stores
+  (let [{:keys [id object]} (llm/make-vector-store
+                           {:name "Process Interview flowchart"
+                            :file_ids [(llm/upload-file "data/instructions/interviewers/process-interview-flowchart.pdf")]})]
+    (is (and (string? id) (= object "vector_store")))))

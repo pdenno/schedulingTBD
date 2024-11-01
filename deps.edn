@@ -14,7 +14,8 @@
            metosin/reitit                      {:mvn/version "0.7.2"}
            metosin/ring-http-response          {:mvn/version "0.9.4"}
            mount/mount                         {:mvn/version "0.1.19"}
-           net.clojars.wkok/openai-clojure     {:mvn/version "0.21.1"}
+           #_#_net.clojars.wkok/openai-clojure     {:mvn/version "0.21.1"}
+           com.github.pdenno/openai-clojure    {:mvn/version "0.21.2"}
            org.apache.logging.log4j/log4j-api  {:mvn/version "2.24.1"}
            org.apache.logging.log4j/log4j-core {:mvn/version "2.24.1"}
            org.clj-commons/hickory             {:mvn/version "0.7.4"}
