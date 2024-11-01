@@ -253,7 +253,9 @@
                          :query-text "Summarize what you see in the uploaded file 'Process Interview Flowchart'")))
 
 (deftest test-vector-stores
-  (let [{:keys [id object]} (llm/make-vector-store
-                           {:name "Process Interview flowchart"
-                            :file_ids [(llm/upload-file "data/instructions/interviewers/process-interview-flowchart.pdf")]})]
+  (let [{:keys [id object] :as obj}
+        (llm/make-vector-store
+         {:name "Process Interview flowchart"
+          :file_ids [(llm/upload-file {:fname "data/instructions/interviewers/process-interview-flowchart.pdf"})]})]
+    (reset! diag obj)
     (is (and (string? id) (= object "vector_store")))))

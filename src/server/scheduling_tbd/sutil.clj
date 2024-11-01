@@ -236,7 +236,30 @@
     (assert (#{:process :data :resource} res))
     res))
 
+(defn remove-preamble
+  "The LLM might put text and markup around the answer, return the answer without this crap."
+  [response]
+  (let [response (str/replace response #"\s" " ")]
+    (cond (re-matches #".*```clojure.*" response)
+          (let [pos (str/index-of response "```clojure")
+                response (subs response (+ pos 10))
+                pos (str/index-of response "```")]
+            (subs response 0 pos))
+
+          (re-matches #".*```json.*" response)
+          (let [pos (str/index-of response "```json")
+                response (subs response (+ pos 7))
+                pos (str/index-of response "```")]
+            (subs response 0 pos))
+          :else response)))
+
+;;; This became complicated once I couldn't use strict schema results.
 (defn output-struct2clj
   "Translate the OpenAI API output structure (a string) to a map with keyword keys."
   [str]
-  (update-keys (json/read-value str) keyword))
+  (try
+    (let [str (remove-preamble str)]
+      (update-keys (json/read-value str) keyword))
+    (catch Exception _e
+      (reset! diag str)
+      (log/error "Could not read string returned from OpenAI:" str))))

@@ -10,7 +10,7 @@
    [clojure.string                :as str]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [default-llm-provider register-planning-domain yes-no-unknown]]
+   [scheduling-tbd.sutil          :as sutil :refer [default-llm-provider register-planning-domain yes-no-unknown remove-preamble]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
@@ -229,17 +229,6 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
 (s/def ::rev-4 (fn [v] (every? #(s/valid? ::rev-4-map %) v)))
 (s/def ::rev-5 (fn [v] (every? #(s/valid? ::rev-5-map %) v)))
 
-(defn remove-preamble
-  "The LLM might put text and markup around the answer, return the answer without this crap."
-  [response]
-  (let [response (str/replace response #"\s" " ")]
-    (if (re-matches #".*```clojure.*" response)
-      (let [pos (str/index-of response "```clojure")
-            response (subs response (+ pos 10))
-            pos (str/index-of response "```")]
-        (subs response 0 pos))
-      response)))
-
 (defn switch-keys
   "Switch from LLM keys to keys used in DB."
   [obj]
@@ -277,7 +266,7 @@ Our challenge is to complete our work while minimizing inconvenience to commuter
         (let [result (llm/query-on-thread
                       {:aid aid :tid tid :role "user"
                        :tries 3 :test-fn (fn [resp] (s/valid? rev resp))
-                       :preprocess-fn (fn [resp] (-> resp remove-preamble edn/read-string))
+                       :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))
                        :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
           (reset! past-rev result)
           (log/info "***************" rev "="  @past-rev))))

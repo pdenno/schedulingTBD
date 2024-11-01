@@ -377,6 +377,7 @@
 (defn make-vector-store
   [& {:keys [name file-ids metadata llm-provider]
       :or {llm-provider @default-llm-provider
+           name "STBD agent vector store"
            metadata {:usage :stbd-agent}}}]
   (openai/create-vector-store
    {:name name :file_ids file-ids :metadata metadata}

@@ -81,16 +81,6 @@
             response-text))
       (throw (ex-info "Unknown response from operator" {:response response-text})))))
 
-(s/def ::interviewer-cmd (s/and (s/keys :req-un [::command]
-                                        :opt-un [::response ::told_what ::conclusions ::advice])
-                                #(case (:command %)
-                                   "SUPPLY-QUESTION"    true
-                                   "HUMAN-RESPONDS"     (contains? % :response)
-                                   "ANALYSIS-CONCLUDES" (contains? % :conclusions)
-                                   "HUMAN-TOLD"         (contains? % :told_what)
-                                   "COURSE-CORRECTION"  (contains? % :advice)
-                                   nil)))
-
 ;;; Note that in OpenAI every thread has its own separate context window, which stores the conversation history specific to
 ;;; that thread, preventing cross-contamination with other threads.
 (defn interview-agent
@@ -116,6 +106,15 @@
                {}
                @interview-agent-atm)))
 
+(s/def ::interviewer-cmd (s/and (s/keys :req-un [::command]
+                                        :opt-un [::response ::told_what ::conclusions ::advice])
+                                #(case (:command %)
+                                   "SUPPLY-QUESTION"    true
+                                   "HUMAN-RESPONDS"     (contains? % :response)
+                                   "ANALYSIS-CONCLUDES" (contains? % :conclusions)
+                                   "HUMAN-TOLD"         (contains? % :told_what)
+                                   "COURSE-CORRECTION"  (contains? % :advice)
+                                   nil)))
 (s/def ::command string?)
 (s/def ::response string?)
 (s/def ::conclusions string?)
@@ -133,6 +132,7 @@
                 llm/query-on-thread
                 output-struct2clj)]
     (log/info "Interviewer returns:" res)
+    (reset! diag res)
     res))
 
 ;;; ToDo: Would be different for different interviews. For example, the resource interview would want to see the process interview.
@@ -206,14 +206,15 @@
   "Call loop-for-answer until the answer is responsive to a question that we obtain from the interviewer here.
    Return the Q/A pair or {:status 'DONE'}."
   [ctx]
-  (let [{:keys [question question-type status]} (tell-interviewer {:command "SUPPLY-QUESTION"} ctx)]
-    (cond (= status "DONE")             "DONE"
+  (let [{:keys [question question-type status] :as result} (tell-interviewer {:command "SUPPLY-QUESTION"} ctx)]
+    (cond (= status "DONE")             result
           (and question question-type)  (let [{:keys [command] :as cmd} (loop-for-answer question (assoc ctx :question-type question-type))]
                                           (if (= command "HUMAN-RESPONDS")
                                             (tell-interviewer cmd ctx)
-                                            (log/warn "loop-for answer should have returns HUMAN-RESPONDS:" cmd)))
+                                            (do (log/warn "loop-for answer should have returns HUMAN-RESPONDS:" cmd)
+                                                {:status "DONE"})))
           question                      (do (log/error "Question does not have type:" question)
-                                            "DONE"))))
+                                            {:status "DONE"}))))
 
 ;;; ToDo: It isn't obvious that the interview agent needs to see this. Only useful when the thread was destroyed?
 (defn prior-responses
@@ -247,9 +248,9 @@
                   (assoc :sur-tid (:surrogate/thread-id sur)))]
       ;; The conversation loop.
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-      (if (== 0 (-> pid (db/get-conversation-eids conv-id) count))
-        (-> sur initial-advice (tell-interviewer ctx))
-        (-> (prior-responses pid conv-id) (tell-interviewer ctx)))
+      (when (== 0 (-> pid (db/get-conversation-eids conv-id) count))
+        (-> sur initial-advice (tell-interviewer ctx)))
+      (-> (prior-responses pid conv-id) (tell-interviewer ctx))
       (loop [cnt 0
              response nil]
         (if (or (= "DONE" (:status response)) (> cnt 10))
@@ -259,7 +260,6 @@
                    (next-question ctx))))))
       (finally
         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
-
 
 ;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-iviewers!
