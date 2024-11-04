@@ -22,7 +22,7 @@
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
      - The project's name and db directory
-     - Planning domains, methods, operators, and axioms"
+     - system-level agents"
   {;; ---------------------- agent (system agents shared by projects)
    :agent/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
@@ -119,6 +119,15 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "boxed value"}
 
+   ;; ---------------------- claim (something believed owing to what users said in interviews)
+   :claim/string
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string :unique :db.unique/identity
+        :doc "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.
+              For example, (:process/production-motivation make-to-stock)."}
+   :claim/confidence
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
+        :doc "a number [0,1] expressing how strongly we believe the proposition ."}
+
    ;; ---------------------- conversation
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
@@ -166,17 +175,6 @@
    :objective/text
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
         :doc "strings expressing the scheduling objective."}
-
-   ;; ---------------------- problem (the planning problem and current state)
-   :problem/domain
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "A keyword identifying the problem domain map"}
-   :problem/goal-string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "A string that can be edn/read-string into a predicate."}
-   :problem/state-string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "A string that can be edn/read-string into a set of predicates"}
 
    ;; ---------------------- process (about production process types)
    :process/desc
@@ -247,6 +245,9 @@
    :project/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "an agent (OpenAI Assistant, etc.) that outputs a vector of clojure maps in response to queries."}
+   :project/claims
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "the collection of things we believe about the project as logical statements."}
    :project/code
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Code associated with the project."}
@@ -271,12 +272,9 @@
    :project/objective
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "a reference to the scheduling objective of the project."}
-   :project/planning-problem
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "an object with keys :problem/domain, :problem/goal-string, and :problem/state-string at least."}
    :project/processes
-      #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-           :doc "the project's process objects; everything about processes."}
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "the project's process objects; everything about processes in a complex structure."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
@@ -628,22 +626,10 @@
       (-> state-str edn/read-string set)
       #{})))
 
-(defn put-planning-state
-  "Write the complete state to the project database. Argument is a vector or set. "
-  [pid state]
-  (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
-  ;;(log/info "put-planning-state: state =" state)
-  (if (empty? state)
-    (throw (ex-info "state is empty" {:pid pid}))
-    (let [state-set (set state)
-          conn (connect-atm pid)
-          eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
-      (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str state-set)]]}))))
-
-(defn add-planning-state
+(defn add-claim
   "Add the argument vector of ground proposition to state, a set. Return the new state."
   [pid more-state]
-  (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
+  (assert (every? #(s/valid? ::spec/proposition %) more-state))
   ;;(log/info "add-planning-state: more-state = " more-state)
   (let [new-state (into (get-planning-state pid) more-state)
         conn (connect-atm pid)

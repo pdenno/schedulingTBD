@@ -143,12 +143,9 @@
           :current-conversation :process,
           :id :sur-ice-cream,
           :name "SUR Ice Cream",
-          :planning-problem
-          #:problem{:domain :process-interview,
-                    :goal-string
-                    "(characterize-process sur-ice-cream)",
-                    :state-string
-                    "#{(proj-id sur-ice-cream) (surrogate sur-ice-cream) (proj-name \"SUR Ice Cream\")}"},
+          :claims [{:claim/string "(proj-id sur-ice-cream)"}
+                   {:claim/string "(surrogate sur-ice-cream)"}
+                   {:claim/string "(:process/production-motivation make-to-stock)"}]
           :surrogate
           #:surrogate{:assistant-id "asst_kEffJTBLOw9d8MdDdNBLeo0v",
                       :id :sur-ice-cream,

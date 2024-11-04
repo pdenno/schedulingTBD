@@ -23,19 +23,6 @@
   (s/or :positive ::positive-proposition
         :negated  ::negated-proposition))
 
-(s/def :edits/add    (s/and set? (s/coll-of ::proposition)))
-(s/def :edits/delete (s/and set? (s/coll-of ::proposition)))
-
-(s/def :step/operator keyword?)
-(s/def :step/args coll?)
-
-(s/def ::plan-step (s/keys :req-un [:step/operator :step/args]))
-(s/def ::state-edits (s/keys :req-un [:edits/add :edits/delete]))
-
-(s/def :problem/domain keyword?)
-(s/def ::goal seq?)
-(s/def ::state (s/coll-of seq?))
-(s/def ::domain-problem  (s/keys :req [:problem/domain] :req-un[::goal ::state]))
 
 ;;; ------ These concern out-bound on ws/send-to-chat. -------------------
 ;;; ToDo: I need to be able to push an update to the conversation!

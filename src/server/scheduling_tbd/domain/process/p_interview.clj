@@ -10,13 +10,10 @@
    [clojure.string                :as str]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm :refer [query-llm]]
-   [scheduling-tbd.sutil          :as sutil :refer [default-llm-provider register-planning-domain yes-no-unknown remove-preamble]]
+   [scheduling-tbd.sutil          :as sutil :refer [yes-no-unknown remove-preamble]]
    [taoensso.timbre               :as log]))
 
 (def ^:diag diag (atom nil))
-
-;;; Place this in any file where you are developing the process interview so updates will be found.
-(register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
 
 ;;; ------------------------------- project name --------------------------------------
 ;;; The user would be prompted: "Tell us what business you are in and what your scheduling problem is."

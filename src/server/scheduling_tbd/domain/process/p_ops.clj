@@ -25,7 +25,7 @@
     (let [[_ pid]   (find-fact '(proj-id ?x) analysis-state)
           [_ pname] (find-fact '(proj-name ?x) analysis-state)
           pid (keyword pid)]
-      (db/add-planning-state pid analysis-state)
+      (doseq [f analysis-state] (db/add-claim pid f))
       (db/add-msg {:pid pid
                    :from :system
                    :text (format "Great, we'll call your project %s." pname)
@@ -56,7 +56,7 @@
         new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid-sym)
                        (re-matches #".*(?i)SERVICE.*" response) (list 'provides-service pid-sym)
                        :else                                    (list 'fails-query 'product-or-service? pid-sym))]
-    (db/add-planning-state pid [new-fact])))
+    (db/add-claim pid new-fact)))
 
 ;;; ----- :!query-production-mode ---------------------------------------------------------
 (defaction :!query-production-mode [{:keys [pid response] :as _obj}]
@@ -65,7 +65,7 @@
                        (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        (list 'production-mode pid-sym 'make-to-order)
                        (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    (list 'production-mode pid-sym 'engineer-to-order)
                        :else                                                 (list 'fails-query 'production-mode pid-sym))]
-    (db/add-planning-state pid [new-fact])))
+    (db/add-claim pid new-fact)))
 
 ;;; ----- :!query-activity-location-type ---------------------------------------------------------
 (defaction :!query-activity-location-type [{:keys [pid response] :as _obj}]
@@ -73,7 +73,7 @@
         new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'has-production-facility pid-sym)
                        (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'performed-at-customer-site pid-sym)
                        :else                                          (list 'fails-query 'facility-vs-site pid-sym))]
-    (db/add-planning-state pid [new-fact])))
+    (db/add-claim pid new-fact)))
 
 ;;; ----- :!query-shop-type ---------------------------------------------------------
 (defaction :!query-shop-type [{:keys [pid response] :as _obj}]
@@ -81,14 +81,14 @@
         new-fact (cond (re-matches #".*(?i)FLOW-SHOP.*" response)  (list 'flow-shop pid-sym)
                        (re-matches #".*(?i)JOB-SHOP.*"  response)  (list 'job-shop pid-sym)
                        :else                                       (list 'fails-query 'flow-vs-job pid-sym))]
-    (db/add-planning-state pid [new-fact])))
+    (db/add-claim pid new-fact)))
 
 ;;; ----- :!query-process-steps. This is for flow shops. ------------------------------------------------
 (defaction :!query-process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
   (let [more-state (pinv/analyze-process-steps-response obj)]
     (log/info "---------------------- !query-process-steps: more-state = " more-state)
-    (db/add-planning-state pid more-state)))
+    (doseq [f more-state] (db/add-claim pid f))))
 
 ;;; ----- :!query-process-durs -----------------------------------------------------------
 (defaction :!query-process-durs [{:keys [client-id response pid] :as obj}]
@@ -109,12 +109,11 @@
                      :text study-the-code-msg
                      :tags [:info-to-user :minizinc]})
         (ws/refresh-client client-id pid :process)
-        (db/add-planning-state pid more-state))
+        (doseq [f more-state] (db/add-claim pid f)))
       (ws/send-to-chat
        {:client-id client-id
         :dispatch-key :tbd-says
         :text "There was a problem defining a process corresponding to what you said."}))))
-
 
 (defaction :!query-process-ordering [{:keys [response] :as _obj}]
   (log/info "!query-process-ordering: response =" response))

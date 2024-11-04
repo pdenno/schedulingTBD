@@ -3,7 +3,6 @@
   (:require
    [clojure.string           :as str]
    [datahike.api             :as d]
-   [datahike.pull-api        :as dp]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.llm       :as llm]
@@ -32,18 +31,10 @@
         pattern (re-pattern (format "%s(-\\d+)?" pid-str))]
     (some #(when (re-matches pattern %) (keyword %)) projects)))
 
-(defn surrogate-init-problem
-  "Create the initial :project/planning-problem for a surrogate."
-  [pid pname]
-  (let [pid-sym (-> pid name symbol)]
-    `{:problem/domain :process-interview
-      :problem/goal-string ~(format "(characterize-process %s)" (name pid))
-      :problem/state-string ~(format "#{(proj-id %s) (surrogate %s) (proj-name \"%s\")}" pid-sym pid-sym pname)}))
-
 (defn ensure-project-and-surrogate
   "If a surrogate with given expertise exists, return the DB map of it.
    Otherwise create and store a project with the given expertise and return the DB map of its surrogate."
-  [pid pname force-new?]
+  [pid force-new?]
   (if force-new?
     (let [conn-atm (connect-atm pid)
           eid (db/project-exists? pid)
@@ -56,10 +47,8 @@
                                      :instructions instructions
                                      :metadata {:usage :stbd-surrogate :user user})
           aid    (:id assist)
-          thread (llm/make-thread {:assistant-id aid :metadata {:usage :stbd-surrogate :user user}})
-          prob (surrogate-init-problem pid pname)] ; Surrogates have just one thread.
+          thread (llm/make-thread {:assistant-id aid :metadata {:usage :stbd-surrogate :user user}})]
       (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)
-                                       :project/planning-problem prob
                                        :project/surrogate {:surrogate/id pid
                                                            :surrogate/subject-of-expertise expertise
                                                            :surrogate/system-instruction instructions
