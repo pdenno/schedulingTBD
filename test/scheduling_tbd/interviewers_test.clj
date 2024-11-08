@@ -1,14 +1,16 @@
 (ns scheduling-tbd.interviewer-test
   (:require
-   [clojure.edn                 :as edn]
-   [clojure.java.io             :as io]
-   [clojure.pprint              :refer [pprint cl-format]]
-   [clojure.test                :refer [deftest is testing]]
-   [datahike.api                :as d]
-   [scheduling-tbd.db           :as db]
-   [scheduling-tbd.interviewers :as inv]
-   [scheduling-tbd.llm          :as llm]
-   [scheduling-tbd.sutil        :as sutil :refer [connect-atm default-llm-provider]]
+   [clojure.edn                   :as edn]
+   [clojure.java.io               :as io]
+   [clojure.pprint                :refer [pprint]]
+   [clojure.test                  :refer [deftest is testing]]
+   [datahike.api                  :as d]
+   [scheduling-tbd.db             :as db]
+   [scheduling-tbd.domain.process-analysis :as pan]
+   [scheduling-tbd.interviewers   :as inv]
+   [scheduling-tbd.llm            :as llm]
+   [scheduling-tbd.response-utils :as ru]
+   [scheduling-tbd.sutil          :as sutil :refer [connect-atm default-llm-provider]]
    [taoensso.timbre :as log :refer [warn debug]]))
 
 ;;; THIS is the namespace I am hanging out in recently.
@@ -38,7 +40,7 @@
   (safe-alias 'p      'promesa.core)
   (safe-alias 'px     'promesa.exec)
   (safe-alias 'core   'scheduling-tbd.core)
-  (safe-alias 'pinv   'scheduling-tbd.domain.process.p-interview)
+  (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'llm    'scheduling-tbd.llm)
@@ -47,13 +49,13 @@
   (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
   (safe-alias 'ou     'scheduling-tbd.op-utils)
   (safe-alias 'opt    'scheduling-tbd.operators-test)
-  ;(safe-alias 'plan   'scheduling-tbd.planner)
-  (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
+  (safe-alias 'ru     'scheduling-tbd.response-utils)
   (safe-alias 'spec   'scheduling-tbd.specs)
   (safe-alias 'sutil  'scheduling-tbd.sutil)
   (safe-alias 'sur    'scheduling-tbd.surrogate)
   (safe-alias 'surt   'scheduling-tbd.surrogate-test)
   (safe-alias 'util   'scheduling-tbd.util)
+  (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
   (safe-alias 'ws     'scheduling-tbd.web.websockets)
   (safe-alias 'openai 'wkok.openai-clojure.api))
 
@@ -239,7 +241,7 @@
 (def ^:diag diag (atom nil))
 
 ;;; "vs_5bIXuiVz9aCYQt9F6HBIrzY5"
-(defn ^:diag tryme []
+(defn ^:diag test-query-on-vstore []
   (let [flowchart (llm/upload-file {:fname "data/instructions/interviewers/process-interview-flowchart.pdf"})
         vec-store (llm/make-vector-store :name "Process Interview Vector Store" :file-ids [(:id flowchart)])
         agent (llm/make-assistant :name "Tryme agent"
@@ -259,3 +261,34 @@
           :file_ids [(llm/upload-file {:fname "data/instructions/interviewers/process-interview-flowchart.pdf"})]})]
     (reset! diag obj)
     (is (and (string? id) (= object "vector_store")))))
+
+
+(defn ^:diag check-instructions
+  "It might be the case that the system instructions were too long. This asks what it knows about."
+  []
+  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)]
+    (llm/query-on-thread
+     {:aid aid :tid tid :role "user"
+      :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
+                       "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))
+
+
+(def response {:client-id (ws/recent-client!)
+               :response "1. Mix Ingredients (30 minutes)
+2. Pasteurize Mixture (45 minutes)
+3. Homogenize Mixture (20 minutes)
+4. Age Mixture (4 hours)
+5. Flavor Addition (15 minutes)
+6. Freeze Mixture (30 minutes)
+7. Add Inclusions (10 minutes)
+8. Fill Containers (20 minutes)
+9. Harden Ice Cream (4 hours)
+10. Package (40 minutes)
+11. Store in Cold Storage (ongoing)"
+               :pid :sur-ice-cream})
+
+(defn  ^:diag tryme []
+  (pan/analyze-process-durs-response response))
+
+(defn ^:diag tryme2 []
+  (ru/analyze-response (assoc response :question-type :process-durations)))

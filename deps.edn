@@ -4,31 +4,31 @@
            com.cemerick/url                    {:mvn/version "0.1.1"}
            ;;com.cognitect/transit-clj           {:mvn/version "1.0.333"}
            com.github.pdenno/mznp              {:mvn/version "1.0.89"}
-           com.taoensso/timbre                 {:mvn/version "6.5.0"}
+           com.taoensso/timbre                 {:mvn/version "6.6.1"}
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
            funcool/promesa                     {:mvn/version "11.0.678"}
-           io.replikativ/datahike              {:mvn/version "0.6.1568"}
-           metosin/jsonista                    {:mvn/version "0.3.11"}
+           io.replikativ/datahike              {:mvn/version "0.6.1592"}
+           metosin/jsonista                    {:mvn/version "0.3.12"}
            metosin/muuntaja                    {:mvn/version "0.6.10"}
            metosin/reitit                      {:mvn/version "0.7.2"}
            metosin/ring-http-response          {:mvn/version "0.9.4"}
-           mount/mount                         {:mvn/version "0.1.19"}
-           #_#_net.clojars.wkok/openai-clojure     {:mvn/version "0.21.1"}
-           com.github.pdenno/openai-clojure    {:mvn/version "0.21.2"}
+           mount/mount                         {:mvn/version "0.1.20"}
+           ;com.github.pdenno/openai-clojure    {:mvn/version "0.21.176"} ; This is temporary, while waiting for wkok's version that has my PR for vector stores.
+           net.clojars.wkok/openai-clojure     {:mvn/version "0.22.0"}   ; 0.21.3 is a guess about version with my PR.
            org.apache.logging.log4j/log4j-api  {:mvn/version "2.24.1"}
            org.apache.logging.log4j/log4j-core {:mvn/version "2.24.1"}
-           org.clj-commons/hickory             {:mvn/version "0.7.4"}
+           org.clj-commons/hickory             {:mvn/version "0.7.5"}
            org.clojure/clojure                 {:mvn/version "1.12.0"}
-           org.clojure/core.unify              {:mvn/version "0.6.0"}
+           org.clojure/core.unify              {:mvn/version "0.7.0"}
            #_#_org.clojure/data.codec              {:mvn/version "0.2.0"}
            #_#_org.clojure/data.json               {:mvn/version "2.5.0"}
            org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"} ;  "0.1.19" Does not exist.
            org.slf4j/slf4j-nop                 {:mvn/version "2.0.16"}    ; Stop spurious logging!
            ring/ring-defaults                  {:mvn/version "0.5.0"}
-           ring/ring-jetty-adapter             {:mvn/version "1.12.2"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
-           ring/ring-core                      {:mvn/version "1.12.2"}  ;; I switched to try org.ring-clojure/ring-websocket-async
-           ring/ring-devel                     {:mvn/version "1.12.2"}  ;; Of course, both could have been accommodated.
+           ring/ring-jetty-adapter             {:mvn/version "1.13.0"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
+           ring/ring-core                      {:mvn/version "1.13.0"}  ;; I switched to try org.ring-clojure/ring-websocket-async
+           ring/ring-devel                     {:mvn/version "1.13.0"}  ;; Of course, both could have been accommodated.
            ring-cors/ring-cors                 {:mvn/version "0.1.13"}
            selmer/selmer                       {:mvn/version "1.12.61"}} ; Used for home.html.
 
@@ -55,13 +55,13 @@
                                          org.clojure/tools.namespace  {:mvn/version "1.5.0"}}}
 
            :app       {:extra-paths ["src/app" "src/server" "test"] ; src/server has shared util.cljc
-                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.28.16"}
+                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.28.19"}
                                      lilactown/helix                {:mvn/version "0.2.1"}
                                      cljs-ajax/cljs-ajax            {:mvn/version "0.8.4"}
                                      applied-science/js-interop     {:mvn/version "0.4.2"}}}
 
            :kaochaSTBD {:extra-paths    ["test" "env/dev"]
-                        :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.28.16"}
+                        :extra-deps     {thheller/shadow-cljs      {:mvn/version "2.28.19"}
                                          lambdaisland/kaocha       {:mvn/version "1.91.1392"}
                                          lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                                          com.lambdaisland/glogi    {:mvn/version "1.3.169"}
@@ -80,11 +80,14 @@
 
 ;;;  |    :file |                                 :name |    :current |  :latest |
 ;;;  |----------+---------------------------------------+-------------+----------|
-;;;  | deps.edn |                io.replikativ/datahike |    0.6.1568 | 0.6.1591 | ; not yet
-;;;  |          |       net.clojars.wkok/openai-clojure |      0.21.0 |   0.21.1 |
-;;;  |          |    org.apache.logging.log4j/log4j-api |      2.23.1 |   2.24.1 |
-;;;  |          |   org.apache.logging.log4j/log4j-core |      2.23.1 |   2.24.1 |
-;;;  |          |                   org.clojure/clojure |      1.11.4 |   1.12.0 |
-;;;  |          | org.ring-clojure/ring-websocket-async | 0.1.0-beta2 |    0.2.0 | ; Keep beta2
-;;;  |          |                  thheller/shadow-cljs |     2.28.14 |  2.28.16 |
-;;;  |          |                  thheller/shadow-cljs |     2.28.14 |  2.28.16 |
+;;;  | deps.edn |                   com.taoensso/timbre |       6.5.0 |    6.6.1 |
+;;;  |          |                io.replikativ/datahike |    0.6.1568 | 0.6.1592 |
+;;;  |          |                      metosin/jsonista |      0.3.11 |   0.3.12 |
+;;;  |          |                           mount/mount |      0.1.19 |   0.1.20 |
+;;;  |          |               org.clj-commons/hickory |       0.7.4 |    0.7.5 |
+;;;  |          |                org.clojure/core.unify |       0.6.0 |    0.7.0 |
+;;;  |          | org.ring-clojure/ring-websocket-async | 0.1.0-beta2 |    0.2.0 |  ; Keep beta2
+;;;  |          |                        ring/ring-core |      1.12.2 |   1.13.0 |
+;;;  |          |                       ring/ring-devel |      1.12.2 |   1.13.0 |
+;;;  |          |               ring/ring-jetty-adapter |      1.12.2 |   1.13.0 |
+;;;  |          |                  thheller/shadow-cljs |     2.28.16 |  2.28.19 |  ; Problem with dropzone; not investigated.

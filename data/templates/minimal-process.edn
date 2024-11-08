@@ -18,6 +18,7 @@ constraint forall (p in Product) (taskEnds[p, qualityControl] <= taskStarts[p, p
 set of int: Product = 1..nProducts;
 enum Task = $$$TASK-ENUM-LIST$$$;
 % Durations are in units of $$$DUR-UOM$$$ and may be rounded.
+% If any of the durations are negative values, we had problems understanding; you should fix these by hand.
 array [Product, Task] of $$$DUR-TYPE$$$: taskDuration = $$$TASK-DURATION-ARRAY$$$;
 
 $$$DUR-TYPE$$$ : minTime = 0;

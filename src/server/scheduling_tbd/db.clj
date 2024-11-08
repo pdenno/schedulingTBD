@@ -121,7 +121,7 @@
 
    ;; ---------------------- claim (something believed owing to what users said in interviews)
    :claim/string
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string :unique :db.unique/identity
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.
               For example, (:process/production-motivation make-to-stock)."}
    :claim/confidence
@@ -478,7 +478,7 @@
    {:id :text-function-agent
     :instruction-path "data/instructions/text-function-agent.txt"}])
 
-(defn agent-exists?
+(defn ^:diag agent-exists?
   "Return true if agent still exists (LLM-providers typiclly don't keep them forever)."
   [aid]
   (d/q '[:find ?eid .
@@ -569,7 +569,9 @@
          sort
          vec))))
 
-(defn get-surrogate-info [pid]
+(defn get-surrogate-agent-info
+  "Return a map about the expert surrogate agent aid, tid, instruction..."
+  [pid]
   (when (project-exists? pid)
     (when-let [eid (d/q '[:find ?sur . :where [_ :project/surrogate ?sur]]  @(connect-atm pid))]
       (dp/pull @(connect-atm pid) '[*] eid))))
@@ -613,29 +615,28 @@
         eid (project-exists? pid)]
     (d/transact conn {:tx-data [[:db/add eid :project/code code-text]]})))
 
-(defn get-planning-state
-  "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
+(defn get-claims
+  "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none.
+   Returns #{} if pid is :START-A-NEW-PROJECT."
   [pid]
   (if (= pid :START-A-NEW-PROJECT)
     '#{(proj-id START-A-NEW-PROJECT)} ; Special treatment for new projects.
-    (if-let [state-str (d/q '[:find ?s .
-                              :where
-                              [_ :project/planning-problem ?pp]
-                              [?pp :problem/state-string ?s]]
-                            @(connect-atm pid))]
-      (-> state-str edn/read-string set)
+    (if-let [facts (d/q '[:find [?s ...]
+                          :where
+                          [_ :project/claims ?pp]
+                          [?pp :claim/string ?s]]
+                        @(connect-atm pid))]
+      (-> (mapv edn/read-string facts) set)
       #{})))
 
 (defn add-claim
-  "Add the argument vector of ground proposition to state, a set. Return the new state."
-  [pid more-state]
-  (assert (every? #(s/valid? ::spec/proposition %) more-state))
-  ;;(log/info "add-planning-state: more-state = " more-state)
-  (let [new-state (into (get-planning-state pid) more-state)
-        conn (connect-atm pid)
-        eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
-    (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str new-state)]]})
-    new-state))
+  "Add the argument vector of ground proposition to state, a set. Returns true."
+  [pid claim]
+  (assert (s/valid? ::spec/proposition claim))
+  (let [conn (connect-atm pid)
+        eid (d/q '[:find ?eid . :where [?eid :project/claims]] @conn)]
+    (d/transact conn {:tx-data [{:db/id eid :project/claims {:claim/string (str claim)}}]}))
+  true)
 
 (defn get-process
   "Return the process structure for the argument pid and interview-class."
@@ -887,6 +888,7 @@
      (d/transact (connect-atm id) {:tx-data [{:project/id id
                                               :project/name pname
                                               :project/current-conversation :process
+                                              :project/claims [{:claim/string (str `(~'project-name ~id ~pname))}]
                                               :project/conversations [{:conversation/id :process}
                                                                       {:conversation/id :data}
                                                                       {:conversation/id :resource}]}]})

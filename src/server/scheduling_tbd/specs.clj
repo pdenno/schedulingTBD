@@ -14,7 +14,8 @@
                     (rest %))))
 
 (s/def ::negated-proposition
-  #(and (= 'not (first %))
+  #(and (seq? %)
+        (= 'not (first %))
         (-> % second seq?)
         (-> % second first symbol?)
         (not-any? coll? (second %))))

@@ -48,14 +48,17 @@
                                      :metadata {:usage :stbd-surrogate :user user})
           aid    (:id assist)
           thread (llm/make-thread {:assistant-id aid :metadata {:usage :stbd-surrogate :user user}})]
-      (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)
-                                       :project/surrogate {:surrogate/id pid
+      (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)        ;; ToDo: Right now we have projects that are viewed as surrogates.
+                                       :project/surrogate {:surrogate/id pid  ;;       What we need is a conversation with a surrogate. See also analyze-response for :warm-up-question.
                                                            :surrogate/subject-of-expertise expertise
                                                            :surrogate/system-instruction instructions
                                                            :surrogate/assistant-id aid
                                                            :surrogate/thread-id (:id thread)}}]})
-      (db/get-surrogate-info pid))
-    (db/get-surrogate-info pid)))
+      (db/add-claim pid `(~'proj-id ~pid))
+      (db/add-claim pid `(~'proj-name ~(:project/name proj-info)))
+      (db/add-claim pid `(~'surrogate ~pid))
+      (db/get-surrogate-agent-info pid))
+    (db/get-surrogate-agent-info pid)))
 
 ;;; (sur/start-surrogate {:product "fountain pens" :client-id (ws/recent-client!)})
 (defn start-surrogate
@@ -70,7 +73,7 @@
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})]
     (try
-      (ensure-project-and-surrogate pid pname force?)
+      (ensure-project-and-surrogate pid force?)
       (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
                         :new-proj-map {:project/name pname :project/id pid}})
       (catch Exception e
@@ -82,7 +85,7 @@
   [{:keys [client-id pid question] :as obj}]
   (log/info "SUR follow-up:" obj)
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
-        {:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-info pid)]
+        {:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
     (when (and assistant-id thread-id)
       (try (when-let [answer (llm/query-on-thread :aid assistant-id :tid thread-id :query-text question)]
              (log/info "SUR's answer:" answer)
