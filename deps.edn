@@ -2,29 +2,27 @@
  :deps    {camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
            com.cemerick/url                    {:mvn/version "0.1.1"}
-           ;;com.cognitect/transit-clj           {:mvn/version "1.0.333"}
            com.github.pdenno/mznp              {:mvn/version "1.0.89"}
-           com.taoensso/timbre                 {:mvn/version "6.6.1"}
+           com.taoensso/timbre                 {:mvn/version "6.6.1"} ; Kee
+           com.taoensso/telemere               {:mvn/version "1.0.0-RC1"}
+           com.taoensso/telemere-slf4j         {:mvn/version "1.0.0-RC1"} ; Just adding it here initializes it; try (tel/check-interop).
+           com.taoensso/truss                  {:mvn/version "1.12.0"}
            com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
            dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
            funcool/promesa                     {:mvn/version "11.0.678"}
            io.replikativ/datahike              {:mvn/version "0.6.1592"}
+           jansi-clj/jansi-clj                 {:mvn/version "1.0.3"}
            metosin/jsonista                    {:mvn/version "0.3.12"}
            metosin/muuntaja                    {:mvn/version "0.6.10"}
            metosin/reitit                      {:mvn/version "0.7.2"}
            metosin/ring-http-response          {:mvn/version "0.9.4"}
            mount/mount                         {:mvn/version "0.1.20"}
-           ;com.github.pdenno/openai-clojure    {:mvn/version "0.21.176"} ; This is temporary, while waiting for wkok's version that has my PR for vector stores.
            net.clojars.wkok/openai-clojure     {:mvn/version "0.22.0"}   ; 0.21.3 is a guess about version with my PR.
-           org.apache.logging.log4j/log4j-api  {:mvn/version "2.24.1"}
-           org.apache.logging.log4j/log4j-core {:mvn/version "2.24.1"}
+           org.apache.logging.log4j/log4j-api  {:mvn/version "2.24.1"}   ; Used by jetty
            org.clj-commons/hickory             {:mvn/version "0.7.5"}
            org.clojure/clojure                 {:mvn/version "1.12.0"}
            org.clojure/core.unify              {:mvn/version "0.7.0"}
-           #_#_org.clojure/data.codec              {:mvn/version "0.2.0"}
-           #_#_org.clojure/data.json               {:mvn/version "2.5.0"}
            org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"} ;  "0.1.19" Does not exist.
-           org.slf4j/slf4j-nop                 {:mvn/version "2.0.16"}    ; Stop spurious logging!
            ring/ring-defaults                  {:mvn/version "0.5.0"}
            ring/ring-jetty-adapter             {:mvn/version "1.13.0"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
            ring/ring-core                      {:mvn/version "1.13.0"}  ;; I switched to try org.ring-clojure/ring-websocket-async
@@ -80,7 +78,7 @@
 
 ;;;  |    :file |                                 :name |    :current |  :latest |
 ;;;  |----------+---------------------------------------+-------------+----------|
-;;;  | deps.edn |                   com.taoensso/timbre |       6.5.0 |    6.6.1 |
+;;;  | deps.edn |                   com.taoensso/timbre |       6.5.0 |    6.6.1 | ; No longer used.
 ;;;  |          |                io.replikativ/datahike |    0.6.1568 | 0.6.1592 |
 ;;;  |          |                      metosin/jsonista |      0.3.11 |   0.3.12 |
 ;;;  |          |                           mount/mount |      0.1.19 |   0.1.20 |

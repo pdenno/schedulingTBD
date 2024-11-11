@@ -120,27 +120,27 @@
 ;;; -------- (devl/ajax-test "/api/list-projects" [])
 (s/def ::others (s/coll-of map?))
 (s/def ::current-project map?)
-(s/def ::conv-id keyword?)
-(s/def ::list-projects-response (s/keys :req-un [::others ::current-project ::conv-id]))
+(s/def ::cid keyword?)
+(s/def ::list-projects-response (s/keys :req-un [::others ::current-project ::cid]))
 
 
 ;;; -------- (devl/ajax-test "/api/get-conversation" {:project-id "craft-beer-brewery-scheduling"})
-(s/def ::conv-id (st/spec {:spec keyword?
-                           :name "conv-id"
-                           :description "one of \"process\" \"data\" or \"resource\"."
-                           :json-schema/default "process"}))
+(s/def ::cid (st/spec {:spec keyword?
+                       :name "cid"
+                       :description "one of \"process\" \"data\" or \"resource\"."
+                       :json-schema/default "process"}))
 
-(s/def ::get-conversation-request (st/spec {:spec (s/keys :req-un [::client-id ::project-id] :opt-un [::conv-id])
+(s/def ::get-conversation-request (st/spec {:spec (s/keys :req-un [::client-id ::project-id] :opt-un [::cid])
                                             :name "project-id"
                                             :description "A string uniquely identifying the project to the system DB."
                                             :json-schema/default {:project-id "sur-craft-beer"
-                                                                  :conv-id "process"
+                                                                  :cid "process"
                                                                   :client-id "2f30f002-37b7-4dd1-bc01-5484273012f0"}}))
 
 (s/def ::conv (s/coll-of map?))
 (s/def ::code string?)
 (s/def ::mzn-output string?)
-(s/def ::get-conversation-response (s/keys :req-un [::project-id ::conv] :opt-un [::code ::conv-id]))
+(s/def ::get-conversation-response (s/keys :req-un [::project-id ::conv] :opt-un [::code ::cid]))
 (s/def ::project-id (st/spec {:spec #(or (string? %) (keyword? %))
                               :name "project-id"
                               :description "A kebab-case string (will be keywordized) unique to the system DB identifying a project."

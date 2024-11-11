@@ -17,7 +17,7 @@
    [scheduling-tbd.llm  :as llm]                           ; Because of deep synchronization problems when this is from mount.
    [scheduling-tbd.interviewers :refer [iviewers]]         ; for mount
    [scheduling-tbd.web.handler]                            ; for mount, defines rm.server.config/config, and router stuff.
-   [taoensso.timbre :as log]))
+   [taoensso.telemere.timbre :as log]))
 
 ;;; If you get stuck do: (clojure.tools.namespace.repl/refresh)
 

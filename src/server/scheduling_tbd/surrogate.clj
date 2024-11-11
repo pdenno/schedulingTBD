@@ -8,7 +8,7 @@
    [scheduling-tbd.llm       :as llm]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
    [scheduling-tbd.web.websockets :as ws]
-   [taoensso.timbre          :as log]))
+   [taoensso.telemere.timbre        :as log]))
 
 ;;; ToDo: Fix this: "You manage a company that makes %s." The problem that some are services and we want to start well.
 ;;; I think we could use an independent LLM call to guess whether "paving" or "general contracting" are services.
@@ -49,7 +49,7 @@
           aid    (:id assist)
           thread (llm/make-thread {:assistant-id aid :metadata {:usage :stbd-surrogate :user user}})]
       (d/transact conn-atm {:tx-data [{:db/id (db/project-exists? pid)        ;; ToDo: Right now we have projects that are viewed as surrogates.
-                                       :project/surrogate {:surrogate/id pid  ;;       What we need is a conversation with a surrogate. See also analyze-response for :warm-up-question.
+                                       :project/surrogate {:surrogate/id pid  ;;       What we need is a conversation with a surrogate. See also analyze-response for the :warm-up question-type.
                                                            :surrogate/subject-of-expertise expertise
                                                            :surrogate/system-instruction instructions
                                                            :surrogate/assistant-id aid
@@ -128,8 +128,8 @@
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []
-  (ws/register-ws-dispatch :start-surrogate start-surrogate)
-  (ws/register-ws-dispatch :surrogate-follow-up surrogate-follow-up)
+  (ws/register-ws-dispatch :start-surrogate start-surrogate)         ; User types SUR:
+  (ws/register-ws-dispatch :surrogate-follow-up surrogate-follow-up) ; User types SUR?:
   :surrogate-ws-fns-registered)
 
 (defn stop-surrogates! []

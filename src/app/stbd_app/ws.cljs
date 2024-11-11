@@ -1,10 +1,10 @@
 (ns stbd-app.ws
   "Implement websocket, except for reading, which happens in the chat component, owing to React hooks."
   (:require
-   [clojure.edn     :as edn]
-   [promesa.core    :as p]
-   [stbd-app.util   :as util :refer [common-info dispatch-table lookup-fn register-fn update-common-info!]]
-   [taoensso.timbre :as log  :refer-macros [info debug log]]))
+   [clojure.edn       :as edn]
+   [promesa.core      :as p]
+   [stbd-app.util     :as util :refer [common-info dispatch-table lookup-fn register-fn update-common-info!]]
+   [taoensso.telemere.timbre :as log  :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 (def client-id "UUID for this instance of the app. Doesn't change except when re-connect!-ing." (str (random-uuid)))
@@ -56,7 +56,7 @@
 
 ;;; The server uses this one after the client sends it :start-surrogate (which creates the surrogate's DB).
 (register-fn :load-proj             (fn [{:keys [new-proj-map]}] ; New projects start on :process
-                                      (update-common-info! (assoc new-proj-map :conv-id :process))
+                                      (update-common-info! (assoc new-proj-map :cid :process))
                                       ((lookup-fn :set-current-project) new-proj-map)
                                       ((lookup-fn :get-conversation) (:project/id new-proj-map))))
 

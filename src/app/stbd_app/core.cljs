@@ -12,15 +12,15 @@
    ["@mui/material/Typography$default" :as Typography]
    [promesa.core :as p]
    ["react-dom/client"          :as react-dom]
-   [scheduling-tbd.util         :refer [config-log]]
+   [scheduling-tbd.util         :refer [config-log!]]
    [stbd-app.components.chat    :as chat]
    [stbd-app.components.editor  :as editor :refer [Editor]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareUpDown ShareLeftRight]]
    [stbd-app.db-access :as dba]
-   [stbd-app.util   :as util :refer [register-fn lookup-fn update-common-info!]]
-   [stbd-app.ws     :as ws]
-   [taoensso.timbre :as log :refer-macros [info debug log]]))
+   [stbd-app.util      :as util :refer [register-fn lookup-fn update-common-info!]]
+   [stbd-app.ws        :as ws]
+   [taoensso.telemere.timbre  :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom {}))
 
@@ -101,12 +101,12 @@
       (log/info "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
       (register-fn :set-code set-code)
-    (-> (dba/get-project-list) ;  Resolves to map with client's :current-project :others, and conv-id the first two are maps of :projec/id :project/name.
-        (p/then (fn [{:keys [current-project others conv-id] :as _resp}]
+    (-> (dba/get-project-list) ;  Resolves to map with client's :current-project :others, and cid the first two are maps of :projec/id :project/name.
+        (p/then (fn [{:keys [current-project others cid] :as _resp}]
                   (set-proj-infos (conj others current-project))
                   (set-proj current-project)
                   (update-common-info! {:project/id (:project/id current-project)})
-                  ((lookup-fn :get-conversation) (:project/id current-project) conv-id)))))
+                  ((lookup-fn :get-conversation) (:project/id current-project) cid)))))
     ;; ------- component (end of use-effect :once)
     ($ Stack {:direction "column" :height useful-height}
        ($ Typography
@@ -169,12 +169,7 @@
 
 ;;; --------------- https://code.thheller.com/blog/shadow-cljs/2019/08/25/hot-reload-in-clojurescript.html ----------------------
 (defn ^{:after-load true, :dev/after-load true} start []
-  (config-log :info)
-  (log/info "Logging level for the client:"
-            (->> log/*config*
-                 :min-level
-                 (filter #(-> % first (contains? "stbd-app.*")))
-                 first second))
+  (config-log!)
   (ws/connect!)
   (.render root ($ app)))
 

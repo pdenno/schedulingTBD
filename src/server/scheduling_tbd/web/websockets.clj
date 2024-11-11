@@ -13,7 +13,7 @@
    [ring.websocket.async     :as wsa]
    [scheduling-tbd.specs     :as spec]
    [scheduling-tbd.util      :refer [now]]
-   [taoensso.timbre          :as log]))
+   [taoensso.telemere.timbre        :as log]))
 
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique client-id provided by the client." (atom {}))
@@ -277,7 +277,7 @@
           msg-obj (cond-> content
                     p-key               (assoc :p-key p-key)
                     true                (assoc :timestamp (now)))]
-      (when-not (= :alive? dispatch-key)
+      #_(when-not (= :alive? dispatch-key)
         (log/info "send-to-chat: msg-obj =" msg-obj))
       (go (>! out (str msg-obj)))
       prom)
@@ -327,13 +327,13 @@
 ;;; ToDo: Should this and a few others have promises? And should :promise? be called :round-trip?
 (defn refresh-client
   "Send a message to the client to reload the conversation. Typically done with surrogate."
-  [client-id pid conv-id]
+  [client-id pid cid]
   (assert (string? client-id))
   (send-to-chat {:promise? false
                  :client-id client-id
                  :dispatch-key :update-conversation-text
                  :pid pid
-                 :conv-id conv-id}))
+                 :cid cid}))
 
 ;;;------------------- Starting and stopping ---------------
 (defn wsock-start []

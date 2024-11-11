@@ -6,7 +6,7 @@
    [clojure.spec.alpha        :as s]
    [clojure.string           :as str]
    [scheduling-tbd.db        :as db]
-   [taoensso.timbre                           :as log]))
+   [taoensso.telemere.timbre        :as log]))
 
 ;;; System thoughts: Given minimal-mzn-for-process, you could then ask to
 ;;;   - allow parallelism where feasible

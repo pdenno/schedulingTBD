@@ -23,7 +23,7 @@
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
    [stbd-app.ws         :as ws :refer [remember-promise]]
-   [taoensso.timbre     :as log :refer-macros [info debug log]]))
+   [taoensso.telemere.timbre   :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -96,21 +96,21 @@
     (log/info "update-msg-times: msg-count = " (count @msgs-atm))
     ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
-;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
+;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid.
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
   "Using an HTTP GET, get the conversation, and also the code, if any."
   ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
-  ([pid conv-id]
-   (-> (dba/get-conversation-http pid conv-id)
-       (p/then (fn [{:keys [conv conv-id code]}]
-                 (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "count =" (count conv))
+  ([pid cid]
+   (-> (dba/get-conversation-http pid cid)
+       (p/then (fn [{:keys [conv cid code]}]
+                 (log/info "chat/get-conversation (return from promise): cid =" cid "count =" (count conv))
                  (reset! msgs-atm conv)
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
-                 ((lookup-fn :set-active-conv) conv-id)
-                 (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
-                 (update-common-info! {:project/id pid :conv-id conv-id})))
+                 ((lookup-fn :set-active-conv) cid)
+                 (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :cid cid})
+                 (update-common-info! {:project/id pid :cid cid})))
        (p/catch (fn [e]
                   (log/info "get-conversation failed:" e))))))
 

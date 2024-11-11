@@ -1,6 +1,6 @@
 (ns stbd-app.util
   (:require
-   [taoensso.timbre :as log  :refer-macros [info debug log]]))
+   [taoensso.telemere.timbre :as log  :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -36,14 +36,14 @@
   [resp]
   (swap! common-info
          (fn [info]
-           (let [{:keys [current-project project-id conv-id]} resp
+           (let [{:keys [current-project project-id cid]} resp
                  {pid :project/id} resp]
              (cond-> info
-               (not (contains? resp :conv-id))     (assoc :conversation/id :process)
+               (not (contains? resp :cid))     (assoc :conversation/id :process)
                current-project   (assoc :project/id current-project)
                project-id        (assoc :project/id project-id)
                pid               (assoc :project/id pid)
-               conv-id           (assoc :conversation/id conv-id))))))
+               cid               (assoc :conversation/id cid))))))
 
 (defn now []
   (js/Date. (.now js/Date)))

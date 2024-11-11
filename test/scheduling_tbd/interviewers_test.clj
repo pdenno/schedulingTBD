@@ -1,19 +1,18 @@
-(ns scheduling-tbd.interviewer-test
+(ns scheduling-tbd.interviewers-test
   (:require
    [clojure.edn                   :as edn]
-   [clojure.java.io               :as io]
    [clojure.pprint                :refer [pprint]]
    [clojure.test                  :refer [deftest is testing]]
    [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
-   [scheduling-tbd.domain.process-analysis :as pan]
    [scheduling-tbd.interviewers   :as inv]
    [scheduling-tbd.llm            :as llm]
-   [scheduling-tbd.response-utils :as ru]
-   [scheduling-tbd.sutil          :as sutil :refer [connect-atm default-llm-provider]]
-   [taoensso.timbre :as log :refer [warn debug]]))
+   [scheduling-tbd.sutil          :as sutil :refer [connect-atm]]
+   [scheduling-tbd.web.websockets :as ws]
+   [taoensso.telemere             :as tel :refer [log!]]
+   [taoensso.truss                :as truss :refer [have have?]]))
 
-;;; THIS is the namespace I am hanging out in recently.
+(def ^:diag diag (atom nil))
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
 
@@ -57,60 +56,119 @@
   (safe-alias 'util   'scheduling-tbd.util)
   (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
   (safe-alias 'ws     'scheduling-tbd.web.websockets)
+  (safe-alias 'tel    'taoensso.telemere)
   (safe-alias 'openai 'wkok.openai-clojure.api))
 
-(defn tryme []
-  (let [aid (:agent/assistant-id (db/get-agent :base-type :process-interview-agent))
-        tid (:id (llm/make-thread {:assistant-id aid
-                                   :llm-provider :openai
-                                   :metadata {:usage :project-agent}}))]
-    (letfn [(tell-agent [text] (log/info (llm/query-on-thread {:aid aid :tid tid :role "user" :query-text text})))]
-      (tell-agent "{'command' : 'ANALYSIS-CONCLUDES', 'conclusions' : '1) They make plate glass. 2) You are talking to surrogate humans (machine agents).'}")
-      (tell-agent "{'command' : 'NEXT-QUESTION'}")
-      (tell-agent "{'command' : 'HUMAN-RESPONDS',
-                    'response' :
-'One of our most significant scheduling problems involves coordinating the production schedule with the supply of raw materials.
- Fluctuations in raw material deliveries can disrupt planned production runs, leading to delays and inefficiencies.
- Additionally, we need to balance these inconsistencies with varying demand from customers, ensuring that we meet order deadlines without overproducing and holding excess inventory.'}")
-      (tell-agent "{'command' : 'NEXT-QUESTION'}")
-      ;; Here I'm guessing, of course.
-      (tell-agent "{'command' : 'HUMAN-RESPONDS',
-'Our production process for plate glass involves several key stages.
- It starts with raw material preparation, where materials like silica sand, soda ash, and limestone are accurately measured and mixed.
- This mixture is then fed into a furnace and melted at very high temperatures to form molten glass.
- The molten glass is then formed into sheets using the float glass process, where it is floated on a bed of molten tin.
- After forming, the glass is slowly cooled to prevent stress in a process called annealing.
- Finally, the glass is cut to size, inspected for quality, and prepared for shipment.'")
-      (tell-agent "{'command' : 'NEXT-QUESTION'}"))))
-
+;; THIS is 2 (the other namespace I am hanging out in recently).
 ;;; Remember to db/backup-system-db once you get things straight.
-(defn new-interviewer
-  "Use this whenever you need to adjust the instructions."
+
+(defn ^:diag recreate-interview-agent!
+  "This is used to experiment with different LLMs and value of flow-charts.
+   Use, for example process-read-the-flowchart.txt rather than the full instructions."
   []
-  (let [{:keys [id instruction-path response-path]}
-        {:id :process-interview-agent
-         :instruction-path     "data/instructions/interviewer-process.txt"
-         :response-format-path "data/instructions/interviewer-response-format.edn"}]
-    (db/add-agent!
-     {:id (-> id name (str "-" "openai") keyword)
-      :base-type id
-      :project-thread? true
-      :llm-provider :openai
-      :response-format (-> response-path slurp edn/read-string)
-      :instructions (slurp instruction-path)})))
+  (db/recreate-system-agents!
+   [{:id :process-interview-agent
+     :project-thread?  true
+     :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
+     :tools [{:type "file_search"}]
+     :vector-store-files ["data/instructions/interviewers/process-interview-flowchart.pdf"]
+     :instruction-path "data/instructions/interviewers/process.txt" #_"data/instructions/interviewers/process-read-the-flowchart.txt"
+     ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
+     #_#_:response-format (-> "data/instructions/interviewers/response-format.edn" slurp edn/read-string)}]))
 
+;;; Used to query the flowchart using the process-interview-agent.
+(defonce process-interview-system-agent (atom {}))
+
+(defn ^:diag setup-flowchart-with-agent! []
+  (let [agent (db/get-agent :base-type :process-interview-agent)
+        thread (llm/make-thread :assistant-id (:aid agent))]
+    (reset! process-interview-system-agent {:aid (:aid agent) :tid (:id thread)})))
+
+;;; ToDo: Consider asking these two questions first on every thread!
+;;; (ask-about-flowchart "Summarize what you see in the uploaded file 'Process Interview Flowchart'."  @process-interview-system-agent)
+;;; (ask-about-flowchart "Suppose the production-system-type was FLOW-SHOP. In the order in which they are to be asked, what are all the question-types you would ask?" @process-interview-system-agent)
+;;; Typical response to the query directly above this line:
+
+;;; If the production-system-type is FLOW-SHOP, the questions would be asked in the following order:
+;;;
+;;; 1. warm-up
+;;; 2. work-type
+;;; 3. production-location
+;;; 4. production-motivation
+;;; 5. production-system-type
+;;; 6. process-steps
+;;; 7. process-durations
+;;; 8. batch-size
+;;; 9. process-ordering
+;;;
+;;; These question-types guide the interview from understanding what the entity does to detailed aspects of their production process,
+;;; ultimately helping in designing an effective scheduling system for their FLOW-SHOP production system.
+(defn ^diag ask-about-flowchart
+  [query {:keys [aid tid]}]
+  (println (llm/query-on-thread :aid aid :tid tid :query-text query)))
+
+(defn ^:diag ask-about-flowchart:inverviewer [])
+
+(defn tell-one
+  "Diagnostic for one interaction with interviewer."
+  [cmd {:keys [pid conv-id] :as ctx}]
+  (inv/tell-interviewer cmd
+                        (merge ctx (inv/interview-agent conv-id pid))))
+
+(deftest finished-process-test
+  (testing "Testing that :sur-ice-cream has finished all process questions."
+    (is (= {:status "DONE"}
+           (do (tell-one (inv/prior-responses :sur-ice-cream :process) {:pid :sur-ice-cream :conv-id :process})
+               (tell-one {:command "SUPPLY-QUESTION"} {:pid :sur-ice-cream :conv-id :process}))))))
+
+(deftest test-vector-stores
+  (let [{:keys [id object] :as obj}
+        (llm/make-vector-store
+         {:name "Process Interview flowchart"
+          :file_ids [(llm/upload-file {:fname "data/instructions/interviewers/process-interview-flowchart.pdf"})]})]
+    (reset! diag obj)
+    (is (and (string? id) (= object "vector_store")))))
+
+(defn ^:diag check-instructions
+  "It might be the case that the system instructions were too long. This asks what it knows about."
+  []
+  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)]
+    (llm/query-on-thread
+     {:aid aid :tid tid :role "user"
+      :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
+                       "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))
+
+;;; ToDo: BTW, "consulting" was thrown in there to test "DONE" in interviewing. Consulting is a kind of service; maybe it is an okay scheduling domain.
+(def q-work-type
+  "This is typical of what you get back from the interviewer when you do SUPPLY-QUESTION."
+  {:question-type :work-type,
+   :status "OK",
+   :question "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING."})
+
+(defn ask-one-question
+  "Use inv/chat-pair to get back an answer"
+  [pid {:keys [question question-type]}]
+  (let [{:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
+    (inv/loop-for-answer
+     question
+     {:pid pid
+      :sur-aid assistant-id
+      :sur-tid thread-id
+      :responder-role :surrogate
+      :client-id (ws/recent-client!)
+      :question-type question-type})))
+
+(deftest question-asking
+  (testing "Testing question asking capability through loop-for-answer."
+    (when (or (nil? (db/get-project :sur-fountain-pens :error? false))
+              (nil? (ws/recent-client!)))
+      (log/warn "No project or client to run interview_test/question-asking."))
+    (is (or (nil? (db/get-project :sur-fountain-pens :error? false))
+            (nil? (ws/recent-client!))
+            (let [pid :sur-fountain-pens]
+              (= {:command "HUMAN-RESPONDS", :response "PRODUCT", :question-type :work-type}
+                 (ask-one-question pid q-work-type)))))))
 ;;; ================================================= Throw-away-able updating of project.edn =====================================
-(def qnames [:process-steps
-             :work-type
-             :batch-size
-             :initial-question
-             :production-motivation
-             :production-location
-             :process-ordering
-             :production-system-type
-             :process-durations])
-
-
 (def ^:diag tag2qname
   {:!describe-challenge :initial-question
    :query-product-or-service :work-type
@@ -155,7 +213,6 @@
                   :else                                          obj))]
     (add-qn project-map)))
 
-
 (defn update-project [pid]
   (as-> pid ?o
     (db/get-project ?o)
@@ -164,7 +221,6 @@
     (vector ?o)
     (with-out-str (pprint ?o))
     (spit (str "data/new-projects/" (name pid) ".edn") ?o)))
-
 
 (defn add-state-vector [pid]
   (let [conn (connect-atm pid)
@@ -180,115 +236,3 @@
     (if eid
       (d/transact conn {:tx-data (vec (for [n new-ones] [:db/add eid :conversation/state-vector n]))})
       (log/error "No eid"))))
-
-
-(defn update-projects! []
-  "Write new project DBs"
-  (doseq [p (db/list-projects)]
-    #_(update-project p)
-    (add-state-vector p)))
-
-(defn tryme []
-  (let [conn (connect-atm :system)
-        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
-        found (d/q '[:find [?s ...]
-                     :in $ ?eid
-                     :where [?eid :system/openai-assistants ?s]]
-                   @conn eid)]
-    (println "eid = " eid)
-    (println "found = " found)
-    (doseq [f found]
-      (println "f = " f)
-      (d/transact conn {:tx-data [[:db/delete eid :system/openai-assistants f]]}))))
-
-(defn tryme2 []
-  (let [conn (connect-atm :system)
-        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
-        found (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]]  @conn)]
-    (doseq [f found]
-      (d/transact conn {:tx-data [[:db/retract eid :system/openai-assistants f]]}))))
-
-#_(defn tell-one
-  "Diagnostic for one interaction with interviewer."
-  [cmd {:keys [pid conv-id] :as ctx}]
-  (let [sur (db/get-surrogate-info pid)
-        ctx (-> ctx
-                (merge (inv/interview-agent conv-id pid))
-                (assoc :responder-role :surrogate)
-                (assoc :sur-aid (:surrogate/assistant-id sur))
-                (assoc :sur-tid (:surrogate/thread-id sur)))]
-    (inv/tell-interviewer cmd ctx)))
-
-(defn tell-one
-  "Diagnostic for one interaction with interviewer."
-  [cmd {:keys [pid conv-id] :as ctx}]
-  (inv/tell-interviewer cmd
-                        (merge ctx (inv/interview-agent conv-id pid))))
-
-(deftest finished-process-test
-  (testing "Testing that :sur-ice-cream has finished all process questions."
-    (is (= {:status "DONE"}
-           (do (tell-one (inv/prior-responses :sur-ice-cream :process) {:pid :sur-ice-cream :conv-id :process})
-               (tell-one {:command "SUPPLY-QUESTION"} {:pid :sur-ice-cream :conv-id :process}))))))
-
-
-(defn ^:diag huh?
-  ([] (huh? "What are your instructions?"))
-  ([q-txt]
-   (let [{:keys [iview-aid iview-tid]} (inv/interview-agent :process :sur-ice-cream)]
-     (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
-
-(def ^:diag diag (atom nil))
-
-;;; "vs_5bIXuiVz9aCYQt9F6HBIrzY5"
-(defn ^:diag test-query-on-vstore []
-  (let [flowchart (llm/upload-file {:fname "data/instructions/interviewers/process-interview-flowchart.pdf"})
-        vec-store (llm/make-vector-store :name "Process Interview Vector Store" :file-ids [(:id flowchart)])
-        agent (llm/make-assistant :name "Tryme agent"
-                                  :instructions (slurp "data/instructions/interviewers/process.txt")
-                                  :tools [{:type "file_search"}]
-                                  :tool-resources {"file_search" {"vector_store_ids" [(:id vec-store)]}})
-        thread (llm/make-thread :assistant-id (:id agent))]
-    (reset! diag {:aid (:id agent) :tid (:id thread)}) ; diag so that you can ask it questions off-line.
-    (llm/query-on-thread :aid (:aid @diag)
-                         :tid (:tid @diag)
-                         :query-text "Summarize what you see in the uploaded file 'Process Interview Flowchart'")))
-
-(deftest test-vector-stores
-  (let [{:keys [id object] :as obj}
-        (llm/make-vector-store
-         {:name "Process Interview flowchart"
-          :file_ids [(llm/upload-file {:fname "data/instructions/interviewers/process-interview-flowchart.pdf"})]})]
-    (reset! diag obj)
-    (is (and (string? id) (= object "vector_store")))))
-
-
-(defn ^:diag check-instructions
-  "It might be the case that the system instructions were too long. This asks what it knows about."
-  []
-  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)]
-    (llm/query-on-thread
-     {:aid aid :tid tid :role "user"
-      :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
-                       "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))
-
-
-(def response {:client-id (ws/recent-client!)
-               :response "1. Mix Ingredients (30 minutes)
-2. Pasteurize Mixture (45 minutes)
-3. Homogenize Mixture (20 minutes)
-4. Age Mixture (4 hours)
-5. Flavor Addition (15 minutes)
-6. Freeze Mixture (30 minutes)
-7. Add Inclusions (10 minutes)
-8. Fill Containers (20 minutes)
-9. Harden Ice Cream (4 hours)
-10. Package (40 minutes)
-11. Store in Cold Storage (ongoing)"
-               :pid :sur-ice-cream})
-
-(defn  ^:diag tryme []
-  (pan/analyze-process-durs-response response))
-
-(defn ^:diag tryme2 []
-  (ru/analyze-response (assoc response :question-type :process-durations)))

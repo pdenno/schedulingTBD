@@ -15,7 +15,7 @@
    [scheduling-tbd.web.websockets :as ws]
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
-   [taoensso.timbre              :as log]
+   [taoensso.telemere            :as tel :refer [log!]]
    [wkok.openai-clojure.api      :as openai]))
 
 (def ^:diag diag (atom nil))
@@ -26,7 +26,7 @@
 
 (def preferred-llms
   "These names (keywords) are the models we use, and the models we've been using lately."
-  {:openai {:gpt         "gpt-4o-2024-08-06" ; was gpt-4-turbo-2024-04-09"... others "gpt-4o" "gpt-4o-2024-05-13" "gpt-4o-2024-08-06" "gpt-4-0125-preview"
+  {:openai {:gpt         "gpt-4o-2024-08-06"
             :analysis    "o1-preview"
             :mini        "gpt-4o-mini"}
    :azure  {:gpt         "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
@@ -48,7 +48,7 @@
    or Clojure map (:raw-string? = false) that is read from the string created by the LLM."
   [messages & {:keys [model-class raw-text? llm-provider response-format] :or {model-class :gpt raw-text? true llm-provider @default-llm-provider}}]
   (assert (every? #(s/valid? ::query-llm-msg %) messages))
-  (log/info "llm-provider = " llm-provider)
+  (log! :debug (str "llm-provider = " llm-provider))
   (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class llm-provider)
                                                 :response_format response-format
                                                 :messages messages}
@@ -70,7 +70,7 @@
   [{:keys [client-id question]}]
   (assert (string? client-id))
   (assert (string? question))
-  (log/info "llm-directly:" question)
+  (log! :info (str "llm-directly: " question))
   (let [chat-args {:client-id client-id :dispatch-key :tbd-says :promise? false}]
     (try
       (let [res (-> (query-llm [{:role "system"    :content "You are a helpful assistant."}
@@ -82,14 +82,18 @@
                                (assoc :msg res)
                                (assoc :time (now))))))
       (catch Exception e
-        (log/error "Failure in llm-directly:" e)
+        (log! :error (str "Failure in llm-directly: " e))
         (ws/send-to-chat (assoc chat-args :msg "There was a problem answering that."))))))
 
 (defn list-openai-models
   "List id and create date of all available models.
    BTW, if there is no internet connection, on startup, this will be the first complaint."
   []
-  (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse))
+  (->> (openai/list-models (api-credentials :openai))
+       :data
+       (sort-by :created)
+       reverse
+       (mapv (fn [x] (update x :created #(-> % (* 1000) java.time.Instant/ofEpochMilli str))))))
 
 (defn list-azure-models
   "List id and create date of all available models.
@@ -115,7 +119,7 @@
       (throw (ex-info "No openai-model found for a required model type." {:models (:openai @llms-used)})))
     (doseq [[k mod] (-> @llms-used :openai)]
       (when (not= mod (-> preferred-llms :openai k))
-        (log/warn "Preferred model for" k "was not available. Chose" mod)))))
+        (log! :warn (str "Preferred model for" k "was not available. Chose " mod))))))
 
 (defn select-llm-models-azure
   "Since in Azure you have to create the model, this is just hard-coded."
@@ -217,18 +221,18 @@
       (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
             msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data) ; ToDo: 20 is a guess.
             response (response-msg query-text msg-list)]
-        (cond (> now timeout)                        (do (log/warn "Timeout")
+        (cond (> now timeout)                        (do (log! :warn "Timeout")
                                                          (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text}))),
 
               (and (= "completed" (:status r))
                    (not-empty response))              (markdown2html response),
 
               (and (= "completed" (:status r))
-                   (empty? response))                 (do (log/warn "empty resposne")
+                   (empty? response))                 (do (log! :warn "empty response")
                                                           (throw (ex-info "query-on-thread empty response:" {:status (:status r)}))),
 
 
-              (#{"expired" "failed"} (:status r))     (do (log/warn "failed/expired last_error = " (:last_error r))
+              (#{"expired" "failed"} (:status r))     (do (log! :warn (str "failed/expired last_error = " (:last_error r)))
                                                           (throw (ex-info "query-on-thread failed:" {:status (:status r)}))),
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
@@ -252,10 +256,10 @@
              (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
            (catch Exception e
              (let [d-e (datafy e)]
-               (log/warn "query-on-thread failed (tries = " (:tries obj) "): "
-                         (or (:cause d-e) (-> d-e :via first :message))))
+               (log! :warn (str "query-on-thread failed (tries = " (:tries obj) "): "
+                                (or (:cause d-e) (-> d-e :via first :message)))))
              (query-on-thread (update obj :tries dec))))
-      (log/warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
+      (log! :warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
 
 (defn ^:diag list-thread-messages
   "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
@@ -303,7 +307,7 @@
   [& {:keys [selection-fn llm-provider] :or {selection-fn #(= "stbd-surrogate" (-> % :metadata (get :usage)))
                                              llm-provider @default-llm-provider}}]
   (doseq [a (->> (list-assistants) (filterv selection-fn))]
-    (log/info "Deleting assistant" (:name a) (:id a))
+    (log! :info (str "Deleting assistant " (:name a) (:id a)))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))
 
 (defn ^:diag delete-agents!
@@ -311,7 +315,7 @@
    The default function check for metadata :usage='stbd-surrogate'."
   [{:keys [selection-fn llm-provider] :or {selection-fn #(= "stbd-agent" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
   (doseq [a (->> (list-assistants)  (filterv selection-fn))]
-    (log/info "Deleting assistant" (:name a) (:id a))
+    (log! :info (str "Deleting assistant " (:name a) (:id a)))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))
 
 ;;; (ws/register-ws-dispatch  :run-long llm/run-long)
@@ -319,7 +323,7 @@
   "Diagnostic for exploring threading/blocking with websocket."
   [& _]
   (loop [cnt 0]
-    (log/info "Run-long: cnt =" cnt)
+    (log! :info (str "Run-long: cnt = " cnt))
     (Thread/sleep 5000) ; 5000 * 30, about 4 minutes.
     (when (< cnt 20) (recur (inc cnt)))))
 
@@ -349,7 +353,7 @@
         (try (->> (edn/read-string result)
                   (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
              (catch Exception _e
-               (log/error "query-agent failed:" result)
+               (log! :error (str "query-agent failed: " result))
                nil))))))
 
 (defn immoderate?

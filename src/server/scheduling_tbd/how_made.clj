@@ -15,7 +15,7 @@
    [scheduling-tbd.db       :as proj-db]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm db-cfg-map]]
-   [taoensso.timbre :as log]))
+   [taoensso.telemere.timbre       :as log]))
 
 (def him-schema+
   "Defines content of the How It's Made DB in a convenient format, not Datahike format."

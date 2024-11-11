@@ -17,7 +17,7 @@
    [scheduling-tbd.specs :as spec]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id default-llm-provider]]
    [scheduling-tbd.util  :as util :refer [now]]
-   [taoensso.timbre :as log :refer [debug]]))
+   [taoensso.telemere.timbre :as log :refer [debug]]))
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
@@ -458,11 +458,11 @@
   "The actual agent :id is the one provided here with -<llm-provider> added."
   [{:id :process-interview-agent
     :project-thread?  true
-    #_#_:model-class :analysis
+    :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
     :tools [{:type "file_search"}]
     :vector-store-files ["data/instructions/interviewers/process-interview-flowchart.pdf"]
     :instruction-path "data/instructions/interviewers/process.txt"
-    ;; "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
+    ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
     #_#_:response-format (-> "data/instructions/interviewers/response-format.edn" slurp edn/read-string)}
 
    {:id :answers-the-question?
@@ -501,42 +501,43 @@
 
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
-  ([pid] (conversation-exists? pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
-  ([pid conv-id]
-   (assert (#{:process :data :resource} conv-id))
+  ([pid] (conversation-exists? pid (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))))
+  ([pid cid]
+   (assert (#{:process :data :resource} cid))
    (d/q '[:find ?eid .
-          :in $ ?conv-id
+          :in $ ?cid
           :where
-          [?eid :conversation/id ?conv-id]]
-        @(connect-atm pid) conv-id)))
+          [?eid :conversation/id ?cid]]
+        @(connect-atm pid) cid)))
 
 (defn get-conversation-eids
   "Return a vector of the EIDs of the argument conversation's messages."
-  [pid conv-id]
-  (when-let [eid (conversation-exists? pid conv-id)]
+  [pid cid]
+  (when-let [eid (conversation-exists? pid cid)]
     (->> (dp/pull @(connect-atm pid) '[*] eid)
          :conversation/messages
          (mapv :db/id))))
 
 (defn change-conversation
-  [{:keys [pid conv-id] :as obj}]
+  [{:keys [pid cid] :as obj}]
   (try
-    (assert (#{:process :data :resource} conv-id))
+    (assert (#{:process :data :resource} cid))
     (let [conn (connect-atm pid)
           eid (project-exists? pid)]
       (if eid
-        (d/transact conn {:tx-data [[:db/add eid :project/current-conversation conv-id]]})
+        (d/transact conn {:tx-data [[:db/add eid :project/current-conversation cid]]})
         (log/info "No change with change-conversation (1):" obj)))
     (catch Throwable _e (log/info "No change with change-conversation (2):" obj) nil))
   nil)
 
 (defn get-project
-  "Return the project structure."
-  ([pid] (get-project pid #{:db/id}))
-  ([pid drop-set]
-   (let [conn (connect-atm pid)]
+  "Return the project structure.
+   Throw an error if :error is true (default) and project does not exist."
+  [pid & {:keys [drop-set error?]
+          :or {drop-set #{:db/id} error? true}}]
+   (let [conn (connect-atm pid :error? error?)]
      (when-let [eid (project-exists? pid)]
-       (resolve-db-id {:db/id eid} conn :drop-set drop-set)))))
+       (resolve-db-id {:db/id eid} conn :drop-set drop-set))))
 
 (defn default-project
   "Return a map of the  default :project/id and :project/name.
@@ -581,7 +582,7 @@
 
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  ([pid] (get-conversation pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
+  ([pid] (get-conversation pid (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))))
   ([pid conversation]
    (assert (#{:process :data :resource} conversation))
    (if-let [eid (conversation-exists? pid conversation)]
@@ -620,7 +621,7 @@
    Returns #{} if pid is :START-A-NEW-PROJECT."
   [pid]
   (if (= pid :START-A-NEW-PROJECT)
-    '#{(proj-id START-A-NEW-PROJECT)} ; Special treatment for new projects.
+    '#{(proj-id :START-A-NEW-PROJECT)} ; Special treatment for new projects.
     (if-let [facts (d/q '[:find [?s ...]
                           :where
                           [_ :project/claims ?pp]

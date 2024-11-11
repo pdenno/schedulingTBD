@@ -1,11 +1,11 @@
 (ns stbd-app.db-access
   "Functions for HTTP-based reading/writing from/to the server."
   (:require
-   [ajax.core        :refer [GET]]
-   [promesa.core    :as p]
-   [stbd-app.util   :refer [register-fn lookup-fn update-common-info!]]
-   [stbd-app.ws     :as ws]
-   [taoensso.timbre :as log :refer-macros [info debug log]]))
+   [ajax.core         :refer [GET]]
+   [promesa.core      :as p]
+   [stbd-app.util     :refer [register-fn lookup-fn update-common-info!]]
+   [stbd-app.ws       :as ws]
+   [taoensso.telemere.timbre :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -28,15 +28,15 @@
   "Return a promise that will resolve to the vector of a maps representing a conversation.
    What conversation is returned depends on the value of :project/current-conversation in the DB; values are #{:process :resource :data}.
    Example of what the promise resolves to:
-   {:project-id :sur-craft-beer :conv-id :process :conv [{:message/from :system :message/content [{:msg-text/string 'Hi!'}]}]}.
-   If the call provides conv-id, :project/current-conversation is set in the DB."
+   {:project-id :sur-craft-beer :cid :process :conv [{:message/from :system :message/content [{:msg-text/string 'Hi!'}]}]}.
+   If the call provides cid, :project/current-conversation is set in the DB."
   ([pid] (get-conversation-http pid nil))
-  ([pid conv-id]
+  ([pid cid]
    (assert (keyword? pid))
-   (log/info "Call to get-conversation-http for" pid "conv-id =" conv-id)
+   (log/info "Call to get-conversation-http for" pid "cid =" cid)
    (let [prom (p/deferred)
-         url (if conv-id
-               (str "/api/get-conversation?project-id=" (name pid) "&conv-id=" (name conv-id) "&client-id=" ws/client-id)
+         url (if cid
+               (str "/api/get-conversation?project-id=" (name pid) "&cid=" (name cid) "&client-id=" ws/client-id)
                (str "/api/get-conversation?project-id=" (name pid) "&client-id=" ws/client-id))]
      (GET url
           {:timeout 3000
@@ -52,9 +52,9 @@
 ;;; it doesn't resume-conversation because planning is already underway.
 (register-fn
  :update-conversation-text
- (fn [{:keys [pid conv-id]}]
+ (fn [{:keys [pid cid]}]
    (assert (keyword? pid))
-   (-> (get-conversation-http pid conv-id)
+   (-> (get-conversation-http pid cid)
        (p/then (fn [resp]
                  (log/info "update-conversation-text: msg count =" (-> resp :conv count))
                  (let [resp (cond-> resp

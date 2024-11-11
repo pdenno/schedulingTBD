@@ -1,12 +1,11 @@
 (ns scheduling-tbd.sutil
   "Server utilities."
   (:require
-   [clojure.core.unify      :as uni]
-   [clojure.string          :as str]
-   [datahike.api            :as d]
-   [datahike.pull-api       :as dp]
-   [jsonista.core           :as json]
-   [taoensso.timbre         :as log]))
+   [clojure.string           :as str]
+   [datahike.api             :as d]
+   [datahike.pull-api        :as dp]
+   [jsonista.core            :as json]
+   [taoensso.telemere.timbre :as log]))
 
 (def ^:diag diag (atom nil))
 
@@ -71,17 +70,19 @@
       in-mem?         (assoc :store {:backend :mem :id (name id)}))))
 
 (defn connect-atm
-  "Return a connection atom for the DB."
-  [k]
+  "Return a connection atom for the DB.
+   Throw an error if the DB does not exist and :error? is true (default)."
+  [k & {:keys [error?] :or {error? true}}]
   (if-let [db-cfg (get @databases-atm k)]
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
-      (log/error "DB is registered but does not exist:" k))
-    (throw (ex-info "No such DB" {:key k}))
-    #_(log/error "No such DB:" k)))
+      (when error?
+        (throw (ex-info "No such DB" {:key k}))))
+    (when error?
+      (throw (ex-info "No such DB" {:key k})))))
 
 (defn datahike-schema
-  "Create a Datahike-compatible schema from the above."
+  "Create a Datahike-compatible schema from map-type schema with notes such as :mm/info."
   [schema]
   (reduce-kv (fn [r k v]
                (conj r (-> v
@@ -147,6 +148,14 @@
   [n]
   (reduce (fn [s _] (str s " ")) "" (range n)))
 
+(defn elide
+  "Return a string no longer than n where the last 3 is ellipsis '...' if the string is > n long."
+  [s n]
+  (let [cnt (count s)]
+    (cond (> n cnt)   s
+          (< n 3)     ""
+          :else (str (subs s 0 (- n 3)) "..."))))
+
 (defn not-nothing
   "Returns true if it is a collection and not empty or something else non-nil"
   [x]
@@ -174,24 +183,6 @@
        (p/await ~timeout)
        (p/then #(log/info "Long-running:" %))
        (p/catch #(log/warn "Long-running (exception):" %))))
-
-;;; ToDo: Ought to have the ability to find multiple.
-(defn find-fact
-  "Unify the fact (which need not be ground) to the fact-list"
-  [fact fact-list]
-  (some #(when (uni/unify fact %) %) fact-list))
-
-(def planning-domains "An atom that associates a keyword key with a planning domain stucture (containing :domain/elems, :domain/problem)."
-  (atom {}))
-
-(defn register-planning-domain
-  "Store the planning domain at the argument id."
-  [id domain]
-  (log/info "Registering planning domain" id)
-  (swap! planning-domains #(assoc % id domain)))
-
-(defn deregister-planning-domain [id] (swap! planning-domains #(dissoc % id)))
-(defn get-domain [id] (get @planning-domains id))
 
 (defn chat-status
   "Create a string to explain in the chat the error we experienced."
@@ -228,13 +219,6 @@
         others (butlast lines)]
     (str (apply str others)
          (subs last 0 (dec (count last))))))
-
-(defn domain-conversation
-  "A planning domain is associated with exactly one conversation."
-  [domain-id]
-  (let [res (-> domain-id get-domain :domain/conversation)]
-    (assert (#{:process :data :resource} res))
-    res))
 
 (defn remove-preamble
   "The LLM might put text and markup around the answer, return the answer without this crap."
