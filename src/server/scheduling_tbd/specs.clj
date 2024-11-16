@@ -40,10 +40,8 @@
 
 (s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
 (s/def ::dispatch-key outbound-dispatch-key?)
-(s/def ::msg (s/and string? #(not-empty %)))
-(s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key ::msg]))
-
-(s/def :agent/id keyword?)
-(s/def :agent/base-type keyword?)
-(s/def :agent/thread-id string?)
-(s/def ::agent (s/keys :req [:agent/id :agent/base-type :agent/thread-id :agent/assistant-id]))
+(s/def ::text (s/and string? #(not-empty %)))
+(s/def ::chat-msg-obj (s/and (s/keys :req-un [::client-id ::dispatch-key])
+                             #(if (#{:sur-says :tbd-says :update-code} (:dispatch-key %))
+                                (s/valid? ::text (:text %))
+                                true)))

@@ -2,6 +2,7 @@
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
    [clojure.test                           :refer [deftest is testing]]
+   [clojure.spec.alpha                     :as s]
    [scheduling-tbd.domain.process-analysis :as pan]
    [scheduling-tbd.db                      :as db]
    [scheduling-tbd.interviewers            :as inv :refer [tell-interviewer]]
@@ -13,6 +14,7 @@
 (def ^:diag diag (atom nil))
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
+
 
 (defn safe-alias
   [al ns-sym]
@@ -40,6 +42,7 @@
   (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'how    'scheduling-tbd.how-made)
+  (safe-alias 'invt   'scheduling-tbd.interviewers-test)
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
   (safe-alias 'mzn    'scheduling-tbd.minizinc)
@@ -67,21 +70,21 @@
           result (atom [])]
       (letfn [(tell-inv [cmd] (swap! result conj (-> (tell-interviewer cmd ctx) (dissoc :question :iview-aid :iview-tid))))]
         (tell-inv {:command  "ANALYSIS-CONCLUDES", :conclusions "1) You are talking to surrogate humans (machine agents)."})
-        (tell-inv {:command  "PRIOR-RESPONSES"  :already-answered [] :responses []})
+        (tell-inv {:command  "CONVERSATION-HISTORY"  :already-answered [] :responses []})
         (tell-inv {:command  "SUPPLY-QUESTION"})
-        (tell-inv {:command  "HUMAN-RESPONDS"                            ;; Response to :warm-up-question
+        (tell-inv {:command  "INTERVIEWEES-RESPONDS"                            ;; Response to :warm-up-question
                    :response
                    "We make plate glass. One of our most significant scheduling problems involves coordinating the production schedule with the supply of raw materials.
  Fluctuations in raw material deliveries can disrupt planned production runs, leading to delays and inefficiencies.
  Additionally, we need to balance these inconsistencies with varying demand from customers, ensuring that we meet order deadlines without overproducing and holding excess inventory."})
         (tell-inv {:command "SUPPLY-QUESTION"})
-        (tell-inv {:command "HUMAN-RESPONDS" :response "PRODUCT"})       ;; Response to :work-type
+        (tell-inv {:command "INTERVIEWEES-RESPONDS" :response "PRODUCT"})       ;; Response to :work-type
         (tell-inv {:command "SUPPLY-QUESTION"})
-        (tell-inv {:command "HUMAN-RESPONDS" :response "MAKE-TO-STOCK"}) ;; Response to :production-motivation
+        (tell-inv {:command "INTERVIEWEES-RESPONDS" :response "MAKE-TO-STOCK"}) ;; Response to :production-motivation
         (tell-inv {:command "SUPPLY-QUESTION"})
-        (tell-inv {:command "HUMAN-RESPONDS" :response "FLOW-SHOP"})     ;; Response to :production-system-type
+        (tell-inv {:command "INTERVIEWEES-RESPONDS" :response "FLOW-SHOP"})     ;; Response to :production-system-type
         (tell-inv {:command "SUPPLY-QUESTION"})
-        (tell-inv {:command "HUMAN-RESPONDS"                             ;; Response to process-steps
+        (tell-inv {:command "INTERVIEWEES-RESPONDS"                             ;; Response to process-steps
                    :response
                    "Our production process for plate glass involves several key stages.
  It starts with raw material preparation, where materials like silica sand, soda ash, and limestone are accurately measured and mixed.
@@ -91,15 +94,15 @@
  Finally, the glass is cut to size, inspected for quality, and prepared for shipment."})
         (tell-inv {:command "SUPPLY-QUESTION"}))
       (is (=  [{:status "OK"}                                            ;; ANALYSIS-CONCLUDES
-               {:status "OK"}                                            ;; PRIOR-RESPONSES
+               {:status "OK"}                                            ;; CONVERSATION-HISTORY
                {:question-type :warm-up-question, :status "OK"}          ;; SUPPLY-QUESTION
-               {:status "OK"}                                            ;; HUMAN-RESPONDS
+               {:status "OK"}                                            ;; INTERVIEWEES-RESPONDS
                {:question-type :work-type, :status "OK"}                 ;; SUPPLY-QUESTION
-               {:status "OK"}                                            ;; HUMAN-RESPONDS
+               {:status "OK"}                                            ;; INTERVIEWEES-RESPONDS
                {:question-type :production-motivation, :status "OK"}     ;; SUPPLY-QUESTION
-               {:status "OK"}                                            ;; HUMAN-RESPONDS
+               {:status "OK"}                                            ;; INTERVIEWEES-RESPONDS
                {:question-type :production-system-type, :status "OK"}    ;; SUPPLY-QUESTION
-               {:status "OK"}                                            ;; HUMAN-RESPONDS
+               {:status "OK"}                                            ;; INTERVIEWEES-RESPONDS
                {:question-type :process-steps, :status "OK"}]            ;; SUPPLY-QUESTION
               @result)))))
 
@@ -162,11 +165,11 @@
 
 (deftest test-warm-up-question
   (testing "Testing warm-up-question with no current project."
-    (let [claims (pan/analyze-intro-response  warm-up-fountain-pens '#{(proj-id :START-A-NEW-PROJECT)})
-          [_ ?pid] (ru/find-claim '(proj-id ?x) claims)]
-      (is (and (ru/find-claim (list 'proj-id ?pid) claims)
+    (let [claims (pan/analyze-intro-response  warm-up-fountain-pens '#{(project-id :START-A-NEW-PROJECT)})
+          [_ ?pid] (ru/find-claim '(project-id ?x) claims)]
+      (is (and (ru/find-claim (list 'project-id ?pid) claims)
                (ru/find-claim (list 'cites-raw-material-challenge ?pid) claims)
-               (ru/find-claim '(proj-name ?x) claims))))))
+               (ru/find-claim '(project-name ?x) claims))))))
 
 (defn ^:diag ask-about-ice-cream-agent
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
@@ -315,51 +318,26 @@
                       {}
                       (keys answer-key))))))))
 
-;;; Is job-shop vs. flow-shop too nebulous? Yes, based on the intro paragraph there is not likely to be sufficient information.
-;;; For that reason, I think I need to pose a question to a surrogate expert / parallel expert:
+(def process-order-resp
+"1. Raw Material Inspection (sand, soda ash, limestone, dolomite)
+2. Glass Melting (use inspected raw materials from Raw Material Inspection)
+3. Forming Glass Sheets (use molten glass from Glass Melting)
+4. Annealing Process (use glass sheets from Forming Glass Sheets)
+5. Cutting Glass (use annealed glass from Annealing Process)
+6. Edge Finishing (use cut glass from Cutting Glass)
+7. Coating or Tinting (if required) (use finished glass from Edge Finishing, apply coatings or tints)
+8. Quality Inspection (use coated or non-coated glass from Coating or Tinting)
+9. Packaging (use inspected glass from Quality Inspection)
+10. Shipping (use packaged glass from Packaging)")
 
-;;;     (scheduling-problem ?x),        ; As opposed to planning-problem (Could have lower priority for (planning-problem ?x)).
-;;;     (has-production-facility ?x)    ; As opposed to performed at customer site.
-;;;     (product-focus ?x)              ; As opposed to (service-focus ?x)
-;;;
-;;; ====> SUR?: Could you provide a few short sentences about your production processes? <======
+(defn tryme-po []
+  (pan/analyze-process-ordering-response {:response process-order-resp}))
 
-(def production-processes
-  {:canned-vegetables "Our production process starts with the receipt of fresh vegetables from our suppliers, which are then cleaned, sorted, and prepped for processing. The vegetables undergo blanching to preserve color and nutritional value, followed by a filling process where they are packed into cans with brine or sauce. The cans are then sealed, sterilized through a high-temperature process to eliminate bacteria and extend shelf life, and finally labeled and packaged for distribution. We operate multiple production lines, each tailored to handle specific types of vegetables, with a focus on efficiency and quality control throughout the process."
+(deftest process-ordering
+  (testing "whether the process-ordering system agent works okay."))
 
-   :plate-glass "Our plate glass production process begins at the Batch House, where raw materials are accurately mixed to create the glass batch. The batch is then transferred to the Melting Furnace, where it's melted at high temperatures to form molten glass. Following this, the molten glass proceeds to the Float Bath, where it's floated on molten tin to create a flat surface. After forming, the glass ribbon enters the Annealing Lehr, where it is gradually cooled to remove internal stresses and ensure the glass's structural integrity. The annealed glass is then Quality Inspected for any defects, Cut into the required sizes, and finally, if necessary, undergoes a Coating process to meet specific product requirements before Packing and Shipping to customers. Each of these steps must be carefully scheduled and managed to ensure a seamless operation and meet customer demands efficiently."
 
-   :remanufactured-alternators "Our production process begins with the reception of core units, which are then inspected for suitability. Following inspection, suitable units are disassembled, and their components are cleaned. Each part is then inspected and sorted, with some being reconditioned or replaced as necessary. Reassembly is the next step, during which the alternators are put back together using both the reconditioned and new parts. The final step involves testing the finished alternators to ensure they meet our quality standards. Once they pass the testing phase, the alternators are packaged and stored, ready for distribution."
 
-   :injection-molds "Our production process for injection molds starts with understanding the customer's requirements and translating that into a functional design. Once the design is approved, we move onto procuring the necessary materials, primarily high-grade metals. The bulk of the mold is then formed using CNC machining for precise cuts and shapes, followed by EDM for intricate details and geometries. Post machining, the mold undergoes polishing and finishing to achieve the required surface quality. If the mold consists of multiple components, they are assembled together. Before shipping, the mold is subjected to rigorous testing and quality control checks to ensure it meets the specified standards. This comprehensive process ensures our molds meet the high expectations of durability and precision our customers have come to expect."
-
-   :craft-beer "Our production processes begin with the brewing phase, where we mix the ingredients and boil them to create the wort. Following brewing, the wort is cooled and transferred to fermentation tanks, where yeast is added and the fermentation process begins. This phase is crucial as it converts sugars into alcohol and carbon dioxide. After fermentation, the beer undergoes conditioning, a phase that helps develop flavors and removes unwanted compounds. Finally, the beer is filtered (if necessary) and then bottled, making it ready for distribution. Each phase has its specific duration and conditions, requiring precise scheduling and monitoring to ensure the quality of the final product."
-
-   ;; On this one I asked SUR?: Could you briefly describe your production processes?
-   :ice-hockey-sticks "Certainly, our production processes for making ice hockey sticks can be summarized as follows: 1. **Raw Material Procurement:** We source high-quality carbon fiber and resin, essential materials for making durable and lightweight ice hockey sticks. 2. **Material Preparation:** The carbon fiber is cut and prepared according to the specifications for different types of hockey sticks. The resin is also prepared to bond the carbon fibers effectively. 3. **Molding and Shaping:** Prepared materials are placed into molds to form the shape of the hockey stick. This process involves layering the carbon fiber and applying resin to bond these layers together. 4. **Curing and Cooling:** Once the hockey sticks are shaped, they undergo a curing process where they are heated in an oven to harden and solidify the resin. Following this, they are cooled to room temperature to set the final shape. 5. **Quality Inspection:** After cooling, each hockey stick is inspected for defects and to ensure they meet our strict quality standards. This includes checking the stick for durability, weight, and balance. 6. **Packaging and Shipping:** The approved hockey sticks are then packaged and prepared for shipping to various customers and retailers. This streamlined process allows us to maintain a high level of quality and meet the demands of our customers effectively."})
-
-;;; This will be part of prelim-analysis on a parallel or surrogate expert. Here I'm just testing it alone.
-(deftest flow-v-job
-  (testing "Testing whether a zero-shop prompt on a given LLM is sufficient on 'done at my place or yours' intro paragraphs."
-    (let [answer-key {:canned-vegetables            "FIXED"
-                      :plate-glass                  "FIXED"
-                      :remanufactured-alternators   "FIXED"      ; <=================== Hmmm... I'll see if it changes is a parallel/surrogate expert
-                      :injection-molds              "VARIABLE"
-                      :ice-hockey-sticks            "FIXED"}]
-      (is (= answer-key
-             (reset! diag
-                     (reduce (fn [res k]
-                               (assoc res k
-                                      (let [dialog [{:role "system"
-                                                     :content "You are a helpful assistant that knows operations research."}
-                                                    {:role "user"
-                                                     :content (format (str "The following paragraph describes manufacturing production processes for a certain product.\n"
-                                                                           "Respond with either 'FIXED' if, like a flow shop in operations research, the order of production operations is apt to be identical for all product types,\n"
-                                                                           "or 'VARIABLE' if, like a job shop in operations reasearch, the order of production operations is apt to vary depending on what is being produced.\n\n\n%s")
-                                                                      (get production-processes k))}]]
-                                        (query-llm dialog {:model-class :gpt #_:gpt-3.5}))))
-                             {}
-                             (keys answer-key))))))))
 
 
 #_(defn migrate-project

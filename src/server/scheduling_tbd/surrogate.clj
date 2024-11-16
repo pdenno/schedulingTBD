@@ -8,7 +8,7 @@
    [scheduling-tbd.llm       :as llm]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
    [scheduling-tbd.web.websockets :as ws]
-   [taoensso.telemere.timbre        :as log]))
+   [taoensso.telemere        :refer [log!]]))
 
 ;;; ToDo: Fix this: "You manage a company that makes %s." The problem that some are services and we want to start well.
 ;;; I think we could use an independent LLM call to guess whether "paving" or "general contracting" are services.
@@ -32,7 +32,7 @@
     (some #(when (re-matches pattern %) (keyword %)) projects)))
 
 (defn ensure-project-and-surrogate
-  "If a surrogate with given expertise exists, return the DB map of it.
+  "If a surrogate with given expertise exists and force-new?=false, return the DB map of it.
    Otherwise create and store a project with the given expertise and return the DB map of its surrogate."
   [pid force-new?]
   (if force-new?
@@ -54,48 +54,47 @@
                                                            :surrogate/system-instruction instructions
                                                            :surrogate/assistant-id aid
                                                            :surrogate/thread-id (:id thread)}}]})
-      (db/add-claim pid `(~'proj-id ~pid))
-      (db/add-claim pid `(~'proj-name ~(:project/name proj-info)))
       (db/add-claim pid `(~'surrogate ~pid))
       (db/get-surrogate-agent-info pid))
     (db/get-surrogate-agent-info pid)))
 
 ;;; (sur/start-surrogate {:product "fountain pens" :client-id (ws/recent-client!)})
-(defn start-surrogate
+(defn start-surrogate!
   "Create or recover a surrogate and ask client to :load-proj.
    :load-proj will cause the client to get-conversation (http and chat). The chat part will :resume-conversation-plan (call back to server to restart planner).
     product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
                Any of the :segment/name from the 'How it's Made' DB would work here.
+    force? - This is about naming of the DB. Unrelated to this is the fact that any old DB having the pid calculated here is deleted.
   "
   [{:keys [product client-id]} & {:keys [force?] :or {force? true}}] ; ToDo: handle force?=false, See similar-surrogate?
-  (log/info "======= Start a surrogate: product =" product "=======================")
+  (log! :info (str "======= Start a surrogate: product = " product "======================="))
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})]
-    (try
-      (ensure-project-and-surrogate pid force?)
-      (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
-                        :new-proj-map {:project/name pname :project/id pid}})
-      (catch Exception e
-        (log/warn "Failed to start surrogate.")
-        (log/error "Error starting surrogate:" e)))))
+      (try
+        (ensure-project-and-surrogate pid force?)
+        (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
+                          :new-proj-map {:project/name pname :project/id pid}})
+        (catch Exception e
+          (log! :warn "Failed to start surrogate.")
+          (log! :error (str "Error starting surrogate:" e))))))
 
 (defn surrogate-follow-up
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."
   [{:keys [client-id pid question] :as obj}]
-  (log/info "SUR follow-up:" obj)
+  (log! :info (str "SUR follow-up:" obj))
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
         {:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
     (when (and assistant-id thread-id)
       (try (when-let [answer (llm/query-on-thread :aid assistant-id :tid thread-id :query-text question)]
-             (log/info "SUR's answer:" answer)
+             (log! :info (str "SUR's answer:" answer))
              (when (string? answer)
-               (ws/send-to-chat (assoc chat-args :msg answer))
+               (ws/send-to-chat (assoc chat-args :text answer))
                (db/add-msg {:pid pid :from :system :text question})
                (db/add-msg {:pid pid :from :surrogate :text answer})))
            (catch Exception e
-             (log/error "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message))
-             (ws/send-to-chat (assoc chat-args :msg "We had a problem answering this questions.")))))))
+             (log! :error (str "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message)))
+             (ws/send-to-chat (assoc chat-args :text "We had a problem answering this questions.")))))))
 
 (defn ^:diag get-surrogate-messages-provider
   [pid]
@@ -128,7 +127,7 @@
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []
-  (ws/register-ws-dispatch :start-surrogate start-surrogate)         ; User types SUR:
+  (ws/register-ws-dispatch :start-surrogate start-surrogate!)         ; User types SUR:
   (ws/register-ws-dispatch :surrogate-follow-up surrogate-follow-up) ; User types SUR?:
   :surrogate-ws-fns-registered)
 

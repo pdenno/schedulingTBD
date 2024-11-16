@@ -3,19 +3,16 @@
   (:require
    [clojure.core.unify                        :as uni]
    [clojure.edn                               :as edn]
-   [clojure.pprint                            :refer [cl-format]]
+   [clojure.pprint                            :refer [cl-format pprint]]
    [clojure.spec.alpha                        :as s]
    [clojure.string                            :as str]
    [scheduling-tbd.db                         :as db]
    [scheduling-tbd.llm                        :as llm :refer [query-llm]]
    [scheduling-tbd.minizinc                   :as mzn]
-   [scheduling-tbd.response-utils             :as ru :refer [defanalyze find-claim make-human-project surrogate?]]
+   [scheduling-tbd.response-utils             :as ru :refer [defanalyze find-claim make-human-project]]
    [scheduling-tbd.sutil                      :as sutil :refer [elide]]
    [scheduling-tbd.web.websockets             :as ws]
    [taoensso.telemere                         :as tel :refer [log!]]))
-
-;;; Place this in any file where you are developing the process interview so updates will be found.
-#_(register-planning-domain :process  (-> "data/planning-domains/process-interview.edn" slurp edn/read-string))
 
 (def ^:diag diag (atom nil))
 (declare analyze-intro-response analyze-process-steps-response analyze-process-durs-response analyze-batch-size-response analyze-process-ordering-response)
@@ -33,15 +30,15 @@
 
 ;;; Note that pid here can be :START-A-NEW-PROJECT. In that case, we don't have a DB for the project yet. We make it here.
 (defanalyze :warm-up [{:keys [response client-id pid] :as _ctx}]
-  (log! :info (str "*******analysis :warm-up, response = " response))
+  (log! :debug (str "*******analysis :warm-up, response = " response))
   (let [init-state (db/get-claims pid)
         new-claims (analyze-intro-response response init-state)
         all-claims (into init-state new-claims)
-        surrogate? (find-claim '(surrogate ?x) init-state)] ; return state props proj-id and proj-name if human, otherwise argument state.
+        surrogate? (find-claim '(surrogate ?x) init-state)] ; return state props project-id and project-name if human, otherwise argument state.
     (when-not surrogate? (make-human-project (into init-state new-claims)))
     ;;--------  Now human/surrogate can be treated nearly identically ---------
-    (let [[_ pid]   (find-claim '(proj-id ?x) all-claims)
-          [_ pname] (find-claim '(proj-name ?x) all-claims)]
+    (let [[_ pid]   (find-claim '(project-id ?x) all-claims)
+          [_ pname] (find-claim '(project-name ?x) all-claims)]
       (doseq [claim new-claims] (db/add-claim pid claim))
       (db/add-msg {:pid pid
                    :from :system
@@ -52,21 +49,21 @@
 (defanalyze :work-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid)
                        (re-matches #".*(?i)SERVICE.*" response) (list 'provides-service pid)
-                       :else                                    (list 'fails-query 'product-or-service? pid))]
+                       :else                                    (list 'fails-query 'work-type pid))]
     (db/add-claim pid new-fact)))
+
+(defanalyze :production-location [{:keys [pid response] :as _ctx}]
+  (let [new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'production-location pid 'factory)
+                       (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'production-location pid 'customer-site)
+                       :else                                    (list 'fails-query 'production-location pid))]
+    (db/add-claim pid new-fact)))
+
 
 (defanalyze :production-motivation [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" response)        (list 'production-mode pid 'make-to-stock)
                        (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        (list 'production-mode pid 'make-to-order)
                        (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    (list 'production-mode pid 'engineer-to-order)
                        :else                                                 (list 'fails-query 'production-mode pid))]
-    (db/add-claim pid new-fact)))
-
-;;; ToDo: This one isn't being used.
-(defanalyze :work-location [{:keys [pid response] :as _ctx}]
-  (let [new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'has-production-facility pid)
-                       (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'performed-at-customer-site pid)
-                       :else                                          (list 'fails-query 'facility-vs-site pid))]
     (db/add-claim pid new-fact)))
 
 (defanalyze :production-system-type [{:keys [pid response] :as _ctx}]
@@ -78,7 +75,7 @@
 (defanalyze :process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
   (let [new-claims (analyze-process-steps-response obj)]
-    (log! :info (str "---------------------- !query-process-steps: new-claims = " new-claims))
+    (log! :debug (str "---------------------- !query-process-steps: new-claims = " new-claims))
     (doseq [claim new-claims] (db/add-claim pid claim))))
 
 (defanalyze :process-durations [{:keys [client-id response pid] :as obj}]
@@ -105,10 +102,12 @@
         :dispatch-key :tbd-says
         :text "There was a problem defining a process corresponding to what you said."}))))
 
+;;; ToDo: Write to db.
 (defanalyze :batch-size [{:keys [response] :as ctx}]
   (log! :info (str "process-ordering: response = " response))
   (analyze-batch-size-response response))
 
+;;; ToDo: Write to db.
 (defanalyze :process-ordering [{:keys [response] :as ctx}]
   (log! :info (str "process-ordering: response = " response))
   (analyze-process-ordering-response response))
@@ -146,6 +145,23 @@
     (query-llm ?r {:model-class :gpt :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
     (:project-name ?r)
     (if (string? ?r) ?r (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text})))))
+
+;;; ------------------------------------------ Raw material challenge ------------------------------------------------------
+;;; This is one way we process the warm-up question. It needs to be substantially enhanced to collect every challenge type that is commonly cited.
+;;; Today we'd use a system agent for this.
+;;; The challenges may include (what comes to mind right now):
+;;;     * raw material uncertainty
+;;;     * demand uncertainty
+;;;     * delivery schedules
+;;;     * demand seaonality
+;;;     * planned maintenance
+;;;     * equipment changeover
+;;;     * equipment availability (breakdowns)
+;;;     * equipment utilization
+;;;     * worker availability
+;;;     * worker skills
+;;;     * bottleneck processes
+;;;     * process variation (When you see this one, before you ask about process steps, mention that you are looking for the generic, then ask more.)
 
 (def raw-material-challenge-partial
   [{:role "system"    :content "You are a helpful assistant."}
@@ -192,26 +208,25 @@
 ;;; ToDo: This was written before I decided that domain.clj ought to require db and use it. Refactor this and its caller, !initial-question ?
 (defn analyze-intro-response
   "Analyze the response to the initial question.
-   If init-state argument is just #{(proj-id :START-A-NEW-PROJECT)}, we are talking to humans and there is not yet a project.
+   If init-state argument is just #{(project-id :START-A-NEW-PROJECT)}, we are talking to humans and there is not yet a project.
    Returns new claims."
   [response init-state]
   (log! :info (-> (str "analyze-intro-response: init-state = " init-state " response = " response) (elide 150)))
-  (let [[_ pid] (find-claim '(proj-id ?x) init-state)
+  (let [[_ pid] (find-claim '(project-id ?x) init-state)
         new-claims (atom #{})]
     (when (= pid :START-A-NEW-PROJECT)
-      (let [proj-name (as-> (project-name-llm-query response) ?s
-                        (str/trim ?s)
-                        (str/split ?s #"\s+")
-                        (map str/capitalize ?s)
-                        (interpose " " ?s)
-                        (apply str ?s))
-            pid (as-> proj-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (keyword ?s))]
-        (reset! new-claims (into (filterv #(not= % '(proj-id :START-A-NEW-PROJECT)) init-state)
-                                 `[(~'proj-id ~pid)
-                                   (~'proj-name ~proj-name)]))))
-    ;; ToDo: Maybe rework this to additionally handle skills classification, delivery schedules, downtime, machine utilization.
-    (when (= :yes (text-cites-raw-material-challenge? response))
-      (let [[_ pid] (find-claim '(proj-id ?x) @new-claims)]
+      (let [project-name (as-> (project-name-llm-query response) ?s
+                           (str/trim ?s)
+                           (str/split ?s #"\s+")
+                           (map str/capitalize ?s)
+                           (interpose " " ?s)
+                           (apply str ?s))
+            pid (as-> project-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (keyword ?s))]
+        (reset! new-claims (into (filterv #(not= % '(project-id :START-A-NEW-PROJECT)) init-state)
+                                 `[(~'project-id ~pid)
+                                   (~'project-name ~project-name)]))))
+    (when (= :yes (text-cites-raw-material-challenge? response)) ; ToDo: Replace this with something more general describe above.
+      (let [[_ pid] (find-claim '(project-id ?x) @new-claims)]
         (swap! new-claims #(conj % `(~'cites-raw-material-challenge ~pid)))))
     @new-claims))
 
@@ -336,7 +351,7 @@
   (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)
         past-rev (atom response)]
     (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]] ; These are also spec defs, thus ns-qualified.
-      (log! :info (str "Starting rev " (name rev)))
+      (log! :info (str "process-dur-agent, rev " (name rev)))
       (when @past-rev
         (let [result (llm/query-on-thread
                       {:aid aid :tid tid :role "user"
@@ -344,7 +359,7 @@
                        :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))
                        :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
           (reset! past-rev result)
-          (log! :info (str "***************" rev " = "  @past-rev)))))
+          (log! :debug (str "process-dur-agent " (name rev) " =\n" (with-out-str (pprint @past-rev)))))))
     @past-rev))
 
 (defn post-process-durs
@@ -384,7 +399,7 @@
 (s/def ::step-2 (fn [v] (every? #(s/valid? ::step-2-map %) v)))
 
 (defn analyze-process-ordering-response
-  "Return state addition for analyzing a Y/N user response about process ordering."
+  "Return structured object for process ordering question."
   [{:keys [response] :as _ctx}]
     (let [{:keys [aid tid]} (db/get-agent :base-type :process-ordering-agent)
         past-step (atom response)]
@@ -393,17 +408,17 @@
       (when @past-step
         (let [result (llm/query-on-thread
                       {:aid aid :tid tid :role "user"
-                       :tries 3 :test-fn (fn [resp] true #_(s/valid? step resp))
+                       :tries 3 :test-fn (fn [_resp] true #_(s/valid? step resp)) ; ToDo: check s/valid?
                        :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))
                        :query-text (str "Perform " (-> step name str/upper-case) " on the following:\n\n" @past-step)})]
           (reset! past-step result)
-          (log! :info (str "***************" step " = "  @past-step)))))
+          (log! :debug (str "process-ordering-agent " (name step) " :\n" (with-out-str (pprint @past-step)))))))
     @past-step))
 
 ;;; -----------------------------------------------------------------------------------------
 ;;; This will always be asked after process-durations.
 (defn analyze-batch-size-response
-  [{:keys [response pid] :as _ctx}])
+  [{:keys [_response _pid] :as _ctx}])
 
 (defn analyze-process-durs-response
   "Used predominantly with surrogates, study the response to a query about process durations,

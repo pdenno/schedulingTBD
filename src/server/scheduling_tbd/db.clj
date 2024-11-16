@@ -17,7 +17,7 @@
    [scheduling-tbd.specs :as spec]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id default-llm-provider]]
    [scheduling-tbd.util  :as util :refer [now]]
-   [taoensso.telemere.timbre :as log :refer [debug]]))
+   [taoensso.telemere    :refer [log!]]))
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
@@ -155,7 +155,7 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
         :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, "
                   "which aren't stored, some values can be skipped.")}
-   :message/question-name
+   :message/question-type
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "A label (from interview instructions) associated with this question or answer."}
    :message/tags
@@ -489,7 +489,7 @@
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
-   (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
+   (the entity id of the map containing :project/id in the database named by the argumen project-id)."
   [pid]
   (assert (keyword? pid))
   (when (some #(= % pid) (sutil/db-ids)) ; (sutil/db-ids) includes non-project IDs.
@@ -526,8 +526,8 @@
           eid (project-exists? pid)]
       (if eid
         (d/transact conn {:tx-data [[:db/add eid :project/current-conversation cid]]})
-        (log/info "No change with change-conversation (1):" obj)))
-    (catch Throwable _e (log/info "No change with change-conversation (2):" obj) nil))
+        (log! :info (str "No change with change-conversation (1): " obj))))
+    (catch Throwable _e (log! :info (str "No change with change-conversation (2): " obj)) nil))
   nil)
 
 (defn get-project
@@ -578,7 +578,7 @@
       (dp/pull @(connect-atm pid) '[*] eid))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/question-name})
+  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/question-type})
 
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
@@ -621,7 +621,7 @@
    Returns #{} if pid is :START-A-NEW-PROJECT."
   [pid]
   (if (= pid :START-A-NEW-PROJECT)
-    '#{(proj-id :START-A-NEW-PROJECT)} ; Special treatment for new projects.
+    '#{(project-id :START-A-NEW-PROJECT)} ; Special treatment for new projects.
     (if-let [facts (d/q '[:find [?s ...]
                           :where
                           [_ :project/claims ?pp]
@@ -674,7 +674,7 @@
                   (pprint obj)
                   (println))))
             (println "]"))]
-    (log/info "Writing project to" filename)
+    (log! :info (str "Writing project to " filename))
     (spit filename s)))
 
 (defn ^:diag backup-proj-dbs
@@ -698,7 +698,7 @@
                       (pprint obj)
                       (println))))
                 (println "]"))]
-      (log/info "Writing system DB to" filename)
+      (log! :info (str "Writing system DB to " filename))
       (spit filename s)))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
@@ -746,7 +746,7 @@
       :or {target-dir "data/" new-agents? true update-assistants? true}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
     (let [cfg (db-cfg-map {:type :system})]
-      (log/info "Recreating the system database.")
+      (log! :info "Recreating the system database.")
       (when (d/database-exists? cfg) (d/delete-database cfg))
       (d/create-database cfg)
       (register-db :system cfg)
@@ -756,7 +756,7 @@
         (when update-assistants? (update-assistants!))
         (when new-agents? (recreate-system-agents!)); This is just about system agents, of course.
         cfg))
-      (log/error "Not recreating system DB: No backup file.")))
+      (log! :error "Not recreating system DB: No backup file.")))
 
 (defn recreate-project-db!
   "Recreate a DB for each project using EDN files."
@@ -778,7 +778,7 @@
         (when-not (-> files-dir io/as-file .isDirectory)
           (-> files-dir io/as-file .mkdir))
         cfg)
-    (log/error "Not recreating DB because backup file does not exist:" backup-file))))
+    (log! :error (str "Not recreating DB because backup file does not exist: " backup-file)))))
 
 (def keep-db? #{:him})
 (defn ^:diag recreate-dbs!
@@ -788,7 +788,7 @@
   (swap! sutil/databases-atm
          #(reduce-kv (fn [res k v] (if (keep-db? k) (assoc res k v) res)) {} %))
   (recreate-system-db!)
-  (log/info "Recreating these projects:" (list-projects))
+  (log! :info (str "Recreating these projects: " (list-projects)))
   (doseq [pid (list-projects)]
     (recreate-project-db! pid)))
 
@@ -837,21 +837,21 @@
   [{:keys[pid from text tags question-type]}]
   (assert (#{:system :human :surrogate :developer-injected} from))
   (assert (string? text))
-  ;;(log/info "add-msg: pid =" pid "text =" text)
+  (log! :debug (str "add-msg: pid = " pid "text = " text))
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
                                                             (not-empty tags) (assoc :message/tags tags)
-                                                            question-type    (assoc :message/question-name question-type))}]}))
+                                                            question-type    (assoc :message/question-type question-type))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
-  [id proj-name dir]
+  [id project-name dir]
   (d/transact (connect-atm :system)
               {:tx-data [{:project/id id
-                          :project/name proj-name
+                          :project/name project-name
                           :project/dir dir}]}))
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
@@ -889,14 +889,15 @@
      (d/transact (connect-atm id) {:tx-data [{:project/id id
                                               :project/name pname
                                               :project/current-conversation :process
-                                              :project/claims [{:claim/string (str `(~'project-name ~id ~pname))}]
+                                              :project/claims [{:claim/string (str `(~'project-id ~id))}
+                                                               {:claim/string (str `(~'project-name ~id ~pname))}]
                                               :project/conversations [{:conversation/id :process}
                                                                       {:conversation/id :data}
                                                                       {:conversation/id :resource}]}]})
      (when (not-empty additional-info)
        (d/transact (connect-atm id) additional-info))
      ;; Add knowledge of this project to the system db.
-     (log/info "Created project database for" id)
+     (log! :info (str "Created project database for " id))
      id)))
 
 (defn delete-project!
@@ -909,7 +910,7 @@
           (d/transact (connect-atm :system) {:tx-data (for [[k v] obj] [:db/retract s-eid k v])})
           (sutil/deregister-db pid)
           nil)))
-    (log/warn "Delete-project: Project not found:" pid)))
+    (log! :warn (str "Delete-project: Project not found: " pid))))
 
 (defn ^:diag known-agents
   "Return a set of all the agents recorded in the system DB."

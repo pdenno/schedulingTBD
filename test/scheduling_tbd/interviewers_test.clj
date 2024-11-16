@@ -1,7 +1,7 @@
 (ns scheduling-tbd.interviewers-test
   (:require
-   [clojure.edn                   :as edn]
    [clojure.pprint                :refer [pprint]]
+   [clojure.spec.alpha            :as s]
    [clojure.test                  :refer [deftest is testing]]
    [datahike.api                  :as d]
    [scheduling-tbd.db             :as db]
@@ -9,8 +9,7 @@
    [scheduling-tbd.llm            :as llm]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm]]
    [scheduling-tbd.web.websockets :as ws]
-   [taoensso.telemere             :as tel :refer [log!]]
-   [taoensso.truss                :as truss :refer [have have?]]))
+   [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -118,7 +117,7 @@
 (deftest finished-process-test
   (testing "Testing that :sur-ice-cream has finished all process questions."
     (is (= {:status "DONE"}
-           (do (tell-one (inv/prior-responses :sur-ice-cream :process) {:pid :sur-ice-cream :conv-id :process})
+           (do (tell-one (inv/conversation-history :sur-ice-cream :process) {:pid :sur-ice-cream :conv-id :process})
                (tell-one {:command "SUPPLY-QUESTION"} {:pid :sur-ice-cream :conv-id :process}))))))
 
 (deftest test-vector-stores
@@ -142,31 +141,32 @@
 (def q-work-type
   "This is typical of what you get back from the interviewer when you do SUPPLY-QUESTION."
   {:question-type :work-type,
-   :status "OK",
-   :question "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING."})
+   :question "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING."
+   :status "OK"})
 
+;;; (invt/ask-one-question q-work-type)
 (defn ask-one-question
   "Use inv/chat-pair to get back an answer"
   [pid {:keys [question question-type]}]
   (let [{:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
     (inv/loop-for-answer
-     question
      {:pid pid
       :sur-aid assistant-id
       :sur-tid thread-id
       :responder-role :surrogate
       :client-id (ws/recent-client!)
+      :question question
       :question-type question-type})))
 
 (deftest question-asking
   (testing "Testing question asking capability through loop-for-answer."
     (when (or (nil? (db/get-project :sur-fountain-pens :error? false))
               (nil? (ws/recent-client!)))
-      (log/warn "No project or client to run interview_test/question-asking."))
+      (log! :warn "No project or client to run interview_test/question-asking."))
     (is (or (nil? (db/get-project :sur-fountain-pens :error? false))
             (nil? (ws/recent-client!))
             (let [pid :sur-fountain-pens]
-              (= {:command "HUMAN-RESPONDS", :response "PRODUCT", :question-type :work-type}
+              (= {:command "INTERVIEWEES-RESPONDS", :response "PRODUCT", :question-type :work-type}
                  (ask-one-question pid q-work-type)))))))
 ;;; ================================================= Throw-away-able updating of project.edn =====================================
 (def ^:diag tag2qname
@@ -235,4 +235,49 @@
                   :process-ordering]]
     (if eid
       (d/transact conn {:tx-data (vec (for [n new-ones] [:db/add eid :conversation/state-vector n]))})
-      (log/error "No eid"))))
+      (log! :error "No eid"))))
+
+(deftest interviewer-commands
+  (testing "that the specs for interviewer commands are correct."
+    (is (s/valid? ::inv/interviewer-cmd
+                  {:command "CONVERSATION-HISTORY",
+                   :claims  "[(project-id :sur-ice-cream)]"
+                   :already-answered [:warm-up],
+                   :responses
+                   [{:question-type :warm-up
+                     :answer "Our most significant scheduling problem is..."}]}))))
+
+
+ #_{:command "CONVERSATION-HISTORY",
+  :claims
+  "[(process-step :sur-ice-cream 10 \"Label and Inspect\") (process-step :sur-ice-cream 9 \"Package\") (production-mode :sur-ice-cream make-to-stock) (production-location :sur-ice-cream factory) (flow-shop :sur-ice-cream) (process-step :sur-ice-cream 2 \"Pasteurize Mixture\") (process-step :sur-ice-cream 1 \"Mix Ingredients\") (surrogate :sur-ice-cream) (have-process-durs :sur-ice-cream) (provides-product :sur-ice-cream) (process-step :sur-ice-cream 6 \"Freeze Mixture\") (process-step :sur-ice-cream 3 \"Homogenize Mixture\") (process-step :sur-ice-cream 7 \"Fill Containers\") (process-step :sur-ice-cream 5 \"Add Flavors and Inclusions\") (process-step :sur-ice-cream 8 \"Harden Ice Cream\") (process-step :sur-ice-cream 4 \"Age Mixture\") (project-id :sur-ice-cream) (project-name :sur-ice-cream \"SUR Ice Cream\") (cites-raw-material-challenge nil)]",
+  :already-answered
+  [:production-motivation
+  :production-system-type
+  :process-steps
+  :process-ordering
+  :warm-up
+  :production-location
+  :process-durations
+  :work-type
+  :batch-size],
+ :responses
+ [{:answer
+   "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service. Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as ingredient availability and production line capacities. Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial.",
+   :question-type "warm-up"}
+  {:answer "PRODUCT", :question-type "work-type"}
+  {:answer "OUR-FACILITY", :question-type "production-location"}
+  {:answer "MAKE-TO-STOCK", :question-type "production-motivation"}
+  {:answer "FLOW-SHOP", :question-type "production-system-type"}
+  {:answer
+   "1. Mix Ingredients\n2. Pasteurize Mixture\n3. Homogenize Mixture\n4. Age Mixture\n5. Add Flavors and Inclusions\n6. Freeze Mixture\n7. Fill Containers\n8. Harden Ice Cream\n9. Package\n10. Label and Inspect",
+   :question-type "process-steps"}
+  {:answer
+   "1. Mix Ingredients (30 minutes)\n2. Pasteurize Mixture (15 minutes)\n3. Homogenize Mixture (10 minutes)\n4. Age Mixture (4 hours)\n5. Add Flavors and Inclusions (20 minutes)\n6. Freeze Mixture (30 minutes)\n7. Fill Containers (20 minutes)\n8. Harden Ice Cream (3 hours)\n9. Package (15 minutes)\n10. Label and Inspect (10 minutes)",
+   :question-type "process-durations"}
+  {:answer
+   "1. Mix Ingredients (500 gallons)\n2. Pasteurize Mixture (500 gallons)\n3. Homogenize Mixture (500 gallons)\n4. Age Mixture (500 gallons)\n5. Add Flavors and Inclusions (500 gallons)\n6. Freeze Mixture (500 gallons)\n7. Fill Containers (1000 pints)\n8. Harden Ice Cream (1000 pints)\n9. Package (1000 pints)\n10. Label and Inspect (1000 pints)",
+   :question-type "batch-size"}
+  {:answer
+   "1. Mix Ingredients (milk, cream, sugar, stabilizers, emulsifiers)\n2. Pasteurize Mixture (use mixture from Mix Ingredients)\n3. Homogenize Mixture (use mixture from Pasteurize Mixture)\n4. Age Mixture (use mixture from Homogenize Mixture)\n5. Add Flavors and Inclusions (use aged mixture, flavorings, inclusions such as fruits, nuts, chocolate chips)\n6. Freeze Mixture (use flavored mixture from Add Flavors and Inclusions)\n7. Fill Containers (use frozen mixture from Freeze Mixture)\n8. Harden Ice Cream (use filled containers from Fill Containers)\n9. Package (use hardened ice cream from Harden Ice Cream)\n10. Label and Inspect (use packaged ice cream from Package)",
+   :question-type "process-ordering"}]}

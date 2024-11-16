@@ -79,11 +79,11 @@
         (if (nil? res)
           (throw (ex-info "Timeout or other exception." {}))
           (ws/send-to-chat (-> chat-args
-                               (assoc :msg res)
+                               (assoc :text res)
                                (assoc :time (now))))))
       (catch Exception e
         (log! :error (str "Failure in llm-directly: " e))
-        (ws/send-to-chat (assoc chat-args :msg "There was a problem answering that."))))))
+        (ws/send-to-chat (assoc chat-args :text "There was a problem answering that."))))))
 
 (defn list-openai-models
   "List id and create date of all available models.

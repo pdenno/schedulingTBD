@@ -4,12 +4,11 @@
    [clojure.string                  :as str]
    [clojure.pprint                  :refer [pprint]]
    #?@(:clj [[datahike.api          :as d]
-             [datahike.pull-api     :as dp]])
+             [datahike.pull-api     :as dp]
+             [jansi-clj.core           :refer [yellow cyan bold]]
+             [taoensso.telemere.tools-logging :as tel-log]])
    [mount.core                      :as mount :refer [defstate]]
-   #?(:clj [jansi-clj.core           :refer [yellow cyan bold]])
    [taoensso.telemere               :as tel :refer [log!]]
-   [taoensso.telemere.timbre        :as tel-timbre]
-   [taoensso.telemere.tools-logging :as tel-log]
    [taoensso.timbre                 :as timbre])) ; To stop pesky datahike :debug messages.
 
 (def diag (atom nil))
@@ -48,9 +47,10 @@
     ;; (tel/set-min-level! :log "datahike.*" :error)             ; ToDo: make it work!
     ;;(tel-timbre/set-ns-min-level! "datahike.connector" :error) ; ToDo: make it work! Can I use "datahike.*" ?
     ;; https://github.com/taoensso/telemere/wiki/3-Config
-    (tel-log/tools-logging->telemere!) ;; Send tools.logging through telemere. Check this with (tel/check-interop)
-    (tel/streams->telemere!)           ;; likewise for *out* and *err* but "Note that Clojure's *out*, *err* are not necessarily automatically affected."
-    (tel/event! ::config-log {:level :info :msg (str "Logging configured:\n" (with-out-str (pprint (tel/check-interop))))})
+    #?@(:clj ((tel-log/tools-logging->telemere!)  ;; Send tools.logging through telemere. Check this with (tel/check-interop)
+              (tel/streams->telemere!)           ;; likewise for *out* and *err* but "Note that Clojure's *out*, *err* are not necessarily automatically affected."
+              (tel/event! ::config-log {:level :info :msg (str "Logging configured:\n" (with-out-str (pprint (tel/check-interop))))}))
+        :cljs ((log! :info "Logging configured.")))
     ;; The following is needed because of datahike; no timbre-logging->telemere!
     (timbre/set-config! (assoc timbre/*config* :min-level [[#{"datahike.*"} :error]
                                                            [#{"konserve.*"} :error]]))))

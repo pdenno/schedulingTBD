@@ -3,105 +3,178 @@
           [#:conversation{:id :process,
                           :messages
                           [#:message{:content
-                                     "Describe your most significant scheduling problem in a few sentences.",
+                                     "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
                                      :from :system,
                                      :id 1,
-                                     :question-name :warm-up-question,
+                                     :question-type :warm-up,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-08T20:50:43.730-00:00"}
+                                     #inst "2024-11-16T19:54:33.595-00:00"}
                            #:message{:content
-                                     "One of the most significant scheduling problems we face is coordinating production schedules with fluctuating demand, especially during peak seasons. We also need to ensure a steady supply of raw materials, like milk and sugar, to match production needs without overstocking, which requires precise timing with our suppliers. Additionally, balancing machine maintenance and staffing schedules to minimize downtime while maintaining high productivity adds another layer of complexity to the logistics.",
+                                     "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service. Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as ingredient availability and production line capacities. Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial.",
                                      :from :surrogate,
                                      :id 2,
-                                     :question-name :warm-up-question,
+                                     :question-type :warm-up,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-11-08T20:50:43.748-00:00"}
+                                     #inst "2024-11-16T19:54:33.653-00:00"}
                            #:message{:content
-                                     "Great, we'll call your project SUR Ice Cream.",
+                                     "Great, we'll call your project Sur ice cream.",
                                      :from :system,
                                      :id 3,
                                      :tags
                                      [:!describe-challenge
                                       :informative],
                                      :time
-                                     #inst "2024-11-08T20:50:47.983-00:00"}
+                                     #inst "2024-11-16T19:54:43.936-00:00"}
                            #:message{:content
-                                     "Would you characterize your production motivation as MAKE-TO-STOCK, MAKE-TO-ORDER, or ENGINEER-TO-ORDER? Please respond with the most accurate term.",
+                                     "Would you characterize your company's work as primarily providing a product, a service or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
                                      :from :system,
                                      :id 4,
-                                     :question-name
-                                     :production-motivation,
+                                     :question-type :work-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-08T20:50:54.996-00:00"}
-                           #:message{:content "MAKE-TO-STOCK.",
+                                     #inst "2024-11-16T19:54:50.762-00:00"}
+                           #:message{:content "PRODUCT",
                                      :from :surrogate,
                                      :id 5,
-                                     :question-name
+                                     :question-type :work-type,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-16T19:54:50.780-00:00"}
+                           #:message{:content
+                                     "Some work is performed in your own facility, some, like cutting down trees, has to be performed at the customer's site. Which is most common in your work? Respond with the single work OUR-FACILITY, CUSTOMER-SITE, or if it isn't straightforward, an explanation.",
+                                     :from :system,
+                                     :id 6,
+                                     :question-type
+                                     :production-location,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-16T19:55:06.126-00:00"}
+                           #:message{:content "OUR-FACILITY",
+                                     :from :surrogate,
+                                     :id 7,
+                                     :question-type
+                                     :production-location,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-16T19:55:06.149-00:00"}
+                           #:message{:content
+                                     "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product is configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
+                                     :from :system,
+                                     :id 8,
+                                     :question-type
+                                     :production-motivation,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-16T19:55:18.922-00:00"}
+                           #:message{:content "MAKE-TO-STOCK",
+                                     :from :surrogate,
+                                     :id 9,
+                                     :question-type
                                      :production-motivation,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-11-08T20:50:55.023-00:00"}
+                                     #inst "2024-11-16T19:55:18.943-00:00"}
                            #:message{:content
-                                     "Would you characterize your production system type as FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE? Please respond with the term that best describes your system.",
+                                     "There are a few common patterns or system designs by which a product is made. In a FLOW-SHOP, all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
                                      :from :system,
-                                     :id 6,
-                                     :question-name
+                                     :id 10,
+                                     :question-type
                                      :production-system-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-08T20:51:04.733-00:00"}
-                           #:message{:content "FLOW-SHOP.",
+                                     #inst "2024-11-16T19:55:33.054-00:00"}
+                           #:message{:content "FLOW-SHOP",
                                      :from :surrogate,
-                                     :id 7,
-                                     :question-name
+                                     :id 11,
+                                     :question-type
                                      :production-system-type,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-11-08T20:51:04.757-00:00"}
+                                     #inst "2024-11-16T19:55:33.101-00:00"}
                            #:message{:content
-                                     "Please list the major steps of your process, one per line.   If there are significant components to be made, list each one as a separate step.   Don't worry about ordering steps that might be done simultaneously; we'll deal with that later.   If you were in the business of making sandwich cookies, the list you create would look like this:       1. Make Cookie Dough      2. Make Filling      3. Bake Wafers      4. Assemble Cookies      5. Package",
+                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
                                      :from :system,
-                                     :id 8,
-                                     :question-name :process-steps,
+                                     :id 12,
+                                     :question-type :process-steps,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-08T20:51:18.959-00:00"}
+                                     #inst "2024-11-16T19:55:47.706-00:00"}
                            #:message{:content
-                                     "1. Mix Ingredients\n2. Pasteurize Mix\n3. Homogenize Mix\n4. Age Mix\n5. Flavor and Color Addition\n6. Freeze Mix\n7. Add Inclusions (e.g., chocolate chips, fruit)\n8. Fill and Seal Containers\n9. Hardening\n10. Package\n11. Cold Storage",
+                                     "1. Mix Ingredients\n2. Pasteurize Mixture\n3. Homogenize Mixture\n4. Age Mixture\n5. Add Flavors and Inclusions\n6. Freeze Mixture\n7. Fill Containers\n8. Harden Ice Cream\n9. Package\n10. Label and Inspect",
                                      :from :surrogate,
-                                     :id 9,
-                                     :question-name :process-steps,
+                                     :id 13,
+                                     :question-type :process-steps,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-11-08T20:51:19.008-00:00"}
+                                     #inst "2024-11-16T19:55:47.735-00:00"}
                            #:message{:content
                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
                                      :from :system,
-                                     :id 10,
-                                     :question-name :process-durations,
+                                     :id 14,
+                                     :question-type :process-durations,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-08T20:51:32.272-00:00"}
+                                     #inst "2024-11-16T19:56:09.520-00:00"}
                            #:message{:content
-                                     "1. Mix Ingredients (30 minutes)\n2. Pasteurize Mix (1 hour)\n3. Homogenize Mix (15 minutes)\n4. Age Mix (4 hours)\n5. Flavor and Color Addition (20 minutes)\n6. Freeze Mix (45 minutes)\n7. Add Inclusions (10 minutes)\n8. Fill and Seal Containers (30 minutes)\n9. Hardening (2 hours)\n10. Package (45 minutes)\n11. Cold Storage (Variable, usually at least 24 hours)",
+                                     "1. Mix Ingredients (30 minutes)\n2. Pasteurize Mixture (15 minutes)\n3. Homogenize Mixture (10 minutes)\n4. Age Mixture (4 hours)\n5. Add Flavors and Inclusions (20 minutes)\n6. Freeze Mixture (30 minutes)\n7. Fill Containers (20 minutes)\n8. Harden Ice Cream (3 hours)\n9. Package (15 minutes)\n10. Label and Inspect (10 minutes)",
                                      :from :surrogate,
-                                     :id 11,
-                                     :question-name :process-durations,
+                                     :id 15,
+                                     :question-type :process-durations,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-11-08T20:51:32.292-00:00"}]}
+                                     #inst "2024-11-16T19:56:09.583-00:00"}
+                           #:message{:content
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
+                                     :from :system,
+                                     :id 16,
+                                     :tags [:info-to-user :minizinc],
+                                     :time
+                                     #inst "2024-11-16T19:57:06.319-00:00"}
+                           #:message{:content
+                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just '1000 packages'. If, however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling (2000 packages)\n 3. Bake Wafers (1000 packages)\n 4. Assemble Cookies (1000 packages)\n 5. Package (1000 packages)",
+                                     :from :system,
+                                     :id 17,
+                                     :question-type :batch-size,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-16T19:57:16.388-00:00"}
+                           #:message{:content
+                                     "1. Mix Ingredients (500 gallons)\n2. Pasteurize Mixture (500 gallons)\n3. Homogenize Mixture (500 gallons)\n4. Age Mixture (500 gallons)\n5. Add Flavors and Inclusions (500 gallons)\n6. Freeze Mixture (500 gallons)\n7. Fill Containers (1000 pints)\n8. Harden Ice Cream (1000 pints)\n9. Package (1000 pints)\n10. Label and Inspect (1000 pints)",
+                                     :from :surrogate,
+                                     :id 18,
+                                     :question-type :batch-size,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-16T19:57:16.412-00:00"}
+                           #:message{:content
+                                     "Earlier, you listed the process steps typically used in making product (e.g. 1. Mix Ingredients, 2. Pasteurize Mixture, etc.) and for each, you specified typical durations. Now we'd like you to tell us what raw materials and intermediate products go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n 1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n 2. Make Filling (sugar, water, vanilla flavoring)\n 3. Bake Wafers (use dough from Make Cookie Dough)\n 4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n 5. Package (use cookies from Assemble Cookies)",
+                                     :from :system,
+                                     :id 19,
+                                     :question-type :process-ordering,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-16T19:57:39.424-00:00"}
+                           #:message{:content
+                                     "1. Mix Ingredients (milk, cream, sugar, stabilizers, emulsifiers)\n2. Pasteurize Mixture (use mixture from Mix Ingredients)\n3. Homogenize Mixture (use mixture from Pasteurize Mixture)\n4. Age Mixture (use mixture from Homogenize Mixture)\n5. Add Flavors and Inclusions (use aged mixture, flavorings, inclusions such as fruits, nuts, chocolate chips)\n6. Freeze Mixture (use flavored mixture from Add Flavors and Inclusions)\n7. Fill Containers (use frozen mixture from Freeze Mixture)\n8. Harden Ice Cream (use filled containers from Fill Containers)\n9. Package (use hardened ice cream from Harden Ice Cream)\n10. Label and Inspect (use packaged ice cream from Package)",
+                                     :from :surrogate,
+                                     :id 20,
+                                     :question-type :process-ordering,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-16T19:57:39.488-00:00"}]}
            #:conversation{:id :data}
            #:conversation{:id :resource}],
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {mixIngredients, pasteurizeMix, homogenizeMix, ageMixture, addFlavors, freezeMix, fillContainers, hardenIceCream, packaging, labelAndInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|0.500, 0.250, 0.167, 4.000, 0.333, 0.500, 0.333, 3.000, 0.250, 0.167|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, mixIngredients] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, mixIngredients] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, mixIngredients] == taskStarts[p, pasteurizeMix]);\nconstraint forall (p in Product) (taskEnds[p, pasteurizeMix] == taskStarts[p, homogenizeMix]);\nconstraint forall (p in Product) (taskEnds[p, homogenizeMix] == taskStarts[p, ageMixture]);\nconstraint forall (p in Product) (taskEnds[p, ageMixture] == taskStarts[p, addFlavors]);\nconstraint forall (p in Product) (taskEnds[p, addFlavors] == taskStarts[p, freezeMix]);\nconstraint forall (p in Product) (taskEnds[p, freezeMix] == taskStarts[p, fillContainers]);\nconstraint forall (p in Product) (taskEnds[p, fillContainers] == taskStarts[p, hardenIceCream]);\nconstraint forall (p in Product) (taskEnds[p, hardenIceCream] == taskStarts[p, packaging]);\nconstraint forall (p in Product) (taskEnds[p, packaging] == taskStarts[p, labelAndInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, labelAndInspect]);",
           :agents
-          [#:agent{:assistant-id "asst_ZQYw9yS51Eoy558SUMmuLRDD",
+          [#:agent{:assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
                    :base-type :process-interview-agent,
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_8KKwUUvq1DI6T1rVQEV8IObd"}],
+                   :thread-id "thread_Af7PPLVuyyJkrkEaeFSxYrX5"}],
           :processes
           [#:process{:id :sur-ice-cream,
                      :interview-class :initial-unordered,
@@ -115,129 +188,119 @@
                                 :step-number 1,
                                 :var-name "mixIngredients"}
                       #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
+                                #:quantity{:units :minutes,
+                                           :value-string "15"},
                                 :id
                                 :sur-ice-cream--initial-unordered--pasteurizeMix,
-                                :name "Pasteurize Mix",
+                                :name "Pasteurize Mixture",
                                 :step-number 2,
                                 :var-name "pasteurizeMix"}
                       #:process{:duration
                                 #:quantity{:units :minutes,
-                                           :value-string "15"},
+                                           :value-string "10"},
                                 :id
                                 :sur-ice-cream--initial-unordered--homogenizeMix,
-                                :name "Homogenize Mix",
+                                :name "Homogenize Mixture",
                                 :step-number 3,
                                 :var-name "homogenizeMix"}
                       #:process{:duration
                                 #:quantity{:units :hours,
                                            :value-string "4"},
                                 :id
-                                :sur-ice-cream--initial-unordered--ageMix,
-                                :name "Age Mix",
+                                :sur-ice-cream--initial-unordered--ageMixture,
+                                :name "Age Mixture",
                                 :step-number 4,
-                                :var-name "ageMix"}
+                                :var-name "ageMixture"}
                       #:process{:duration
                                 #:quantity{:units :minutes,
                                            :value-string "20"},
                                 :id
-                                :sur-ice-cream--initial-unordered--addFlavorColor,
-                                :name "Flavor and Color Addition",
+                                :sur-ice-cream--initial-unordered--addFlavors,
+                                :name "Add Flavors and Inclusions",
                                 :step-number 5,
-                                :var-name "addFlavorColor"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "45"},
-                                :id
-                                :sur-ice-cream--initial-unordered--freezeMix,
-                                :name "Freeze Mix",
-                                :step-number 6,
-                                :var-name "freezeMix"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "10"},
-                                :id
-                                :sur-ice-cream--initial-unordered--addInclusions,
-                                :name "Add Inclusions",
-                                :step-number 7,
-                                :var-name "addInclusions"}
+                                :var-name "addFlavors"}
                       #:process{:duration
                                 #:quantity{:units :minutes,
                                            :value-string "30"},
                                 :id
-                                :sur-ice-cream--initial-unordered--fillAndSeal,
-                                :name "Fill and Seal Containers",
-                                :step-number 8,
-                                :var-name "fillAndSeal"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "2"},
-                                :id
-                                :sur-ice-cream--initial-unordered--hardening,
-                                :name "Hardening",
-                                :step-number 9,
-                                :var-name "hardening"}
+                                :sur-ice-cream--initial-unordered--freezeMix,
+                                :name "Freeze Mixture",
+                                :step-number 6,
+                                :var-name "freezeMix"}
                       #:process{:duration
                                 #:quantity{:units :minutes,
-                                           :value-string "45"},
+                                           :value-string "20"},
                                 :id
-                                :sur-ice-cream--initial-unordered--package,
-                                :name "Package",
-                                :step-number 10,
-                                :var-name "package"}
+                                :sur-ice-cream--initial-unordered--fillContainers,
+                                :name "Fill Containers",
+                                :step-number 7,
+                                :var-name "fillContainers"}
                       #:process{:duration
-                                #:box{:string-val "variable"},
-                                :duration-comment
-                                "Variable, usually at least 24 hours",
+                                #:quantity{:units :hours,
+                                           :value-string "3"},
                                 :id
-                                :sur-ice-cream--initial-unordered--coldStorage,
-                                :name "Cold Storage",
-                                :step-number 11,
-                                :supply-chain? true,
-                                :var-name "coldStorage"}]}],
+                                :sur-ice-cream--initial-unordered--hardenIceCream,
+                                :name "Harden Ice Cream",
+                                :step-number 8,
+                                :var-name "hardenIceCream"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "15"},
+                                :id
+                                :sur-ice-cream--initial-unordered--packaging,
+                                :name "Package",
+                                :step-number 9,
+                                :var-name "packaging"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "10"},
+                                :id
+                                :sur-ice-cream--initial-unordered--labelAndInspect,
+                                :name "Label and Inspect",
+                                :step-number 10,
+                                :var-name "labelAndInspect"}]}],
           :current-conversation :process,
           :claims
-          [#:claim{:string
-                   "(project-name :sur-ice-cream \"SUR Ice Cream\")"}
-           #:claim{:string "(proj-id :sur-ice-cream)"}
-           #:claim{:string "(proj-name \"SUR Ice Cream\")"}
-           #:claim{:string "(surrogate :sur-ice-cream)"}
+          [#:claim{:string "(project-id :sur-ice-cream)"}
            #:claim{:string
-                   "(cites-raw-material-challenge scheduling-tbd.domain.process-analysis/pid)"}
+                   "(project-name :sur-ice-cream \"SUR Ice Cream\")"}
+           #:claim{:string "(surrogate :sur-ice-cream)"}
+           #:claim{:string "(cites-raw-material-challenge nil)"}
+           #:claim{:string "(provides-product :sur-ice-cream)"}
+           #:claim{:string
+                   "(production-location :sur-ice-cream factory)"}
            #:claim{:string
                    "(production-mode :sur-ice-cream make-to-stock)"}
            #:claim{:string "(flow-shop :sur-ice-cream)"}
            #:claim{:string
                    "(process-step :sur-ice-cream 1 \"Mix Ingredients\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 2 \"Pasteurize Mix\")"}
+                   "(process-step :sur-ice-cream 2 \"Pasteurize Mixture\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 3 \"Homogenize Mix\")"}
+                   "(process-step :sur-ice-cream 3 \"Homogenize Mixture\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 4 \"Age Mix\")"}
+                   "(process-step :sur-ice-cream 4 \"Age Mixture\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 5 \"Flavor and Color Addition\")"}
+                   "(process-step :sur-ice-cream 5 \"Add Flavors and Inclusions\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 6 \"Freeze Mix\")"}
+                   "(process-step :sur-ice-cream 6 \"Freeze Mixture\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 7 \"Add Inclusions\")"}
+                   "(process-step :sur-ice-cream 7 \"Fill Containers\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 8 \"Fill and Seal Containers\")"}
+                   "(process-step :sur-ice-cream 8 \"Harden Ice Cream\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 9 \"Hardening\")"}
+                   "(process-step :sur-ice-cream 9 \"Package\")"}
            #:claim{:string
-                   "(process-step :sur-ice-cream 10 \"Package\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 11 \"Cold Storage\")"}],
+                   "(process-step :sur-ice-cream 10 \"Label and Inspect\")"}
+           #:claim{:string "(have-process-durs :sur-ice-cream)"}],
           :name "SUR Ice Cream",
           :surrogate
-          #:surrogate{:assistant-id "asst_1X4thXWtSyfXiPmniQXM4nZa",
+          #:surrogate{:assistant-id "asst_2Uv2cpwG5GuRAsp1nzkIMGDH",
                       :id :sur-ice-cream,
                       :subject-of-expertise "ice cream",
                       :system-instruction
                       "You manage a company that makes ice cream.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_0ve6n3udh81B2tSJYGVHMZpI"},
+                      :thread-id "thread_g64Pkn9wvd6sLdGBIllYAolQ"},
           :id :sur-ice-cream}
 
 ]
