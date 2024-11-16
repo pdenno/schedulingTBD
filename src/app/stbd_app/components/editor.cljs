@@ -21,7 +21,7 @@
    [stbd-app.rm-mode.parser :as parser]
    [stbd-app.rm-mode.state :as state]
    [stbd-app.util          :as util :refer [register-fn]]
-   [taoensso.timbre :as log :refer-macros [info debug log]]))
+   [taoensso.telemere.timbre      :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 

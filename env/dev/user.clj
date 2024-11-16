@@ -11,13 +11,13 @@
    [mount.core :as mount]
    [lambdaisland.classpath.watch-deps :as watch-deps]      ; hot loading for deps.
    [scheduling-tbd.core :refer [server]]                   ; for mount.
-   [scheduling-tbd.domain.data.d-ops]                      ; for mount.
-   [scheduling-tbd.domain.process.p-ops]                   ; for mount.
-   [scheduling-tbd.domain.resource.r-ops]                  ; for mount.
+   [scheduling-tbd.domain.data-analysis]                   ; for mount.
+   [scheduling-tbd.domain.process-analysis]                ; for mount.
+   [scheduling-tbd.domain.resource-analysis]               ; for mount.
    [scheduling-tbd.llm  :as llm]                           ; Because of deep synchronization problems when this is from mount.
-   [scheduling-tbd.planner :refer [planning]]              ; for mount
+   [scheduling-tbd.interviewers :refer [iviewers]]         ; for mount
    [scheduling-tbd.web.handler]                            ; for mount, defines rm.server.config/config, and router stuff.
-   [taoensso.timbre :as log]))
+   [taoensso.telemere.timbre :as log]))
 
 ;;; If you get stuck do: (clojure.tools.namespace.repl/refresh)
 
@@ -27,6 +27,7 @@
 (alter-var-root #'s/*explain-out* (constantly expound/printer))
 (add-tap (bound-fn* clojure.pprint/pprint))
 (set-refresh-dirs "src/server/scheduling_tbd" #_"test/scheduling_tbd")  ; Put here as many as you need. test messes with ns-setup!
+(s/check-asserts true) ; Error on s/assert, run s/valid? rather than just returning the argument.
 
 (defn start
   "Start the web server"

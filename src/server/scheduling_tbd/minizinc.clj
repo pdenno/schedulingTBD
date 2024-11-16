@@ -3,9 +3,10 @@
   (:require
    [clojure.edn              :as edn]
    [clojure.pprint           :refer [cl-format]]
+   [clojure.spec.alpha        :as s]
    [clojure.string           :as str]
    [scheduling-tbd.db        :as db]
-   [taoensso.timbre                           :as log]))
+   [taoensso.telemere.timbre        :as log]))
 
 ;;; System thoughts: Given minimal-mzn-for-process, you could then ask to
 ;;;   - allow parallelism where feasible
@@ -22,38 +23,45 @@
           ""
           (range 0 (dec (count pnames)))))
 
-(defn convert-qty
+(s/def ::uom (s/or :ordinary #(#{:minutes :hours :days :weeks :months} %)
+                   :botched (s/keys :req [:box/string-val])))
+
+(defn convert-duration
   "Given a process qty-map (a map with keys :duration/units and :duration/value-string),
    return a number being the value of the value-string converted to the tartget-units units of measure.
-   Thus (convert-qty :hours {:duration/units :minutes :duration/value-string '30'} would return 0.50."
-  [target-units {:quantity/keys [units value-string format] :as _qty-map}]
-  (assert (#{:minutes :hours :days :months} units))
+   Thus (convert-duration :hours {:duration/units :minutes :duration/value-string '30'} would return 0.50.
+
+   The whole quantity map could be #:box{:string-val 'variable'}, in which case duration is set to -1."
+  [target-units {:quantity/keys [units value-string] :as _qty-map}]
+  (s/assert ::uom units)
   (assert (#{:minutes :hours :days :8-hour-shifts} target-units))
   (let [src-val (edn/read-string value-string)]
-    (assert (number? src-val))
-    (case units
-      :minutes (case target-units
-                 :minutes src-val
-                 :hours  (/ src-val 60)
-                 :8-hour-shifts (/ src-val 480)
-                 :days   (/ src-val 1440))
-      :hours (case target-units
-               :minutes (* src-val 60)
-               :hours src-val
-               :8-hour-shifts (/ src-val 8)
-               :days (/ src-val 24))
+    (assert (or (number? src-val) (nil? src-val)))
+    (if (nil? src-val)
+      -1
+      (case units
+        :minutes (case target-units
+                   :minutes src-val
+                   :hours  (/ src-val 60)
+                   :8-hour-shifts (/ src-val 480)
+                   :days   (/ src-val 1440))
+        :hours (case target-units
+                 :minutes (* src-val 60)
+                 :hours src-val
+                 :8-hour-shifts (/ src-val 8)
+                 :days (/ src-val 24))
 
-      :days (case target-units
-              :minutes (* src-val 1440)
-              :hours (* src-val 24)
-              :8-hour-shifts (* src-val 3)
-              :days src-val)
+        :days (case target-units
+                :minutes (* src-val 1440)
+                :hours (* src-val 24)
+                :8-hour-shifts (* src-val 3)
+                :days src-val)
 
-      :months (case target-units
-                :minutes (* src-val 43200)
-                :hours (* src-val 720)
-                :8-hour-shifts (* src-val 30) ; Guessing that's what they mean!
-                :days (* src-val 30)))))
+        :months (case target-units
+                  :minutes (* src-val 43200)
+                  :hours (* src-val 720)
+                  :8-hour-shifts (* src-val 30) ; Guessing that's what they mean!
+                  :days (* src-val 30))))))
 
 (defn process-dur-avg
   "Return the argument the process definition with where :process/duration in the case where
@@ -63,7 +71,7 @@
   (if (contains? duration :quantity-range/low)
     (let [low-uom (-> duration :quantity-range/low :quantity/units)
           low-val (-> duration :quantity-range/low :quantity/value-string edn/read-string)
-          high-val (convert-qty low-uom (:quantity-range/high duration))]
+          high-val (convert-duration low-uom (:quantity-range/high duration))]
       (assoc process :process/duration {:quantity/value-string (cl-format nil "~,3f" (/ (+ high-val low-val) 2.0))
                                         :quantity/units low-uom}))
     process))
@@ -109,7 +117,7 @@
   [procs]
   (let [procs (map process-dur-avg procs)
         uom (best-uom procs)
-        durs (mapv #(convert-qty uom %) (map :process/duration procs))
+        durs (mapv #(convert-duration uom %) (map :process/duration procs))
         type (if (not-every? integer? durs) :float :int)
         dur-string (if (= type :int)
                      (cl-format nil "[|~{~A~^, ~}|]" durs)

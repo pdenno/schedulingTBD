@@ -5,7 +5,7 @@
             [applied-science.js-interop :as j]
             [clojure.string :as str]
             [stbd-app.rm-mode.extensions.formatting :as format]
-            [taoensso.timbre :as log :refer-macros [info debug log]]))
+            [taoensso.telemere.timbre :as log :refer-macros [info debug log]]))
 
 ;; (de)serialize cursors| and <selections> for testing
 

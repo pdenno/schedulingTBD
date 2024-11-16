@@ -14,7 +14,8 @@
                     (rest %))))
 
 (s/def ::negated-proposition
-  #(and (= 'not (first %))
+  #(and (seq? %)
+        (= 'not (first %))
         (-> % second seq?)
         (-> % second first symbol?)
         (not-any? coll? (second %))))
@@ -23,19 +24,6 @@
   (s/or :positive ::positive-proposition
         :negated  ::negated-proposition))
 
-(s/def :edits/add    (s/and set? (s/coll-of ::proposition)))
-(s/def :edits/delete (s/and set? (s/coll-of ::proposition)))
-
-(s/def :step/operator keyword?)
-(s/def :step/args coll?)
-
-(s/def ::plan-step (s/keys :req-un [:step/operator :step/args]))
-(s/def ::state-edits (s/keys :req-un [:edits/add :edits/delete]))
-
-(s/def :problem/domain keyword?)
-(s/def ::goal seq?)
-(s/def ::state (s/coll-of seq?))
-(s/def ::domain-problem  (s/keys :req [:problem/domain] :req-un[::goal ::state]))
 
 ;;; ------ These concern out-bound on ws/send-to-chat. -------------------
 ;;; ToDo: I need to be able to push an update to the conversation!
@@ -52,10 +40,8 @@
 
 (s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
 (s/def ::dispatch-key outbound-dispatch-key?)
-(s/def ::msg (s/and string? #(not-empty %)))
-(s/def ::chat-msg-obj (s/keys :req-un [::client-id ::dispatch-key ::msg]))
-
-(s/def :agent/id keyword?)
-(s/def :agent/base-type keyword?)
-(s/def :agent/thread-id string?)
-(s/def ::agent (s/keys :req [:agent/id :agent/base-type :agent/thread-id :agent/assistant-id]))
+(s/def ::text (s/and string? #(not-empty %)))
+(s/def ::chat-msg-obj (s/and (s/keys :req-un [::client-id ::dispatch-key])
+                             #(if (#{:sur-says :tbd-says :update-code} (:dispatch-key %))
+                                (s/valid? ::text (:text %))
+                                true)))

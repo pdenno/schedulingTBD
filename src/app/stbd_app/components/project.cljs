@@ -10,7 +10,7 @@
    ;;["@mui/material/styles"              :as styles :refer [createTheme themeOptions ThemeProvider]] ; WIP
    [helix.core         :as helix :refer [defnc $]]
    [stbd-app.util      :as util :refer [lookup-fn register-fn]]
-   [taoensso.timbre    :as log :refer-macros [info debug log]]))
+   [taoensso.telemere.timbre  :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 

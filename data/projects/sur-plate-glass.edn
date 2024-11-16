@@ -1,230 +1,185 @@
-[
-#:project{:conversations
-          [#:conversation{:id :process,
-                          :messages
-                          [#:message{:content
-                                     "Describe your most significant scheduling problem in a few sentences.",
-                                     :from :system,
-                                     :id 1,
-                                     :tags
-                                     [:!describe-challenge :query],
-                                     :time
-                                     #inst "2024-08-12T16:07:05.646-00:00"}
-                           #:message{:content
-                                     "Our most significant scheduling problem involves coordinating the various stages of glass production with the availability of raw materials and manpower. The challenge is further compounded by fluctuations in demand, leading to either overstock or shortages if not managed precisely. This problem requires a dynamic scheduling system that can adapt quickly to changes in supply chain inputs and customer orders, while minimizing downtime and optimizing the use of resources.",
-                                     :from :surrogate,
-                                     :id 2,
-                                     :tags
-                                     [:!describe-challenge :response],
-                                     :time
-                                     #inst "2024-08-12T16:07:05.664-00:00"}
-                           #:message{:content
-                                     "Great, we'll call your project SUR Plate Glass.",
-                                     :from :system,
-                                     :id 3,
-                                     :tags
-                                     [:!describe-challenge
-                                      :informative],
-                                     :time
-                                     #inst "2024-08-12T16:07:06.704-00:00"}
-                           #:message{:content
-                                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
-                                     :from :system,
-                                     :id 4,
-                                     :tags
-                                     [:!remark-raw-material-challenge
-                                      :informative],
-                                     :time
-                                     #inst "2024-08-12T16:07:06.792-00:00"}
-                           #:message{:content
-                                     "Please briefly describe your production processes.",
-                                     :from :system,
-                                     :id 5,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-08-12T16:07:16.089-00:00"}
-                           #:message{:content
-                                     "Our plate glass production process involves several key steps:\n\n1. <b>Batching</b>: Raw materials (sand, soda ash, limestone, and other additives) are mixed in specific proportions.\n2. <b>Melting</b>: The batch mixture is melted in a furnace at about 1700°C to form molten glass.\n3. <b>Float Process</b>: The molten glass is poured onto a molten tin bath where it floats and spreads out to form a flat surface. The thickness of the glass is controlled by the speed at which the glass ribbon is drawn off from the bath.\n4. <b>Annealing</b>: The glass ribbon moves through an annealing lehr, where it is gradually cooled to relieve internal stresses.\n5. <b>Cutting</b>: The annealed glass is then measured and cut into panels as per the required dimensions.\n6. <b>Quality Control</b>: Each glass panel is inspected for defects and quality before being cleared for delivery.\n7. <b>Packaging and Shipping</b>: Approved glass panels are packaged safely and prepared for shipping to customers.\n\nManaging the flow and timing between these stages efficiently is critical to ensure high-quality output and timely deliveries.",
-                                     :from :surrogate,
-                                     :id 6,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-08-12T16:07:16.108-00:00"}
-                           #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
-                                     :from :system,
-                                     :id 7,
-                                     :tags
-                                     [:query
-                                      :query-product-or-service],
-                                     :time
-                                     #inst "2024-08-12T16:07:23.993-00:00"}
-                           #:message{:content "PRODUCT",
-                                     :from :surrogate,
-                                     :id 8,
-                                     :tags
-                                     [:query-product-or-service
-                                      :response],
-                                     :time
-                                     #inst "2024-08-12T16:07:24.018-00:00"}
-                           #:message{:content
-                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
-                                     :from :system,
-                                     :id 9,
-                                     :tags
-                                     [:!query-production-mode :query],
-                                     :time
-                                     #inst "2024-08-12T16:07:27.902-00:00"}
-                           #:message{:content "MAKE-TO-STOCK",
-                                     :from :surrogate,
-                                     :id 10,
-                                     :tags
-                                     [:!query-production-mode
-                                      :response],
-                                     :time
-                                     #inst "2024-08-12T16:07:27.949-00:00"}
-                           #:message{:content
-                                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
-                                     :from :system,
-                                     :id 11,
-                                     :tags
-                                     [:!query-activity-location-type
-                                      :query],
-                                     :time
-                                     #inst "2024-08-12T16:07:30.522-00:00"}
-                           #:message{:content "OUR-FACILITY",
-                                     :from :surrogate,
-                                     :id 12,
-                                     :tags
-                                     [:!query-activity-location-type
-                                      :response],
-                                     :time
-                                     #inst "2024-08-12T16:07:30.554-00:00"}
-                           #:message{:content
-                                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
-                                     :from :system,
-                                     :id 13,
-                                     :tags [:!query-shop-type :query],
-                                     :time
-                                     #inst "2024-08-12T16:07:33.390-00:00"}
-                           #:message{:content "FLOW-SHOP",
-                                     :from :surrogate,
-                                     :id 14,
-                                     :tags
-                                     [:!query-shop-type :response],
-                                     :time
-                                     #inst "2024-08-12T16:07:33.444-00:00"}
-                           #:message{:content
-                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
-                                     :from :system,
-                                     :id 15,
-                                     :tags
-                                     [:query :query-process-steps],
-                                     :time
-                                     #inst "2024-08-12T16:07:37.997-00:00"}
-                           #:message{:content
-                                     "1. Batching\n2. Melting\n3. Float Process\n4. Annealing\n5. Cutting\n6. Quality Control\n7. Packaging and Shipping",
-                                     :from :surrogate,
-                                     :id 16,
-                                     :tags
-                                     [:query-process-steps :response],
-                                     :time
-                                     #inst "2024-08-12T16:07:38.036-00:00"}
-                           #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
-                                     :from :system,
-                                     :id 17,
-                                     :tags
-                                     [:!query-process-durs :query],
-                                     :time
-                                     #inst "2024-08-12T16:07:45.852-00:00"}
-                           #:message{:content
-                                     "1. Batching (2 hours)\n2. Melting (8 hours)\n3. Float Process (4 hours)\n4. Annealing (6 hours)\n5. Cutting (1 hour)\n6. Quality Control (2 hours)\n7. Packaging and Shipping (3 hours)",
-                                     :from :surrogate,
-                                     :id 18,
-                                     :tags
-                                     [:!query-process-durs :response],
-                                     :time
-                                     #inst "2024-08-12T16:07:45.888-00:00"}
-                           #:message{:content
-                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
-                                     :from :system,
-                                     :id 19,
-                                     :tags [:info-to-user :minizinc],
-                                     :time
-                                     #inst "2024-08-12T16:08:42.922-00:00"}]}
-           #:conversation{:id :data}
-           #:conversation{:id :resource}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {batching, melting, floatProcess, annealing, cutting, qualityControl};\n% Durations are in units of hours and may be rounded.\narray [Product, Task] of int: taskDuration = [|2, 8, 4, 6, 1, 2|];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, batching] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, batching] == taskStarts[p, melting]);\nconstraint forall (p in Product) (taskEnds[p, melting] == taskStarts[p, floatProcess]);\nconstraint forall (p in Product) (taskEnds[p, floatProcess] == taskStarts[p, annealing]);\nconstraint forall (p in Product) (taskEnds[p, annealing] == taskStarts[p, cutting]);\nconstraint forall (p in Product) (taskEnds[p, cutting] == taskStarts[p, qualityControl]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, qualityControl]);",
-          :processes
-          #:process{:desc
-                    "1. Batching (2 hours)\n2. Melting (8 hours)\n3. Float Process (4 hours)\n4. Annealing (6 hours)\n5. Cutting (1 hour)\n6. Quality Control (2 hours)\n7. Packaging and Shipping (3 hours)",
-                    :id :sur-plate-glass,
-                    :sub-processes
-                    [#:process{:duration
-                               #:quantity{:units :hours,
-                                          :value-string "2"},
-                               :id :sur-plate-glass--batching,
-                               :var-name "batching"}
-                     #:process{:duration
-                               #:quantity{:units :hours,
-                                          :value-string "8"},
-                               :id :sur-plate-glass--melting,
-                               :pre-processes
-                               [:sur-plate-glass--batching],
-                               :var-name "melting"}
-                     #:process{:duration
-                               #:quantity{:units :hours,
-                                          :value-string "4"},
-                               :id :sur-plate-glass--floatProcess,
-                               :pre-processes
-                               [:sur-plate-glass--melting],
-                               :var-name "floatProcess"}
-                     #:process{:duration
-                               #:quantity{:units :hours,
-                                          :value-string "6"},
-                               :id :sur-plate-glass--annealing,
-                               :pre-processes
-                               [:sur-plate-glass--floatProcess],
-                               :var-name "annealing"}
-                     #:process{:duration
-                               #:quantity{:units :hours,
-                                          :value-string "1"},
-                               :id :sur-plate-glass--cutting,
-                               :pre-processes
-                               [:sur-plate-glass--annealing],
-                               :var-name "cutting"}
-                     #:process{:duration
-                               #:quantity{:units :hours,
-                                          :value-string "2"},
-                               :id :sur-plate-glass--qualityControl,
-                               :pre-processes
-                               [:sur-plate-glass--cutting],
-                               :var-name "qualityControl"}
-                     #:process{:duration
-                               #:quantity{:units :hours,
-                                          :value-string "3"},
-                               :id :sur-plate-glass--packAndShip,
-                               :pre-processes
-                               [:sur-plate-glass--qualityControl],
-                               :supply-chain? true,
-                               :var-name "packAndShip"}]},
-          :current-conversation :process,
-          :planning-problem
-          #:problem{:domain :process-interview,
-                    :goal-string
-                    "(characterize-process sur-plate-glass)",
-                    :state-string
-                    "#{(done !query-production-mode sur-plate-glass) (done !do-nothing sur-plate-glass) (done !describe-process sur-plate-glass) (has-production-facility sur-plate-glass) (done !query-process-durs sur-plate-glass) (done !query-shop-type sur-plate-glass) (done !describe-challenge sur-plate-glass) (done !remark-raw-material-challenge sur-plate-glass) (proj-name \"SUR Plate Glass\") (cites-raw-material-challenge sur-plate-glass) (proj-id sur-plate-glass) (surrogate sur-plate-glass) (done !query-product-or-service sur-plate-glass) (provides-product sur-plate-glass) (done !query-process-steps sur-plate-glass) (production-mode sur-plate-glass make-to-stock) (have-process-durs sur-plate-glass) (done !query-activity-location-type sur-plate-glass) (flow-shop sur-plate-glass)}"},
-          :name "SUR Plate Glass",
-          :surrogate
-          #:surrogate{:assistant-id "asst_Op7pgaxZGr8sv2L8tAmutXBq",
-                      :id :sur-plate-glass,
-                      :subject-of-expertise "plate glass",
-                      :system-instruction
-                      "You manage a company that makes plate glass.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_mgXRRh85c1XYxCGtn4aTs9Gf"},
-          :id :sur-plate-glass}
-
-]
+[#:project{:conversations
+           [#:conversation{:id :process,
+                           :messages
+                           [#:message{:content
+                                      "Describe your most significant scheduling problem in a few sentences.",
+                                      :from :system,
+                                      :id 1,
+                                      :tags [:initial-question :query],
+                                      :time
+                                      #inst "2024-08-18T19:40:22.416-00:00",
+                                      :question-name :initial-question}
+                            #:message{:content
+                                      "One of our most significant scheduling problems is managing the synchronization between production schedules and raw material supply. Due to the variability in demand, lead times, and the complexity of our supply chain, it's challenging to ensure that all necessary raw materials are available just in time for production without overstocking, which can increase holding costs. Furthermore, unexpected equipment downtimes or maintenance can disrupt production plans, causing delays and requiring quick rescheduling to meet delivery commitments.",
+                                      :from :surrogate,
+                                      :id 2,
+                                      :tags
+                                      [:initial-question :response],
+                                      :time
+                                      #inst "2024-08-18T19:40:22.444-00:00",
+                                      :question-name :initial-question}
+                            #:message{:content
+                                      "Great, we'll call your project SUR Plate Glass.",
+                                      :from :system,
+                                      :id 3,
+                                      :tags
+                                      [:initial-question :informative],
+                                      :time
+                                      #inst "2024-08-18T19:40:23.205-00:00",
+                                      :question-name :initial-question}
+                            #:message{:content
+                                      "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
+                                      :from :system,
+                                      :id 4,
+                                      :tags
+                                      [:remark-raw-material-challenge
+                                       :informative],
+                                      :time
+                                      #inst "2024-08-18T19:40:23.306-00:00",
+                                      :question-name
+                                      :remark-raw-material-challenge}
+                            #:message{:content
+                                      "Please briefly describe your production processes.",
+                                      :from :system,
+                                      :id 5,
+                                      :tags [:query],
+                                      :time
+                                      #inst "2024-08-18T19:40:29.684-00:00"}
+                            #:message{:content
+                                      "Our plate glass production process involves several key stages. First, we prepare the raw materials, primarily silica sand, soda ash, and limestone, which are melted together in a furnace at high temperatures. The molten glass is then floated on a bed of molten tin, in a process known as the float glass method, which ensures a uniform thickness and smooth surface. After shaping and cooling, the glass undergoes annealing to relieve internal stresses. Finally, the glass is cut to size, inspected for quality, and packaged for delivery. Each stage requires precise timing and control to ensure product quality and minimize waste.",
+                                      :from :surrogate,
+                                      :id 6,
+                                      :tags [:response],
+                                      :time
+                                      #inst "2024-08-18T19:40:29.745-00:00"}
+                            #:message{:content
+                                      "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
+                                      :from :system,
+                                      :id 7,
+                                      :tags [:query :work-type],
+                                      :time
+                                      #inst "2024-08-18T19:40:32.348-00:00",
+                                      :question-name :work-type}
+                            #:message{:content "PRODUCT",
+                                      :from :surrogate,
+                                      :id 8,
+                                      :tags [:work-type :response],
+                                      :time
+                                      #inst "2024-08-18T19:40:32.409-00:00",
+                                      :question-name :work-type}
+                            #:message{:content
+                                      "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
+                                      :from :system,
+                                      :id 9,
+                                      :tags
+                                      [:production-motivation :query],
+                                      :time
+                                      #inst "2024-08-18T19:40:35.116-00:00",
+                                      :question-name
+                                      :production-motivation}
+                            #:message{:content "MAKE-TO-STOCK",
+                                      :from :surrogate,
+                                      :id 10,
+                                      :tags
+                                      [:production-motivation
+                                       :response],
+                                      :time
+                                      #inst "2024-08-18T19:40:35.165-00:00",
+                                      :question-name
+                                      :production-motivation}
+                            #:message{:content
+                                      "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                                      :from :system,
+                                      :id 11,
+                                      :tags
+                                      [:production-location :query],
+                                      :time
+                                      #inst "2024-08-18T19:40:37.913-00:00",
+                                      :question-name
+                                      :production-location}
+                            #:message{:content "OUR-FACILITY",
+                                      :from :surrogate,
+                                      :id 12,
+                                      :tags
+                                      [:production-location :response],
+                                      :time
+                                      #inst "2024-08-18T19:40:37.964-00:00",
+                                      :question-name
+                                      :production-location}
+                            #:message{:content
+                                      "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                                      :from :system,
+                                      :id 13,
+                                      :tags
+                                      [:production-system-type :query],
+                                      :time
+                                      #inst "2024-08-18T19:40:40.845-00:00",
+                                      :question-name
+                                      :production-system-type}
+                            #:message{:content "FLOW-SHOP",
+                                      :from :surrogate,
+                                      :id 14,
+                                      :tags
+                                      [:production-system-type
+                                       :response],
+                                      :time
+                                      #inst "2024-08-18T19:40:40.881-00:00",
+                                      :question-name
+                                      :production-system-type}
+                            #:message{:content
+                                      "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. The list you create should look like this:\n\n1. (some step)\n2. (some other step)...\n\n",
+                                      :from :system,
+                                      :id 15,
+                                      :tags [:query :process-steps],
+                                      :time
+                                      #inst "2024-08-18T19:40:44.838-00:00",
+                                      :question-name :process-steps}
+                            #:message{:content
+                                      "1. Preparation of raw materials\n2. Melting in the furnace\n3. Forming glass on molten tin (float glass method)\n4. Cooling and solidifying\n5. Annealing\n6. Cutting to size\n7. Quality inspection\n8. Packaging for delivery",
+                                      :from :surrogate,
+                                      :id 16,
+                                      :tags [:process-steps :response],
+                                      :time
+                                      #inst "2024-08-18T19:40:44.901-00:00",
+                                      :question-name :process-steps}
+                            #:message{:content
+                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
+                                      :from :system,
+                                      :id 17,
+                                      :tags
+                                      [:process-durations :query],
+                                      :time
+                                      #inst "2024-08-18T19:40:48.944-00:00",
+                                      :question-name
+                                      :process-durations}
+                            #:message{:content
+                                      "1. Preparation of raw materials (2-3 hours)\n2. Melting in the furnace (24 hours)\n3. Forming glass on molten tin (8-10 hours)\n4. Cooling and solidifying (1-2 hours)\n5. Annealing (6-8 hours)\n6. Cutting to size (1-2 hours)\n7. Quality inspection (1 hour)\n8. Packaging for delivery (2-3 hours)",
+                                      :from :surrogate,
+                                      :id 18,
+                                      :tags
+                                      [:process-durations :response],
+                                      :time
+                                      #inst "2024-08-18T19:40:48.970-00:00",
+                                      :question-name
+                                      :process-durations}]}
+            #:conversation{:id :data}
+            #:conversation{:id :resource}],
+           :current-conversation :process,
+           :id :sur-plate-glass,
+           :name "SUR Plate Glass",
+           :planning-problem
+           #:problem{:domain :process-interview,
+                     :goal-string
+                     "(characterize-process sur-plate-glass)",
+                     :state-string
+                     "#{(done !query-production-mode sur-plate-glass) (done !describe-process sur-plate-glass) (has-production-facility sur-plate-glass) (done !query-process-durs sur-plate-glass) (done !query-shop-type sur-plate-glass) (done !describe-challenge sur-plate-glass) (done !remark-raw-material-challenge sur-plate-glass) (proj-name \"SUR Plate Glass\") (cites-raw-material-challenge sur-plate-glass) (proj-id sur-plate-glass) (surrogate sur-plate-glass) (done !query-product-or-service sur-plate-glass) (provides-product sur-plate-glass) (done !query-process-steps sur-plate-glass) (production-mode sur-plate-glass make-to-stock) (done !query-activity-location-type sur-plate-glass) (flow-shop sur-plate-glass)}"},
+           :processes
+           [#:process{:id :sur-plate-glass,
+                      :interview-class :initial-unordered}],
+           :surrogate
+           #:surrogate{:assistant-id "asst_ZKN5sDlWu8vDAlQeinONduuJ",
+                       :id :sur-plate-glass,
+                       :subject-of-expertise "plate glass",
+                       :system-instruction
+                       "You manage a company that makes plate glass.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                       :thread-id "thread_f54nlFCqZMvfHandESEuwSVR"}}]

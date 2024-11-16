@@ -8,14 +8,21 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.db   :refer [sys&proj-database-cfgs]] ; for mount
    [scheduling-tbd.how-made :refer [him-cfg]]            ; for mount
-   [scheduling-tbd.planner :refer [planning]]            ; for mount
+;  [scheduling-tbd.planner :refer [planning]]            ; for mount
+   [scheduling-tbd.interviewers :refer [iviewers]]       ; for mount
    [scheduling-tbd.surrogate :refer [surrogates]]        ; for mount
    [scheduling-tbd.util :refer [util-state]]             ; for mount
    [scheduling-tbd.web.handler :refer [app]]             ; for mount
    [scheduling-tbd.web.websockets :refer [wsock]]        ; for mount
    [ring.adapter.jetty :as jetty]
-   [taoensso.timbre :as log])
+   [taoensso.telemere.timbre  :as log])
   (:gen-class))
+
+;;; Here are some naming conventions we try to use throughout the server and app code.
+;;;   pid - a project id (keyword)
+;;;   aid - an assistant id (string)
+;;;   tid - a thread id (string)
+;;;   cid - a conversation id, currently one of #{:process :data :resource}.
 
 ;; log uncaught exceptions in threads
 (Thread/setDefaultUncaughtExceptionHandler

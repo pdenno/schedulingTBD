@@ -23,7 +23,7 @@
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
    [stbd-app.ws         :as ws :refer [remember-promise]]
-   [taoensso.timbre     :as log :refer-macros [info debug log]]))
+   [taoensso.telemere.timbre   :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -50,9 +50,9 @@
 
 (defn msg-with-title
   [content from]
-  (cond (= from :surrogate)            (str "<b>Surrogate Expert</b><br/>" content)
-        (= from :developer-injected)   (str "<b>Developer Injected Question</b><br/>" content)
-        :else                          content))
+  (cond (= from :surrogate)               (str "<b>Surrogate Expert</b><br/>" content)
+        (= from :developer-interjected)   (str "<b>Developer Interjected Question</b><br/>" content)
+        :else                             content))
 
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
@@ -73,7 +73,7 @@
                   (conj ?r ($ Message
                               {:key (new-key)
                                :model #js {:position "single" ; "single" "normal", "first" and "last"
-                                           :direction (if (#{:system :developer-injected} from) "incoming" "outgoing") ; From perspective of user.
+                                           :direction (if (#{:system :developer-interjected} from) "incoming" "outgoing") ; From perspective of user.
                                            :type "html"
                                            :payload content}}
                               ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))})))))) ;  They only appear for Interviewer, which is probably good!
@@ -96,21 +96,21 @@
     (log/info "update-msg-times: msg-count = " (count @msgs-atm))
     ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
-;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify conv-id.
+;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid.
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
   "Using an HTTP GET, get the conversation, and also the code, if any."
   ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
-  ([pid conv-id]
-   (-> (dba/get-conversation-http pid conv-id)
-       (p/then (fn [{:keys [conv conv-id code]}]
-                 (log/info "chat/get-conversation (return from promise): conv-id =" conv-id "count =" (count conv))
+  ([pid cid]
+   (-> (dba/get-conversation-http pid cid)
+       (p/then (fn [{:keys [conv cid code]}]
+                 (log/info "chat/get-conversation (return from promise): cid =" cid "count =" (count conv))
                  (reset! msgs-atm conv)
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
-                 ((lookup-fn :set-active-conv) conv-id)
-                 (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :conv-id conv-id})
-                 (update-common-info! {:project/id pid :conv-id conv-id})))
+                 ((lookup-fn :set-active-conv) cid)
+                 (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :cid cid})
+                 (update-common-info! {:project/id pid :cid cid})))
        (p/catch (fn [e]
                   (log/info "get-conversation failed:" e))))))
 
@@ -160,10 +160,14 @@
                                  surrogate?     {:dispatch-key :start-surrogate :product product}
                                  sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:project/id proj-info) :question q}
                                  :else          {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
-                  ;; ToDo: Human-injected questions, though some of them are stored, don't store the human-injected annotation.
+                  ;; ToDo: Human-interjected questions, though some of them are stored, don't store the human-interjected annotation.
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.
-                  (set-msg-list (conj msg-list {:message/content (str "<b>[Human-injected question]</b><br/>"(or question q))
-                                                :message/from :system}))
+                  (when sur-follow-up?
+                    (set-msg-list (conj msg-list {:message/content (str "<b>[Human-interjected question]</b><br/>" q)
+                                                  :message/from :system})))
+                  (when ask-llm?
+                    (set-msg-list (conj msg-list {:message/content (str "<b>[Side discussion with LLM]</b><br/>" question)
+                                                  :message/from :system})))
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.

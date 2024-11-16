@@ -7,8 +7,8 @@
    [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
-   [scheduling-tbd.util  :as util :refer [now]]
-   [taoensso.timbre          :as log])
+   [scheduling-tbd.util      :as util :refer [now]]
+   [taoensso.telemere.timbre        :as log])
   (:import
    [java.util Date]))
 
@@ -21,26 +21,26 @@
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
    Note that this can CHANGE :project/current-conversation."
   [request]
-  (let [{:keys [project-id conv-id]} (-> request :query-params keywordize-keys)]
-    ;;(log/info "get-conversation (1): project-id = " project-id "conv-id =" conv-id)
-    (when conv-id (db/change-conversation {:pid (keyword project-id) :conv-id (keyword conv-id)}))
+  (let [{:keys [project-id cid]} (-> request :query-params keywordize-keys)]
+    ;;(log/info "get-conversation (1): project-id = " project-id "cid =" cid)
+    (when cid (db/change-conversation {:pid (keyword project-id) :cid (keyword cid)}))
     (let [project-id (keyword project-id)
           eid (db/project-exists? project-id)
-          conv-id (if eid
-                    (-> (or conv-id
-                            (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm project-id)))
-                        keyword)
-                    :process)
+          cid (if eid
+                (-> (or cid
+                        (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm project-id)))
+                    keyword)
+                :process)
           empty-conv  [#:message{:id 1 :content "No discussion here yet.", :from :system, :time (now)}]
-          msgs        (if (and eid conv-id) (db/get-conversation project-id conv-id) empty-conv)
+          msgs        (if (and eid cid) (db/get-conversation project-id cid) empty-conv)
           code    (if eid (db/get-code project-id) "")]
-      ;;(log/info "get-conversation (2):" project-id "conv-id =" conv-id "message count =" (count msgs))
-      (http/ok {:project-id project-id :conv msgs :conv-id conv-id :code code}))))
+      ;;(log/info "get-conversation (2):" project-id "cid =" cid "message count =" (count msgs))
+      (http/ok {:project-id project-id :conv msgs :cid cid :code code}))))
 
 (def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
 
 (defn list-projects
-  "Return a map containing :current-project, :conv-id, and :others, which is a sorted list of every other project in the DB."
+  "Return a map containing :current-project, :cid, and :others, which is a sorted list of every other project in the DB."
   [_request]
   (letfn [(resolve-proj-info [pid]
             (resolve-db-id {:db/id (db/project-exists? pid)}
@@ -48,11 +48,11 @@
                            :keep-set #{:project/name :project/id :project/surrogate?}))]
     (let [proj-infos (mapv resolve-proj-info (db/list-projects))
           current (or (db/default-project) new-proj-entry) ; ToDo: Client could tell you what its current project is.
-          conv-id (or (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(-> current :project/id connect-atm))
+          cid (or (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(-> current :project/id connect-atm))
                       :process)
           others (filterv #(not= % current) proj-infos)]
       (http/ok
-       (cond-> {:current-project current, :conv-id conv-id}
+       (cond-> {:current-project current, :cid cid}
          (not-empty others) (assoc :others others))))))
 
 

@@ -11,18 +11,19 @@
    [clojure.spec.alpha           :as s]
    [clojure.string               :as str]
    [datahike.api                 :as d]
+   [datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.llm   :as llm]
    [scheduling-tbd.specs :as spec]
    [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id default-llm-provider]]
    [scheduling-tbd.util  :as util :refer [now]]
-   [taoensso.timbre :as log :refer [debug]]))
+   [taoensso.telemere    :refer [log!]]))
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
      - The project's name and db directory
-     - Planning domains, methods, operators, and axioms"
-  {;; ---------------------- agent
+     - system-level agents"
+  {;; ---------------------- agent (system agents shared by projects)
    :agent/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A unique ID for each agent to ensure only one of each type is available."}
@@ -35,9 +36,23 @@
    :agent/llm-provider
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "Currently either :openai or :azure."}
+   :agent/model-class
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "One of the classes of LLM model defined in the system. See llm.clj."}
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
+
+   ;; ---------------------- agent-files files that assistants can use
+   :agent-file/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "A unique ID for each agent to ensure only one of each type is available."}
+   :agent-file/file-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An ID to the file provided by the LLM provider."}
+   :agent-file/doc
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Documentation about the file."}
 
    ;; ---------------------- project
    :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
@@ -59,13 +74,38 @@
         :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
    :system/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}})
+        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}
+   ;; ---------------------- openai (about all stbd-related assistants on the running account)
+   :system/openai-assistants
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
+        :doc "All stbd-related assistants in existance. (See recreate-system-db for how this is updated.)"}})
+
 
 ;;;========================================================== Project DBs ==========================================
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
    To eliminate confusion and need for back pointers, each project has its own db."
-  {;; ---------------------- box
+  {;; ---------------------- agent
+   :agent/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "A unique ID for each agent to ensure only one of each type is available."}
+   :agent/assistant-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant id (a string) associated with this surrogate."}
+   :agent/base-type
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Indicates the purpose and instructions given."}
+   :agent/llm-provider
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Currently either :openai or :azure."}
+   :agent/model-class
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "One of the classes of LLM model defined in the system. See llm.clj."}
+   :agent/thread-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
+
+   ;; ---------------------- box
    :box/string-val
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "boxed value"}
@@ -79,10 +119,22 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "boxed value"}
 
+   ;; ---------------------- claim (something believed owing to what users said in interviews)
+   :claim/string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
+        :doc "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.
+              For example, (:process/production-motivation make-to-stock)."}
+   :claim/confidence
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
+        :doc "a number [0,1] expressing how strongly we believe the proposition ."}
+
    ;; ---------------------- conversation
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resource}."}
+   :conversation/state-vector
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "keywords indicating the state of the conversation (i.e. what has been discussed."}
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages of the conversation."}
@@ -103,6 +155,9 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
         :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, "
                   "which aren't stored, some values can be skipped.")}
+   :message/question-type
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "A label (from interview instructions) associated with this question or answer."}
    :message/tags
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "Optional keywords used to classify the message."}
@@ -120,17 +175,6 @@
    :objective/text
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
         :doc "strings expressing the scheduling objective."}
-
-   ;; ---------------------- problem (the planning problem and current state)
-   :problem/domain
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "A keyword identifying the problem domain map"}
-   :problem/goal-string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "A string that can be edn/read-string into a predicate."}
-   :problem/state-string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "A string that can be edn/read-string into a set of predicates"}
 
    ;; ---------------------- process (about production process types)
    :process/desc
@@ -198,6 +242,12 @@
         :doc "a instant object indicating when the process ended."}
 
    ;; ---------------------- project
+   :project/agents
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "an agent (OpenAI Assistant, etc.) that outputs a vector of clojure maps in response to queries."}
+   :project/claims
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "the collection of things we believe about the project as logical statements."}
    :project/code
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Code associated with the project."}
@@ -222,12 +272,9 @@
    :project/objective
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "a reference to the scheduling objective of the project."}
-   :project/planning-problem
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "an object with keys :problem/domain, :problem/goal-string, and :problem/state-string at least."}
    :project/processes
-      #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the project's process objects; everything about processes."}
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "the project's process objects; everything about processes in a complex structure."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
@@ -367,44 +414,82 @@
 (def db-schema-proj (datahike-schema db-schema-proj+))
 
 ;;; ---------------------------------- agents ----------------------------------------------
+(s/def ::agent-args (s/keys :req-un [::base-type ::instructions]
+                            :opt-un [::response-format ::llm-provider ::model-class ::project-thread? ::tools ::tool-resources]))
+(s/def ::base-type keyword?)
+(s/def ::instructions string?)
+(s/def ::response-format string?) ;; ToDo: Valid JSON schema.
+(s/def ::llm-provider #{:openai :azure})
+(s/def ::project-thread? boolean?)
+(s/def ::tools (s/and vector? (s/coll-of ::tool)))
+(s/def ::tool (s/keys :req-un [::type]))
+
 (defn add-agent!
   "Create an agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
-   Store what is needed to identify it in system DB."
-  [{:keys [id instructions llm-provider]}]
-  (let [assist (llm/make-assistant :name (name id)
-                                   :llm-provider llm-provider
-                                   :instructions instructions
-                                   :metadata {:usage :agent})
+   Store what is needed to identify it in system DB. Return the OpenAI Assistent object."
+  [{:keys [id base-type llm-provider #_response-format project-thread? model-class #_tools #_tool-resources]
+    :or {llm-provider @default-llm-provider model-class :gpt} :as args}]
+  (s/valid? ::agent-args args)
+  (let [user (-> (System/getenv) (get "USER"))
+        assist (llm/make-assistant (-> args
+                                       (assoc :name (name id))
+                                       (assoc :metadata {:usage :stbd-agent :user user})))
         aid    (:id assist)
-        thread (llm/make-thread {:assistant-id aid
-                                 :llm-provider llm-provider
-                                 :metadata {:usage :agent}})
+        thread (when-not project-thread?
+                 (llm/make-thread {:assistant-id aid
+                                   :llm-provider llm-provider
+                                   :metadata {:usage :stbd-agent :user user}}))
         tid    (:id thread)
         conn   (connect-atm :system)
         eid    (d/q '[:find ?eid .
                       :where [?eid :system/name "SYSTEM"]]
                     @(connect-atm :system))]
     (d/transact conn {:tx-data [{:db/id eid
-                                 :system/agents {:agent/id id
-                                                 :agent/assistant-id aid
-                                                 :agent/thread-id tid}}]})))
+                                 :system/agents (cond-> {:agent/id id
+                                                         :agent/base-type base-type
+                                                         :agent/llm-provider llm-provider
+                                                         :agent/model-class model-class
+                                                         :agent/assistant-id aid}
+                                                  tid (assoc :agent/thread-id tid))}]})
+    assist))
 
-;;; (db/add-agent! :process-dur-agent
-(def known-agent-templates
+;;; (db/add-agent! {:id :process-dur-agent,,,}
+(def known-agent-info
   "The actual agent :id is the one provided here with -<llm-provider> added."
-  [{:id :process-dur-agent
-    :instructions (slurp "data/instructions/process-dur-agent.txt")}
+  [{:id :process-interview-agent
+    :project-thread?  true
+    :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
+    :tools [{:type "file_search"}]
+    :vector-store-files ["data/instructions/interviewers/process-interview-flowchart.pdf"]
+    :instruction-path "data/instructions/interviewers/process.txt"
+    ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
+    #_#_:response-format (-> "data/instructions/interviewers/response-format.edn" slurp edn/read-string)}
+
+   {:id :answers-the-question?
+    :instruction-path "data/instructions/answers-the-question.txt"
+    :response-format (-> "data/instructions/boolean-response-format.edn" slurp edn/read-string)}
+
+   {:id :process-dur-agent
+    :instruction-path "data/instructions/process-dur-agent.txt"}
+
+   {:id :process-ordering-agent
+    :instruction-path "data/instructions/process-ordering-agent.txt"}
 
    {:id :text-function-agent
-    :instructions (slurp "data/instructions/text-function-agent.txt")}])
+    :instruction-path "data/instructions/text-function-agent.txt"}])
+
+(defn ^:diag agent-exists?
+  "Return true if agent still exists (LLM-providers typiclly don't keep them forever)."
+  [aid]
+  (d/q '[:find ?eid .
+         :in $ ?aid
+         :where [?eid :system/openai-assistants ?aid]]
+       @(connect-atm :system) aid))
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
-;;; Atom for the configuration map used for connecting to the project db.
-(defonce proj-base-cfg (atom nil))
-
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
-   (the entity id of the map containing :project/id in the database named by the argumen proj-id)."
+   (the entity id of the map containing :project/id in the database named by the argumen project-id)."
   [pid]
   (assert (keyword? pid))
   (when (some #(= % pid) (sutil/db-ids)) ; (sutil/db-ids) includes non-project IDs.
@@ -416,34 +501,43 @@
 
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
-  ([pid] (conversation-exists? pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
-  ([pid conv-id]
-   (assert (#{:process :data :resource} conv-id))
+  ([pid] (conversation-exists? pid (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))))
+  ([pid cid]
+   (assert (#{:process :data :resource} cid))
    (d/q '[:find ?eid .
-          :in $ ?conv-id
+          :in $ ?cid
           :where
-          [?eid :conversation/id ?conv-id]]
-        @(connect-atm pid) conv-id)))
+          [?eid :conversation/id ?cid]]
+        @(connect-atm pid) cid)))
+
+(defn get-conversation-eids
+  "Return a vector of the EIDs of the argument conversation's messages."
+  [pid cid]
+  (when-let [eid (conversation-exists? pid cid)]
+    (->> (dp/pull @(connect-atm pid) '[*] eid)
+         :conversation/messages
+         (mapv :db/id))))
 
 (defn change-conversation
-  [{:keys [pid conv-id] :as obj}]
+  [{:keys [pid cid] :as obj}]
   (try
-    (assert (#{:process :data :resource} conv-id))
+    (assert (#{:process :data :resource} cid))
     (let [conn (connect-atm pid)
           eid (project-exists? pid)]
       (if eid
-        (d/transact conn {:tx-data [[:db/add eid :project/current-conversation conv-id]]})
-        (log/info "No change with change-conversation (1):" obj)))
-    (catch Throwable _e (log/info "No change with change-conversation (2):" obj) nil))
+        (d/transact conn {:tx-data [[:db/add eid :project/current-conversation cid]]})
+        (log! :info (str "No change with change-conversation (1): " obj))))
+    (catch Throwable _e (log! :info (str "No change with change-conversation (2): " obj)) nil))
   nil)
 
 (defn get-project
-  "Return the project structure."
-  ([pid] (get-project pid #{:db/id}))
-  ([pid drop-set]
-   (let [conn (connect-atm pid)]
+  "Return the project structure.
+   Throw an error if :error is true (default) and project does not exist."
+  [pid & {:keys [drop-set error?]
+          :or {drop-set #{:db/id} error? true}}]
+   (let [conn (connect-atm pid :error? error?)]
      (when-let [eid (project-exists? pid)]
-       (resolve-db-id {:db/id eid} conn :drop-set drop-set)))))
+       (resolve-db-id {:db/id eid} conn :drop-set drop-set))))
 
 (defn default-project
   "Return a map of the  default :project/id and :project/name.
@@ -476,42 +570,19 @@
          sort
          vec))))
 
-(defn get-thread-id
-  "Get the thread object of the argument PID."
-  ([pid] (get-thread-id pid true))
-  ([pid fail-when-missing?]
-   (let [eid (project-exists? pid)
-         res (when eid
-               (-> (resolve-db-id {:db/id eid}
-                                  (connect-atm pid)
-                                  :keep-set #{:project/surrogate :surrogate/thread-id})
-                   :project/surrogate
-                   :surrogate/thread-id))]
-     (cond res                         res
-           (not fail-when-missing?)    nil
-           :else                       (throw (ex-info "Did not find thread-id." {:pid pid}))))))
-
-(defn get-assistant-id
-  "Get the thread object of the argument PID."
-  ([pid] (get-assistant-id pid true))
-  ([pid fail-when-missing?]
-   (let [eid (project-exists? pid)
-         res (when eid
-               (-> (resolve-db-id {:db/id eid}
-                                  (connect-atm pid)
-                                  :keep-set #{:project/surrogate :surrogate/assistant-id})
-                   :project/surrogate
-                   :surrogate/assistant-id))]
-     (cond res                         res
-           (not fail-when-missing?)    nil
-           :else                       (throw (ex-info "Did not find assistant-id." {:pid pid}))))))
+(defn get-surrogate-agent-info
+  "Return a map about the expert surrogate agent aid, tid, instruction..."
+  [pid]
+  (when (project-exists? pid)
+    (when-let [eid (d/q '[:find ?sur . :where [_ :project/surrogate ?sur]]  @(connect-atm pid))]
+      (dp/pull @(connect-atm pid) '[*] eid))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time})
+  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/question-type})
 
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  ([pid] (get-conversation pid (d/q '[:find ?conv-id . :where [_ :project/current-conversation ?conv-id]] @(connect-atm pid))))
+  ([pid] (get-conversation pid (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))))
   ([pid conversation]
    (assert (#{:process :data :resource} conversation))
    (if-let [eid (conversation-exists? pid conversation)]
@@ -522,15 +593,6 @@
           (sort-by :message/id)
           vec)
      [])))
-
-#_(defn get-problem
-  "Return the planning problem. We add new keys for the things that end in -string,
-   that is, for :problem/goal-string and :problem/state-string :goal and :state are added respectively."
-  [pid]
-  (as-> (get-project pid #{:db/id :project/conversations :project/surrogate :project/code}) ?x
-    (:project/planning-problem ?x)
-    (assoc ?x :goal (-> ?x :problem/goal-string edn/read-string))
-    (assoc ?x :state (-> ?x :problem/state-string edn/read-string))))
 
 (defn get-code
   "Return the code string for the argument project (or an empty string if it does not exist)."
@@ -554,41 +616,28 @@
         eid (project-exists? pid)]
     (d/transact conn {:tx-data [[:db/add eid :project/code code-text]]})))
 
-(defn get-planning-state
-  "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
+(defn get-claims
+  "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none.
+   Returns #{} if pid is :START-A-NEW-PROJECT."
   [pid]
   (if (= pid :START-A-NEW-PROJECT)
-    '#{(proj-id START-A-NEW-PROJECT)} ; Special treatment for new projects.
-    (if-let [state-str (d/q '[:find ?s .
-                              :where
-                              [_ :project/planning-problem ?pp]
-                              [?pp :problem/state-string ?s]]
-                            @(connect-atm pid))]
-      (-> state-str edn/read-string set)
+    '#{(project-id :START-A-NEW-PROJECT)} ; Special treatment for new projects.
+    (if-let [facts (d/q '[:find [?s ...]
+                          :where
+                          [_ :project/claims ?pp]
+                          [?pp :claim/string ?s]]
+                        @(connect-atm pid))]
+      (-> (mapv edn/read-string facts) set)
       #{})))
 
-(defn put-planning-state
-  "Write the complete state to the project database. Argument is a vector or set. "
-  [pid state]
-  (assert (every? #(s/valid? ::spec/ground-positive-proposition %) state))
-  ;;(log/info "put-planning-state: state =" state)
-  (if (empty? state)
-    (throw (ex-info "state is empty" {:pid pid}))
-    (let [state-set (set state)
-          conn (connect-atm pid)
-          eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
-      (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str state-set)]]}))))
-
-(defn add-planning-state
-  "Add the argument vector of ground proposition to state, a set. Return the new state."
-  [pid more-state]
-  (assert (every? #(s/valid? ::spec/ground-positive-proposition %) more-state))
-  ;;(log/info "add-planning-state: more-state = " more-state)
-  (let [new-state (into (get-planning-state pid) more-state)
-        conn (connect-atm pid)
-        eid (d/q '[:find ?eid . :where [?eid :problem/state-string]] @conn)]
-    (d/transact conn {:tx-data [[:db/add eid :problem/state-string (str new-state)]]})
-    new-state))
+(defn add-claim
+  "Add the argument vector of ground proposition to state, a set. Returns true."
+  [pid claim]
+  (assert (s/valid? ::spec/proposition claim))
+  (let [conn (connect-atm pid)
+        eid (d/q '[:find ?eid . :where [?eid :project/claims]] @conn)]
+    (d/transact conn {:tx-data [{:db/id eid :project/claims {:claim/string (str claim)}}]}))
+  true)
 
 (defn get-process
   "Return the process structure for the argument pid and interview-class."
@@ -625,17 +674,17 @@
                   (pprint obj)
                   (println))))
             (println "]"))]
-    (log/info "Writing project to" filename)
+    (log! :info (str "Writing project to " filename))
     (spit filename s)))
 
-(defn backup-proj-dbs
+(defn ^:diag backup-proj-dbs
   "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir.
    Example usage: (backup-proj-dbs)."
   [& {:keys [target-dir] :or {target-dir "data/projects/"}}]
   (doseq [id (list-projects)]
     (backup-proj-db id {:target-dir target-dir})))
 
-(defn backup-system-db
+(defn ^:diag backup-system-db
   "Backup the system database to an edn file."
   [& {:keys [target-dir] :or {target-dir "data/"}}]
       (let [conn-atm (connect-atm :system)
@@ -649,31 +698,65 @@
                       (pprint obj)
                       (println))))
                 (println "]"))]
-      (log/info "Writing system DB to" filename)
+      (log! :info (str "Writing system DB to " filename))
       (spit filename s)))
+
+;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
+(defn update-assistants!
+  "List what assistants the LLM-provider's currently maintains that have metadata indicating that
+   they are part of our project (where they are called agents). Store this in the sytems DB."
+  []
+  (let [conn (connect-atm :system)
+        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
+        old-ones (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]] @conn)
+        new-ones (llm/list-assistants)]
+    (d/transact conn {:tx-data (vec (for [o old-ones] [:db/retract eid :system/openai-assistants o]))})
+    (d/transact conn {:tx-data (vec (for [n new-ones] [:db/add     eid :system/openai-assistants n]))})))
+
+(defn recreate-system-agents!
+  "Recreate the system agents for the agent infos given (db/known-agent-info if called with no args)."
+  ([] (recreate-system-agents! known-agent-info))
+  ([infos]
+   (doseq [llm-provider [:openai]]
+     (doseq [{:keys [id instruction-path response-format project-thread? model-class tools vector-store-files]
+              :or {model-class :gpt}} infos]
+       (as-> {} ?res
+       (cond-> ?res
+         true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
+         true (assoc :base-type id)
+         true (assoc :llm-provider llm-provider)
+         true (assoc :instructions (slurp instruction-path))
+         true (assoc :model-class model-class)
+         tools           (assoc :tools tools)
+         project-thread? (assoc :project-thread? true)
+         response-format (assoc :response-format response-format))
+       (let [file-objs (doall (mapv #(llm/upload-file {:fname %}) vector-store-files))
+             v-store (when (not-empty file-objs) (llm/make-vector-store {:file-ids (mapv :id file-objs)}))]
+         (if (not-empty file-objs)
+           (assoc ?res :tool-resources  {"file_search" {"vector_store_ids" [(:id v-store)]}})
+           ?res))
+        (add-agent! ?res))))))
 
 (defn recreate-system-db!
   "Recreate the system database from an EDN file
-   By default this creates new agents."
-  [& {:keys [target-dir new-agents?] :or {target-dir "data/" new-agents? true}}]
+   By default this creates new agents.
+     :update-assistants! - if true, list extant OpenAI assistants. (OpenAI doesn't keep them forever.)
+     :new-agents? - Make new agents based on instructions."
+  [& {:keys [target-dir new-agents? update-assistants?]
+      :or {target-dir "data/" new-agents? true update-assistants? true}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
     (let [cfg (db-cfg-map {:type :system})]
-      (log/info "Recreating the system database.")
+      (log! :info "Recreating the system database.")
       (when (d/database-exists? cfg) (d/delete-database cfg))
       (d/create-database cfg)
       (register-db :system cfg)
       (let [conn (connect-atm :system)]
         (d/transact conn db-schema-sys)
-        (d/transact conn (-> "data/system-db.edn" slurp edn/read-string)))
-      (when new-agents?
-        (doseq [llm-provider [:openai]]
-          (doseq [a known-agent-templates]
-            (-> a
-                (update :id #(-> % name (str "-" (name llm-provider)) keyword))
-                (assoc :llm-provider llm-provider)
-                add-agent!))))
-      cfg)
-    (log/error "Not recreating system DB: No backup file.")))
+        (d/transact conn (-> "data/system-db.edn" slurp edn/read-string))
+        (when update-assistants? (update-assistants!))
+        (when new-agents? (recreate-system-agents!)); This is just about system agents, of course.
+        cfg))
+      (log! :error "Not recreating system DB: No backup file.")))
 
 (defn recreate-project-db!
   "Recreate a DB for each project using EDN files."
@@ -695,21 +778,21 @@
         (when-not (-> files-dir io/as-file .isDirectory)
           (-> files-dir io/as-file .mkdir))
         cfg)
-    (log/error "Not recreating DB because backup file does not exist:" backup-file))))
+    (log! :error (str "Not recreating DB because backup file does not exist: " backup-file)))))
 
 (def keep-db? #{:him})
-(defn recreate-dbs!
+(defn ^:diag recreate-dbs!
   "Recreate the system DB on storage from backup.
    For each project it lists, recreate it from backup if such backup exists."
   []
   (swap! sutil/databases-atm
          #(reduce-kv (fn [res k v] (if (keep-db? k) (assoc res k v) res)) {} %))
   (recreate-system-db!)
-  (log/info "Recreating these projects:" (list-projects))
+  (log! :info (str "Recreating these projects: " (list-projects)))
   (doseq [pid (list-projects)]
     (recreate-project-db! pid)))
 
-(defn unknown-projects
+(defn ^:diag unknown-projects
   "Return a vector of directories that the system DB does not know."
   []
   (set/difference
@@ -751,24 +834,24 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to current conversation of the database with :project/id = id."
-  ([pid from text] (add-msg pid from text []))
-  ([pid from text tags]
-   (assert (#{:system :human :surrogate :developer-injected} from))
-   (assert (string? text))
-   ;;(log/info "add-msg: pid =" pid "text =" text)
-   (if-let [conn (connect-atm pid)]
-     (let [msg-id (inc (max-msg-id pid))]
-       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
-                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
-                                                             (not-empty tags) (assoc :message/tags tags))}]}))
-     (throw (ex-info "Could not connect to DB." {:pid pid})))))
+  [{:keys[pid from text tags question-type]}]
+  (assert (#{:system :human :surrogate :developer-injected} from))
+  (assert (string? text))
+  (log! :debug (str "add-msg: pid = " pid "text = " text))
+  (if-let [conn (connect-atm pid)]
+    (let [msg-id (inc (max-msg-id pid))]
+      (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
+                                   :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
+                                                            (not-empty tags) (assoc :message/tags tags)
+                                                            question-type    (assoc :message/question-type question-type))}]}))
+    (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
-  [id proj-name dir]
+  [id project-name dir]
   (d/transact (connect-atm :system)
               {:tx-data [{:project/id id
-                          :project/name proj-name
+                          :project/name project-name
                           :project/dir dir}]}))
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
@@ -779,13 +862,14 @@
    The project-info map must include :project/id and :project/name.
      proj-info  - map containing at least :project/id and :project/name.
      additional - a vector of maps to add to the database.
-     opts -  {:force? - overwrite project with same name}
+     opts -  {:force-this-name? - overwrite project with same name}
+   This always destroys DBs with the same name as that calculated here.
    Return the PID of the project."
   ([proj-info] (create-proj-db! proj-info {} {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
-  ([proj-info additional-info {:keys [in-mem? force?] :as opts}]
+  ([proj-info additional-info {:keys [in-mem? force-this-name?] :as opts}]
    (s/assert ::project-info proj-info)
-   (let [{id :project/id pname :project/name} (if force? proj-info (unique-proj proj-info))
+   (let [{id :project/id pname :project/name} (if force-this-name? proj-info (unique-proj proj-info))
          cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
          dir (-> cfg :store :path)
          files-dir (-> cfg :base-dir (str "/" pname  "/files"))]
@@ -805,16 +889,18 @@
      (d/transact (connect-atm id) {:tx-data [{:project/id id
                                               :project/name pname
                                               :project/current-conversation :process
+                                              :project/claims [{:claim/string (str `(~'project-id ~id))}
+                                                               {:claim/string (str `(~'project-name ~id ~pname))}]
                                               :project/conversations [{:conversation/id :process}
                                                                       {:conversation/id :data}
                                                                       {:conversation/id :resource}]}]})
      (when (not-empty additional-info)
        (d/transact (connect-atm id) additional-info))
      ;; Add knowledge of this project to the system db.
-     (log/info "Created project database for" id)
+     (log! :info (str "Created project database for " id))
      id)))
 
-(defn ^:diag delete-project!
+(defn delete-project!
   "Remove project from the system."
   [pid]
   (if (some #(= % pid) (list-projects))
@@ -824,30 +910,50 @@
           (d/transact (connect-atm :system) {:tx-data (for [[k v] obj] [:db/retract s-eid k v])})
           (sutil/deregister-db pid)
           nil)))
-    (log/warn "Delete-project: Project not found:" pid)))
+    (log! :warn (str "Delete-project: Project not found: " pid))))
 
-(defn ^:diag  known-agents
+(defn ^:diag known-agents
   "Return a set of all the agents recorded in the system DB."
   []
   (-> (d/q '[:find [?id ...] :where [_ :agent/id ?id]] @(connect-atm :system))
       set))
 
+(defn agent-info
+  "Return a map of agent info (keys :aid :tid, :role, and sometimes, :expertise) for a ordinary agent or surrogate."
+  [agent]
+  (cond (contains? agent :agent/id)       (reduce-kv (fn [m k v]
+                                                       (cond (= k :agent/assistant-id) (assoc m :aid v)
+                                                             (= k :agent/thread-id)    (assoc m :tid v)
+                                                             (= k :agent/base-type)    (assoc m :role v)
+                                                             :else m))
+                                                     {}
+                                                     agent)
+        (contains? agent :surrogate/id)   (reduce-kv (fn [m k v]
+                                                       (cond (= k :surrogate/assistant-id)         (assoc m :aid v)
+                                                             (= k :surrogate/thread-id)            (assoc m :tid v)
+                                                             (= k :surrogate/id)                   (assoc m :role :surrogate)
+                                                             (= k :surrogate/subject-of-expertise) (assoc m :expertise v)
+                                                             :else m))
+                                                     {}
+                                                     agent)))
+
 (defn get-agent
-  "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)."
-  ([base-type] (get-agent base-type @default-llm-provider))
-  ([base-type llm-provider]
-   (if-let [res (-> (d/q '[:find ?aid ?tid
-                           :keys aid tid
-                           :in $ ?base-type ?llm-provider
-                           :where
-                           [?e :agent/base-type ?base-type]
-                           [?e :agent/llm-provider ?llm-provider]
-                           [?e :agent/assistant-id ?aid]
-                           [?e :agent/thread-id ?tid]]
-                         @(connect-atm :system) base-type llm-provider)
-                    first)]
-     res
-     (throw (ex-info "get-agent: no such agent." {:base-type base-type :llm-provider llm-provider})))))
+  "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)
+   from either the system DB, or if :pid is provided, the project DB.
+   If :db-attrs? then return the object with DB-native attributes, not :aid :tid."
+  [& {:keys [base-type llm-provider pid db-attrs?] :or {llm-provider @default-llm-provider} :as obj}]
+  (reset! diag obj)
+  (let [conn (if pid @(connect-atm pid) @(connect-atm :system))
+        ent (when base-type
+              (d/q '[:find ?e .
+                     :in $ ?base-type ?llm-provider
+                     :where
+                     [?e :agent/base-type ?base-type]
+                     [?e :agent/llm-provider ?llm-provider]]
+                   conn base-type llm-provider))]
+    (when ent
+      (let [a-map (dp/pull conn '[*] ent)]
+        (if db-attrs? a-map (agent-info a-map))))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs

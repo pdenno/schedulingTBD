@@ -1,29 +1,20 @@
-(ns scheduling-tbd.domain.process.p-interview-test
+(ns scheduling-tbd.domain.process-analysis-test
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
-   [clojure.pprint        :refer [cl-format pprint]]
-   [clojure.test          :refer [deftest is testing]]
-   [promesa.core          :as p]
-   [scheduling-tbd.domain.process.p-interview :as inv]
-   [scheduling-tbd.db    :as db]
-   [scheduling-tbd.llm    :as llm :refer [query-llm]]))
+   [clojure.test                           :refer [deftest is testing]]
+   [clojure.spec.alpha                     :as s]
+   [scheduling-tbd.domain.process-analysis :as pan]
+   [scheduling-tbd.db                      :as db]
+   [scheduling-tbd.interviewers            :as inv :refer [tell-interviewer]]
+   [scheduling-tbd.llm                     :as llm :refer [query-llm]]
+   [scheduling-tbd.response-utils          :as ru]
+   [scheduling-tbd.web.websockets          :as ws]))
 
-;;; (ns-unalias (find-ns 'scheduling-tbd.domain.process.interview-test) 'inv)
-;;; (ns-unmap  'scheduling-tbd.domain.process.interview-test 'inv)
-
-(defn huh?
-  []
-  (ns-unalias (find-ns 'scheduling-tbd.domain.process.p-interview-test) 'db)
-  (ns-unalias (find-ns 'scheduling-tbd.domain.process.p-interview-test) 'sutil)
-  (ns-unalias (find-ns 'scheduling-tbd.domain.process.p-interview-test) 'llm)
-  (ns-unalias (find-ns 'scheduling-tbd.domain.process.p-interview-test) 'log)
-  (ns-unmap  'scheduling-tbd.domain.process.p-interview-test 'inv)
-  (ns-unmap  'scheduling-tbd.domain.process.p-interview-test 'db)
-  (ns-unmap  'scheduling-tbd.domain.process.p-interview-test 'sutil)
-  (ns-unmap  'scheduling-tbd.domain.process.p-interview-test 'llm)
-  (ns-unmap  'scheduling-tbd.domain.process.p-interview-test 'log))
+;;; THIS is the namespace I am hanging out in recently.
+(def ^:diag diag (atom nil))
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
+
 
 (defn safe-alias
   [al ns-sym]
@@ -43,53 +34,166 @@
   (safe-alias 'str    'clojure.string)
   (safe-alias 'd      'datahike.api)
   (safe-alias 'dp     'datahike.pull-api)
+  (safe-alias 'json   'jsonista.core)
   (safe-alias 'mount  'mount.core)
   (safe-alias 'p      'promesa.core)
   (safe-alias 'px     'promesa.exec)
   (safe-alias 'core   'scheduling-tbd.core)
-  (safe-alias 'pinv   'scheduling-tbd.domain.process.p-interview)
+  (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'how    'scheduling-tbd.how-made)
+  (safe-alias 'invt   'scheduling-tbd.interviewers-test)
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
   (safe-alias 'mzn    'scheduling-tbd.minizinc)
   (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
   (safe-alias 'ou     'scheduling-tbd.op-utils)
   (safe-alias 'opt    'scheduling-tbd.operators-test)
-  (safe-alias 'plan   'scheduling-tbd.planner)
-  (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
+  (safe-alias 'ru     'scheduling-tbd.response-utils)
   (safe-alias 'spec   'scheduling-tbd.specs)
   (safe-alias 'sutil  'scheduling-tbd.sutil)
   (safe-alias 'sur    'scheduling-tbd.surrogate)
   (safe-alias 'surt   'scheduling-tbd.surrogate-test)
   (safe-alias 'util   'scheduling-tbd.util)
+  (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
   (safe-alias 'ws     'scheduling-tbd.web.websockets)
+  (safe-alias 'tel    'taoensso.telemere)
   (safe-alias 'openai 'wkok.openai-clojure.api))
 
-(def diag (atom nil))
+(deftest interviewer-question-ordering
+  (testing "that interviews for flow-shop manufacturing follow the correct processes."
+    (let [aid (:aid (db/get-agent :base-type :process-interview-agent))
+          tid (:id (llm/make-thread {:assistant-id aid
+                                     :llm-provider :openai
+                                     :metadata {:usage :project-agent}}))
+          ctx {:iview-aid aid :iview-tid tid}
+          result (atom [])]
+      (letfn [(tell-inv [cmd] (swap! result conj (-> (tell-interviewer cmd ctx) (dissoc :question :iview-aid :iview-tid))))]
+        (tell-inv {:command  "ANALYSIS-CONCLUDES", :conclusions "1) You are talking to surrogate humans (machine agents)."})
+        (tell-inv {:command  "CONVERSATION-HISTORY"  :already-answered [] :responses []})
+        (tell-inv {:command  "SUPPLY-QUESTION"})
+        (tell-inv {:command  "INTERVIEWEES-RESPONDS"                            ;; Response to :warm-up-question
+                   :response
+                   "We make plate glass. One of our most significant scheduling problems involves coordinating the production schedule with the supply of raw materials.
+ Fluctuations in raw material deliveries can disrupt planned production runs, leading to delays and inefficiencies.
+ Additionally, we need to balance these inconsistencies with varying demand from customers, ensuring that we meet order deadlines without overproducing and holding excess inventory."})
+        (tell-inv {:command "SUPPLY-QUESTION"})
+        (tell-inv {:command "INTERVIEWEES-RESPONDS" :response "PRODUCT"})       ;; Response to :work-type
+        (tell-inv {:command "SUPPLY-QUESTION"})
+        (tell-inv {:command "INTERVIEWEES-RESPONDS" :response "MAKE-TO-STOCK"}) ;; Response to :production-motivation
+        (tell-inv {:command "SUPPLY-QUESTION"})
+        (tell-inv {:command "INTERVIEWEES-RESPONDS" :response "FLOW-SHOP"})     ;; Response to :production-system-type
+        (tell-inv {:command "SUPPLY-QUESTION"})
+        (tell-inv {:command "INTERVIEWEES-RESPONDS"                             ;; Response to process-steps
+                   :response
+                   "Our production process for plate glass involves several key stages.
+ It starts with raw material preparation, where materials like silica sand, soda ash, and limestone are accurately measured and mixed.
+ This mixture is then fed into a furnace and melted at very high temperatures to form molten glass.
+ The molten glass is then formed into sheets using the float glass process, where it is floated on a bed of molten tin.
+ After forming, the glass is slowly cooled to prevent stress in a process called annealing.
+ Finally, the glass is cut to size, inspected for quality, and prepared for shipment."})
+        (tell-inv {:command "SUPPLY-QUESTION"}))
+      (is (=  [{:status "OK"}                                            ;; ANALYSIS-CONCLUDES
+               {:status "OK"}                                            ;; CONVERSATION-HISTORY
+               {:question-type :warm-up-question, :status "OK"}          ;; SUPPLY-QUESTION
+               {:status "OK"}                                            ;; INTERVIEWEES-RESPONDS
+               {:question-type :work-type, :status "OK"}                 ;; SUPPLY-QUESTION
+               {:status "OK"}                                            ;; INTERVIEWEES-RESPONDS
+               {:question-type :production-motivation, :status "OK"}     ;; SUPPLY-QUESTION
+               {:status "OK"}                                            ;; INTERVIEWEES-RESPONDS
+               {:question-type :production-system-type, :status "OK"}    ;; SUPPLY-QUESTION
+               {:status "OK"}                                            ;; INTERVIEWEES-RESPONDS
+               {:question-type :process-steps, :status "OK"}]            ;; SUPPLY-QUESTION
+              @result)))))
+
+(def response-durs-ice-cream {:client-id (ws/recent-client!)
+               :response "1. Mix Ingredients (30 minutes)
+2. Pasteurize Mixture (45 minutes)
+3. Homogenize Mixture (20 minutes)
+4. Age Mixture (4 hours)
+5. Flavor Addition (15 minutes)
+6. Freeze Mixture (30 minutes)
+7. Add Inclusions (10 minutes)
+8. Fill Containers (20 minutes)
+9. Harden Ice Cream (4 hours)
+10. Package (40 minutes)
+11. Store in Cold Storage (ongoing)"
+               :pid :sur-ice-cream})
+
+(defn  ^:diag analyze-durs-ice-cream-1 []
+  (pan/analyze-process-durs-response response-durs-ice-cream))
+
+(defn ^:diag analyze-durs-ice-cream-2 []
+  (ru/analyze-response-meth (assoc response-durs-ice-cream :question-type :process-durations)))
 
 
-(def proj-objective-prompt
-  (conj inv/project-objective-partial
-        {:role "user"
-         :content "[We bake cookies and sell them through grocery chains. Our challenge is to supply fresh cookies and never stock-out.
- We want a schedule that will ensure we meet demand and have the ingredients we need.]"}))
+(def response-ordering-ice-cream
+  "This is entirely serial."
+  {:client-id (ws/recent-client!)
+   :response "1. Mix Ingredients (cream, milk, sugar, stabilizers, emulsifiers)
+2. Pasteurize Mixture (use mixture from Mix Ingredients)
+3. Homogenize Mixture (use mixture from Pasteurize Mixture)
+4. Age Mixture (use mixture from Homogenize Mixture)
+5. Add Flavors and Colors (use aged mixture, flavor extracts, color additives)
+6. Freeze Mixture (use flavored mixture)
+7. Add Inclusions (use partially frozen mixture, chocolate chips, nuts, fruits)
+8. Package Ice Cream (use ice cream from Add Inclusions)
+9. Store Finished Product (use packaged ice cream)"})
 
+(def response-ordering-cookies
+  " 1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)
+ 2. Make Filling (sugar, water vanilla flavoring)
+ 3. Bake Wafers (use dough from Make Cookie Dough)
+ 4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)
+ 5. Package (use cookies from Assemble Cookies)")
+
+(deftest test-process-ordering
+  (testing "Testing process ordering"
+    (testing "Testing the same example as I gave the agent")
+    (pan/analyze-process-ordering-response {:response response-ordering-cookies})),,,,) ; <=============================
+
+(defn ^:diag tpo []
+  (pan/analyze-process-ordering-response {:response response-ordering-cookies}))
+
+(def warm-up-fountain-pens
+  "The original of this makes it clear that we need update the warm-up question."
+  (str "We make fountain pens. "
+       "Our most significant scheduling problem is coordinating production runs with the arrival of raw materials. "
+       "Due to variability in lead times from suppliers, sometimes we face delays or shortages that disrupt our production schedule. "
+       "This, in turn, leads to challenges in meeting customer demand and fulfilling orders on time, "
+       "resulting in potential bottlenecks in various stages of the production process."))
+
+(deftest test-warm-up-question
+  (testing "Testing warm-up-question with no current project."
+    (let [claims (pan/analyze-intro-response  warm-up-fountain-pens '#{(project-id :START-A-NEW-PROJECT)})
+          [_ ?pid] (ru/find-claim '(project-id ?x) claims)]
+      (is (and (ru/find-claim (list 'project-id ?pid) claims)
+               (ru/find-claim (list 'cites-raw-material-challenge ?pid) claims)
+               (ru/find-claim '(project-name ?x) claims))))))
+
+(defn ^:diag ask-about-ice-cream-agent
+  ([] (ask-about-ice-cream-agent "What are your instructions?"))
+  ([q-txt]
+   (let [{:keys [iview-aid iview-tid]} (inv/interview-agent :process :sur-ice-cream)]
+     (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"
-  {:snack-food "The primary challenge in our production process involves effectively coordinating all the steps in our supply chain, starting from raw material procurement to the final delivery of our snack foods to grocery chains.
+  {:snack-food "We make snack food.
+ The primary challenge in our production process involves effectively coordinating all the steps in our supply chain, starting from raw material procurement to the final delivery of our snack foods to grocery chains.
  We aim to maintain an optimal inventory level which involves proper timing of production runs to minimize stockouts and excess storage costs.
  Seasonal fluctuations in demand, delays from suppliers, equipment breakdowns, and transportation delays pose consistent scheduling problems.
  Additionally, the scheduling process needs to account for shelf-life of our products to prevent wastage.
  Lastly, integrating all the processes within the firm and communicating the schedule effectively to all the stakeholders is a significant problem.",
 
-   :paving "The principal problem we face is coordinating the availability of our clients, skilled work crew, and the delivery of material supplies.
+   :paving "We pave roads.
+ The principal problem we face is coordinating the availability of our clients, skilled work crew, and the delivery of material supplies.
  Unpredictable weather conditions often lead to sudden schedule changes.
  Also, delays in supply chain due to various reasons can significantly affect the timeline of the project.
  Balancing multiple projects simultaneously without over-committing our resources is also a challenge.
  Lastly, unanticipated repairs and maintenance of our paving equipment affects our work schedule.",
 
-   :injection-molds "Our principal production problem in running an injection mold facility is coordinating the different production orders in a manner that optimizes our machine utilization and minimizes
+   :injection-molds "We make injection molds.
+ Our principal production problem in running an injection mold facility is coordinating the different production orders in a manner that optimizes our machine utilization and minimizes
  production time without leading to bottlenecks.
  We must effectively manage the flow of materials from suppliers, ensuring that they're available exactly when needed to avoid delays.
  It's also crucial to ensure our labor force is appropriately assigned to different tasks in the shop to maximize efficiency.
@@ -108,7 +212,6 @@
  :general-contractor "We are prime contractors in construction specializing in office and laboratory buildings. We manage subcontractors, permits, quality, the site, and the budget.
   Most importantly, we are the prinicpal contact between the client, subs, vendors, and regulatory authorities. Our principal challenge is in providing a plan and schedule for the project that meets the client's budget."})
 
-
 (deftest product-or-service?
   (testing "Testing whether are zero-shot prompt on a given LLM is sufficient on various service vs. product intro paragraphs."
     (let [answer-key {:snack-food         "product"
@@ -126,7 +229,7 @@
                                              :content (format (str "The following paragraph describes an activity that either provides a service or produces a product.\n"
                                                                    "Reply with respectively with the single word 'service' or 'product' depending on which most closely describes the paragraph.\n\n %s")
                                                               (get domain-problems k))}]]
-                                (query-llm dialog {:model-class :gpt-4 #_:gpt-3.5}))))
+                                (query-llm dialog {:model-class :gpt #_:gpt-3.5}))))
                      {}
                      (keys answer-key)))))))
 
@@ -137,28 +240,6 @@
 ;;;    "it concerns activity that will be performed at a place the customer designates.
 ;;;
 ;;; Also was better off with full sentences; sometimes I got back "Our facility" when I asked for 'our facility'.
-(deftest my-place-or-yours?
-  (testing "Testing whether a zero-shop prompt on a given LLM is sufficient on 'done at my place or yours' intro paragraphs."
-    (let [answer-key {:snack-food         "Our facility."
-                      :paving             "Customer site."
-                      :injection-molds    "Our facility."
-                      :brewery            "Our facility."
-                      :music-lessons      "Our facility."
-                      :general-contractor "Customer site."}]  ; <===== a hard one, where the LLMs disagree and aren't consistent across runs. See remarks above.
-      (is (= answer-key
-             (reduce (fn [res k]
-                       (assoc res k
-                              (let [dialog [{:role "system"
-                                             :content "You are a helpful assistant."}
-                                            {:role "user"
-                                             :content (format (str "The following paragraph describes an activity that can be performed in only one of two ways.\n"
-                                                                   "Respond with either 'Our facility.' if, like factory work, it is done in a place other than where the customer will use it,"
-                                                                   "or 'Customer site.' if it concerns work that will be performed at a place the customer designates.\n\n %s")
-                                                              (get domain-problems k))}]]
-                                (query-llm dialog {:model-class :gpt-4 #_gpt-3.5}))))
-                     {}
-                     (keys answer-key)))))))
-
 
 ;;; This is NOT working out well! The LLM is concluding that everything except :general-contractor is a scheduling problem. <===========================================
 ;;; Maybe we are going to have to narrow it down to just those two, and then recognize resource-assignment as a sub-problem that can occur in either case:
@@ -197,7 +278,7 @@
                                             {:role "assistant" :content "You are describing a 'scheduling' situation."}
                                             {:role "user" :content "WRONG! The answer must be just the string 'scheduling'."}
                                             {:role "user" :content (get domain-problems k)}]]
-                                (query-llm dialog {:model-class :gpt-4}))))
+                                (query-llm dialog {:model-class :gpt}))))
                       {}
                       (keys answer-key))))))))
 
@@ -233,71 +314,31 @@
                                             {:role "assistant" :content "You are describing a 'scheduling' situation."}
                                             {:role "user" :content "WRONG! The answer must be just the string 'scheduling'."}
                                             {:role "user" :content (get domain-problems k)}]]
-                                (query-llm dialog {:model-class :gpt-4}))))
+                                (query-llm dialog {:model-class :gpt}))))
                       {}
                       (keys answer-key))))))))
 
-;;; Is job-shop vs. flow-shop too nebulous? Yes, based on the intro paragraph there is not likely to be sufficient information.
-;;; For that reason, I think I need to pose a question to a surrogate expert / parallel expert:
+(def process-order-resp
+"1. Raw Material Inspection (sand, soda ash, limestone, dolomite)
+2. Glass Melting (use inspected raw materials from Raw Material Inspection)
+3. Forming Glass Sheets (use molten glass from Glass Melting)
+4. Annealing Process (use glass sheets from Forming Glass Sheets)
+5. Cutting Glass (use annealed glass from Annealing Process)
+6. Edge Finishing (use cut glass from Cutting Glass)
+7. Coating or Tinting (if required) (use finished glass from Edge Finishing, apply coatings or tints)
+8. Quality Inspection (use coated or non-coated glass from Coating or Tinting)
+9. Packaging (use inspected glass from Quality Inspection)
+10. Shipping (use packaged glass from Packaging)")
 
-;;;     (scheduling-problem ?x),        ; As opposed to planning-problem (Could have lower priority for (planning-problem ?x)).
-;;;     (has-production-facility ?x)    ; As opposed to performed at customer site.
-;;;     (product-focus ?x)              ; As opposed to (service-focus ?x)
-;;;
-;;; ====> SUR?: Could you provide a few short sentences about your production processes? <======
+(defn tryme-po []
+  (pan/analyze-process-ordering-response {:response process-order-resp}))
 
-(def production-processes
-  {:canned-vegetables "Our production process starts with the receipt of fresh vegetables from our suppliers, which are then cleaned, sorted, and prepped for processing. The vegetables undergo blanching to preserve color and nutritional value, followed by a filling process where they are packed into cans with brine or sauce. The cans are then sealed, sterilized through a high-temperature process to eliminate bacteria and extend shelf life, and finally labeled and packaged for distribution. We operate multiple production lines, each tailored to handle specific types of vegetables, with a focus on efficiency and quality control throughout the process."
-
-   :plate-glass "Our plate glass production process begins at the Batch House, where raw materials are accurately mixed to create the glass batch. The batch is then transferred to the Melting Furnace, where it's melted at high temperatures to form molten glass. Following this, the molten glass proceeds to the Float Bath, where it's floated on molten tin to create a flat surface. After forming, the glass ribbon enters the Annealing Lehr, where it is gradually cooled to remove internal stresses and ensure the glass's structural integrity. The annealed glass is then Quality Inspected for any defects, Cut into the required sizes, and finally, if necessary, undergoes a Coating process to meet specific product requirements before Packing and Shipping to customers. Each of these steps must be carefully scheduled and managed to ensure a seamless operation and meet customer demands efficiently."
-
-   :remanufactured-alternators "Our production process begins with the reception of core units, which are then inspected for suitability. Following inspection, suitable units are disassembled, and their components are cleaned. Each part is then inspected and sorted, with some being reconditioned or replaced as necessary. Reassembly is the next step, during which the alternators are put back together using both the reconditioned and new parts. The final step involves testing the finished alternators to ensure they meet our quality standards. Once they pass the testing phase, the alternators are packaged and stored, ready for distribution."
-
-   :injection-molds "Our production process for injection molds starts with understanding the customer's requirements and translating that into a functional design. Once the design is approved, we move onto procuring the necessary materials, primarily high-grade metals. The bulk of the mold is then formed using CNC machining for precise cuts and shapes, followed by EDM for intricate details and geometries. Post machining, the mold undergoes polishing and finishing to achieve the required surface quality. If the mold consists of multiple components, they are assembled together. Before shipping, the mold is subjected to rigorous testing and quality control checks to ensure it meets the specified standards. This comprehensive process ensures our molds meet the high expectations of durability and precision our customers have come to expect."
-
-   :craft-beer "Our production processes begin with the brewing phase, where we mix the ingredients and boil them to create the wort. Following brewing, the wort is cooled and transferred to fermentation tanks, where yeast is added and the fermentation process begins. This phase is crucial as it converts sugars into alcohol and carbon dioxide. After fermentation, the beer undergoes conditioning, a phase that helps develop flavors and removes unwanted compounds. Finally, the beer is filtered (if necessary) and then bottled, making it ready for distribution. Each phase has its specific duration and conditions, requiring precise scheduling and monitoring to ensure the quality of the final product."
-
-   ;; On this one I asked SUR?: Could you briefly describe your production processes?
-   :ice-hockey-sticks "Certainly, our production processes for making ice hockey sticks can be summarized as follows: 1. **Raw Material Procurement:** We source high-quality carbon fiber and resin, essential materials for making durable and lightweight ice hockey sticks. 2. **Material Preparation:** The carbon fiber is cut and prepared according to the specifications for different types of hockey sticks. The resin is also prepared to bond the carbon fibers effectively. 3. **Molding and Shaping:** Prepared materials are placed into molds to form the shape of the hockey stick. This process involves layering the carbon fiber and applying resin to bond these layers together. 4. **Curing and Cooling:** Once the hockey sticks are shaped, they undergo a curing process where they are heated in an oven to harden and solidify the resin. Following this, they are cooled to room temperature to set the final shape. 5. **Quality Inspection:** After cooling, each hockey stick is inspected for defects and to ensure they meet our strict quality standards. This includes checking the stick for durability, weight, and balance. 6. **Packaging and Shipping:** The approved hockey sticks are then packaged and prepared for shipping to various customers and retailers. This streamlined process allows us to maintain a high level of quality and meet the demands of our customers effectively."})
-
-;;; This will be part of prelim-analysis on a parallel or surrogate expert. Here I'm just testing it alone.
-(deftest flow-v-job
-  (testing "Testing whether a zero-shop prompt on a given LLM is sufficient on 'done at my place or yours' intro paragraphs."
-    (let [answer-key {:canned-vegetables            "FIXED"
-                      :plate-glass                  "FIXED"
-                      :remanufactured-alternators   "FIXED"      ; <=================== Hmmm... I'll see if it changes is a parallel/surrogate expert
-                      :injection-molds              "VARIABLE"
-                      :ice-hockey-sticks            "FIXED"}]
-      (is (= answer-key
-             (reset! diag
-                     (reduce (fn [res k]
-                               (assoc res k
-                                      (let [dialog [{:role "system"
-                                                     :content "You are a helpful assistant that knows operations research."}
-                                                    {:role "user"
-                                                     :content (format (str "The following paragraph describes manufacturing production processes for a certain product.\n"
-                                                                           "Respond with either 'FIXED' if, like a flow shop in operations research, the order of production operations is apt to be identical for all product types,\n"
-                                                                           "or 'VARIABLE' if, like a job shop in operations reasearch, the order of production operations is apt to vary depending on what is being produced.\n\n\n%s")
-                                                                      (get production-processes k))}]]
-                                        (query-llm dialog {:model-class :gpt-4 #_gpt-3.5}))))
-                             {}
-                             (keys answer-key))))))))
+(deftest process-ordering
+  (testing "whether the process-ordering system agent works okay."))
 
 
-(deftest project-objective-test
-  (testing "Testing that project objective prompt is okay. Really this only cares that it returns a clojure map with the correct keys.")
-  (let [res (-> (query-llm proj-objective-prompt {:model-class :gpt-4 :raw-text? false}) (p/await))]
-    (is (= #{:objective :probability} (-> res keys set))))
 
-  ;; This one is interesting; in some sense better than GPT-4. It sometimes returns two sentences.
-  (let [res (-> (query-llm proj-objective-prompt {:model-class :gpt-3.5 :raw-text? false}) (p/await))]
-    (is (= #{:objective :probability} (-> res keys set)))))
 
-(defn msg-vec2html
-  [msg]
-  (if (some #(contains? % :msg-link/text) (:message/content msg))
-    (assoc msg :message/content "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.")
-    (assoc msg :message/content (apply str (map #(:msg-text/string %) (:message/content msg))))))
 
 #_(defn migrate-project
   "Translate :message/content to html."
@@ -321,7 +362,7 @@
         proj-string (with-out-str (pprint new-proj))]
     (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string))))
 
-(defn migrate-project
+#_(defn migrate-project
   "Translate :message/content to html."
   [pid]
   (letfn [(name2id [obj]
@@ -333,21 +374,3 @@
     (let [proj (db/get-project pid)
           proj-string (with-out-str (-> proj name2id pprint))]
     (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string)))))
-
-
-(def beer-steps
-"Our production process involves several key steps:
-
-1. Mashing: Mixing milled grains (usually malted barley) with water and heating the mixture. This step extracts sugars from the grains, creating a sugary liquid known as \"wort.\"
-
-2. Boiling: The wort is boiled, and hops are added for flavor, aroma, and bitterness. This step also sterilizes the wort.
-
-3. Cooling: After boiling, the wort is rapidly cooled down to a temperature suitable for fermentation.
-
-4. Fermentation: The cooled wort is transferred to fermentation tanks, where yeast is added. The yeast ferments the sugars in the wort, producing alcohol and carbon dioxide. This can take from a few days to several weeks, depending on the beer type.
-
-5. Conditioning: After fermentation, the beer is conditioned to develop its full flavor profile. This can happen in the same tank or by transferring the beer to a new tank.
-
-6. Packaging: The final step is packaging the beer into cans, bottles, or kegs for distribution.
-
-Each of these steps requires specific time intervals and conditions (e.g., temperature) to ensure the production of high-quality beer.")

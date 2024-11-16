@@ -1,156 +1,157 @@
-[
-#:project{:conversations
-          [#:conversation{:id :process,
-                          :messages
-                          [#:message{:content
-                                     "Describe your most significant scheduling problem in a few sentences.",
-                                     :from :system,
-                                     :id 1,
-                                     :tags [:initial-question :query],
-                                     :time
-                                     #inst "2024-05-31T00:00:03.403-00:00"}
-                           #:message{:content
-                                     "Our most significant scheduling problem involves coordinating the delivery of raw corn from various local farms to our processing facility in line with our production capacity and demand cycles. We need to ensure that we receive the right amount of fresh corn at the right times to optimize processing efficiency and minimize waste. Additionally, scheduling overlaps and lags between harvest times, delivery logistics, processing rates, and shipping out finished goods to retailers must be managed meticulously to prevent bottlenecks or inventory excesses.",
-                                     :from :surrogate,
-                                     :id 2,
-                                     :tags
-                                     [:initial-question :response],
-                                     :time
-                                     #inst "2024-05-31T00:00:03.424-00:00"}
-                           #:message{:content
-                                     "Great, we'll call your project SUR Canned Corn.",
-                                     :from :system,
-                                     :id 3,
-                                     :tags [:informative],
-                                     :time
-                                     #inst "2024-05-31T00:00:04.384-00:00"}
-                           #:message{:content
-                                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
-                                     :from :system,
-                                     :id 4,
-                                     :time
-                                     #inst "2024-05-31T00:00:04.400-00:00"}
-                           #:message{:content
-                                     "Please briefly describe your production processes.",
-                                     :from :system,
-                                     :id 5,
-                                     :time
-                                     #inst "2024-05-31T00:00:12.806-00:00"}
-                           #:message{:content
-                                     "Our production process for canned corn involves several key steps:\n\n1. <b>Receiving and Inspection:</b> Corn is delivered from farms and inspected for quality.\n2. <b>Husking:</b> The corn husks are removed either manually or mechanically.\n3. <b>Cleaning:</b> The husked corn is cleansed of any dirt or foreign materials.\n4. <b>Blanching:</b> Corn is briefly heated to preserve color, flavor, and nutritional content.\n5. <b>Cutting:</b> Kernels are cut from the cob.\n6. <b>Filling:</b> Cleaned kernels are placed into cans along with a brine or water solution.\n7. <b>Sealing and Sterilizing:</b> Cans are sealed and then sterilized to ensure product safety and longevity.\n8. <b>Labeling and Packaging:</b> The cans are labeled and packaged into cases for distribution.\n\nEach stage must be carefully timed to ensure a seamless flow that maximizes both efficiency and product quality.",
-                                     :from :surrogate,
-                                     :id 6,
-                                     :tags [:process-description],
-                                     :time
-                                     #inst "2024-05-31T00:00:12.826-00:00"}
-                           #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
-                                     :from :system,
-                                     :id 7,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-05-31T00:00:15.766-00:00"}
-                           #:message{:content "PRODUCT",
-                                     :from :surrogate,
-                                     :id 8,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-05-31T00:00:15.782-00:00"}
-                           #:message{:content
-                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
-                                     :from :system,
-                                     :id 9,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-05-31T00:00:19.824-00:00"}
-                           #:message{:content "MAKE-TO-STOCK",
-                                     :from :surrogate,
-                                     :id 10,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-05-31T00:00:19.887-00:00"}
-                           #:message{:content
-                                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
-                                     :from :system,
-                                     :id 11,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-05-31T00:00:22.821-00:00"}
-                           #:message{:content "OUR-FACILITY",
-                                     :from :surrogate,
-                                     :id 12,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-05-31T00:00:22.858-00:00"}
-                           #:message{:content
-                                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
-                                     :from :system,
-                                     :id 13,
-                                     :time
-                                     #inst "2024-05-31T00:00:25.949-00:00"}
-                           #:message{:content "FLOW-SHOP",
-                                     :from :surrogate,
-                                     :id 14,
-                                     :time
-                                     #inst "2024-05-31T00:00:25.980-00:00"}
-                           #:message{:content
-                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
-                                     :from :system,
-                                     :id 15,
-                                     :tags [:process-steps :query],
-                                     :time
-                                     #inst "2024-05-31T00:00:35.958-00:00"}
-                           #:message{:content
-                                     "1. Receiving and Inspection\n2. Husking\n3. Cleaning\n4. Blanching\n5. Cutting\n6. Filling\n7. Sealing and Sterilizing\n8. Labeling and Packaging",
-                                     :from :surrogate,
-                                     :id 16,
-                                     :tags [:process-steps :response],
-                                     :time
-                                     #inst "2024-05-31T00:00:35.988-00:00"}
-                           #:message{:content
-                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. The 'enum values' name the steps of your process in the order they are executed for each product.",
-                                     :from :system,
-                                     :id 17,
-                                     :tags [:info-to-user :minizinc],
-                                     :time
-                                     #inst "2024-05-31T00:00:36.048-00:00"}
-                           #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. receiving (some amount of time)\n2. husking (some amount of time)...",
-                                     :from :system,
-                                     :id 18,
-                                     :tags [:process-durs :query],
-                                     :time
-                                     #inst "2024-05-31T00:00:42.211-00:00"}
-                           #:message{:content
-                                     "1. Receiving and Inspection (30 minutes)\n2. Husking (15 minutes)\n3. Cleaning (10 minutes)\n4. Blanching (5 minutes)\n5. Cutting (20 minutes)\n6. Filling (15 minutes)\n7. Sealing and Sterilizing (25 minutes)\n8. Labeling and Packaging (10 minutes)",
-                                     :from :surrogate,
-                                     :id 19,
-                                     :tags [:process-durs :response],
-                                     :time
-                                     #inst "2024-05-31T00:00:42.238-00:00"}]}
-           #:conversation{:id :data}
-           #:conversation{:id :resource}],
-          :code
-          "enum Task = {receiving, husking, cleaning, blanching, cutting, filling, sealing, labeling};",
-          :processes
-          #:process{:desc
-                    "1. Receiving and Inspection (30 minutes)\n2. Husking (15 minutes)\n3. Cleaning (10 minutes)\n4. Blanching (5 minutes)\n5. Cutting (20 minutes)\n6. Filling (15 minutes)\n7. Sealing and Sterilizing (25 minutes)\n8. Labeling and Packaging (10 minutes)",
-                    :id :sur-canned-corn},
-          :current-conversation :process,
-          :planning-problem
-          #:problem{:domain :process-interview,
-                    :goal-string
-                    "(characterize-process sur-canned-corn)",
-                    :state-string
-                    "#{(process-step sur-canned-corn 6 filling) (cites-raw-material-challenge sur-canned-corn) (flow-shop sur-canned-corn) (proj-id sur-canned-corn) (process-step sur-canned-corn 8 labeling) (process-step sur-canned-corn 2 husking) (process-step sur-canned-corn 5 cutting) (production-mode sur-canned-corn make-to-stock) (provides-product sur-canned-corn) (has-production-facility sur-canned-corn) (ongoing-discussion sur-canned-corn) (process-step sur-canned-corn 4 blanching) (have-process-steps sur-canned-corn) (process-step sur-canned-corn 1 receiving) (have-process-durs sur-canned-corn) (process-step sur-canned-corn 3 cleaning) (surrogate sur-canned-corn) (proj-name \"SUR Canned Corn\") (process-step sur-canned-corn 7 sealing)}"},
-          :name "SUR Canned Corn",
-          :surrogate
-          #:surrogate{:assistant-id "asst_g91VMowymiHxQYwm3n3QAgsi",
-                      :id :sur-canned-corn,
-                      :subject-of-expertise "canned corn",
-                      :system-instruction
-                      "You manage a company that makes canned corn.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_PaNG176R7upH82TJEeDXsNVg"},
-          :id :sur-canned-corn}
-
-]
+[#:project{:conversations
+           [#:conversation{:id :process,
+                           :messages
+                           [#:message{:content
+                                      "Describe your most significant scheduling problem in a few sentences.",
+                                      :from :system,
+                                      :id 1,
+                                      :tags [:initial-question :query],
+                                      :time
+                                      #inst "2024-05-31T00:00:03.403-00:00",
+                                      :question-name :initial-question}
+                            #:message{:content
+                                      "Our most significant scheduling problem involves coordinating the delivery of raw corn from various local farms to our processing facility in line with our production capacity and demand cycles. We need to ensure that we receive the right amount of fresh corn at the right times to optimize processing efficiency and minimize waste. Additionally, scheduling overlaps and lags between harvest times, delivery logistics, processing rates, and shipping out finished goods to retailers must be managed meticulously to prevent bottlenecks or inventory excesses.",
+                                      :from :surrogate,
+                                      :id 2,
+                                      :tags
+                                      [:initial-question :response],
+                                      :time
+                                      #inst "2024-05-31T00:00:03.424-00:00",
+                                      :question-name :initial-question}
+                            #:message{:content
+                                      "Great, we'll call your project SUR Canned Corn.",
+                                      :from :system,
+                                      :id 3,
+                                      :tags [:informative],
+                                      :time
+                                      #inst "2024-05-31T00:00:04.384-00:00"}
+                            #:message{:content
+                                      "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
+                                      :from :system,
+                                      :id 4,
+                                      :time
+                                      #inst "2024-05-31T00:00:04.400-00:00"}
+                            #:message{:content
+                                      "Please briefly describe your production processes.",
+                                      :from :system,
+                                      :id 5,
+                                      :time
+                                      #inst "2024-05-31T00:00:12.806-00:00"}
+                            #:message{:content
+                                      "Our production process for canned corn involves several key steps:\n\n1. <b>Receiving and Inspection:</b> Corn is delivered from farms and inspected for quality.\n2. <b>Husking:</b> The corn husks are removed either manually or mechanically.\n3. <b>Cleaning:</b> The husked corn is cleansed of any dirt or foreign materials.\n4. <b>Blanching:</b> Corn is briefly heated to preserve color, flavor, and nutritional content.\n5. <b>Cutting:</b> Kernels are cut from the cob.\n6. <b>Filling:</b> Cleaned kernels are placed into cans along with a brine or water solution.\n7. <b>Sealing and Sterilizing:</b> Cans are sealed and then sterilized to ensure product safety and longevity.\n8. <b>Labeling and Packaging:</b> The cans are labeled and packaged into cases for distribution.\n\nEach stage must be carefully timed to ensure a seamless flow that maximizes both efficiency and product quality.",
+                                      :from :surrogate,
+                                      :id 6,
+                                      :tags [:process-description],
+                                      :time
+                                      #inst "2024-05-31T00:00:12.826-00:00"}
+                            #:message{:content
+                                      "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
+                                      :from :system,
+                                      :id 7,
+                                      :tags [:query],
+                                      :time
+                                      #inst "2024-05-31T00:00:15.766-00:00"}
+                            #:message{:content "PRODUCT",
+                                      :from :surrogate,
+                                      :id 8,
+                                      :tags [:response],
+                                      :time
+                                      #inst "2024-05-31T00:00:15.782-00:00"}
+                            #:message{:content
+                                      "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
+                                      :from :system,
+                                      :id 9,
+                                      :tags [:query],
+                                      :time
+                                      #inst "2024-05-31T00:00:19.824-00:00"}
+                            #:message{:content "MAKE-TO-STOCK",
+                                      :from :surrogate,
+                                      :id 10,
+                                      :tags [:response],
+                                      :time
+                                      #inst "2024-05-31T00:00:19.887-00:00"}
+                            #:message{:content
+                                      "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                                      :from :system,
+                                      :id 11,
+                                      :tags [:query],
+                                      :time
+                                      #inst "2024-05-31T00:00:22.821-00:00"}
+                            #:message{:content "OUR-FACILITY",
+                                      :from :surrogate,
+                                      :id 12,
+                                      :tags [:response],
+                                      :time
+                                      #inst "2024-05-31T00:00:22.858-00:00"}
+                            #:message{:content
+                                      "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                                      :from :system,
+                                      :id 13,
+                                      :time
+                                      #inst "2024-05-31T00:00:25.949-00:00"}
+                            #:message{:content "FLOW-SHOP",
+                                      :from :surrogate,
+                                      :id 14,
+                                      :time
+                                      #inst "2024-05-31T00:00:25.980-00:00"}
+                            #:message{:content
+                                      "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
+                                      :from :system,
+                                      :id 15,
+                                      :tags [:process-steps :query],
+                                      :time
+                                      #inst "2024-05-31T00:00:35.958-00:00",
+                                      :question-name :process-steps}
+                            #:message{:content
+                                      "1. Receiving and Inspection\n2. Husking\n3. Cleaning\n4. Blanching\n5. Cutting\n6. Filling\n7. Sealing and Sterilizing\n8. Labeling and Packaging",
+                                      :from :surrogate,
+                                      :id 16,
+                                      :tags [:process-steps :response],
+                                      :time
+                                      #inst "2024-05-31T00:00:35.988-00:00",
+                                      :question-name :process-steps}
+                            #:message{:content
+                                      "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. The 'enum values' name the steps of your process in the order they are executed for each product.",
+                                      :from :system,
+                                      :id 17,
+                                      :tags [:info-to-user :minizinc],
+                                      :time
+                                      #inst "2024-05-31T00:00:36.048-00:00"}
+                            #:message{:content
+                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. receiving (some amount of time)\n2. husking (some amount of time)...",
+                                      :from :system,
+                                      :id 18,
+                                      :tags [:process-durs :query],
+                                      :time
+                                      #inst "2024-05-31T00:00:42.211-00:00"}
+                            #:message{:content
+                                      "1. Receiving and Inspection (30 minutes)\n2. Husking (15 minutes)\n3. Cleaning (10 minutes)\n4. Blanching (5 minutes)\n5. Cutting (20 minutes)\n6. Filling (15 minutes)\n7. Sealing and Sterilizing (25 minutes)\n8. Labeling and Packaging (10 minutes)",
+                                      :from :surrogate,
+                                      :id 19,
+                                      :tags [:process-durs :response],
+                                      :time
+                                      #inst "2024-05-31T00:00:42.238-00:00"}]}
+            #:conversation{:id :data}
+            #:conversation{:id :resource}],
+           :code
+           "enum Task = {receiving, husking, cleaning, blanching, cutting, filling, sealing, labeling};",
+           :processes
+           [#:process{:desc
+                      "1. Receiving and Inspection (30 minutes)\n2. Husking (15 minutes)\n3. Cleaning (10 minutes)\n4. Blanching (5 minutes)\n5. Cutting (20 minutes)\n6. Filling (15 minutes)\n7. Sealing and Sterilizing (25 minutes)\n8. Labeling and Packaging (10 minutes)",
+                      :id :sur-canned-corn}],
+           :current-conversation :process,
+           :planning-problem
+           #:problem{:domain :process-interview,
+                     :goal-string
+                     "(characterize-process sur-canned-corn)",
+                     :state-string
+                     "#{(process-step sur-canned-corn 6 filling) (cites-raw-material-challenge sur-canned-corn) (flow-shop sur-canned-corn) (proj-id sur-canned-corn) (process-step sur-canned-corn 8 labeling) (process-step sur-canned-corn 2 husking) (process-step sur-canned-corn 5 cutting) (production-mode sur-canned-corn make-to-stock) (provides-product sur-canned-corn) (has-production-facility sur-canned-corn) (ongoing-discussion sur-canned-corn) (process-step sur-canned-corn 4 blanching) (have-process-steps sur-canned-corn) (process-step sur-canned-corn 1 receiving) (have-process-durs sur-canned-corn) (process-step sur-canned-corn 3 cleaning) (surrogate sur-canned-corn) (proj-name \"SUR Canned Corn\") (process-step sur-canned-corn 7 sealing)}"},
+           :name "SUR Canned Corn",
+           :surrogate
+           #:surrogate{:assistant-id "asst_g91VMowymiHxQYwm3n3QAgsi",
+                       :id :sur-canned-corn,
+                       :subject-of-expertise "canned corn",
+                       :system-instruction
+                       "You manage a company that makes canned corn.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                       :thread-id "thread_PaNG176R7upH82TJEeDXsNVg"},
+           :id :sur-canned-corn}]

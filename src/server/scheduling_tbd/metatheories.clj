@@ -5,4 +5,4 @@
    [scheduling-tbd.sutil         :refer [connect-atm api-credentials default-llm-provider]]
    [clojure.pprint               :refer [cl-format pprint]]
    [clojure.string               :as str]
-   [taoensso.timbre              :as log]))
+   [taoensso.telemere.timbre            :as log]))

@@ -18,6 +18,7 @@ constraint forall (p in Product) (taskEnds[p, qualityControl] <= taskStarts[p, p
 set of int: Product = 1..nProducts;
 enum Task = $$$TASK-ENUM-LIST$$$;
 % Durations are in units of $$$DUR-UOM$$$ and may be rounded.
+% If any of the durations are negative values, we had problems understanding; you should fix these by hand.
 array [Product, Task] of $$$DUR-TYPE$$$: taskDuration = $$$TASK-DURATION-ARRAY$$$;
 
 $$$DUR-TYPE$$$ : minTime = 0;
@@ -40,7 +41,7 @@ constraint forall (t in Task)
 constraint exists (p in Product) (taskStarts[p, $$$FIRST-TASK-NAME$$$] = 0);
 
 % Starting some time in the past is not allowed.
-constraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);
+constraint forall (p in Product where p > 1) (taskStarts[p, $$$FIRST-TASK-NAME$$$] > 0);
 
 % Every other task can start after the previous task ends.
 $$$TASK-SERIAL-CONSTRAINTS$$$

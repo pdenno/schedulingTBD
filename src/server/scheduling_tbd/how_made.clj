@@ -15,7 +15,7 @@
    [scheduling-tbd.db       :as proj-db]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm db-cfg-map]]
-   [taoensso.timbre :as log]))
+   [taoensso.telemere.timbre       :as log]))
 
 (def him-schema+
   "Defines content of the How It's Made DB in a convenient format, not Datahike format."
@@ -221,7 +221,7 @@
   (if (segment-exists? seg-name)
     (if-let [challenge (-> (str "a company that makes " seg-name)
                              pretend-you-manage-prompt
-                             (llm/query-llm {:model-class :gpt-4})
+                             (llm/query-llm {:model-class :gpt})
                              (p/await))]
       (do (log/info "Intro Response: " challenge)
           (d/transact (connect-atm :him) {:tx-data [{:segment/name seg-name
@@ -246,7 +246,7 @@
         (write-challenge-intro seg-name)))))
 
 ;;;--------------------- Starting, stopping, recreating etc.  ---------------------
-(defn write-db-backup
+(defn ^:diag write-db-backup
   "Write a file of current db content.
    Example-usage (write-db-backup \"my-him-db.edn\")
    Example-usage (write-db-backup) writes to data/him-db.edn which is kept in the repository."
@@ -278,7 +278,7 @@
          [?e :segment/name ?name]]
        @(connect-atm :him)))
 
-(defn create-project!
+(defn ^:diag create-project!
   "Add the project to the system and create a project DB for it.
    Example usage (create-project! 'Aluminium Foil') -- really!."
   [seg-name]
@@ -290,7 +290,9 @@
         :project/id   (-> pname str/lower-case (str/replace #"\s+" "-") keyword)}
        {}
        {:force? true :make-current? false})
-      (proj-db/add-msg :him (:segment/challenge-intro intro) :user))
+      (proj-db/add-msg {:pid :him
+                        :text (:segment/challenge-intro intro)
+                        :from :user}))
     (log/error "HIM segment by that name not found:" seg-name)))
 
 (def rebuild-him? "True if mount/init should rebuild the How It's Made database." false)
@@ -305,8 +307,7 @@
 
 ;;; ------------------- Starting and stopping ---------------
 (defn init-him
-  "Set sys-db-cfg atoms for system db and the template for the proj-base-cfg (:path-base).
-   Recreate the system database if sys-db-cfg.rebuild-db? = true."
+  "Recreate the system database when rebuild-db? = true."
   []
   (let [him-cfg (db-cfg-map {:type :him})]
     (sutil/register-db :him him-cfg)

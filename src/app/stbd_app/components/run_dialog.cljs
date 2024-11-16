@@ -14,9 +14,9 @@
    ["@mui/material/Typography$default" :as Typography]
    ["@mui/material/Dialog$default" :as Dialog]
    ["@mui/material/IconButton$default" :as IconButton]
-   [stbd-app.util   :refer [common-info]]
-   [stbd-app.ws     :as ws]
-   [taoensso.timbre :as log :refer-macros [info debug log]]))
+   [stbd-app.util     :refer [common-info]]
+   [stbd-app.ws       :as ws]
+   [taoensso.telemere.timbre :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 

@@ -8,7 +8,7 @@
    [helix.core :refer [defnc $]]
    [helix.dom :as dom]
    [helix.hooks :as hooks]
-   ["react-dropzone/dist/index$useDropzone" :as useDropzone]
+   ;["react-dropzone/dist/index$useDropzone" :as useDropzone]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/Button$default" :as Button]
    ["@mui/material/Card$default" :as Card]
@@ -17,9 +17,9 @@
    ["@mui/material/Stack$default" :as Stack]
    ["@mui/material/Typography$default" :as Typography]
    ["@mui/material/Dialog$default" :as Dialog]
-   [stbd-app.util   :refer [common-info]]
-   [stbd-app.ws     :as ws]
-   [taoensso.timbre :as log :refer-macros [info debug log]]))
+   [stbd-app.util     :refer [common-info]]
+   [stbd-app.ws       :as ws]
+   [taoensso.telemere.timbre :as log :refer-macros [info debug log]]))
 
 (def ^:diag diag (atom nil))
 
@@ -38,10 +38,10 @@
   (let [[open, set-open] (hooks/use-state false)
         [state-text set-state-text]  (hooks/use-state drag-text) ; mystery why this doesn't work.
         modal           (hooks/use-ref nil)
-        dz-hook         (useDropzone)
-        root-props      ((j/get dz-hook :getRootProps) #js {:className "dropzone"})
-        input-props     ((j/get dz-hook :getInputProps))
-        accepted-files  (j/get dz-hook :acceptedFiles)]
+        ;dz-hook         (useDropzone)
+        root-props      nil #_((j/get dz-hook :getRootProps) #js {:className "dropzone"})
+        input-props     nil #_((j/get dz-hook :getInputProps))
+        accepted-files  nil #_(j/get dz-hook :acceptedFiles)]
     (letfn [(save-success [_] (when (j/get modal :current)
                                 ;;(set-open false)
                                 (set-state-text "Saving to server succeeded.")))

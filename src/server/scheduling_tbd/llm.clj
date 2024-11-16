@@ -3,22 +3,19 @@
    Functions with names beginning with a '$' are available to the user (e.g. $filter).
    Others (such as bi/key and bi/strcat) implement other parts of the expression language
    but are not available directly to the user except through the operators (e.g. the dot, and &
-   respectively for navigation to a property and concatenation).
-
-   N.B. LSP annotates many operators here as '0 references'; of course, they are used."
+   respectively for navigation to a property and concatenation)."
   (:require
    [clojure.datafy               :refer [datafy]]
    [clojure.edn                  :as edn]
+   [clojure.java.io              :as io]
    [clojure.spec.alpha           :as s]
    [datahike.api                 :as d]
    [scheduling-tbd.sutil         :refer [api-credentials default-llm-provider markdown2html connect-atm]]
    [scheduling-tbd.util          :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
-   [camel-snake-kebab.core       :as csk]
-   [clojure.pprint               :refer [cl-format]]
    [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
-   [taoensso.timbre              :as log]
+   [taoensso.telemere            :as tel :refer [log!]]
    [wkok.openai-clojure.api      :as openai]))
 
 (def ^:diag diag (atom nil))
@@ -29,15 +26,14 @@
 
 (def preferred-llms
   "These names (keywords) are the models we use, and the models we've been using lately."
-  {:openai {:gpt-3.5     "gpt-3.5-turbo-0125"
-            :gpt-4       "gpt-4-turbo-2024-04-09" ; "gpt-4o" "gpt-4o-2024-05-13" "gpt-4-0125-preview"
-            :davinci     "davinci-002"}
-   :azure {:gpt-3.5     "mygpt-35"
-            :gpt-4      "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
+  {:openai {:gpt         "gpt-4o-2024-08-06"
+            :analysis    "o1-preview"
+            :mini        "gpt-4o-mini"}
+   :azure  {:gpt         "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
 
 (defn pick-llm
   "Return a string recognizable by OpenAI naming a model of the class provide.
-   For example (pick-llm :gpt-4) --> 'gpt-4-0125-preview'."
+   For example (pick-llm :gpt) --> 'gpt-4-0125-preview'."
   ([k] (pick-llm k @default-llm-provider))
   ([k provider]
    (assert (contains? (get @llms-used provider) k))
@@ -50,10 +46,11 @@
 (defn query-llm
   "Given the vector of messages that is the argument, return a string (default)
    or Clojure map (:raw-string? = false) that is read from the string created by the LLM."
-  [messages & {:keys [model-class raw-text? llm-provider] :or {model-class :gpt-4 raw-text? true llm-provider @default-llm-provider}}]
+  [messages & {:keys [model-class raw-text? llm-provider response-format] :or {model-class :gpt raw-text? true llm-provider @default-llm-provider}}]
   (assert (every? #(s/valid? ::query-llm-msg %) messages))
-  (log/info "llm-provider = " llm-provider)
+  (log! :debug (str "llm-provider = " llm-provider))
   (let [res (-> (openai/create-chat-completion {:model (pick-llm model-class llm-provider)
+                                                :response_format response-format
                                                 :messages messages}
                                                (api-credentials llm-provider))
                 :choices
@@ -73,7 +70,7 @@
   [{:keys [client-id question]}]
   (assert (string? client-id))
   (assert (string? question))
-  (log/info "llm-directly:" question)
+  (log! :info (str "llm-directly: " question))
   (let [chat-args {:client-id client-id :dispatch-key :tbd-says :promise? false}]
     (try
       (let [res (-> (query-llm [{:role "system"    :content "You are a helpful assistant."}
@@ -82,55 +79,21 @@
         (if (nil? res)
           (throw (ex-info "Timeout or other exception." {}))
           (ws/send-to-chat (-> chat-args
-                               (assoc :msg res)
+                               (assoc :text res)
                                (assoc :time (now))))))
       (catch Exception e
-        (log/error "Failure in llm-directly:" e)
-        (ws/send-to-chat (assoc chat-args :msg "There was a problem answering that."))))))
-
-;;; ------------------------------- naming variables --------------------------------------
-(def good-var-partial
-    [{:role "system"    :content "You are a helpful assistant."}
-     {:role "user"      :content "Produce a Clojure map containing one key, :name, the value of which is a camelCase string used to name a programming variable and matching the requirements described in the text in square brackets."}
-
-     {:role "user"      :content "[less than 15 chars for how long a task will take]"}
-     {:role "assistant" :content "{:name \"taskDuration\"}"}
-
-     {:role "user"      :content "[less than 10 chars for the number of users]"}
-     {:role "assistant" :content "{:name \"numUsers\"}"}
-
-     {:role "user"      :content "[less than 10 chars for an array of tasks indexed by the resource doing the task and day in which it is doing it]"}
-     {:role "assistant" :content "{:name \"busyWith\"}"}
-
-     {:role "user"      :content "[less than 10 chars for an array of tasks indexed by the resource doing the task and day in which it is doing it]"}
-     {:role "assistant" :content "{:name \"resBusyWithOnDay\"}"}
-     {:role "user"      :content "WRONG: \"resBusyWithOnDay\" contains more contains 10 chars."}])
-
-(defn name-var
-  "Return a Clojure map {:name <some-string>} where <some-string> is a good name for a variable matching the requirements defined
-   by the clojure map provided.
-   The argument map has the following keys:
-     :purpose - describes how the variable will be used; this usually beings 'less than n chars for ....'.
-     :string-type - one of :camelCase, :kebab-case :snake_case,
-     :capitalize? - either true or false."
-  [{:keys [purpose string-type capitalize?] :or {string-type :camelCase}}]
-  (when purpose
-    (let [prompt (conj good-var-partial
-                       {:role "user"
-                        :content (cl-format nil "[~A]" purpose)})
-          res (query-llm prompt {:model-class :gpt-4 :raw-text? false})]
-      (if-let [var-name (:name res)]
-        (cond-> var-name
-          (= :kebab-case string-type) (csk/->kebab-case-string)
-          (= :snake-case string-type) (csk/->snake_case_string)
-          capitalize?                 (str/capitalize))
-        (throw (ex-info "No :name provided, or :name is not a string." {:res res}))))))
+        (log! :error (str "Failure in llm-directly: " e))
+        (ws/send-to-chat (assoc chat-args :text "There was a problem answering that."))))))
 
 (defn list-openai-models
   "List id and create date of all available models.
    BTW, if there is no internet connection, on startup, this will be the first complaint."
   []
-  (->> (openai/list-models (api-credentials :openai)) :data (sort-by :created) reverse))
+  (->> (openai/list-models (api-credentials :openai))
+       :data
+       (sort-by :created)
+       reverse
+       (mapv (fn [x] (update x :created #(-> % (* 1000) java.time.Instant/ofEpochMilli str))))))
 
 (defn list-azure-models
   "List id and create date of all available models.
@@ -156,12 +119,12 @@
       (throw (ex-info "No openai-model found for a required model type." {:models (:openai @llms-used)})))
     (doseq [[k mod] (-> @llms-used :openai)]
       (when (not= mod (-> preferred-llms :openai k))
-        (log/warn "Preferred model for" k "was not available. Chose" mod)))))
+        (log! :warn (str "Preferred model for" k "was not available. Chose " mod))))))
 
 (defn select-llm-models-azure
   "Since in Azure you have to create the model, this is just hard-coded."
   []
-  (swap! llms-used #(assoc % :azure {:gpt-3.5 "mygpt-35" :gpt-4 "mygpt-4"})))
+  (swap! llms-used #(assoc % :azure {:gpt-3.5 "mygpt-35" :gpt "mygpt-4"})))
 
 (defn select-llm-models!
   "Set the open-ai-models atom to models in each class"
@@ -178,22 +141,34 @@
      :name - a string, no default.
      :instructions - a string, the systems instructions; defaults to 'You are a helpful assistant.',
      :model - a string; defaults to whatever is the chosen 'gpt-4',
-     :tools - a vector containing maps; defaults to [{:type 'code_interpreter'}]."
-  [& {:keys [name model-class instructions tools metadata llm-provider]
-      :or {model-class :gpt-4
+     :tools - a vector containing maps, for example [{:type 'code_interpreter'}]."
+  [& {:keys [name model-class instructions tools tool-resources metadata llm-provider response-format]
+      :or {model-class :gpt
            llm-provider @default-llm-provider
-           metadata {}
-           tools [{:type "code_interpreter"}]} :as obj}]
+           metadata {:usage :stbd-agent}} :as obj}]
   (s/valid? ::assistant-args obj)
-  (openai/create-assistant {:name         name
-                            :model        (pick-llm model-class llm-provider)
-                            :metadata     metadata
-                            :instructions instructions
-                            :tools        tools} ; Will be good for csv and xslx, at least.
+  (openai/create-assistant {:name            name
+                            :model           (pick-llm model-class llm-provider)
+                            :response_format response-format
+                            :metadata        metadata
+                            :instructions    instructions
+                            :tools           tools
+                            :tool_resources  tool-resources}
                            (api-credentials llm-provider)))
 
+;;; Not clear that this does anything! See notes 2024-10-31.
+#_(defn update-assistant
+  "Update an assistant with a file for file-search."
+  [& {:keys [aid fids llm-provider] :or {llm-provider @default-llm-provider}}]
+  (assert (string? aid))
+  (assert (every? #(string? %) fids))
+  (reset! diag (openai/modify-assistant {:assistant_id aid :file_ids fids}
+                                        (api-credentials llm-provider))))
+
 (defn make-thread
-  [& {:keys [assistant-id metadata llm-provider] :or {metadata {} llm-provider @default-llm-provider}}]
+  [& {:keys [assistant-id metadata llm-provider] :or
+      {metadata {:usage :stbd-agent}
+       llm-provider @default-llm-provider}}]
   (openai/create-thread {:assistant_id assistant-id
                          :metadata metadata}
                         (api-credentials llm-provider)))
@@ -226,9 +201,12 @@
     role     - #{'user' 'assistant'},
     query-text - a string.
    Returns text but uses promesa internally to deal with errors."
-  [& {:keys [aid tid role query-text timeout-secs llm-provider]
-      :or {timeout-secs 60 role "user" llm-provider @default-llm-provider} :as _obj}] ; "user" when "assistant" is surrogate.
+  [aid tid role query-text timeout-secs llm-provider]
+  (assert (string? aid))
+  (assert (string? tid))
   (assert (#{"user" "assistant"} role))
+  (assert (number? timeout-secs))
+  (assert (keyword? llm-provider))
   (assert (and (string? query-text) (not-empty query-text)))
   (let [creds (api-credentials llm-provider)
         ;; Apparently the thread_id links the run to msg.
@@ -243,55 +221,45 @@
       (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
             msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data) ; ToDo: 20 is a guess.
             response (response-msg query-text msg-list)]
-        (cond (> now timeout)                        (do (log/warn "Timeout")
+        (cond (> now timeout)                        (do (log! :warn "Timeout")
                                                          (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text}))),
 
               (and (= "completed" (:status r))
                    (not-empty response))              (markdown2html response),
 
               (and (= "completed" (:status r))
-                   (empty? response))                 (do (log/warn "empty resposne")
+                   (empty? response))                 (do (log! :warn "empty response")
                                                           (throw (ex-info "query-on-thread empty response:" {:status (:status r)}))),
 
 
-              (#{"expired" "failed"} (:status r))     (do (log/warn "failed/expired last_error = " (:last_error r))
+              (#{"expired" "failed"} (:status r))     (do (log! :warn (str "failed/expired last_error = " (:last_error r)))
                                                           (throw (ex-info "query-on-thread failed:" {:status (:status r)}))),
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
-
-(defn assistant-on-provider?
-  "Retrieve the assistant object from OpenAI using its ID, a string you can
-   find on the list-assistants, or while logged into the OpenAI website."
-  [id & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
-  (openai/retrieve-assistant {:assistant_id id} (api-credentials llm-provider)))
-
-(def diag2 (atom nil))
 
 (defn query-on-thread
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
     :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
-  [& {:keys [aid llm-provider test-fn preprocess-fn]
+  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn]
       :or {test-fn (fn [_] true), preprocess-fn identity
-           llm-provider @default-llm-provider}
-      :as obj}]
+           llm-provider @default-llm-provider
+           timeout-secs 60
+           role "user"} :as obj}]
   (let [obj (cond-> obj ; All recursive calls will contains? :tries.
               (or (not (contains? obj :tries))
                   (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
     (assert (< (:tries obj) 10))
-    (try (assistant-on-provider? aid {:llm-provider llm-provider})
-         (catch Exception _e
-           (log/error "Assistant does not exist!:" aid)))
     (if (> (:tries obj) 0)
-      (try (let [raw (reset! diag (query-on-thread-aux obj))
+      (try (let [raw (reset! diag (query-on-thread-aux aid tid role query-text timeout-secs llm-provider))
                  res (preprocess-fn raw)]
              (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
            (catch Exception e
              (let [d-e (datafy e)]
-               (log/warn "query-on-thread failed (tries = " (:tries obj) "): "
-                         (or (:cause d-e) (-> d-e :via first :message))))
+               (log! :warn (str "query-on-thread failed (tries = " (:tries obj) "): "
+                                (or (:cause d-e) (-> d-e :via first :message)))))
              (query-on-thread (update obj :tries dec))))
-      (log/warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
+      (log! :warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
 
 (defn ^:diag list-thread-messages
   "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
@@ -307,12 +275,24 @@
         (map  (fn [m] (update m :created_at #(str (java.util.Date. (* 1000 %))))))
         (mapv (fn [m] (update m :role keyword))))))
 
+(defn ours?
+  "Returns true if assistant metadata :usage key indiciates it is ours."
+  [usage]
+  (#{"stbd-surrogate" "surrogate" "agent" "stbd-agent"} usage))
+
+;;; When you call list-assistants with :after or with :limit=1, you get an object with keys (:object :data :first_id :last_id :has_more)
+;;; :after takes the id of an assistant (a string).
 (defn list-assistants
-  "Return a vector of assistants. :limit (max number returned) default to 90."
-  [& {:keys [llm-provider limit] :or {llm-provider @default-llm-provider
-                                      limit 90}}]
-  (-> (openai/list-assistants {:limit limit} (api-credentials llm-provider))
-      :data))
+  "Return a vector of all assistants (their id) on the account that are related to this project (stbd).
+   The elements are sorted by creating timestamp, most recent first."
+  [& {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (let [creds (api-credentials llm-provider)]
+    (loop [ours []
+           response (openai/list-assistants {:limit 1} creds)]
+      (if (:has_more response)
+        (recur (into ours (->> response :data (filter #(-> % :metadata :usage ours?)) (map :id)))
+               (openai/list-assistants {:limit 99 :after (:last_id response)} creds)) ; 99 is max in openai.
+        (into ours (->> response :data (filter #(-> % :metadata :usage ours?)) (map :id)))))))
 
 (defn delete-assistant!
   "Delete the assistant having the given ID, a string."
@@ -322,20 +302,20 @@
 ;;; There is a function in db.clj that calls this with a selection-fn that avoids deleting surrogates used in projects.
 (defn ^:diag delete-surrogates!
   "Delete from the openai account all assistants that match the argument filter function.
-   The default selection-function checks for metadata :usage='surrogate'.
+   The default selection-function checks for metadata :usage='stbd-surrogate'.
    If, for example, you want to not delete surrogates that are used in projects, you will have to override this."
-  [& {:keys [selection-fn llm-provider] :or {selection-fn #(= "surrogate" (-> % :metadata (get :usage)))
+  [& {:keys [selection-fn llm-provider] :or {selection-fn #(= "stbd-surrogate" (-> % :metadata (get :usage)))
                                              llm-provider @default-llm-provider}}]
   (doseq [a (->> (list-assistants) (filterv selection-fn))]
-    (log/info "Deleting assistant" (:name a) (:id a))
+    (log! :info (str "Deleting assistant " (:name a) (:id a)))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))
 
 (defn ^:diag delete-agents!
   "Delete from the openai account all assistants that match the argument filter function.
-   The default function check for metadata :usage='surrogate'."
-  [{:keys [selection-fn llm-provider] :or {selection-fn #(= "agent" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
+   The default function check for metadata :usage='stbd-surrogate'."
+  [{:keys [selection-fn llm-provider] :or {selection-fn #(= "stbd-agent" (-> % :metadata (get :usage))) llm-provider @default-llm-provider}}]
   (doseq [a (->> (list-assistants)  (filterv selection-fn))]
-    (log/info "Deleting assistant" (:name a) (:id a))
+    (log! :info (str "Deleting assistant " (:name a) (:id a)))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))
 
 ;;; (ws/register-ws-dispatch  :run-long llm/run-long)
@@ -343,7 +323,7 @@
   "Diagnostic for exploring threading/blocking with websocket."
   [& _]
   (loop [cnt 0]
-    (log/info "Run-long: cnt =" cnt)
+    (log! :info (str "Run-long: cnt = " cnt))
     (Thread/sleep 5000) ; 5000 * 30, about 4 minutes.
     (when (< cnt 20) (recur (inc cnt)))))
 
@@ -351,39 +331,88 @@
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
 
-(defn known-agent?
-  "Return the set of known agents."
-  []
-  (-> (d/q '[:find [?id ...]
-             :where [_ :agent/id ?id]]
-           @(connect-atm :system))
-      set))
 
 (defn query-agent
   "Make a query to a named agent."
-  [agent-id query & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
-  (assert ((known-agent?) agent-id))
+  [base-type query & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
   (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
                                      :keys aid tid
-                                     :in $ ?agent-id
+                                     :in $ ?base-type ?provider
                                      :where
-                                     [?e :agent/id ?agent-id]
+                                     [?e :agent/base-type ?base-type]
+                                     [?e :agent/llm-provider ?provider]
                                      [?e :agent/assistant-id ?aid]
                                      [?e :agent/thread-id ?tid]]
                                    @(connect-atm :system)
-                                   agent-id)
+                                   base-type llm-provider)
                               first)]
     (if-not (and aid tid)
       (throw (ex-info "Could not find the agent requested. (Not created for this LLM provider?:" {:llm-provider llm-provider}))
       (let [result (-> (query-on-thread {:aid aid :tid tid :query-text query})
-                       (str/replace #"\s+" " "))
-            #_#_[success? useful] (re-matches #"```clojure(.*)```" result)
-            #_#_result (if success? useful result)]
+                       (str/replace #"\s+" " "))]
         (try (->> (edn/read-string result)
                   (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
              (catch Exception _e
-               (log/error "query-agent failed:" result)
+               (log! :error (str "query-agent failed: " result))
                nil))))))
+
+(defn immoderate?
+  "Return true if LLM flags text as immoderate."
+  [txt]
+  (-> (openai/create-moderation {:input txt}) :results first :flagged))
+
+;;; --------------------------------- Files -------------------------------
+(defn upload-file
+  "Upload a file and get back a file id response."
+  [& {:keys [fname purpose llm-provider]
+      :or {purpose "assistants"
+           llm-provider @default-llm-provider}}]
+  (openai/create-file {:purpose purpose
+                       :file (io/file fname)}
+                      (api-credentials llm-provider)))
+
+(defn ^:diag delete-file
+  [& {:keys [file-id llm-provider]
+      :or {llm-provider @default-llm-provider}}]
+  (assert (string? file-id))
+  (openai/delete-file {:file-id file-id} (api-credentials llm-provider)))
+
+;;; --------------------------------- Vector stores -------------------------------
+(defn make-vector-store
+  [& {:keys [name file-ids metadata llm-provider]
+      :or {llm-provider @default-llm-provider
+           name "STBD agent vector store"
+           metadata {:usage :stbd-agent}}}]
+  (openai/create-vector-store
+   {:name name :file_ids file-ids :metadata metadata}
+   (api-credentials llm-provider)))
+
+(defn list-vector-stores
+  [& {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (let [creds (api-credentials llm-provider)]
+    (loop [ours []
+           response (openai/list-vector-stores {:limit 1} creds)]
+      (if (:has_more response)
+        (recur (into ours (->> response :data (filter #(-> % :metadata :usage ours?)) (map :id)))
+               (openai/list-vector-stores {:limit 99 :after (:last_id response)} creds)) ; 99 is max in openai.
+        (into ours (->> response :data (filter #(-> % :metadata :usage ours?)) (map :id)))))))
+
+(defn modify-vector-store
+  [& {:keys [vector-store-id name llm-provider] :or {llm-provider @default-llm-provider}}]
+  (openai/modify-vector-store {:vector_store_id vector-store-id :name name}
+                              (api-credentials llm-provider)))
+
+;;; Calls to openai/retieve-vector-store raises an error "Could not find route :retrieve-vector-store"openai/retrieve-vector-store
+;;; Instead of calling openai/retieve-vector-store, I think you can call modify-vector-store with params specifying just :vector_store_id.
+(defn retrieve-vector-store
+  [& {:keys [vector-store-id llm-provider] :or {llm-provider @default-llm-provider}}]
+  (modify-vector-store {:vector-store-id vector-store-id :llm-provider llm-provider}))
+
+
+(defn delete-vector-store
+  [& {:keys [vector-store-id llm-provider] :or {llm-provider @default-llm-provider}}]
+  (openai/delete-vector-store {:vector_store_id vector-store-id}
+                              (api-credentials llm-provider)))
 
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []
