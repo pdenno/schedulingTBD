@@ -15,7 +15,7 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.llm   :as llm]
    [scheduling-tbd.specs :as spec]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id default-llm-provider]]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema db-cfg-map default-llm-provider register-db resolve-db-id starting-new-project?]]
    [scheduling-tbd.util  :as util :refer [now]]
    [taoensso.telemere    :refer [log!]]))
 
@@ -129,12 +129,12 @@
         :doc "a number [0,1] expressing how strongly we believe the proposition ."}
 
    ;; ---------------------- conversation
+   :conversation/done?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "true if we don't have more to add (though user might)."}
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resource}."}
-   :conversation/state-vector
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "keywords indicating the state of the conversation (i.e. what has been discussed."}
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages of the conversation."}
@@ -412,6 +412,7 @@
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
 (def db-schema-proj (datahike-schema db-schema-proj+))
+(def project-schema-key? (-> db-schema-proj+ keys set))
 
 ;;; ---------------------------------- agents ----------------------------------------------
 (s/def ::agent-args (s/keys :req-un [::base-type ::instructions]
@@ -468,6 +469,10 @@
    {:id :answers-the-question?
     :instruction-path "data/instructions/answers-the-question.txt"
     :response-format (-> "data/instructions/boolean-response-format.edn" slurp edn/read-string)}
+
+   {:id :scheduling-challenges-agent
+    :instruction-path "data/instructions/scheduling-challenges.txt"
+    :response-format (-> "data/instructions/scheduling-challenges-response-format.edn" slurp edn/read-string)}
 
    {:id :process-dur-agent
     :instruction-path "data/instructions/process-dur-agent.txt"}
@@ -618,9 +623,9 @@
 
 (defn get-claims
   "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none.
-   Returns #{} if pid is :START-A-NEW-PROJECT."
+   Returns '#{(project-id :START-A-NEW-PROJECT)} if starting-new-project."
   [pid]
-  (if (= pid :START-A-NEW-PROJECT)
+  (if (starting-new-project? pid)
     '#{(project-id :START-A-NEW-PROJECT)} ; Special treatment for new projects.
     (if-let [facts (d/q '[:find [?s ...]
                           :where
@@ -630,7 +635,7 @@
       (-> (mapv edn/read-string facts) set)
       #{})))
 
-(defn add-claim
+(defn add-claim!
   "Add the argument vector of ground proposition to state, a set. Returns true."
   [pid claim]
   (assert (s/valid? ::spec/proposition claim))
@@ -660,19 +665,28 @@
         eid (project-exists? pid)]
     (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
 
+(defn clean-project-for-schema
+  "Remove attributes that are no longer in the schema."
+  [proj]
+  (letfn [(cpfs [x]
+            (cond (map? x)      (reduce-kv (fn [m k v]
+                                             (if (project-schema-key? k)
+                                               (assoc m k (cpfs v))
+                                               (do (log! :warn (str "Dropping obsolete attr: " k)) m)))
+                                           {} x)
+                  (vector? x)   (mapv cpfs x)
+                  :else         x))]
+    (cpfs proj)))
+
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
-  [id & {:keys [target-dir] :or {target-dir "data/projects/"}}]
-  (let [conn-atm (connect-atm id)
-        filename (str target-dir (name id) ".edn")
+  [id & {:keys [target-dir clean?] :or {target-dir "data/projects/" clean? true}}]
+  (let [filename (str target-dir (name id) ".edn")
+        proj (cond-> (get-project id)
+               clean? clean-project-for-schema)
         s (with-out-str
             (println "[")
-            (doseq [ent-id  (sutil/root-entities conn-atm)]
-              (let [obj (resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
-                ;; Write content except schema elements and transaction markers.
-                (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
-                  (pprint obj)
-                  (println))))
+            (pprint proj)
             (println "]"))]
     (log! :info (str "Writing project to " filename))
     (spit filename s)))
@@ -954,6 +968,40 @@
     (when ent
       (let [a-map (dp/pull conn '[*] ent)]
         (if db-attrs? a-map (agent-info a-map))))))
+
+(defn assert-conversation-done!
+  "Set the conversation's :converation/done? attribute to true."
+  [pid cid]
+  (if-let [eid (conversation-exists? pid cid)]
+    (d/transact (connect-atm pid) {:tx-data [[:db/add eid :conversation/done? true]]})
+    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
+
+(defn ^:diag retract-conversation-done!
+  [pid cid]
+  (if-let [eid (conversation-exists? pid cid)]
+    (d/transact (connect-atm pid) {:tx-data [[:db/add eid :conversation/done? false]]})
+    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
+
+(defn conversation-done?
+  "Returns true if the conversation is completed, as far as the interviewer is concerned."
+  [pid cid]
+  (if-let [eid (conversation-exists? pid cid)]
+    (d/q '[:find ?done .
+           :in $ ?eid
+           :where [?eid :conversation/done? ?done]]
+         @(connect-atm pid) eid)
+    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
+
+(defn ^:diag update-project-for-schema!
+  "This has the ADDITIONAL side-effect of writing a backup file."
+  [pid]
+  (backup-proj-db pid)
+  (recreate-project-db! pid))
+
+(defn ^:diag update-all-projects-for-schema!
+  []
+  (doseq [p (list-projects)]
+    (update-project-for-schema! p)))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs

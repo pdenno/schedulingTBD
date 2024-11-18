@@ -1,260 +1,358 @@
-[#:project{:conversations
-           [#:conversation{:id :data}
-            #:conversation{:id :resource}
-            #:conversation{:id :process,
-                           :messages
-                           [#:message{:content
-                                      "Describe your most significant scheduling problem in a few sentences.",
-                                      :from :system,
-                                      :id 1,
-                                      :tags [:initial-question :query],
-                                      :time
-                                      #inst "2024-05-13T20:23:43.444-00:00",
-                                      :question-name :initial-question}
-                            #:message{:content
-                                      "Our most significant scheduling problem involves efficiently managing the production batches for various beer types to meet fluctuating demand while minimizing downtime and waste. This complexity is heightened by factors like fermentation and conditioning times varying by beer type, availability of ingredients, and limitations in production capacity (e.g., fermenter availability). We need to pivot quickly based on changes in demand and resource availability, aiming to optimize production runs, reduce inventory costs, and ensure timely delivery to customers. Balancing these elements to maintain a smooth and cost-effective operation is our core scheduling challenge.",
-                                      :from :surrogate,
-                                      :id 2,
-                                      :tags
-                                      [:initial-question :response],
-                                      :time
-                                      #inst "2024-05-13T20:23:43.489-00:00",
-                                      :question-name :initial-question}
-                            #:message{:content
-                                      "Great, we'll call your project Sur Craft Beer.",
-                                      :from :system,
-                                      :id 3,
-                                      :tags [:informative],
-                                      :time
-                                      #inst "2024-05-13T20:23:44.402-00:00"}
-                            #:message{:content
-                                      "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
-                                      :from :system,
-                                      :id 4,
-                                      :time
-                                      #inst "2024-05-13T20:23:44.417-00:00"}
-                            #:message{:content
-                                      "Please briefly describe your production processes.",
-                                      :from :system,
-                                      :id 5,
-                                      :time
-                                      #inst "2024-05-13T20:23:57.184-00:00"}
-                            #:message{:content
-                                      "Our production process involves several key stages:\n\n1. <b>Milling</b>: The first step is milling, where grains are crushed to break apart the kernels and make the starches accessible to the enzymes during mashing.\n\n2. <b>Mashing</b>: In the mash tun, the crushed grains are mixed with hot water, which activates enzymes to convert starches into fermentable sugars. This process creates a sugary liquid called wort.\n\n3. <b>Lautering</b>: The wort is then separated from the solid grain husks in the lauter tun. The liquid is collected, and the remaining grains are rinsed to extract as much fermentable liquid as possible.\n\n4. <b>Boiling</b>: The wort is boiled and hops are added for bitterness, flavor, and aroma. Boiling also sterilizes the wort and precipitates proteins.\n\n5. <b>Cooling</b>: After boiling, the wort is cooled rapidly to a temperature suitable for yeast addition. This is critical to prevent unwanted microbial growth.\n\n6. <b>Fermentation</b>: The cooled wort is transferred to a fermenter, where yeast is added. The yeast ferments the sugars, producing alcohol and carbon dioxide. This stage can vary in length depending on the beer type.\n\n7. <b>Conditioning</b>: After fermentation, the beer is conditioned to develop its full flavor profile. This can occur in the same vessel or in a separate tank.\n\n8. <b>Packaging</b>: Finally, the beer is filtered (if needed) and packaged into cans, bottles, or kegs for distribution.\n\nEach step has its own specific time requirements and resource needs (equipment, ingredients), making scheduling and batch management a complex process to ensure efficient production flow.",
-                                      :from :surrogate,
-                                      :id 6,
-                                      :tags [:process-description],
-                                      :time
-                                      #inst "2024-05-13T20:23:57.204-00:00"}
-                            #:message{:content
-                                      "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
-                                      :from :system,
-                                      :id 7,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-05-13T20:24:00.237-00:00"}
-                            #:message{:content "PRODUCT",
-                                      :from :surrogate,
-                                      :id 8,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-05-13T20:24:00.256-00:00"}
-                            #:message{:content
-                                      "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
-                                      :from :system,
-                                      :id 9,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-05-13T20:24:03.618-00:00"}
-                            #:message{:content "MAKE-TO-STOCK",
-                                      :from :surrogate,
-                                      :id 10,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-05-13T20:24:03.667-00:00"}
-                            #:message{:content
-                                      "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
-                                      :from :system,
-                                      :id 11,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-05-13T20:24:06.891-00:00"}
-                            #:message{:content "OUR-FACILITY",
-                                      :from :surrogate,
-                                      :id 12,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-05-13T20:24:06.941-00:00"}
-                            #:message{:content
-                                      "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
-                                      :from :system,
-                                      :id 13,
-                                      :time
-                                      #inst "2024-05-13T20:24:09.370-00:00"}
-                            #:message{:content "FLOW-SHOP",
-                                      :from :surrogate,
-                                      :id 14,
-                                      :time
-                                      #inst "2024-05-13T20:24:09.419-00:00"}
-                            #:message{:content
-                                      "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
-                                      :from :system,
-                                      :id 15,
-                                      :tags [:process-steps :query],
-                                      :time
-                                      #inst "2024-05-13T20:24:14.902-00:00",
-                                      :question-name :process-steps}
-                            #:message{:content
-                                      "1. Milling\n2. Mashing\n3. Lautering\n4. Boiling\n5. Cooling\n6. Fermentation\n7. Conditioning\n8. Packaging",
-                                      :from :surrogate,
-                                      :id 16,
-                                      :tags [:process-steps :response],
-                                      :time
-                                      #inst "2024-05-13T20:24:14.927-00:00",
-                                      :question-name :process-steps}
-                            #:message{:content
-                                      "Okay, we now know enough to get started on a MiniZinc solution.\nIn the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>.\nThe 'enum values' name the steps of your process in the order they are executed for each product.",
-                                      :from :system,
-                                      :id 17,
-                                      :tags [:info-to-user :minizinc],
-                                      :time
-                                      #inst "2024-05-13T20:24:14.991-00:00"}
-                            #:message{:content
-                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. milling (some amount of time)\n2. mashing (some amount of time)...",
-                                      :from :system,
-                                      :id 18,
-                                      :tags [:process-durs :query],
-                                      :time
-                                      #inst "2024-05-22T20:01:15.895-00:00"}
-                            #:message{:content
-                                      "1. Milling (1-2 hours)\n2. Mashing (1-2 hours)\n3. Lautering (1-2 hours)\n4. Boiling (1 hour)\n5. Cooling (1 hour)\n6. Fermentation (1-3 weeks)\n7. Conditioning (1-2 weeks)\n8. Packaging (1-2 hours)",
-                                      :from :surrogate,
-                                      :id 19,
-                                      :tags [:process-durs :response],
-                                      :time
-                                      #inst "2024-05-22T20:01:15.913-00:00"}]}],
-           :code
-           " int : nProducts = 5;\n set of int: Product = 1..nProducts;\n set of int: Day = -36..365;\n enum Task = {mill, ferment, bright};\n array [Product, Task] of int: taskDuration = [|1, 20, 20 |   % processing times for\n                                                1, 20, 20 |   % various beers, perhaps\n                                                1, 30, 11 |   % from a screenshot of a\n                                                1, 21, 11 |   % of spreadsheet the\n                                                1, 18, 19 |]; % user provided.\n\n array [Product] of Day: neededDate = [50, 80, 130, 140, 150];\n\n % We assume a task uses one major resource; resources are synonymous with tasks.\n array [Product, Task] of var Day: taskStarts; % 'var' means it is a decision variable.\n array [Product, Task] of var Day: taskEnds;\n\n % We'll use this below to ensure a resource can only be used by one product at a time.\n array [Task, Day] of var Product: busyWith;\n\n % The first two Product are already in the fermentation tank and bright tank respectively.\n constraint taskStarts[1,mill] = -35;   % Product 1 is therefore in the bright tank...\n constraint taskStarts[2,mill] = -5;    % ...and out before this one moves there.\n\n % Next task must start right after previous task ends. No place to put WIP.\n constraint forall (p in Product) (taskEnds[p, mill   ] + 1 == taskStarts[p, ferment]);\n constraint forall (p in Product) (taskEnds[p, ferment] + 1 == taskStarts[p, bright]);\n\n % A task ends taskDuration days after it starts.\n constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n % A resource(task) can only be used with one product at a time.\n constraint forall (t in Task, p in Product, d in Day where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])\n                    (busyWith[t,d] == p);\n\n % Aim to have it done when it is needed.\n solve minimize sum (p in Product) (abs(neededDate[p] - taskEnds[p,bright]));",
-           :processes
-           [#:process{:desc
-                      "1. Milling (1-2 hours)\n2. Mashing (1-2 hours)\n3. Lautering (1-2 hours)\n4. Boiling (1 hour)\n5. Cooling (1 hour)\n6. Fermentation (1-3 weeks)\n7. Conditioning (1-2 weeks)\n8. Packaging (1-2 hours)",
+[
+#:project{:conversations
+          [#:conversation{:done? true,
+                          :id :process,
+                          :messages
+                          [#:message{:content
+                                     "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 1,
+                                     :question-type :warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:13:14.424-00:00"}
+                           #:message{:content
+                                     "We produce various craft beers, including IPAs, stouts, lagers, and seasonal specialties. Our main scheduling challenge involves coordinating production cycles to ensure consistent inventory match with market demand, accommodating limited fermentation and storage capacity, and managing the supply chain of raw ingredients. Additionally, scheduling can be complex due to varying fermentation times for different beer types and the need to minimize downtime of brewing equipment.",
+                                     :from :surrogate,
+                                     :id 2,
+                                     :question-type :warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:13:14.446-00:00"}
+                           #:message{:content
+                                     "Great, we'll call your project SUR Craft Beer.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags
+                                     [:!describe-challenge
+                                      :informative],
+                                     :time
+                                     #inst "2024-11-18T13:13:43.313-00:00"}
+                           #:message{:content
+                                     "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
+                                     :from :system,
+                                     :id 4,
+                                     :question-type :work-type,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:14:35.500-00:00"}
+                           #:message{:content "PRODUCT",
+                                     :from :surrogate,
+                                     :id 5,
+                                     :question-type :work-type,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:14:35.528-00:00"}
+                           #:message{:content
+                                     "Some work is performed in your own facility, some, like cutting down trees, has to be performed at the customer's site. Which is most common in your work? Respond with the single word OUR-FACILITY, CUSTOMER-SITE, or if it isn't straightforward, an explanation.",
+                                     :from :system,
+                                     :id 6,
+                                     :question-type
+                                     :production-location,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:15:28.246-00:00"}
+                           #:message{:content "OUR-FACILITY",
+                                     :from :surrogate,
+                                     :id 7,
+                                     :question-type
+                                     :production-location,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:15:28.277-00:00"}
+                           #:message{:content
+                                     "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
+                                     :from :system,
+                                     :id 8,
+                                     :question-type
+                                     :production-motivation,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:16:33.163-00:00"}
+                           #:message{:content "MAKE-TO-STOCK",
+                                     :from :surrogate,
+                                     :id 9,
+                                     :question-type
+                                     :production-motivation,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:16:33.187-00:00"}
+                           #:message{:content
+                                     "There are a few common patterns or system designs by which product is made. In a FLOW-SHOP, all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
+                                     :from :system,
+                                     :id 10,
+                                     :question-type
+                                     :production-system-type,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:17:22.725-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 11,
+                                     :question-type
+                                     :production-system-type,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:17:22.753-00:00"}
+                           #:message{:content
+                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
+                                     :from :system,
+                                     :id 12,
+                                     :question-type :process-steps,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:18:17.914-00:00"}
+                           #:message{:content
+                                     "1. Milling Grains\n2. Mashing\n3. Lautering\n4. Boiling\n5. Fermentation\n6. Conditioning\n7. Filtering\n8. Carbonation\n9. Bottling/Canning\n10. Packaging",
+                                     :from :surrogate,
+                                     :id 13,
+                                     :question-type :process-steps,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:18:17.937-00:00"}
+                           #:message{:content
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
+                                     :from :system,
+                                     :id 14,
+                                     :question-type :process-durations,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:19:17.936-00:00"}
+                           #:message{:content
+                                     "1. Milling Grains (1 hour)\n2. Mashing (1.5 hours)\n3. Lautering (1 hour)\n4. Boiling (1 hour)\n5. Fermentation (7 to 14 days)\n6. Conditioning (2 to 3 days)\n7. Filtering (2 to 4 hours)\n8. Carbonation (1 day)\n9. Bottling/Canning (2 to 4 hours)\n10. Packaging (2 to 4 hours)",
+                                     :from :surrogate,
+                                     :id 15,
+                                     :question-type :process-durations,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:19:17.969-00:00"}
+                           #:message{:content
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
+                                     :from :system,
+                                     :id 16,
+                                     :tags [:info-to-user :minizinc],
+                                     :time
+                                     #inst "2024-11-18T13:21:46.585-00:00"}
+                           #:message{:content
+                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just '1000 packages'. If however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling (2000 packages)\n 3. Bake Wafers (1000 packages)\n 4. Assemble Cookies (1000 packages)\n 5. Package (1000 packages)",
+                                     :from :system,
+                                     :id 17,
+                                     :question-type :batch-size,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:22:19.696-00:00"}
+                           #:message{:content
+                                     "1. Milling Grains (500 gallons)\n2. Mashing (500 gallons)\n3. Lautering (500 gallons)\n4. Boiling (500 gallons)\n5. Fermentation (500 gallons)\n6. Conditioning (500 gallons)\n7. Filtering (500 gallons)\n8. Carbonation (500 gallons)\n9. Bottling/Canning (500 gallons, typically yielding around 4000 to 4500 standard-sized bottles/cans)\n10. Packaging (4000 to 4500 units)",
+                                     :from :surrogate,
+                                     :id 18,
+                                     :question-type :batch-size,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:22:19.729-00:00"}
+                           #:message{:content
+                                     "Earlier, you listed the process steps typically used in making product (e.g. 1. Milling Grains, 2. Mashing, etc.) and for each you specified typical durations. Now we'd like you to tell us what raw materials and intermediate product go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n2. Make Filling (sugar, water vanilla flavoring)\n3. Bake Wafers (use dough from Make Cookie Dough)\n4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n5. Package (use cookies from Assemble Cookies)",
+                                     :from :system,
+                                     :id 19,
+                                     :question-type :process-ordering,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-18T13:22:57.681-00:00"}
+                           #:message{:content
+                                     "1. Milling Grains (barley, wheat, malt)\n2. Mashing (milled grains from Milling Grains, water)\n3. Lautering (mash from Mashing)\n4. Boiling (wort from Lautering, hops, any additional flavorings or adjuncts as needed)\n5. Fermentation (boiled wort from Boiling, yeast)\n6. Conditioning (beer from Fermentation)\n7. Filtering (conditioned beer from Conditioning)\n8. Carbonation (filtered beer from Filtering, CO2 if force carbonated)\n9. Bottling/Canning (carbonated beer from Carbonation, bottles/cans, caps)\n10. Packaging (bottled/canned beer from Bottling/Canning, packaging materials like boxes or cases)",
+                                     :from :surrogate,
+                                     :id 20,
+                                     :question-type :process-ordering,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-18T13:22:57.776-00:00"}]}
+           #:conversation{:id :data}
+           #:conversation{:id :resource}],
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {millGrains, mashing, lautering, boiling, fermentation, conditioning, filtering, carbonation, bottlingCanning, packaging};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|1.000, 1.500, 1.000, 1.000, 252.000, 60.000, 3.000, 24.000, 3.000, 3.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, millGrains] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, millGrains] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, millGrains] == taskStarts[p, mashing]);\nconstraint forall (p in Product) (taskEnds[p, mashing] == taskStarts[p, lautering]);\nconstraint forall (p in Product) (taskEnds[p, lautering] == taskStarts[p, boiling]);\nconstraint forall (p in Product) (taskEnds[p, boiling] == taskStarts[p, fermentation]);\nconstraint forall (p in Product) (taskEnds[p, fermentation] == taskStarts[p, conditioning]);\nconstraint forall (p in Product) (taskEnds[p, conditioning] == taskStarts[p, filtering]);\nconstraint forall (p in Product) (taskEnds[p, filtering] == taskStarts[p, carbonation]);\nconstraint forall (p in Product) (taskEnds[p, carbonation] == taskStarts[p, bottlingCanning]);\nconstraint forall (p in Product) (taskEnds[p, bottlingCanning] == taskStarts[p, packaging]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packaging]);",
+          :agents
+          [#:agent{:assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
+                   :base-type :process-interview-agent,
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_S6odTkFTcgXrV1nwxy2iNPpw"}
+           #:agent{:thread-id "thread_ckkyqEM8RslQgkFUBdRKFFp5"}],
+          :processes
+          [#:process{:id :sur-craft-beer,
+                     :interview-class :initial-unordered,
+                     :sub-processes
+                     [#:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-craft-beer--initial-unordered--millGrains,
+                                :name "Milling Grains",
+                                :step-number 1,
+                                :var-name "millGrains"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1.5"},
+                                :id
+                                :sur-craft-beer--initial-unordered--mashing,
+                                :name "Mashing",
+                                :step-number 2,
+                                :var-name "mashing"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-craft-beer--initial-unordered--lautering,
+                                :name "Lautering",
+                                :step-number 3,
+                                :var-name "lautering"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-craft-beer--initial-unordered--boiling,
+                                :name "Boiling",
+                                :step-number 4,
+                                :var-name "boiling"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :days,
+                                                            :value-string
+                                                            "14"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :days,
+                                                            :value-string
+                                                            "7"}},
+                                :id
+                                :sur-craft-beer--initial-unordered--fermentation,
+                                :name "Fermentation",
+                                :step-number 5,
+                                :var-name "fermentation"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :days,
+                                                            :value-string
+                                                            "3"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :days,
+                                                            :value-string
+                                                            "2"}},
+                                :id
+                                :sur-craft-beer--initial-unordered--conditioning,
+                                :name "Conditioning",
+                                :step-number 6,
+                                :var-name "conditioning"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "4"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "2"}},
+                                :id
+                                :sur-craft-beer--initial-unordered--filtering,
+                                :name "Filtering",
+                                :step-number 7,
+                                :var-name "filtering"}
+                      #:process{:duration
+                                #:quantity{:units :days,
+                                           :value-string "1"},
+                                :id
+                                :sur-craft-beer--initial-unordered--carbonation,
+                                :name "Carbonation",
+                                :step-number 8,
+                                :var-name "carbonation"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "4"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "2"}},
+                                :id
+                                :sur-craft-beer--initial-unordered--bottlingCanning,
+                                :name "Bottling/Canning",
+                                :step-number 9,
+                                :var-name "bottlingCanning"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "4"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "2"}},
+                                :id
+                                :sur-craft-beer--initial-unordered--packaging,
+                                :name "Packaging",
+                                :step-number 10,
+                                :var-name "packaging"}]}],
+          :current-conversation :process,
+          :claims
+          [#:claim{:string "(project-id :sur-craft-beer)"}
+           #:claim{:string
+                   "(project-name :sur-craft-beer \"SUR Craft Beer\")"}
+           #:claim{:string "(surrogate :sur-craft-beer)"}
+           #:claim{:string
+                   "(scheduling-challenge :sur-craft-beer :demand-uncertainty)"}
+           #:claim{:string
+                   "(scheduling-challenge :sur-craft-beer :raw-material-uncertainty)"}
+           #:claim{:string
+                   "(scheduling-challenge :sur-craft-beer :bottleneck-processes)"}
+           #:claim{:string
+                   "(scheduling-challenge :sur-craft-beer :process-variation)"}
+           #:claim{:string
+                   "(scheduling-challenge :sur-craft-beer :product-variation)"}
+           #:claim{:string
+                   "(scheduling-challenge :sur-craft-beer :equipment-utilization)"}
+           #:claim{:string "(provides-product :sur-craft-beer)"}
+           #:claim{:string
+                   "(production-location :sur-craft-beer factory)"}
+           #:claim{:string
+                   "(production-mode :sur-craft-beer make-to-stock)"}
+           #:claim{:string "(flow-shop :sur-craft-beer)"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 1 \"Milling Grains\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 2 \"Mashing\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 3 \"Lautering\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 4 \"Boiling\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 5 \"Fermentation\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 6 \"Conditioning\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 7 \"Filtering\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 8 \"Carbonation\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 9 \"Bottling\")"}
+           #:claim{:string
+                   "(process-step :sur-craft-beer 10 \"Packaging\")"}
+           #:claim{:string "(have-process-durs :sur-craft-beer)"}],
+          :name "SUR Craft Beer",
+          :surrogate
+          #:surrogate{:assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",
                       :id :sur-craft-beer,
-                      :sub-processes
-                      [#:process{:duration
-                                 #:quantity-range{:high
-                                                  #:quantity{:units
-                                                             :hours,
-                                                             :value-string
-                                                             "2"},
-                                                  :low
-                                                  #:quantity{:units
-                                                             :hours,
-                                                             :value-string
-                                                             "1"}},
-                                 :id :sur-craft-beer--milling,
-                                 :var-name "milling"}
-                       #:process{:duration
-                                 #:quantity-range{:high
-                                                  #:quantity{:units
-                                                             :hours,
-                                                             :value-string
-                                                             "2"},
-                                                  :low
-                                                  #:quantity{:units
-                                                             :hours,
-                                                             :value-string
-                                                             "1"}},
-                                 :id :sur-craft-beer--mashing,
-                                 :pre-processes
-                                 [:sur-craft-beer--milling],
-                                 :var-name "mashing"}
-                       #:process{:duration
-                                 #:quantity-range{:high
-                                                  #:quantity{:units
-                                                             :hours,
-                                                             :value-string
-                                                             "2"},
-                                                  :low
-                                                  #:quantity{:units
-                                                             :hours,
-                                                             :value-string
-                                                             "1"}},
-                                 :id :sur-craft-beer--lautering,
-                                 :pre-processes
-                                 [:sur-craft-beer--mashing],
-                                 :var-name "lautering"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "1"},
-                                 :id :sur-craft-beer--boiling,
-                                 :pre-processes
-                                 [:sur-craft-beer--lautering],
-                                 :var-name "boiling"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "1"},
-                                 :id :sur-craft-beer--cooling,
-                                 :pre-processes
-                                 [:sur-craft-beer--boiling],
-                                 :var-name "cooling"}
-                       #:process{:duration
-                                 #:quantity-range{:high
-                                                  #:quantity{:units
-                                                             :weeks,
-                                                             :value-string
-                                                             "3"},
-                                                  :low
-                                                  #:quantity{:units
-                                                             :weeks,
-                                                             :value-string
-                                                             "1"}},
-                                 :id :sur-craft-beer--fermentation,
-                                 :pre-processes
-                                 [:sur-craft-beer--cooling],
-                                 :var-name "fermentation"}
-                       #:process{:duration
-                                 #:quantity-range{:high
-                                                  #:quantity{:units
-                                                             :weeks,
-                                                             :value-string
-                                                             "2"},
-                                                  :low
-                                                  #:quantity{:units
-                                                             :weeks,
-                                                             :value-string
-                                                             "1"}},
-                                 :id :sur-craft-beer--conditioning,
-                                 :pre-processes
-                                 [:sur-craft-beer--fermentation],
-                                 :var-name "conditioning"}
-                       #:process{:duration
-                                 #:quantity-range{:high
-                                                  #:quantity{:units
-                                                             :hours,
-                                                             :value-string
-                                                             "2"},
-                                                  :low
-                                                  #:quantity{:units
-                                                             :hours,
-                                                             :value-string
-                                                             "1"}},
-                                 :id :sur-craft-beer--packaging,
-                                 :pre-processes
-                                 [:sur-craft-beer--conditioning],
-                                 :var-name "packaging"}]}],
-           :current-conversation :process,
-           :planning-problem
-           #:problem{:domain :process-interview,
-                     :goal-string
-                     "(characterize-process sur-craft-beer)",
-                     :state-string
-                     "#{(process-step sur-craft-beer 6 fermentation) (provides-product sur-craft-beer) (surrogate sur-craft-beer) (process-step sur-craft-beer 3 lautering) (proj-id sur-craft-beer) (process-step sur-craft-beer 8 packaging) (production-mode sur-craft-beer make-to-stock) (process-step sur-craft-beer 7 conditioning) (process-step sur-craft-beer 1 milling) (process-step sur-craft-beer 4 boiling) (proj-name \"Sur Craft Beer\") (flow-shop sur-craft-beer) (have-process-steps sur-craft-beer) (process-step sur-craft-beer 2 mashing) (extreme-duration-span sur-craft-beer hours weeks) (process-step sur-craft-beer 5 cooling) (has-production-facility sur-craft-beer) (cites-raw-material-challenge sur-craft-beer) (ongoing-discussion sur-craft-beer) (have-process-durs sur-craft-beer)}"},
-           :name "SUR Craft Beer",
-           :surrogate
-           #:surrogate{:assistant-id "asst_hweCfQ6arHNK4R60RkvGYnnI",
-                       :id :sur-craft-beer,
-                       :subject-of-expertise "sur craft beer",
-                       :system-instruction
-                       "You manage a company that makes sur craft beer.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                       :thread-id "thread_TCuUEVyi1bvY45iQDkldqHQk"},
-           :id :sur-craft-beer}]
+                      :subject-of-expertise "craft beer",
+                      :system-instruction
+                      "You manage a company that makes craft beer.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av"},
+          :id :sur-craft-beer}
+]

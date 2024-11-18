@@ -61,19 +61,16 @@
 ;; THIS is 2 (the other namespace I am hanging out in recently).
 ;;; Remember to db/backup-system-db once you get things straight.
 
-(defn ^:diag recreate-interview-agent!
+;;; (invt/recreate-agent! :process-interview-agent)
+;;; (invt/recreate-agent! :scheduling-challenges-agent)
+(defn ^:diag recreate-agent!
   "This is used to experiment with different LLMs and value of flow-charts.
    Use, for example process-read-the-flowchart.txt rather than the full instructions."
-  []
-  (db/recreate-system-agents!
-   [{:id :process-interview-agent
-     :project-thread?  true
-     :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
-     :tools [{:type "file_search"}]
-     :vector-store-files ["data/instructions/interviewers/process-interview-flowchart.pdf"]
-     :instruction-path "data/instructions/interviewers/process.txt" #_"data/instructions/interviewers/process-read-the-flowchart.txt"
-     ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
-     #_#_:response-format (-> "data/instructions/interviewers/response-format.edn" slurp edn/read-string)}]))
+  ([] (recreate-agent! :production-challenges-agent))
+  ([id]
+   (if-let [info (some #(when (= (:id %) id) %) db/known-agent-info)]
+     (db/recreate-system-agents! [info])
+     (log! :error (str "No such agent: " id)))))
 
 ;;; Used to query the flowchart using the process-interview-agent.
 (defonce process-interview-system-agent (atom {}))
@@ -281,3 +278,10 @@
   {:answer
    "1. Mix Ingredients (milk, cream, sugar, stabilizers, emulsifiers)\n2. Pasteurize Mixture (use mixture from Mix Ingredients)\n3. Homogenize Mixture (use mixture from Pasteurize Mixture)\n4. Age Mixture (use mixture from Homogenize Mixture)\n5. Add Flavors and Inclusions (use aged mixture, flavorings, inclusions such as fruits, nuts, chocolate chips)\n6. Freeze Mixture (use flavored mixture from Add Flavors and Inclusions)\n7. Fill Containers (use frozen mixture from Freeze Mixture)\n8. Harden Ice Cream (use filled containers from Fill Containers)\n9. Package (use hardened ice cream from Harden Ice Cream)\n10. Label and Inspect (use packaged ice cream from Package)",
    :question-type "process-ordering"}]}
+
+(def warm-up-text
+  "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service. Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as ingredient availability and production line capacities. Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial.")
+
+(deftest test-start-human-project!
+  (testing "that you can make a human project from an answer to warm-up text."
+    (inv/start-human-project! {:use-this-answer warm-up-text})))

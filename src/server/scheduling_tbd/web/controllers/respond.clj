@@ -19,7 +19,7 @@
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    get-conversation always returns the conversation corresponding to :project/current-converation in the project's DB.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
-   Note that this can CHANGE :project/current-conversation."
+   Note that this can CHANGE :project/current-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
   [request]
   (let [{:keys [project-id cid]} (-> request :query-params keywordize-keys)]
     ;;(log/info "get-conversation (1): project-id = " project-id "cid =" cid)

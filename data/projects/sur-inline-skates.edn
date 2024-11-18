@@ -1,251 +1,223 @@
-[#:project{:conversations
-           [#:conversation{:id :process,
-                           :messages
-                           [#:message{:content
-                                      "Describe your most significant scheduling problem in a few sentences.",
-                                      :from :system,
-                                      :id 1,
-                                      :tags [:initial-question :query],
-                                      :time
-                                      #inst "2024-08-12T22:59:44.962-00:00",
-                                      :question-name :initial-question}
-                            #:message{:content
-                                      "Our most significant scheduling problem revolves around managing the production and assembly lines for different models of inline skates to meet fluctuating demand. We need to dynamically allocate resources and labor across various tasks, while also keeping track of supply chain deliveries for necessary components. The goal is to optimize production schedules to reduce downtime and avoid delays, ensuring that we can meet both retail and direct consumer orders timely. The challenge is further complicated by last-minute order changes and the need to maintain high-quality standards.",
-                                      :from :surrogate,
-                                      :id 2,
-                                      :tags
-                                      [:initial-question :response],
-                                      :time
-                                      #inst "2024-08-12T22:59:44.982-00:00",
-                                      :question-name :initial-question}
-                            #:message{:content
-                                      "Great, we'll call your project SUR Inline Skates.",
-                                      :from :system,
-                                      :id 3,
-                                      :tags
-                                      [:initial-question :informative],
-                                      :time
-                                      #inst "2024-08-12T22:59:45.985-00:00",
-                                      :question-name :initial-question}
-                            #:message{:content
-                                      "Please briefly describe your production processes.",
-                                      :from :system,
-                                      :id 4,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-08-12T22:59:54.989-00:00"}
-                            #:message{:content
-                                      "Our production process for inline skates involves several key steps:\n\n1. <b>Component Sourcing</b>: We source various components like wheels, bearings, boots, and frames from different suppliers.\n\n2. <b>Component Inspection and Storage</b>: Upon arrival, components are inspected for quality and stored in our warehouse.\n\n3. <b>Assembly Line</b>: Components are moved to the assembly line where boots are fitted with frames, wheels, and bearings. This process includes both automated and manual steps.\n\n4. <b>Quality Control</b>: Assembled skates undergo rigorous testing for performance and safety standards.\n\n5. <b>Packaging</b>: Once approved, skates are packaged according to the product specifications and prepared for shipment.\n\n6. <b>Shipping and Distribution</b>: Finished products are shipped to distributors or direct to customers based on orders.\n\nThe entire process requires careful coordination to ensure efficiency and minimize production bottlenecks.",
-                                      :from :surrogate,
-                                      :id 5,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-08-12T22:59:55.008-00:00"}
-                            #:message{:content
-                                      "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
-                                      :from :system,
-                                      :id 6,
-                                      :tags [:query :work-type],
-                                      :time
-                                      #inst "2024-08-12T22:59:57.850-00:00",
-                                      :question-name :work-type}
-                            #:message{:content "PRODUCT",
-                                      :from :surrogate,
-                                      :id 7,
-                                      :tags [:work-type :response],
-                                      :time
-                                      #inst "2024-08-12T22:59:57.901-00:00",
-                                      :question-name :work-type}
-                            #:message{:content
-                                      "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
-                                      :from :system,
-                                      :id 8,
-                                      :tags
-                                      [:production-motivation :query],
-                                      :time
-                                      #inst "2024-08-12T23:00:00.922-00:00",
-                                      :question-name
-                                      :production-motivation}
-                            #:message{:content "MAKE-TO-STOCK",
-                                      :from :surrogate,
-                                      :id 9,
-                                      :tags
-                                      [:production-motivation
-                                       :response],
-                                      :time
-                                      #inst "2024-08-12T23:00:00.977-00:00",
-                                      :question-name
-                                      :production-motivation}
-                            #:message{:content
-                                      "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
-                                      :from :system,
-                                      :id 10,
-                                      :tags
-                                      [:production-location :query],
-                                      :time
-                                      #inst "2024-08-12T23:00:03.724-00:00",
-                                      :question-name
-                                      :production-location}
-                            #:message{:content "OUR-FACILITY",
-                                      :from :surrogate,
-                                      :id 11,
-                                      :tags
-                                      [:production-location :response],
-                                      :time
-                                      #inst "2024-08-12T23:00:03.764-00:00",
-                                      :question-name
-                                      :production-location}
-                            #:message{:content
-                                      "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
-                                      :from :system,
-                                      :id 12,
-                                      :tags
-                                      [:production-system-type :query],
-                                      :time
-                                      #inst "2024-08-12T23:00:06.447-00:00",
-                                      :question-name
-                                      :production-system-type}
-                            #:message{:content "FLOW-SHOP",
-                                      :from :surrogate,
-                                      :id 13,
-                                      :tags
-                                      [:production-system-type
-                                       :response],
-                                      :time
-                                      #inst "2024-08-12T23:00:06.464-00:00",
-                                      :question-name
-                                      :production-system-type}
-                            #:message{:content
-                                      "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
-                                      :from :system,
-                                      :id 14,
-                                      :tags [:query :process-steps],
-                                      :time
-                                      #inst "2024-08-12T23:00:11.059-00:00",
-                                      :question-name :process-steps}
-                            #:message{:content
-                                      "1. Component Sourcing\n2. Component Inspection and Storage\n3. Assembly Line\n4. Quality Control\n5. Packaging\n6. Shipping and Distribution",
-                                      :from :surrogate,
-                                      :id 15,
-                                      :tags [:process-steps :response],
-                                      :time
-                                      #inst "2024-08-12T23:00:11.112-00:00",
-                                      :question-name :process-steps}
-                            #:message{:content
-                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
-                                      :from :system,
-                                      :id 16,
-                                      :tags
-                                      [:process-durations :query],
-                                      :time
-                                      #inst "2024-08-12T23:00:15.636-00:00",
-                                      :question-name
-                                      :process-durations}
-                            #:message{:content
-                                      "1. Component Sourcing (5-7 days)\n2. Component Inspection and Storage (1 day)\n3. Assembly Line (3 hours)\n4. Quality Control (2 hours)\n5. Packaging (1 hour)\n6. Shipping and Distribution (2-5 days)",
-                                      :from :surrogate,
-                                      :id 17,
-                                      :tags
-                                      [:process-durations :response],
-                                      :time
-                                      #inst "2024-08-12T23:00:15.653-00:00",
-                                      :question-name
-                                      :process-durations}
-                            #:message{:content
-                                      "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
-                                      :from :system,
-                                      :id 18,
-                                      :tags [:info-to-user :minizinc],
-                                      :time
-                                      #inst "2024-08-12T23:01:25.527-00:00"}]}
-            #:conversation{:id :data}
-            #:conversation{:id :resource}],
-           :code
-           "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {};\n% Durations are in units of minutes and may be rounded.\narray [Product, Task] of int: taskDuration = [||];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, nil] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);\n\n% Every other task can start after the previous task ends.\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, nil]);",
-           :processes
-           [#:process{:id :sur-inline-skates,
-                      :interview-class :initial-unordered,
-                      :sub-processes
-                      [#:process{:duration
-                                 #:quantity-range{:high
-                                                  #:quantity{:units
-                                                             :days,
-                                                             :value-string
-                                                             "7"},
-                                                  :low
-                                                  #:quantity{:units
-                                                             :days,
-                                                             :value-string
-                                                             "5"}},
-                                 :id
-                                 :sur-inline-skates--initial-unordered--componentSourcing,
-                                 :name "Component Sourcing",
-                                 :step-number 1,
-                                 :supply-chain? true,
-                                 :var-name "componentSourcing"}
-                       #:process{:duration
-                                 #:quantity{:units :days,
-                                            :value-string "1"},
-                                 :id
-                                 :sur-inline-skates--initial-unordered--compInspectStorage,
-                                 :name
-                                 "Component Inspection and Storage",
-                                 :step-number 2,
-                                 :var-name "compInspectStorage"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "3"},
-                                 :id
-                                 :sur-inline-skates--initial-unordered--assemblyLine,
-                                 :name "Assembly Line",
-                                 :step-number 3,
-                                 :var-name "assemblyLine"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "2"},
-                                 :id
-                                 :sur-inline-skates--initial-unordered--qualityControl,
-                                 :name "Quality Control",
-                                 :step-number 4,
-                                 :var-name "qualityControl"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "1"},
-                                 :id
-                                 :sur-inline-skates--initial-unordered--packaging,
-                                 :name "Packaging",
-                                 :step-number 5,
-                                 :var-name "packaging"}
-                       #:process{:duration
-                                 #:quantity-range{:high
-                                                  #:quantity{:units
-                                                             :days,
-                                                             :value-string
-                                                             "5"},
-                                                  :low
-                                                  #:quantity{:units
-                                                             :days,
-                                                             :value-string
-                                                             "2"}},
-                                 :id
-                                 :sur-inline-skates--initial-unordered--shippingDistribution,
-                                 :name "Shipping and Distribution",
-                                 :step-number 6,
-                                 :supply-chain? true,
-                                 :var-name "shippingDistribution"}]}],
-           :current-conversation :process,
-           :planning-problem
-           #:problem{:domain :process-interview,
-                     :goal-string
-                     "(characterize-process sur-inline-skates)",
-                     :state-string
-                     "#{(done !describe-challenge sur-inline-skates) (surrogate sur-inline-skates) (done !query-shop-type sur-inline-skates) (has-production-facility sur-inline-skates) (done !describe-process sur-inline-skates) (have-process-durs sur-inline-skates) (done !do-nothing sur-inline-skates) (done !query-process-durs sur-inline-skates) (flow-shop sur-inline-skates) (production-mode sur-inline-skates make-to-stock) (done !query-activity-location-type sur-inline-skates) (provides-product sur-inline-skates) (done !query-production-mode sur-inline-skates) (done !query-product-or-service sur-inline-skates) (proj-name \"SUR Inline Skates\") (proj-id sur-inline-skates) (done !query-process-steps sur-inline-skates)}"},
-           :name "SUR Inline Skates",
-           :surrogate
-           #:surrogate{:assistant-id "asst_wwRTlaPt0CrKmWPcbBAHyxAL",
-                       :id :sur-inline-skates,
-                       :subject-of-expertise "inline skates",
-                       :system-instruction
-                       "You manage a company that makes inline skates.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                       :thread-id "thread_hyYBTXV1bR0PIDzCvqUC81kn"},
-           :id :sur-inline-skates}]
+[
+#:project{:code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {};\n% Durations are in units of minutes and may be rounded.\narray [Product, Task] of int: taskDuration = [||];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, nil] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);\n\n% Every other task can start after the previous task ends.\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, nil]);",
+          :conversations
+          [#:conversation{:id :process,
+                          :messages
+                          [#:message{:content
+                                     "Describe your most significant scheduling problem in a few sentences.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:initial-question :query],
+                                     :time
+                                     #inst "2024-08-12T22:59:44.962-00:00"}
+                           #:message{:content
+                                     "Our most significant scheduling problem revolves around managing the production and assembly lines for different models of inline skates to meet fluctuating demand. We need to dynamically allocate resources and labor across various tasks, while also keeping track of supply chain deliveries for necessary components. The goal is to optimize production schedules to reduce downtime and avoid delays, ensuring that we can meet both retail and direct consumer orders timely. The challenge is further complicated by last-minute order changes and the need to maintain high-quality standards.",
+                                     :from :surrogate,
+                                     :id 2,
+                                     :tags
+                                     [:initial-question :response],
+                                     :time
+                                     #inst "2024-08-12T22:59:44.982-00:00"}
+                           #:message{:content
+                                     "Great, we'll call your project SUR Inline Skates.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags
+                                     [:informative :initial-question],
+                                     :time
+                                     #inst "2024-08-12T22:59:45.985-00:00"}
+                           #:message{:content
+                                     "Please briefly describe your production processes.",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-08-12T22:59:54.989-00:00"}
+                           #:message{:content
+                                     "Our production process for inline skates involves several key steps:\n\n1. <b>Component Sourcing</b>: We source various components like wheels, bearings, boots, and frames from different suppliers.\n\n2. <b>Component Inspection and Storage</b>: Upon arrival, components are inspected for quality and stored in our warehouse.\n\n3. <b>Assembly Line</b>: Components are moved to the assembly line where boots are fitted with frames, wheels, and bearings. This process includes both automated and manual steps.\n\n4. <b>Quality Control</b>: Assembled skates undergo rigorous testing for performance and safety standards.\n\n5. <b>Packaging</b>: Once approved, skates are packaged according to the product specifications and prepared for shipment.\n\n6. <b>Shipping and Distribution</b>: Finished products are shipped to distributors or direct to customers based on orders.\n\nThe entire process requires careful coordination to ensure efficiency and minimize production bottlenecks.",
+                                     :from :surrogate,
+                                     :id 5,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-08-12T22:59:55.008-00:00"}
+                           #:message{:content
+                                     "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
+                                     :from :system,
+                                     :id 6,
+                                     :tags [:query :work-type],
+                                     :time
+                                     #inst "2024-08-12T22:59:57.850-00:00"}
+                           #:message{:content "PRODUCT",
+                                     :from :surrogate,
+                                     :id 7,
+                                     :tags [:response :work-type],
+                                     :time
+                                     #inst "2024-08-12T22:59:57.901-00:00"}
+                           #:message{:content
+                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
+                                     :from :system,
+                                     :id 8,
+                                     :tags
+                                     [:production-motivation :query],
+                                     :time
+                                     #inst "2024-08-12T23:00:00.922-00:00"}
+                           #:message{:content "MAKE-TO-STOCK",
+                                     :from :surrogate,
+                                     :id 9,
+                                     :tags
+                                     [:production-motivation
+                                      :response],
+                                     :time
+                                     #inst "2024-08-12T23:00:00.977-00:00"}
+                           #:message{:content
+                                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                                     :from :system,
+                                     :id 10,
+                                     :tags
+                                     [:production-location :query],
+                                     :time
+                                     #inst "2024-08-12T23:00:03.724-00:00"}
+                           #:message{:content "OUR-FACILITY",
+                                     :from :surrogate,
+                                     :id 11,
+                                     :tags
+                                     [:production-location :response],
+                                     :time
+                                     #inst "2024-08-12T23:00:03.764-00:00"}
+                           #:message{:content
+                                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                                     :from :system,
+                                     :id 12,
+                                     :tags
+                                     [:production-system-type :query],
+                                     :time
+                                     #inst "2024-08-12T23:00:06.447-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 13,
+                                     :tags
+                                     [:production-system-type
+                                      :response],
+                                     :time
+                                     #inst "2024-08-12T23:00:06.464-00:00"}
+                           #:message{:content
+                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
+                                     :from :system,
+                                     :id 14,
+                                     :tags [:process-steps :query],
+                                     :time
+                                     #inst "2024-08-12T23:00:11.059-00:00"}
+                           #:message{:content
+                                     "1. Component Sourcing\n2. Component Inspection and Storage\n3. Assembly Line\n4. Quality Control\n5. Packaging\n6. Shipping and Distribution",
+                                     :from :surrogate,
+                                     :id 15,
+                                     :tags [:process-steps :response],
+                                     :time
+                                     #inst "2024-08-12T23:00:11.112-00:00"}
+                           #:message{:content
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
+                                     :from :system,
+                                     :id 16,
+                                     :tags [:process-durations :query],
+                                     :time
+                                     #inst "2024-08-12T23:00:15.636-00:00"}
+                           #:message{:content
+                                     "1. Component Sourcing (5-7 days)\n2. Component Inspection and Storage (1 day)\n3. Assembly Line (3 hours)\n4. Quality Control (2 hours)\n5. Packaging (1 hour)\n6. Shipping and Distribution (2-5 days)",
+                                     :from :surrogate,
+                                     :id 17,
+                                     :tags
+                                     [:process-durations :response],
+                                     :time
+                                     #inst "2024-08-12T23:00:15.653-00:00"}
+                           #:message{:content
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
+                                     :from :system,
+                                     :id 18,
+                                     :tags [:info-to-user :minizinc],
+                                     :time
+                                     #inst "2024-08-12T23:01:25.527-00:00"}]}
+           #:conversation{:id :data}
+           #:conversation{:id :resource}],
+          :current-conversation :process,
+          :id :sur-inline-skates,
+          :name "SUR Inline Skates",
+          :processes
+          [#:process{:id :sur-inline-skates,
+                     :interview-class :initial-unordered,
+                     :sub-processes
+                     [#:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :days,
+                                                            :value-string
+                                                            "7"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :days,
+                                                            :value-string
+                                                            "5"}},
+                                :id
+                                :sur-inline-skates--initial-unordered--componentSourcing,
+                                :name "Component Sourcing",
+                                :step-number 1,
+                                :supply-chain? true,
+                                :var-name "componentSourcing"}
+                      #:process{:duration
+                                #:quantity{:units :days,
+                                           :value-string "1"},
+                                :id
+                                :sur-inline-skates--initial-unordered--compInspectStorage,
+                                :name
+                                "Component Inspection and Storage",
+                                :step-number 2,
+                                :var-name "compInspectStorage"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "3"},
+                                :id
+                                :sur-inline-skates--initial-unordered--assemblyLine,
+                                :name "Assembly Line",
+                                :step-number 3,
+                                :var-name "assemblyLine"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "2"},
+                                :id
+                                :sur-inline-skates--initial-unordered--qualityControl,
+                                :name "Quality Control",
+                                :step-number 4,
+                                :var-name "qualityControl"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-inline-skates--initial-unordered--packaging,
+                                :name "Packaging",
+                                :step-number 5,
+                                :var-name "packaging"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :days,
+                                                            :value-string
+                                                            "5"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :days,
+                                                            :value-string
+                                                            "2"}},
+                                :id
+                                :sur-inline-skates--initial-unordered--shippingDistribution,
+                                :name "Shipping and Distribution",
+                                :step-number 6,
+                                :supply-chain? true,
+                                :var-name "shippingDistribution"}]}],
+          :surrogate
+          #:surrogate{:assistant-id "asst_wwRTlaPt0CrKmWPcbBAHyxAL",
+                      :id :sur-inline-skates,
+                      :subject-of-expertise "inline skates",
+                      :system-instruction
+                      "You manage a company that makes inline skates.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_hyYBTXV1bR0PIDzCvqUC81kn"}}
+]

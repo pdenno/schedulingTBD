@@ -1,16 +1,16 @@
 (ns scheduling-tbd.domain.process-analysis
   "Analysis of the process interview"
   (:require
-   [clojure.core.unify                        :as uni]
    [clojure.edn                               :as edn]
-   [clojure.pprint                            :refer [cl-format pprint]]
+   [clojure.pprint                            :refer [pprint]]
    [clojure.spec.alpha                        :as s]
    [clojure.string                            :as str]
+   [jsonista.core                             :as json]
    [scheduling-tbd.db                         :as db]
    [scheduling-tbd.llm                        :as llm :refer [query-llm]]
    [scheduling-tbd.minizinc                   :as mzn]
    [scheduling-tbd.response-utils             :as ru :refer [defanalyze find-claim make-human-project]]
-   [scheduling-tbd.sutil                      :as sutil :refer [elide]]
+   [scheduling-tbd.sutil                      :as sutil :refer [elide starting-new-project?]]
    [scheduling-tbd.web.websockets             :as ws]
    [taoensso.telemere                         :as tel :refer [log!]]))
 
@@ -18,7 +18,7 @@
 (declare analyze-intro-response analyze-process-steps-response analyze-process-durs-response analyze-batch-size-response analyze-process-ordering-response)
 
 (def the-warm-up-type-question
-  (str "What are products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."))
+  (str "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."))
 
 ;;; ToDo: warm-up question might suggest several avenues of investigation. For example, consider this, from sur-plate-glass:
 ;;; "Our most significant scheduling problem revolves around coordinating the manufacturing process with the fluctuating availability of raw materials,
@@ -37,26 +37,27 @@
         surrogate? (find-claim '(surrogate ?x) init-state)] ; return state props project-id and project-name if human, otherwise argument state.
     (when-not surrogate? (make-human-project (into init-state new-claims)))
     ;;--------  Now human/surrogate can be treated nearly identically ---------
-    (let [[_ pid]   (find-claim '(project-id ?x) all-claims)
-          [_ pname] (find-claim '(project-name ?x) all-claims)]
-      (doseq [claim new-claims] (db/add-claim pid claim))
+    (let [[_ pid]     (find-claim '(project-id ?pid) all-claims)
+          [_ _ pname] (find-claim '(project-name ?pid ?pname) all-claims)]
+      (doseq [claim new-claims] (db/add-claim! pid claim))
       (db/add-msg {:pid pid
                    :from :system
                    :text (format "Great, we'll call your project %s." pname)
                    :tags [:!describe-challenge :informative]})
-      (ws/refresh-client client-id pid :process))))
+      (ws/refresh-client client-id pid :process)
+      pid))) ; Need this when you made a new project.
 
 (defanalyze :work-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid)
                        (re-matches #".*(?i)SERVICE.*" response) (list 'provides-service pid)
                        :else                                    (list 'fails-query 'work-type pid))]
-    (db/add-claim pid new-fact)))
+    (db/add-claim! pid new-fact)))
 
 (defanalyze :production-location [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'production-location pid 'factory)
                        (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'production-location pid 'customer-site)
                        :else                                    (list 'fails-query 'production-location pid))]
-    (db/add-claim pid new-fact)))
+    (db/add-claim! pid new-fact)))
 
 
 (defanalyze :production-motivation [{:keys [pid response] :as _ctx}]
@@ -64,19 +65,19 @@
                        (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        (list 'production-mode pid 'make-to-order)
                        (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    (list 'production-mode pid 'engineer-to-order)
                        :else                                                 (list 'fails-query 'production-mode pid))]
-    (db/add-claim pid new-fact)))
+    (db/add-claim! pid new-fact)))
 
 (defanalyze :production-system-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)FLOW-SHOP.*" response)  (list 'flow-shop pid)
                        (re-matches #".*(?i)JOB-SHOP.*"  response)  (list 'job-shop pid)
                        :else                                       (list 'fails-query 'flow-vs-job pid))]
-    (db/add-claim pid new-fact)))
+    (db/add-claim! pid new-fact)))
 
 (defanalyze :process-steps [{:keys [pid response client-id] :as obj}]
   ;; Nothing to do here but update state from a-list.
   (let [new-claims (analyze-process-steps-response obj)]
     (log! :debug (str "---------------------- !query-process-steps: new-claims = " new-claims))
-    (doseq [claim new-claims] (db/add-claim pid claim))))
+    (doseq [claim new-claims] (db/add-claim! pid claim))))
 
 (defanalyze :process-durations [{:keys [client-id response pid] :as obj}]
   (log! :info (str "process-durations (action): response =\n" response))
@@ -96,7 +97,7 @@
                      :text see-code-msg
                      :tags [:info-to-user :minizinc]})
         (ws/refresh-client client-id pid :process)
-        (doseq [claim new-claims] (db/add-claim pid claim)))
+        (doseq [claim new-claims] (db/add-claim! pid claim)))
       (ws/send-to-chat
        {:client-id client-id
         :dispatch-key :tbd-says
@@ -146,75 +147,30 @@
     (:project-name ?r)
     (if (string? ?r) ?r (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text})))))
 
-;;; ------------------------------------------ Raw material challenge ------------------------------------------------------
-;;; This is one way we process the warm-up question. It needs to be substantially enhanced to collect every challenge type that is commonly cited.
-;;; Today we'd use a system agent for this.
-;;; The challenges may include (what comes to mind right now):
-;;;     * raw material uncertainty
-;;;     * demand uncertainty
-;;;     * delivery schedules
-;;;     * demand seaonality
-;;;     * planned maintenance
-;;;     * equipment changeover
-;;;     * equipment availability (breakdowns)
-;;;     * equipment utilization
-;;;     * worker availability
-;;;     * worker skills
-;;;     * bottleneck processes
-;;;     * process variation (When you see this one, before you ask about process steps, mention that you are looking for the generic, then ask more.)
+(defn scheduling-challenges-claims
+  "Analyze the response for a fixed set of 'scheduling challenges' and add claims to the DB
+   for the ones that are evident in the response. This is particularly useful for planning detailed conversation.
+   Returns a map {:challenge <keywords naming challenges> :one-more-thing <a string>}."
+  [response]
+  (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
+        res (llm/query-on-thread {:aid aid :tid tid :query-text response :tries 2})
+        {:keys [one-more-thing] :as result} (-> res
+                                                json/read-value
+                                                (update-keys keyword)
+                                                (update :challenges #(mapv keyword %)))]
+    (when (not-empty one-more-thing)
+      (log! :info (str "one-more-thing: " one-more-thing))) ; This just to see whether another claim should be added to the agent.
+    result))
 
-(def raw-material-challenge-partial
-  [{:role "system"    :content "You are a helpful assistant."}
-   {:role "user"      :content "Respond with either 'yes' or 'no' to whether the text in square brackets alludes to a raw-materials shortage."}
-
-   {:role "user"      :content "[We produce clothes for firefighting. Our most significant scheduling problem is about deciding how many workers to assign to each product.]"}
-   {:role "assistant" :content "no"}
-
-   {:role "user"      :content "[We do road construction and repaving. We find coping with our limited resources (trucks, workers, aggregate, etc.) a challenge.]"}
-   {:role "assistant" :content "yes"}
-
-   {:role "user"      :content "[Our principal scheduling problem revolves around coordinating raw material procurement with production schedules and customer delivery deadlines.
- We often face the challenge of ensuring a continuous supply of high-quality raw aluminium, which is subject to market availability and price fluctuations.]"}
-   {:role "assistant" :content "yes"}
-
-   {:role "user"      :content "[We run several products simultaneously and simply would like to be able to have the beer bottled and ready to ship as near as possible to
- the dates defined in our sales plan.]"}
-   {:role "assistant" :content "no"}])
-
-(defn text-cites-raw-material-challenge?
-  "Return :yes, :no, or :unknown depending on whether the text cites an inventory challenge."
-  [text]
-  (-> (conj raw-material-challenge-partial
-            {:role "user" :content (format "[%s]" text)})
-      (query-llm {:model-class :gpt})
-      sutil/yes-no-unknown))
-
-(defn mzn-process-steps
-  "Use state information to write a string enumerating process steps."
-  [state]
-  (let [procs (->> state (filter #(uni/unify % '(process-step ?pid ?num ?proc))) (sort-by #(nth % 2)) (mapv #(nth % 3)))]
-    (cl-format nil "enum Task = {~{~a~^, ~}};" procs)))
-
-;;; -------------------------------- response analysis  -----------------------------------------------
-;;; ToDo: Could be several more "cites" in the intro paragraph. For example, consider this, from sur-plate-glass:
-;;; "Our most significant scheduling problem revolves around coordinating the manufacturing process with the fluctuating availability of raw materials,
-;;; particularly high-quality silica sand and soda ash, and accommodating the variable demand from our customers.
-;;; We struggle with optimizing machine utilization time and reducing downtime, while also managing delivery schedules that are dependent
-;;; on these unpredictable elements. Additionally, managing the workforce to align with these changes,
-;;; ensuring we have enough skilled workers available when needed, adds another layer of complexity to our operations.",
-;;;
-;;; This might get into skills classification, delivery schedules, downtime, machine utilization.
-
-;;; ToDo: This was written before I decided that domain.clj ought to require db and use it. Refactor this and its caller, !initial-question ?
 (defn analyze-intro-response
   "Analyze the response to the initial question.
    If init-state argument is just #{(project-id :START-A-NEW-PROJECT)}, we are talking to humans and there is not yet a project.
-   Returns new claims."
+   Returns a map containing (possibly new) pid, and claims."
   [response init-state]
   (log! :info (-> (str "analyze-intro-response: init-state = " init-state " response = " response) (elide 150)))
   (let [[_ pid] (find-claim '(project-id ?x) init-state)
         new-claims (atom #{})]
-    (when (= pid :START-A-NEW-PROJECT)
+    (when (starting-new-project? pid)
       (let [project-name (as-> (project-name-llm-query response) ?s
                            (str/trim ?s)
                            (str/split ?s #"\s+")
@@ -225,10 +181,10 @@
         (reset! new-claims (into (filterv #(not= % '(project-id :START-A-NEW-PROJECT)) init-state)
                                  `[(~'project-id ~pid)
                                    (~'project-name ~project-name)]))))
-    (when (= :yes (text-cites-raw-material-challenge? response)) ; ToDo: Replace this with something more general describe above.
-      (let [[_ pid] (find-claim '(project-id ?x) @new-claims)]
-        (swap! new-claims #(conj % `(~'cites-raw-material-challenge ~pid)))))
-    @new-claims))
+    (let [{:keys [challenges]} (scheduling-challenges-claims response) ; ToDo keep one-more-thing?
+          more-claims (for [claim challenges]
+                        (list 'scheduling-challenge pid claim))]
+        (into @new-claims more-claims))))
 
 ;;; ToDo: If this ever fails, replace it with an agent!
 (defn analyze-process-steps-response
@@ -245,6 +201,12 @@
        (filterv identity)))
 
 ;;; ----------------- analyze-process-durs-response (done with :process-dur-agent) ----------------------------
+;;; ToDo: This isn't quite sufficient. If, for example, you have hours & days, which is commmon, for example, with craft beer,
+;;;       then it won't be recognized as extreme. It would be better to gather the smallest amount and largest amount. It would also be
+;;;       useful to note where there are groups of short processes that can be combined.
+;;; enum Task = {millGrains, mashing, lautering, boiling, fermentation, conditioning, filtering, carbonation, bottlingCanning, packaging};
+;;; array [Product, Task] of float: taskDuration = [|1.000, 1.500, 1.000, 1.000, 252.000, 60.000, 3.000, 24.000, 3.000, 3.000|];
+;;; ... So you could use the code that does this MZn translation. Makes use of averages too.
 (defn extreme-dur-span?
   "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more.
    This always looks at :process/inverview-class = :initial-unordered."

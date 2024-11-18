@@ -54,7 +54,7 @@
                                                            :surrogate/system-instruction instructions
                                                            :surrogate/assistant-id aid
                                                            :surrogate/thread-id (:id thread)}}]})
-      (db/add-claim pid `(~'surrogate ~pid))
+      (db/add-claim! pid `(~'surrogate ~pid))
       (db/get-surrogate-agent-info pid))
     (db/get-surrogate-agent-info pid)))
 

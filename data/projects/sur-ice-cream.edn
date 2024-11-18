@@ -1,6 +1,7 @@
 [
 #:project{:conversations
-          [#:conversation{:id :process,
+          [#:conversation{:done? true,
+                          :id :process,
                           :messages
                           [#:message{:content
                                      "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
@@ -174,7 +175,10 @@
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_Af7PPLVuyyJkrkEaeFSxYrX5"}],
+                   :thread-id "thread_Af7PPLVuyyJkrkEaeFSxYrX5"}
+           #:agent{:thread-id "thread_lFOCrV7QpIOsNLwtlHYXIfei"}
+           #:agent{:thread-id "thread_KTr47XkJmQqi7L1kMZZQKNKI"}
+           #:agent{:thread-id "thread_ueXO3brY3c0kMfc3UpDI6nhy"}],
           :processes
           [#:process{:id :sur-ice-cream,
                      :interview-class :initial-unordered,
@@ -302,5 +306,4 @@
                       "You manage a company that makes ice cream.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
                       :thread-id "thread_g64Pkn9wvd6sLdGBIllYAolQ"},
           :id :sur-ice-cream}
-
 ]

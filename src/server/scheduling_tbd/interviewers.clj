@@ -12,7 +12,7 @@
    [scheduling-tbd.domain.process-analysis :refer [the-warm-up-type-question]]
    [scheduling-tbd.llm            :as llm]
    [scheduling-tbd.response-utils :as ru :refer [find-claim]]
-   [scheduling-tbd.sutil          :as sutil :refer [connect-atm output-struct2clj elide]]
+   [scheduling-tbd.sutil          :as sutil :refer [connect-atm elide output-struct2clj starting-new-project?]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere             :as tel :refer [log!]]
    [taoensso.truss                 :as truss :refer [have]]))
@@ -48,7 +48,6 @@
      2) :response is added. Typically its value is a string."
   [{:keys [question sur-aid sur-tid responder-role preprocess-fn tries] :as ctx
     :or {tries 1 preprocess-fn identity}}]
-  (s/assert ::chat-pair-context ctx)
   (let [prom (if (= :human responder-role)
                (ws/send-to-chat (-> ctx                        ; This cannot timeout.
                                     (assoc :text question)
@@ -68,18 +67,21 @@
                   (log! :error "Failed in chat-pair-aux:" (datafy e))))
        p/await)))
 
-;;; For use of chat-pair defined below.
-(s/def ::chat-pair-context (s/and (s/keys :req-un [::pid ::responder-role ::client-id ::sur-aid ::sur-tid ::question ::question-type]
-                                          :opt-un [::tags ::cid])
-                                  #(or (and (= :surrogate (:responder-role %)) (contains? % :sur-aid) (contains? % :sur-tid))
-                                       (= :human (:responder-role %)))))
+;;; For use of chat-pair and other things defined below.
+(s/def ::chat-pair-ctx (s/or :surrogate (s/and #(s/valid? ::surrogate-ctx %) #(s/valid? ::common-ctx %))
+                             :human     (s/and #(s/valid? ::human-ctx %)     #(s/valid? ::common-ctx %))))
+
+(s/def ::common-ctx (s/keys :req-un [::client-id ::pid ::cid]))
+(s/def ::surrogate-ctx (s/and ::common-ctx (s/keys :req-un [:sur/responder-role ::sur-aid ::sur-tid ])))
+(s/def ::human-ctx     (s/and ::common-ctx (s/keys :req-un [:hum/responder-role])))
+
 (s/def ::pid keyword?)
 (s/def ::cid keyword?)
-(s/def ::responder-role keyword?)
+(s/def :sur/responder-role #(= % :surrogate)) ; Keep. Bug in kondo?
+(s/def :hum/responder-role #(= % :human))     ; Keep. Bug in kondo?
 (s/def ::client-id string?)
 (s/def ::sur-aid string?)
 (s/def ::sur-tid string?)
-(s/def ::question string?)
 (s/def ::question-type keyword?)
 
 ;;; Optional
@@ -91,7 +93,7 @@
    Updates the UI and returns response text."
   [{:keys [pid responder-role client-id tags cid question question-type]
     :or {tags []} :as ctx}] ; ToDo: How do I implement tags? I suppose I need an agent to classify the question. Also no default for topic?
-  (s/assert ::chat-pair-context ctx)
+  (s/assert ::chat-pair-ctx ctx)
   (let [response-text (chat-pair-aux ctx)
         q-type (keyword question-type)]
     (if (string? response-text)
@@ -222,7 +224,7 @@
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    Returns {:command 'INTERVIEWEES-RESPOND' :response <some-text> :question-type <a keyword>}."
   [{:keys [question question-type] :as ctx}]
-  (s/assert ::chat-pair-context ctx)
+  (s/assert ::chat-pair-ctx ctx)
   (let [save-ctx ctx
         ask-continue "Shall we continue with the interview?"
         iviewee-response-txt (chat-pair ctx)]
@@ -378,7 +380,7 @@
       (loop-for-answer (merge ctx resp)))))
 
 (defn ctx-surrogate
-  "Return context updated with surrogate info"
+  "Return context updated with surrogate info."
   [{:keys [pid cid] :as ctx}]
   (let [sur (db/get-surrogate-agent-info pid)]
     (-> ctx
@@ -387,24 +389,36 @@
         (assoc :sur-aid (:surrogate/assistant-id sur))
         (assoc :sur-tid (:surrogate/thread-id sur)))))
 
-;;; ToDo: Check that they are on :process. Put them on process if they are not there.
 (defn ctx-human
-  "Return context updated with surrogate info"
+  "Return context updated with human info."
   [{:keys [pid cid] :as ctx}]
-  (-> ctx
-      (merge (interview-agent cid pid))
-      (assoc :responder-role :surrogate)))
+  (let [ctx (-> ctx
+                (merge (interview-agent cid pid))
+                (assoc :responder-role :human))]
+    (if (s/valid? ::human-ctx ctx)
+      ctx
+      (do
+        (reset! diag ctx)
+        (throw (ex-info "invalid human context:" {:ctx ctx}))))))
 
-(defn start-human-project
-  "Return context updated for human by creating a project for the human." ; ToDo: The idea of human-project isn't quite right!
-  [ctx & {:keys [use-this-answer]}]
-    ;; Add a (s/assert  here.  ; <=========================
-  (let [ctx (ctx-human ctx)
-        response (or use-this-answer (loop-for-answer (merge ctx {:question-type the-warm-up-type-question})))]
-    (let [_res (ru/analyze-response-meth {:question-type :warm-up :response response})]
-      #_(tell-interviewer {:command "INTERVIEWEES-RESPONDS" :response response} ctx) ; <================= when done.
-      ;; More updating of ctx from creation of the project.
-    ctx)))
+(defn start-human-project!
+  "Ask the warm-up question, get a pid and return context updated for human by creating a project for the human.
+   Return an updated context (s/valid? ::human-ctx) with :question and :answer, which then can be communicated to the app."
+  [{:keys [pid client-id] :as ctx} & {:keys [use-this-answer] :as _opts}]
+  (assert (or use-this-answer (starting-new-project? pid))) ; use-this-answer is for debugging.
+  (when-not use-this-answer
+    (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :text the-warm-up-type-question}))
+  (let [response (or use-this-answer
+                     (loop-for-answer (merge ctx {:responder-role :human
+                                                  :question-type :warm-up
+                                                  :question the-warm-up-type-question})))
+        ;; This, the :warm-up method of defanalyze creates the project and updates the chat about the project name.
+        pid (ru/analyze-response-meth (merge ctx {:question-type :warm-up :response response}))]
+    (-> ctx
+        (assoc :pid pid)
+        (assoc :cid :process)
+        (assoc :question-type :warm-up)
+        ctx-human)))
 
 (defn start-surrogate-project
   "Return context updated for surrogate usage. Project was already made because resume-conversation was called by
@@ -412,8 +426,32 @@
   which provides :proj/id on which we can then call resume-conversation."
   [ctx]
   (let [ctx (ctx-surrogate ctx)]
-    ;; Add a (s/assert  here.  ; <=========================
+    (s/valid? ::surrogate-ctx ctx)
     ctx))
+
+(defn ready-for-discussion?
+  "Return true if the state of conversation is such that we can now have
+   discussion on the given topic."
+  [pid cid]
+  (if (starting-new-project? pid)
+    (= cid :process)
+    (case cid
+      (:data :resource) (find-claim '(flow-shop ?x) (db/get-claims pid)) ; ToDo: Someday we will be able to do better than this!
+      :process true)))
+
+(defn redirect-user-to-discussion
+  "Put a message in the current chat to go to the recommended chat."
+  [client-id current-chat recommended-chat]
+  (let [nice-names {:resource "resources" :data "data" :optimality "optimality" :process "process"} ; Note "resources".
+        current (nice-names current-chat)
+        recommended (nice-names recommended-chat)
+        text (str
+              (format "We aren't quite ready to discuss %s until we've talked more about %s. "
+                      current recommended)
+              (format "Could you pop over to the %s discussion (menu on left, 'Process', 'Data' etc.) and chat more with that agent?"
+                      recommended))]
+    ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
+    (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :text text})))
 
 (defn resume-conversation
   "Start the interview loop. :resume-conversation-plan is a dispatch key from client.
@@ -421,24 +459,30 @@
   [{:keys [client-id pid cid] :as ctx}]
   (assert (string? client-id))
   (try
-    (let [cid (or cid ; One of #{:process :resource :data} currently.
-                      (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid)))
-          {:keys [pid] :as ctx} (if (= :START-A-NEW-PROJECT pid) (start-human-project ctx) (start-surrogate-project ctx))]
-      ;; The conversation loop.
-      (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-      (when @active?
-        (when (== 0 (-> (db/get-conversation-eids pid cid) count))
-          (-> ctx :pid initial-advice (tell-interviewer ctx)))
-        (-> (conversation-history pid cid) (tell-interviewer ctx))
-        (loop [cnt 0
-               response (q-and-a ctx)]
-          (if (or (= "DONE" (:status response)) (> cnt 10))
-            :interview-completed
-            (when @active? ; Keep this despite (when @active? ...) above. Can set to false while running.
-              (tell-interviewer response ctx) ; This is a INTERVIEWEES-RESPONDS
-              (ru/analyze-response-meth (merge ctx response))
-              (recur (inc cnt)
-                     (q-and-a ctx)))))))
+    ;; ToDo: If :process isn't pretty far along.  Put them on process if they are not there.
+    (let [cid (or (#{:process :resource :data :optimality} cid)
+                  (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid)))]
+      (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
+        (redirect-user-to-discussion client-id cid :process)
+        (let [{:keys [pid] :as ctx} (if (starting-new-project? pid) (start-human-project! ctx) (start-surrogate-project ctx))]
+          ;; The conversation loop.
+          (when-not (db/conversation-done? pid cid)
+            (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+            (when @active?
+              (when (== 0 (-> (db/get-conversation-eids pid cid) count))
+                (-> ctx :pid initial-advice (tell-interviewer ctx)))
+              (-> (conversation-history pid cid) (tell-interviewer ctx))
+              (loop [cnt 0
+                     response (q-and-a ctx)]
+                (cond
+                  (> cnt 15)                      :exceeded-questions-safety-stop
+                  (= "DONE" (:status response))   (db/assert-conversation-done! pid cid)
+                  :else
+                  (when @active? ; Keep this despite (when @active? ...) above. Can set to false while running.
+                    (tell-interviewer response ctx) ; This is a INTERVIEWEES-RESPONDS
+                    (ru/analyze-response-meth (merge ctx response))
+                    (recur (inc cnt)
+                           (q-and-a ctx))))))))))
       (finally
         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 

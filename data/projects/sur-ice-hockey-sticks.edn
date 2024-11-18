@@ -1,201 +1,193 @@
-[#:project{:conversations
-           [#:conversation{:id :process,
-                           :messages
-                           [#:message{:content
-                                      "Describe your most significant scheduling problem in a few sentences.",
-                                      :from :system,
-                                      :id 1,
-                                      :tags [:initial-question :query],
-                                      :time
-                                      #inst "2024-05-31T00:04:08.525-00:00",
-                                      :question-name :initial-question}
-                            #:message{:content
-                                      "Our most significant scheduling problem is coordinating the synchronization of raw material deliveries with the production cycles of various hockey stick models to optimize manufacturing throughput and reduce downtime. Additionally, managing labor shifts and machine maintenance schedules in a way that maximizes productivity and minimizes operational disruptions is challenging, especially during peak production periods. These issues often lead to bottlenecks that can delay order fulfillment and impact overall efficiency.",
-                                      :from :surrogate,
-                                      :id 2,
-                                      :tags
-                                      [:initial-question :response],
-                                      :time
-                                      #inst "2024-05-31T00:04:08.554-00:00",
-                                      :question-name :initial-question}
-                            #:message{:content
-                                      "Great, we'll call your project SUR Ice Hockey Sticks.",
-                                      :from :system,
-                                      :id 3,
-                                      :tags [:informative],
-                                      :time
-                                      #inst "2024-05-31T00:04:09.323-00:00"}
-                            #:message{:content
-                                      "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
-                                      :from :system,
-                                      :id 4,
-                                      :time
-                                      #inst "2024-05-31T00:04:09.343-00:00"}
-                            #:message{:content
-                                      "Please briefly describe your production processes.",
-                                      :from :system,
-                                      :id 5,
-                                      :time
-                                      #inst "2024-05-31T00:04:16.674-00:00"}
-                            #:message{:content
-                                      "Our production process for ice hockey sticks involves several key steps:\n\n1. <b>Material Preparation</b>: We begin by sourcing and preparing materials, primarily composite fibers or wood, depending on the model.\n\n2. <b>Molding and Shaping</b>: For composite sticks, layers of carbon fiber or fiberglass are shaped and molded under heat and pressure to form the shaft and blade. Wood sticks are cut to shape and sanded.\n\n3. <b>Curing</b>: The molded sticks are cured in a temperature-controlled environment to ensure they harden and maintain the desired properties.\n\n4. <b>Finishing</b>: Once cured, the sticks are sanded, painted, and decals are applied. A protective coating is also added.\n\n5. <b>Quality Control</b>: Every stick undergoes strict quality control to ensure it meets our performance and durability standards.\n\n6. <b>Packaging and Shipping</b>: Approved sticks are then packaged and prepared for shipping to distributors or direct customers.\n\nEach step must be carefully timed and coordinated to maximize efficiency and reduce waste, particularly during the molding and curing phases where timing is crucial for product quality.",
-                                      :from :surrogate,
-                                      :id 6,
-                                      :tags [:process-description],
-                                      :time
-                                      #inst "2024-05-31T00:04:16.748-00:00"}
-                            #:message{:content
-                                      "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
-                                      :from :system,
-                                      :id 7,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-05-31T00:04:19.653-00:00"}
-                            #:message{:content "PRODUCT",
-                                      :from :surrogate,
-                                      :id 8,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-05-31T00:04:19.707-00:00"}
-                            #:message{:content
-                                      "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
-                                      :from :system,
-                                      :id 9,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-05-31T00:04:22.720-00:00"}
-                            #:message{:content "MAKE-TO-STOCK",
-                                      :from :surrogate,
-                                      :id 10,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-05-31T00:04:22.746-00:00"}
-                            #:message{:content
-                                      "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
-                                      :from :system,
-                                      :id 11,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-05-31T00:04:25.726-00:00"}
-                            #:message{:content "OUR-FACILITY",
-                                      :from :surrogate,
-                                      :id 12,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-05-31T00:04:25.742-00:00"}
-                            #:message{:content
-                                      "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
-                                      :from :system,
-                                      :id 13,
-                                      :time
-                                      #inst "2024-05-31T00:04:29.071-00:00"}
-                            #:message{:content "FLOW-SHOP",
-                                      :from :surrogate,
-                                      :id 14,
-                                      :time
-                                      #inst "2024-05-31T00:04:29.141-00:00"}
-                            #:message{:content
-                                      "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
-                                      :from :system,
-                                      :id 15,
-                                      :tags [:process-steps :query],
-                                      :time
-                                      #inst "2024-05-31T00:04:32.653-00:00",
-                                      :question-name :process-steps}
-                            #:message{:content
-                                      "1. Material Preparation\n2. Molding and Shaping\n3. Curing\n4. Finishing\n5. Quality Control\n6. Packaging and Shipping",
-                                      :from :surrogate,
-                                      :id 16,
-                                      :tags [:process-steps :response],
-                                      :time
-                                      #inst "2024-05-31T00:04:32.687-00:00",
-                                      :question-name :process-steps}
-                            #:message{:content
-                                      "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. The 'enum values' name the steps of your process in the order they are executed for each product.",
-                                      :from :system,
-                                      :id 17,
-                                      :tags [:info-to-user :minizinc],
-                                      :time
-                                      #inst "2024-05-31T00:04:32.745-00:00"}
-                            #:message{:content
-                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. material (some amount of time)\n2. molding (some amount of time)...",
-                                      :from :system,
-                                      :id 18,
-                                      :tags [:process-durs :query],
-                                      :time
-                                      #inst "2024-05-31T00:04:37.434-00:00"}
-                            #:message{:content
-                                      "1. Material Preparation (30 minutes)\n2. Molding and Shaping (2 hours)\n3. Curing (4 hours)\n4. Finishing (1 hour)\n5. Quality Control (30 minutes)\n6. Packaging and Shipping (1 hour)",
-                                      :from :surrogate,
-                                      :id 19,
-                                      :tags [:process-durs :response],
-                                      :time
-                                      #inst "2024-05-31T00:04:37.466-00:00"}]}
-            #:conversation{:id :data}
-            #:conversation{:id :resource}],
-           :code
-           "enum Task = {material, molding, curing, finishing, quality, packaging};",
-           :processes
-           [#:process{:desc
-                      "1. Material Preparation (30 minutes)\n2. Molding and Shaping (2 hours)\n3. Curing (4 hours)\n4. Finishing (1 hour)\n5. Quality Control (30 minutes)\n6. Packaging and Shipping (1 hour)",
+[
+#:project{:code
+          "enum Task = {material, molding, curing, finishing, quality, packaging};",
+          :conversations
+          [#:conversation{:id :process,
+                          :messages
+                          [#:message{:content
+                                     "Describe your most significant scheduling problem in a few sentences.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:initial-question :query],
+                                     :time
+                                     #inst "2024-05-31T00:04:08.525-00:00"}
+                           #:message{:content
+                                     "Our most significant scheduling problem is coordinating the synchronization of raw material deliveries with the production cycles of various hockey stick models to optimize manufacturing throughput and reduce downtime. Additionally, managing labor shifts and machine maintenance schedules in a way that maximizes productivity and minimizes operational disruptions is challenging, especially during peak production periods. These issues often lead to bottlenecks that can delay order fulfillment and impact overall efficiency.",
+                                     :from :surrogate,
+                                     :id 2,
+                                     :tags
+                                     [:initial-question :response],
+                                     :time
+                                     #inst "2024-05-31T00:04:08.554-00:00"}
+                           #:message{:content
+                                     "Great, we'll call your project SUR Ice Hockey Sticks.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags [:informative],
+                                     :time
+                                     #inst "2024-05-31T00:04:09.323-00:00"}
+                           #:message{:content
+                                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
+                                     :from :system,
+                                     :id 4,
+                                     :time
+                                     #inst "2024-05-31T00:04:09.343-00:00"}
+                           #:message{:content
+                                     "Please briefly describe your production processes.",
+                                     :from :system,
+                                     :id 5,
+                                     :time
+                                     #inst "2024-05-31T00:04:16.674-00:00"}
+                           #:message{:content
+                                     "Our production process for ice hockey sticks involves several key steps:\n\n1. <b>Material Preparation</b>: We begin by sourcing and preparing materials, primarily composite fibers or wood, depending on the model.\n\n2. <b>Molding and Shaping</b>: For composite sticks, layers of carbon fiber or fiberglass are shaped and molded under heat and pressure to form the shaft and blade. Wood sticks are cut to shape and sanded.\n\n3. <b>Curing</b>: The molded sticks are cured in a temperature-controlled environment to ensure they harden and maintain the desired properties.\n\n4. <b>Finishing</b>: Once cured, the sticks are sanded, painted, and decals are applied. A protective coating is also added.\n\n5. <b>Quality Control</b>: Every stick undergoes strict quality control to ensure it meets our performance and durability standards.\n\n6. <b>Packaging and Shipping</b>: Approved sticks are then packaged and prepared for shipping to distributors or direct customers.\n\nEach step must be carefully timed and coordinated to maximize efficiency and reduce waste, particularly during the molding and curing phases where timing is crucial for product quality.",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :tags [:process-description],
+                                     :time
+                                     #inst "2024-05-31T00:04:16.748-00:00"}
+                           #:message{:content
+                                     "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
+                                     :from :system,
+                                     :id 7,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-05-31T00:04:19.653-00:00"}
+                           #:message{:content "PRODUCT",
+                                     :from :surrogate,
+                                     :id 8,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-05-31T00:04:19.707-00:00"}
+                           #:message{:content
+                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
+                                     :from :system,
+                                     :id 9,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-05-31T00:04:22.720-00:00"}
+                           #:message{:content "MAKE-TO-STOCK",
+                                     :from :surrogate,
+                                     :id 10,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-05-31T00:04:22.746-00:00"}
+                           #:message{:content
+                                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
+                                     :from :system,
+                                     :id 11,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-05-31T00:04:25.726-00:00"}
+                           #:message{:content "OUR-FACILITY",
+                                     :from :surrogate,
+                                     :id 12,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-05-31T00:04:25.742-00:00"}
+                           #:message{:content
+                                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                                     :from :system,
+                                     :id 13,
+                                     :time
+                                     #inst "2024-05-31T00:04:29.071-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 14,
+                                     :time
+                                     #inst "2024-05-31T00:04:29.141-00:00"}
+                           #:message{:content
+                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
+                                     :from :system,
+                                     :id 15,
+                                     :tags [:process-steps :query],
+                                     :time
+                                     #inst "2024-05-31T00:04:32.653-00:00"}
+                           #:message{:content
+                                     "1. Material Preparation\n2. Molding and Shaping\n3. Curing\n4. Finishing\n5. Quality Control\n6. Packaging and Shipping",
+                                     :from :surrogate,
+                                     :id 16,
+                                     :tags [:process-steps :response],
+                                     :time
+                                     #inst "2024-05-31T00:04:32.687-00:00"}
+                           #:message{:content
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. The 'enum values' name the steps of your process in the order they are executed for each product.",
+                                     :from :system,
+                                     :id 17,
+                                     :tags [:info-to-user :minizinc],
+                                     :time
+                                     #inst "2024-05-31T00:04:32.745-00:00"}
+                           #:message{:content
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. material (some amount of time)\n2. molding (some amount of time)...",
+                                     :from :system,
+                                     :id 18,
+                                     :tags [:process-durs :query],
+                                     :time
+                                     #inst "2024-05-31T00:04:37.434-00:00"}
+                           #:message{:content
+                                     "1. Material Preparation (30 minutes)\n2. Molding and Shaping (2 hours)\n3. Curing (4 hours)\n4. Finishing (1 hour)\n5. Quality Control (30 minutes)\n6. Packaging and Shipping (1 hour)",
+                                     :from :surrogate,
+                                     :id 19,
+                                     :tags [:process-durs :response],
+                                     :time
+                                     #inst "2024-05-31T00:04:37.466-00:00"}]}
+           #:conversation{:id :data}
+           #:conversation{:id :resource}],
+          :current-conversation :process,
+          :id :sur-ice-hockey-sticks,
+          :name "SUR Ice Hockey Sticks",
+          :processes
+          [#:process{:desc
+                     "1. Material Preparation (30 minutes)\n2. Molding and Shaping (2 hours)\n3. Curing (4 hours)\n4. Finishing (1 hour)\n5. Quality Control (30 minutes)\n6. Packaging and Shipping (1 hour)",
+                     :id :sur-ice-hockey-sticks,
+                     :sub-processes
+                     [#:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "30"},
+                                :id
+                                :sur-ice-hockey-sticks--materialPrep,
+                                :var-name "materialPrep"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "2"},
+                                :id :sur-ice-hockey-sticks--moldShape,
+                                :pre-processes
+                                [:sur-ice-hockey-sticks--materialPrep],
+                                :var-name "moldShape"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "4"},
+                                :id :sur-ice-hockey-sticks--curing,
+                                :pre-processes
+                                [:sur-ice-hockey-sticks--moldShape],
+                                :var-name "curing"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id :sur-ice-hockey-sticks--finishing,
+                                :pre-processes
+                                [:sur-ice-hockey-sticks--curing],
+                                :var-name "finishing"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "30"},
+                                :id
+                                :sur-ice-hockey-sticks--qualityCtrl,
+                                :pre-processes
+                                [:sur-ice-hockey-sticks--finishing],
+                                :var-name "qualityCtrl"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id :sur-ice-hockey-sticks--packShip,
+                                :pre-processes
+                                [:sur-ice-hockey-sticks--qualityCtrl],
+                                :supply-chain? true,
+                                :var-name "packShip"}]}],
+          :surrogate
+          #:surrogate{:assistant-id "asst_jXxyYHhw8M1pWykaLJNKv79h",
                       :id :sur-ice-hockey-sticks,
-                      :sub-processes
-                      [#:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "30"},
-                                 :id
-                                 :sur-ice-hockey-sticks--materialPrep,
-                                 :var-name "materialPrep"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "2"},
-                                 :id :sur-ice-hockey-sticks--moldShape,
-                                 :pre-processes
-                                 [:sur-ice-hockey-sticks--materialPrep],
-                                 :var-name "moldShape"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "4"},
-                                 :id :sur-ice-hockey-sticks--curing,
-                                 :pre-processes
-                                 [:sur-ice-hockey-sticks--moldShape],
-                                 :var-name "curing"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "1"},
-                                 :id :sur-ice-hockey-sticks--finishing,
-                                 :pre-processes
-                                 [:sur-ice-hockey-sticks--curing],
-                                 :var-name "finishing"}
-                       #:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "30"},
-                                 :id
-                                 :sur-ice-hockey-sticks--qualityCtrl,
-                                 :pre-processes
-                                 [:sur-ice-hockey-sticks--finishing],
-                                 :var-name "qualityCtrl"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "1"},
-                                 :id :sur-ice-hockey-sticks--packShip,
-                                 :pre-processes
-                                 [:sur-ice-hockey-sticks--qualityCtrl],
-                                 :supply-chain? true,
-                                 :var-name "packShip"}]}],
-           :current-conversation :process,
-           :planning-problem
-           #:problem{:domain :process-interview,
-                     :goal-string
-                     "(characterize-process sur-ice-hockey-sticks)",
-                     :state-string
-                     "#{(have-process-durs sur-ice-hockey-sticks) (process-step sur-ice-hockey-sticks 5 quality) (provides-product sur-ice-hockey-sticks) (ongoing-discussion sur-ice-hockey-sticks) (production-mode sur-ice-hockey-sticks make-to-stock) (process-step sur-ice-hockey-sticks 4 finishing) (has-production-facility sur-ice-hockey-sticks) (process-step sur-ice-hockey-sticks 1 material) (cites-raw-material-challenge sur-ice-hockey-sticks) (surrogate sur-ice-hockey-sticks) (proj-id sur-ice-hockey-sticks) (proj-name \"SUR Ice Hockey Sticks\") (process-step sur-ice-hockey-sticks 2 molding) (process-step sur-ice-hockey-sticks 6 packaging) (flow-shop sur-ice-hockey-sticks) (have-process-steps sur-ice-hockey-sticks) (process-step sur-ice-hockey-sticks 3 curing)}"},
-           :name "SUR Ice Hockey Sticks",
-           :surrogate
-           #:surrogate{:assistant-id "asst_jXxyYHhw8M1pWykaLJNKv79h",
-                       :id :sur-ice-hockey-sticks,
-                       :subject-of-expertise "ice hockey sticks",
-                       :system-instruction
-                       "You manage a company that makes ice hockey sticks.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                       :thread-id "thread_snIjYXODqcIeeDrGu57q8ijo"},
-           :id :sur-ice-hockey-sticks}]
+                      :subject-of-expertise "ice hockey sticks",
+                      :system-instruction
+                      "You manage a company that makes ice hockey sticks.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_snIjYXODqcIeeDrGu57q8ijo"}}
+]

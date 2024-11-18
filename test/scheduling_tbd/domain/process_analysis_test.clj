@@ -3,6 +3,7 @@
   (:require
    [clojure.test                           :refer [deftest is testing]]
    [clojure.spec.alpha                     :as s]
+   [jsonista.core                          :as json]
    [scheduling-tbd.domain.process-analysis :as pan]
    [scheduling-tbd.db                      :as db]
    [scheduling-tbd.interviewers            :as inv :refer [tell-interviewer]]
@@ -41,6 +42,7 @@
   (safe-alias 'core   'scheduling-tbd.core)
   (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
   (safe-alias 'db     'scheduling-tbd.db)
+  (safe-alias 'dbt    'scheduling-tbd.db-test)
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'invt   'scheduling-tbd.interviewers-test)
   (safe-alias 'llm    'scheduling-tbd.llm)
@@ -336,9 +338,21 @@
 (deftest process-ordering
   (testing "whether the process-ordering system agent works okay."))
 
-
-
-
+(deftest scheduling-challenges-agent
+  (testing "the scheduling-challenges agent"
+    (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
+          result (llm/query-on-thread
+                  {:aid aid :tid tid :query-text
+                   "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service.
+Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as
+ingredient availability and production line capacities.
+Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial."})
+          {:keys [challenges]} (-> result
+                                   json/read-value
+                                   (update-keys keyword)
+                                   (update :challenges #(->> % (map keyword) set)))]
+      (is (= #{:raw-material-uncertainty :product-variation :variation-in-demand :delivery-schedules :demand-uncertainty},
+             challenges)))))
 
 #_(defn migrate-project
   "Translate :message/content to html."
