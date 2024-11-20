@@ -165,8 +165,54 @@
                                      :tags [:response],
                                      :time
                                      #inst "2024-11-18T13:22:57.776-00:00"}]}
-           #:conversation{:id :data}
-           #:conversation{:id :resource}],
+           #:conversation{:id :data,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 21,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:11.459-00:00"}
+                           #:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 24,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:53.320-00:00"}]}
+           #:conversation{:id :resources,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     :from :system,
+                                     :id 22,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:11.478-00:00"}
+                           #:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     :from :system,
+                                     :id 25,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:53.345-00:00"}]}
+           #:conversation{:id :optimality,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 23,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:11.494-00:00"}
+                           #:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 26,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:53.373-00:00"}]}],
           :code
           "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {millGrains, mashing, lautering, boiling, fermentation, conditioning, filtering, carbonation, bottlingCanning, packaging};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|1.000, 1.500, 1.000, 1.000, 252.000, 60.000, 3.000, 24.000, 3.000, 3.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, millGrains] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, millGrains] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, millGrains] == taskStarts[p, mashing]);\nconstraint forall (p in Product) (taskEnds[p, mashing] == taskStarts[p, lautering]);\nconstraint forall (p in Product) (taskEnds[p, lautering] == taskStarts[p, boiling]);\nconstraint forall (p in Product) (taskEnds[p, boiling] == taskStarts[p, fermentation]);\nconstraint forall (p in Product) (taskEnds[p, fermentation] == taskStarts[p, conditioning]);\nconstraint forall (p in Product) (taskEnds[p, conditioning] == taskStarts[p, filtering]);\nconstraint forall (p in Product) (taskEnds[p, filtering] == taskStarts[p, carbonation]);\nconstraint forall (p in Product) (taskEnds[p, carbonation] == taskStarts[p, bottlingCanning]);\nconstraint forall (p in Product) (taskEnds[p, bottlingCanning] == taskStarts[p, packaging]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packaging]);",
           :agents
@@ -175,8 +221,7 @@
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_S6odTkFTcgXrV1nwxy2iNPpw"}
-           #:agent{:thread-id "thread_ckkyqEM8RslQgkFUBdRKFFp5"}],
+                   :thread-id "thread_S6odTkFTcgXrV1nwxy2iNPpw"}],
           :processes
           [#:process{:id :sur-craft-beer,
                      :interview-class :initial-unordered,
@@ -303,49 +348,50 @@
                                 :var-name "packaging"}]}],
           :current-conversation :process,
           :claims
-          [#:claim{:string "(project-id :sur-craft-beer)"}
-           #:claim{:string
-                   "(project-name :sur-craft-beer \"SUR Craft Beer\")"}
-           #:claim{:string "(surrogate :sur-craft-beer)"}
-           #:claim{:string
+          [#:claim{:conversation-id :process,
+                   :question-type :work-type,
+                   :string "(provides-product :sur-craft-beer)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
                    "(scheduling-challenge :sur-craft-beer :demand-uncertainty)"}
-           #:claim{:string
-                   "(scheduling-challenge :sur-craft-beer :raw-material-uncertainty)"}
-           #:claim{:string
+           #:claim{:conversation-id :process,
+                   :string
+                   "(project-name :sur-craft-beer \"SUR Craft Beer\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
                    "(scheduling-challenge :sur-craft-beer :bottleneck-processes)"}
-           #:claim{:string
-                   "(scheduling-challenge :sur-craft-beer :process-variation)"}
-           #:claim{:string
-                   "(scheduling-challenge :sur-craft-beer :product-variation)"}
-           #:claim{:string
-                   "(scheduling-challenge :sur-craft-beer :equipment-utilization)"}
-           #:claim{:string "(provides-product :sur-craft-beer)"}
-           #:claim{:string
-                   "(production-location :sur-craft-beer factory)"}
-           #:claim{:string
+           #:claim{:conversation-id :process,
+                   :string
                    "(production-mode :sur-craft-beer make-to-stock)"}
-           #:claim{:string "(flow-shop :sur-craft-beer)"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 1 \"Milling Grains\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 2 \"Mashing\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 3 \"Lautering\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 4 \"Boiling\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 5 \"Fermentation\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 6 \"Conditioning\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 7 \"Filtering\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 8 \"Carbonation\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 9 \"Bottling\")"}
-           #:claim{:string
-                   "(process-step :sur-craft-beer 10 \"Packaging\")"}
-           #:claim{:string "(have-process-durs :sur-craft-beer)"}],
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-craft-beer)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-system-type,
+                   :string "(flow-shop :sur-craft-beer)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :process-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-location,
+                   :string
+                   "(production-location :sur-craft-beer factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :equipment-utilization)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :string "(project-id :sur-craft-beer)"}],
           :name "SUR Craft Beer",
           :surrogate
           #:surrogate{:assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",

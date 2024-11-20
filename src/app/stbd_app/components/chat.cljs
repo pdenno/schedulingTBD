@@ -199,12 +199,16 @@
                           ($ Conversation {:name "Process"
                                            :active (= active-conv :process)
                                            :onClick (fn [_] (change-conversation-click :process))})
-                          ($ Conversation {:name "Resources"
-                                           :active (= active-conv :resource)
-                                           :onClick (fn [_] (change-conversation-click :resource))})
                           ($ Conversation {:name "Data"
                                            :active (= active-conv :data)
-                                           :onClick (fn [_] (change-conversation-click :data))})))
+                                           :onClick (fn [_] (change-conversation-click :data))})
+                          ($ Conversation {:name "Resources"
+                                           :active (= active-conv :resources)
+                                           :onClick (fn [_] (change-conversation-click :resources))})
+                          ($ Conversation {:name "Optimality"
+                                           :active (= active-conv :optimality)
+                                           :onClick (fn [_] (change-conversation-click :optimality))})))
+
                     ($ ChatContainer
                        ($ MessageList
                           {:typingIndicator (when busy? ($ TypingIndicator {:content "Interviewer is typing"}))

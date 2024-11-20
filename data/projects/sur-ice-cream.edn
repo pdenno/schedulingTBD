@@ -165,8 +165,33 @@
                                      :tags [:response],
                                      :time
                                      #inst "2024-11-16T19:57:39.488-00:00"}]}
-           #:conversation{:id :data}
-           #:conversation{:id :resource}],
+           #:conversation{:id :data,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 21,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T15:43:59.083-00:00"}]}
+           #:conversation{:id :resources,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     :from :system,
+                                     :id 22,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T15:43:59.101-00:00"}]}
+           #:conversation{:id :optimality,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 23,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T15:43:59.119-00:00"}]}],
           :code
           "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {mixIngredients, pasteurizeMix, homogenizeMix, ageMixture, addFlavors, freezeMix, fillContainers, hardenIceCream, packaging, labelAndInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|0.500, 0.250, 0.167, 4.000, 0.333, 0.500, 0.333, 3.000, 0.250, 0.167|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, mixIngredients] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, mixIngredients] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, mixIngredients] == taskStarts[p, pasteurizeMix]);\nconstraint forall (p in Product) (taskEnds[p, pasteurizeMix] == taskStarts[p, homogenizeMix]);\nconstraint forall (p in Product) (taskEnds[p, homogenizeMix] == taskStarts[p, ageMixture]);\nconstraint forall (p in Product) (taskEnds[p, ageMixture] == taskStarts[p, addFlavors]);\nconstraint forall (p in Product) (taskEnds[p, addFlavors] == taskStarts[p, freezeMix]);\nconstraint forall (p in Product) (taskEnds[p, freezeMix] == taskStarts[p, fillContainers]);\nconstraint forall (p in Product) (taskEnds[p, fillContainers] == taskStarts[p, hardenIceCream]);\nconstraint forall (p in Product) (taskEnds[p, hardenIceCream] == taskStarts[p, packaging]);\nconstraint forall (p in Product) (taskEnds[p, packaging] == taskStarts[p, labelAndInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, labelAndInspect]);",
           :agents
@@ -176,9 +201,12 @@
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_Af7PPLVuyyJkrkEaeFSxYrX5"}
-           #:agent{:thread-id "thread_lFOCrV7QpIOsNLwtlHYXIfei"}
-           #:agent{:thread-id "thread_KTr47XkJmQqi7L1kMZZQKNKI"}
-           #:agent{:thread-id "thread_ueXO3brY3c0kMfc3UpDI6nhy"}],
+           #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
+                   :base-type :data-interview-agent,
+                   :id :data-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_H93OzH5wmhXMkvYlew34qDfI"}],
           :processes
           [#:process{:id :sur-ice-cream,
                      :interview-class :initial-unordered,
@@ -263,40 +291,32 @@
                                 :name "Label and Inspect",
                                 :step-number 10,
                                 :var-name "labelAndInspect"}]}],
-          :current-conversation :process,
+          :current-conversation :data,
           :claims
-          [#:claim{:string "(project-id :sur-ice-cream)"}
-           #:claim{:string
-                   "(project-name :sur-ice-cream \"SUR Ice Cream\")"}
-           #:claim{:string "(surrogate :sur-ice-cream)"}
-           #:claim{:string "(cites-raw-material-challenge nil)"}
-           #:claim{:string "(provides-product :sur-ice-cream)"}
-           #:claim{:string
-                   "(production-location :sur-ice-cream factory)"}
-           #:claim{:string
+          [#:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ice-cream :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :string
                    "(production-mode :sur-ice-cream make-to-stock)"}
-           #:claim{:string "(flow-shop :sur-ice-cream)"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 1 \"Mix Ingredients\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 2 \"Pasteurize Mixture\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 3 \"Homogenize Mixture\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 4 \"Age Mixture\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 5 \"Add Flavors and Inclusions\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 6 \"Freeze Mixture\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 7 \"Fill Containers\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 8 \"Harden Ice Cream\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 9 \"Package\")"}
-           #:claim{:string
-                   "(process-step :sur-ice-cream 10 \"Label and Inspect\")"}
-           #:claim{:string "(have-process-durs :sur-ice-cream)"}],
+           #:claim{:conversation-id :process,
+                   :question-type :production-location,
+                   :string
+                   "(production-location :sur-ice-cream factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-system-type,
+                   :string "(flow-shop :sur-ice-cream)"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-ice-cream)"}
+           #:claim{:conversation-id :process,
+                   :question-type :work-type,
+                   :string "(provides-product :sur-ice-cream)"}
+           #:claim{:conversation-id :process,
+                   :string "(project-id :sur-ice-cream)"}
+           #:claim{:conversation-id :process,
+                   :string
+                   "(project-name :sur-ice-cream \"SUR Ice Cream\")"}],
           :name "SUR Ice Cream",
           :surrogate
           #:surrogate{:assistant-id "asst_2Uv2cpwG5GuRAsp1nzkIMGDH",

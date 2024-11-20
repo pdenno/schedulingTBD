@@ -29,8 +29,8 @@
 ;;; This might get into skills classification, delivery schedules, downtime, machine utilization.
 
 ;;; Note that pid here can be :START-A-NEW-PROJECT. In that case, we don't have a DB for the project yet. We make it here.
-(defanalyze :warm-up [{:keys [response client-id pid] :as _ctx}]
-  (log! :debug (str "*******analysis :warm-up, response = " response))
+(defanalyze :process/warm-up [{:keys [response client-id pid] :as _ctx}]
+  (log! :debug (str "*******analysis :process/warm-up, response = " response))
   (let [init-state (db/get-claims pid)
         new-claims (analyze-intro-response response init-state)
         all-claims (into init-state new-claims)
@@ -39,47 +39,49 @@
     ;;--------  Now human/surrogate can be treated nearly identically ---------
     (let [[_ pid]     (find-claim '(project-id ?pid) all-claims)
           [_ _ pname] (find-claim '(project-name ?pid ?pname) all-claims)]
-      (doseq [claim new-claims] (db/add-claim! pid claim))
+      (doseq [claim new-claims]
+        (db/add-claim! pid {:string (str claim) :cid :process :q-type :warm-up}))
       (db/add-msg {:pid pid
+                   :cid :process
                    :from :system
                    :text (format "Great, we'll call your project %s." pname)
                    :tags [:!describe-challenge :informative]})
       (ws/refresh-client client-id pid :process)
       pid))) ; Need this when you made a new project.
 
-(defanalyze :work-type [{:keys [pid response] :as _ctx}]
+(defanalyze :process/work-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid)
                        (re-matches #".*(?i)SERVICE.*" response) (list 'provides-service pid)
                        :else                                    (list 'fails-query 'work-type pid))]
-    (db/add-claim! pid new-fact)))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :work-type})))
 
-(defanalyze :production-location [{:keys [pid response] :as _ctx}]
+(defanalyze :process/production-location [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'production-location pid 'factory)
                        (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'production-location pid 'customer-site)
                        :else                                    (list 'fails-query 'production-location pid))]
-    (db/add-claim! pid new-fact)))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-location})))
 
 
-(defanalyze :production-motivation [{:keys [pid response] :as _ctx}]
+(defanalyze :process/production-motivation [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)MAKE-TO-STOCK.*" response)        (list 'production-mode pid 'make-to-stock)
                        (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        (list 'production-mode pid 'make-to-order)
                        (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    (list 'production-mode pid 'engineer-to-order)
                        :else                                                 (list 'fails-query 'production-mode pid))]
-    (db/add-claim! pid new-fact)))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-motivation})))
 
-(defanalyze :production-system-type [{:keys [pid response] :as _ctx}]
+(defanalyze :process/production-system-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)FLOW-SHOP.*" response)  (list 'flow-shop pid)
                        (re-matches #".*(?i)JOB-SHOP.*"  response)  (list 'job-shop pid)
                        :else                                       (list 'fails-query 'flow-vs-job pid))]
-    (db/add-claim! pid new-fact)))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-system-type})))
 
-(defanalyze :process-steps [{:keys [pid response client-id] :as obj}]
-  ;; Nothing to do here but update state from a-list.
+(defanalyze :process/process-steps [{:keys [pid] :as obj}]
   (let [new-claims (analyze-process-steps-response obj)]
     (log! :debug (str "---------------------- !query-process-steps: new-claims = " new-claims))
-    (doseq [claim new-claims] (db/add-claim! pid claim))))
+    (doseq [claim new-claims]
+      (db/add-claim! pid {:string (str claim) :cid :process :q-type :process-steps}))))
 
-(defanalyze :process-durations [{:keys [client-id response pid] :as obj}]
+(defanalyze :process/process-durations [{:keys [client-id response pid] :as obj}]
   (log! :info (str "process-durations (action): response =\n" response))
   (let [new-claims (analyze-process-durs-response obj)]
     (if (-> (db/get-process pid :initial-unordered) :process/sub-processes not-empty)
@@ -93,23 +95,25 @@
         (db/put-code pid new-code)
         ;; ToDo: This should really be just for humans. Maybe use the DB's message tags to decide that. (or to decide what to send).
         (db/add-msg {:pid pid
+                     :cid :process
                      :from :system
                      :text see-code-msg
                      :tags [:info-to-user :minizinc]})
         (ws/refresh-client client-id pid :process)
-        (doseq [claim new-claims] (db/add-claim! pid claim)))
+        (doseq [claim new-claims]
+          (db/add-claim! pid {:string (str claim) :cid :process :q-type :process-durations})))
       (ws/send-to-chat
        {:client-id client-id
         :dispatch-key :tbd-says
         :text "There was a problem defining a process corresponding to what you said."}))))
 
 ;;; ToDo: Write to db.
-(defanalyze :batch-size [{:keys [response] :as ctx}]
+(defanalyze :process/batch-size [{:keys [response] :as ctx}]
   (log! :info (str "process-ordering: response = " response))
   (analyze-batch-size-response response))
 
 ;;; ToDo: Write to db.
-(defanalyze :process-ordering [{:keys [response] :as ctx}]
+(defanalyze :process/process-ordering [{:keys [response] :as ctx}]
   (log! :info (str "process-ordering: response = " response))
   (analyze-process-ordering-response response))
 
@@ -186,7 +190,7 @@
                         (list 'scheduling-challenge pid claim))]
         (into @new-claims more-claims))))
 
-;;; ToDo: If this ever fails, replace it with an agent!
+;;; ToDo: I can't decide whether or not I want these process-steps in claims. I suppose it can't hurt.
 (defn analyze-process-steps-response
   "Return state addition for analyzing a Y/N user response about process steps.
    The state objects look like (have-process <pid> <num> <proc-name) OR (fails-process-step <line>)."
@@ -391,5 +395,5 @@
     (db/put-process-sequence! pid full-obj)
     (let [extreme-span? (extreme-dur-span? pid)] ; This look at the DB just updated.
       (log! :debug (str "extreme-span? = " extreme-span?))
-      (cond-> [(list 'have-process-durs pid)]
+      (cond-> []
         extreme-span?  (conj `(~'extreme-duration-span ~pid ~@(map #(-> % name symbol) extreme-span?)))))))

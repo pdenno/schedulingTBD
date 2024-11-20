@@ -31,8 +31,7 @@
                         (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm project-id)))
                     keyword)
                 :process)
-          empty-conv  [#:message{:id 1 :content "No discussion here yet.", :from :system, :time (now)}]
-          msgs        (if (and eid cid) (db/get-conversation project-id cid) empty-conv)
+          msgs    (db/get-conversation project-id cid)
           code    (if eid (db/get-code project-id) "")]
       ;;(log/info "get-conversation (2):" project-id "cid =" cid "message count =" (count msgs))
       (http/ok {:project-id project-id :conv msgs :cid cid :code code}))))

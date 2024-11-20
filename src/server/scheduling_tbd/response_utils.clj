@@ -2,6 +2,7 @@
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:refer-clojure :exclude [send])
   (:require
+   [clojure.spec.alpha     :as s]
    [clojure.core.unify     :as uni]
    [clojure.pprint        :refer [cl-format]]
    [scheduling-tbd.db     :as db]
@@ -26,16 +27,22 @@
        (do (log! :debug (cl-format nil "<-- ~A (act) returns ~S" ~tag res#))
            res#))))
 
+(s/def ::response-ctx (s/keys :req-un [::response ::question-type ::cid]))
+(s/def ::response string?)
+(s/def ::question-type keyword?)
+(s/def ::cid #(#{:process :data :resources :optimality} %))
+
 (defn analyze-response--dispatch
   "Parameters to analyze-response is a object with at least a :plan-step in it and a response from operator-meth (user response)."
-  [{:keys [response question-type] :as obj}]
-  (log! :debug (str "analyze-response-dispatch: obj = " obj "response = " response))
-  (if question-type
-    question-type
+  [{:keys [response question-type cid] :as ctx}]
+  (s/assert ::response-ctx ctx)
+  (log! :debug (str "analyze-response-dispatch: ctx = " ctx "response = " response))
+  (if (and question-type cid)
+    (keyword (name cid) (name question-type))
     (do
-      (reset! diag obj)
-      (log! :error (str "analyze-response-dispatch: No dispatch for question-type. obj = " obj))
-      (throw (ex-info "No method to analyze response: " {:obj obj})))))
+      (reset! diag ctx)
+      (log! :error (str "analyze-response-dispatch: No dispatch for question-type. ctx = " ctx))
+      (throw (ex-info "No method to analyze response: " {:ctx ctx})))))
 
 (defmulti analyze-response-meth #'analyze-response--dispatch)
 

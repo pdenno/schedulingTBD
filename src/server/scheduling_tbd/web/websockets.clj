@@ -155,8 +155,8 @@
                 (-> prom
                     (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation-plan don't return anything themselves.
                     (p/catch (fn [err]
-                               (reset! diag err)
-                               (log! :error (str "Error dispatching: msg = " msg " err = " err)))))))
+                               (let [trace (->> (.getStackTrace err) (map str) (interpose "\n") (apply str))]
+                                 (log! :error (str "Error dispatching: msg = " msg " err = " err "\ntrace:\n" trace))))))))
             (when-not (exiting? client-id) (recur)))))
       ;; There are many reasons a websocket connection might be dropped.
       ;; It is absolutely necessary that it exits the go loop when the socket closes; a race condition my occur otherwise.

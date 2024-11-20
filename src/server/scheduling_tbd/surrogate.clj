@@ -54,7 +54,7 @@
                                                            :surrogate/system-instruction instructions
                                                            :surrogate/assistant-id aid
                                                            :surrogate/thread-id (:id thread)}}]})
-      (db/add-claim! pid `(~'surrogate ~pid))
+      (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
       (db/get-surrogate-agent-info pid))
     (db/get-surrogate-agent-info pid)))
 
@@ -84,14 +84,15 @@
   [{:keys [client-id pid question] :as obj}]
   (log! :info (str "SUR follow-up:" obj))
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
-        {:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
+        {:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)
+        cid (db/get-current-conversation pid)]
     (when (and assistant-id thread-id)
       (try (when-let [answer (llm/query-on-thread :aid assistant-id :tid thread-id :query-text question)]
              (log! :info (str "SUR's answer:" answer))
              (when (string? answer)
                (ws/send-to-chat (assoc chat-args :text answer))
-               (db/add-msg {:pid pid :from :system :text question})
-               (db/add-msg {:pid pid :from :surrogate :text answer})))
+               (db/add-msg {:pid pid :cid cid :from :system :text question})
+               (db/add-msg {:pid pid :cid cid :from :surrogate :text answer})))
            (catch Exception e
              (log! :error (str "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message)))
              (ws/send-to-chat (assoc chat-args :text "We had a problem answering this questions.")))))))

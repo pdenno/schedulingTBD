@@ -22,7 +22,7 @@
 ;;;   pid - a project id (keyword)
 ;;;   aid - an assistant id (string)
 ;;;   tid - a thread id (string)
-;;;   cid - a conversation id, currently one of #{:process :data :resource}.
+;;;   cid - a conversation id, currently one of #{:process :data :resources :optimality}.
 
 ;; log uncaught exceptions in threads
 (Thread/setDefaultUncaughtExceptionHandler

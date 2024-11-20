@@ -356,10 +356,15 @@
                (log! :error (str "query-agent failed: " result))
                nil))))))
 
+(def moderation-checking?
+  "Set to true if you want to filter immoderate user text."
+  (atom false))
+
 (defn immoderate?
   "Return true if LLM flags text as immoderate."
   [txt]
-  (-> (openai/create-moderation {:input txt}) :results first :flagged))
+  (when @moderation-checking?
+    (-> (openai/create-moderation {:input txt}) :results first :flagged)))
 
 ;;; --------------------------------- Files -------------------------------
 (defn upload-file

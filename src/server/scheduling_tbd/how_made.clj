@@ -278,23 +278,6 @@
          [?e :segment/name ?name]]
        @(connect-atm :him)))
 
-(defn ^:diag create-project!
-  "Add the project to the system and create a project DB for it.
-   Example usage (create-project! 'Aluminium Foil') -- really!."
-  [seg-name]
-  (if-let [intro (->> (segment-intros)
-                      (some #(when (= seg-name (:segment/name %)) (:segment/intro %))))]
-    (let [pname (-> seg-name (str " segment scheduling"))]
-      (proj-db/create-proj-db!
-       {:project/name pname
-        :project/id   (-> pname str/lower-case (str/replace #"\s+" "-") keyword)}
-       {}
-       {:force? true :make-current? false})
-      (proj-db/add-msg {:pid :him
-                        :text (:segment/challenge-intro intro)
-                        :from :user}))
-    (log/error "HIM segment by that name not found:" seg-name)))
-
 (def rebuild-him? "True if mount/init should rebuild the How It's Made database." false)
 
 ;;; ------------------- Command line -----------------------

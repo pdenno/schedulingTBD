@@ -22,7 +22,7 @@
   "Return the set of unused DB attributes, as the difference of those found in project
    and those in the schema definition."
   []
-  (set/difference db/project-schema-key? (used-db-attrs)))
+  (sort (set/difference db/project-schema-key? (used-db-attrs))))
 
 (deftest unused-db-attrs
   (testing "that there isn't any junk in the DB schema."

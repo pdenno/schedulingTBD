@@ -107,15 +107,15 @@
 
 (defn tell-one
   "Diagnostic for one interaction with interviewer."
-  [cmd {:keys [pid conv-id] :as ctx}]
+  [cmd {:keys [pid cid] :as ctx}]
   (inv/tell-interviewer cmd
-                        (merge ctx (inv/interview-agent conv-id pid))))
+                        (merge ctx (inv/interview-agent pid cid))))
 
 (deftest finished-process-test
   (testing "Testing that :sur-ice-cream has finished all process questions."
     (is (= {:status "DONE"}
-           (do (tell-one (inv/conversation-history :sur-ice-cream :process) {:pid :sur-ice-cream :conv-id :process})
-               (tell-one {:command "SUPPLY-QUESTION"} {:pid :sur-ice-cream :conv-id :process}))))))
+           (do (tell-one (inv/conversation-history :sur-ice-cream :process) {:pid :sur-ice-cream :cid :process})
+               (tell-one {:command "SUPPLY-QUESTION"} {:pid :sur-ice-cream :cid :process}))))))
 
 (deftest test-vector-stores
   (let [{:keys [id object] :as obj}

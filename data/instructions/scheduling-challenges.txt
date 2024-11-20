@@ -15,7 +15,7 @@ Here are the challenges:
   11) bottleneck-processes : The pace of their production is throttled by just a few processes.
   12) process-variation : They have many different processes for making roughly the same class of products.
   13) product-variation : They have many different products to make.
-  14) mention-kpi : They mention key performance indicators (KPIs).
+  14) mentions-KPIs : They mention key performance indicators (KPIs).
 
 You respond with a JSON object that lists the terms among those above that are evident in the text.
 For example, if you we were to provide you the following text:
