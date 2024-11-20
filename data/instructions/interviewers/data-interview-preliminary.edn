@@ -1,3 +1,8 @@
+;The end goal of this conversation is to come up with the typical spreadsheet "types" that are used in production scheduling. 
+;The end goal is to be able to sort an uploaded spreadsheet into one of these categories, and to then extract the information we want to generate a "real-world" MZN model.
+;The conversation below is an attempt at coming up with the spreadsheet types, as well as generating an example spreadsheet combination.
+
+;Peter and I initially came up with 4 types of spreadsheets, I wanted to see what GPT-4o would come up with for production scheduling spreadsheet types.
 User: 
 "What are 4 typical spreadsheets you would use for production scheduling?"
 
@@ -42,6 +47,10 @@ Milestones: Key deadlines or deliverables.
 Benefits: Enhances visibility into task dependencies and progress.
 Each of these spreadsheets can be customized based on specific industry needs and integrated into broader production management systems for enhanced automation and real-time tracking."
 
+;This is okay but we're missing customer information as a core part of what a production scheduling spreadsheet or combination of spreadsheets should contain.
+;I'm also not sure the Gantt chart is something we need for our purposes. In fact, the Gantt chart is kind of what we are trying to make with the MiniZinc models,
+;so I don't think it helps us to have it as part of the core group of spreadsheets we'll be using.
+
 User:
 "Where would the list of customers be ?"
 
@@ -74,6 +83,11 @@ Stock reserved for specific customers.
 A column for Customer Name/Order ID can be added to tasks in the Gantt Chart Spreadsheet, linking production activities directly to specific customers.
 By keeping the customer list organized and accessible, it becomes easier to manage priorities, track order fulfillment, and ensure smooth communication throughout the production process."
 
+;The dedicated customer management spreadsheet is a good step forward in my opinion, as we move closer to a relational style DB where things reference one another in different
+;spreadsheets. The production schedule spreadsheet is a little bit of a misnomer in that I don't think it purports to actually schedule anything, it's just a list of jobs and customers,
+;but it's definetely one of the core spreadsheets we should be using. The third spreadsheet down is inventory, which GPT-4o immediately recognized as being useful (for good reason),
+;and has kept it since. Again, I don't think the Gantt chart is of any use to us here.
+
 User:
 "Can you explain why you removed the resource management spreadsheet?"
 
@@ -86,6 +100,7 @@ Primary Focus of Resource Management:
 The Resource Management Spreadsheet is designed to monitor resources such as machines, labor, and materials.
 It helps ensure that resources are effectively allocated, preventing overuse or underutilization.
 It’s typically not customer-specific because it focuses on the operational aspect of production, not directly on who the product is for.
+
 Customer Information Integration:
 
 Customer details are more naturally linked to Production Scheduling (which assigns jobs to customers) or Order Management, rather than directly to Resource Allocation.
@@ -99,8 +114,11 @@ Customer Job/Order ID: Helps trace resources allocated for a specific customer�
 Priority Levels: Indicates high-priority orders tied to key customers, helping allocate resources preferentially.
 In conclusion, the Resource Management Spreadsheet wasn’t removed; it just serves a different function than managing customer data. If your workflow needs customer linkage, it’s possible to adapt the spreadsheet to include this information!"
 
+;I'm not convinced by this, but it gave me what I wanted in the previous answer anyway.
+
 User:
 "Can you give me a typical database schema that would be used for production scheduling?"
+
 
 Agent:
 "A typical database schema for production scheduling organizes data into tables that reflect the key aspects of production management, such as jobs, resources, inventory, and customer orders. Here’s an example of a database schema with essential tables and their relationships:
@@ -434,3 +452,5 @@ Download the Excel file"
 ;Note: the conversation ended here as I did not use the API key, so my free trial ran out after it generated an excel file.
 ;Next steps will be to come up with a flowchart to find out which of the 7 described types of spreadsheet we are dealing with.
 ;The goal is to create a prompt like process.txt to understand what type of spreadsheet we are dealing with to integrate it to the generated MiniZinc.
+
+;Assume single process, focus on customer orders; no resources yet / production order

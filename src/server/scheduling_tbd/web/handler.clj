@@ -151,7 +151,7 @@
                                         :description "A string uniquely identifying the project to the system DB."
                                         :json-schema/default {:project-id "sur-craft-beer"
                                                               :client-id "2f30f002-37b7-4dd1-bc01-5484273012f0"
-                                                              :body {:code (-> "data/examples/small2-pred.mzn" slurp)}}}))
+                                                              :body ""}})) ;{:code (-> "data/examples/small2-pred.mzn" slurp)}
 
 (s/def ::run-minizinc-response (st/spec {:spec (s/keys :req-un [[::mzn-output]])
                                         :name "run-minizinc-response"

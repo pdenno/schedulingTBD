@@ -284,6 +284,9 @@
    :project/tables
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "true if domain expertise is provided by an artificial agent."}
+   :project/planning-problem
+   #:db{:cardinality :db.cardinality/many :valueType :db.type/ref
+        :doc "the project's explicit problem"}
 
    ;; ---------------------- quantity (an amount of something)
    :quantity/value-string
@@ -348,6 +351,15 @@
    :surrogate/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread that this surrogate uses."}
+
+   ;; ------------------------ problem
+   ;:problem/domain
+   ;#:db{:cardinality :}
+
+;   :problem/goal-string
+
+   ;:problem/state-string
+
 
    ;; ------------------------ table
    :table/id
