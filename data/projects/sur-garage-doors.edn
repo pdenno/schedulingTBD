@@ -1,0 +1,125 @@
+[
+#:project{:agents
+          [#:agent{:assistant-id "asst_leylWRmtWrnmgFhBtiy18Es8",
+                   :base-type :process-interview-agent,
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_WNe4n7ecqwgyeyNtQTzVLfqx"}],
+          :conversations
+          [#:conversation{:done? true,
+                          :id :process,
+                          :messages
+                          [#:message{:content
+                                     "Would you characterize your company's work as primarily providing a product, a service or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-10-29T15:18:16.653-00:00"}
+                           #:message{:content "PRODUCT",
+                                     :from :surrogate,
+                                     :id 2,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-10-29T15:18:16.676-00:00"}
+                           #:message{:content
+                                     "Would you describe your production system as a flow-shop, job-shop, or single-machine?",
+                                     :from :system,
+                                     :id 3,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-10-29T15:18:34.611-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 4,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-10-29T15:18:34.683-00:00"}
+                           #:message{:content
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product.\nBut generally speaking, how long does each step take?\nPlease produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
+                                     :from :system,
+                                     :id 5,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-10-29T15:18:52.836-00:00"}
+                           #:message{:content
+                                     "1. Material Procurement (1-2 weeks)\n2. Cutting and Sizing (1-2 hours)\n3. Assembly (3-4 hours)\n4. Painting and Finishing (2-3 hours)\n5. Quality Inspection (1-2 hours)\n6. Packaging (1-2 hours)\n7. Shipping (1-5 days)",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-10-29T15:18:52.894-00:00"}
+                           #:message{:content
+                                     "Earlier, you listed the process steps typically used in making product and for each you specified typical durations. Now we'd like you to tell us what raw materials and intermediate product go into those process steps. For example, if you were making sandwich cookies, you might list the materials needed for each step. Using the list of process steps you provided, please specify the requirements like this:\n\n 1. Material Procurement (steel, wood, glass)\n 2. Cutting and Sizing (use materials from Material Procurement)\n 3. Assembly (use cut and sized materials)\n 4. Painting and Finishing (use assembled doors)\n 5. Quality Inspection (use finished doors)\n 6. Packaging (use inspected doors)\n 7. Shipping (use packaged doors)",
+                                     :from :system,
+                                     :id 7,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-10-29T15:19:18.044-00:00"}
+                           #:message{:content
+                                     "1. Material Procurement (steel, aluminum, wood, glass, weather stripping)\n2. Cutting and Sizing (use materials from Material Procurement)\n3. Assembly (use cut and sized materials, hinges, rollers)\n4. Painting and Finishing (use assembled doors, paint, protective coatings)\n5. Quality Inspection (use finished doors)\n6. Packaging (use inspected doors, packaging materials)\n7. Shipping (use packaged doors)",
+                                     :from :surrogate,
+                                     :id 8,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-10-29T15:19:18.070-00:00"}]}
+           #:conversation{:id :data,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 9,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:11.748-00:00"}
+                           #:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 12,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:53.637-00:00"}]}
+           #:conversation{:id :resources,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     :from :system,
+                                     :id 10,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:11.772-00:00"}
+                           #:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     :from :system,
+                                     :id 13,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:53.656-00:00"}]}
+           #:conversation{:id :optimality,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 11,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:11.790-00:00"}
+                           #:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 14,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:53.672-00:00"}]}],
+          :current-conversation :process,
+          :id :sur-garage-doors,
+          :name "SUR Garage Doors",
+          :surrogate
+          #:surrogate{:assistant-id "asst_vPTpOkNrOFUH6WWZGe0NR2po",
+                      :id :sur-garage-doors,
+                      :subject-of-expertise "garage doors",
+                      :system-instruction
+                      "You manage a company that makes garage doors.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                      :thread-id "thread_Ad16kb8CnqsALW8jIusBc4yH"}}
+]

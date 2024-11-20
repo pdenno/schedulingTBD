@@ -6,12 +6,12 @@
    [clojure.edn              :as edn]
    [clojure.spec.alpha       :as s]
    [clojure.walk             :as walk  :refer [keywordize-keys]]
-   ;;[cognitect.transit        :as transit]
    [mount.core               :as mount :refer [defstate]]
    [promesa.core             :as p]
    [promesa.exec             :as px]
    [ring.websocket.async     :as wsa]
    [scheduling-tbd.specs     :as spec]
+   [scheduling-tbd.sutil     :as sutil :refer [elide]]
    [scheduling-tbd.util      :refer [now]]
    [taoensso.telemere        :refer [log! event!]]))
 
@@ -155,8 +155,8 @@
                 (-> prom
                     (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation-plan don't return anything themselves.
                     (p/catch (fn [err]
-                               (reset! diag err)
-                               (log! :error (str "Error dispatching: msg = " msg " err = " err)))))))
+                               (let [trace (->> (.getStackTrace err) (map str) (interpose "\n") (apply str))]
+                                 (log! :error (str "Error dispatching: msg = " msg " err = " err "\ntrace:\n" trace))))))))
             (when-not (exiting? client-id) (recur)))))
       ;; There are many reasons a websocket connection might be dropped.
       ;; It is absolutely necessary that it exits the go loop when the socket closes; a race condition my occur otherwise.
@@ -280,7 +280,7 @@
                     p-key               (assoc :p-key p-key)
                     true                (assoc :timestamp (now)))]
       (when-not (= :alive? dispatch-key)
-        (event! ::send-to-client {:level :debug :msg (str "send-to-chat: msg-obj =" msg-obj)}))
+        (event! ::send-to-client {:level :debug :msg (elide (str "send-to-chat: msg-obj =" msg-obj) 80)}))
       (go (>! out (str msg-obj)))
       prom)
     (log! :error (str "Could not find out async channel for client " client-id))))

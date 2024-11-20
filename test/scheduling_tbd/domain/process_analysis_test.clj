@@ -1,20 +1,24 @@
 (ns scheduling-tbd.domain.process-analysis-test
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
+   [clojure.core.unify                     :as uni]
    [clojure.test                           :refer [deftest is testing]]
    [clojure.spec.alpha                     :as s]
+   [datahike.api                           :as d]
+   [jsonista.core                          :as json]
    [scheduling-tbd.domain.process-analysis :as pan]
    [scheduling-tbd.db                      :as db]
    [scheduling-tbd.interviewers            :as inv :refer [tell-interviewer]]
    [scheduling-tbd.llm                     :as llm :refer [query-llm]]
    [scheduling-tbd.response-utils          :as ru]
-   [scheduling-tbd.web.websockets          :as ws]))
+   [scheduling-tbd.sutil                   :as sutil]
+   [scheduling-tbd.web.websockets          :as ws]
+   [taoensso.telemere                      :refer [log!]]))
 
 ;;; THIS is the namespace I am hanging out in recently.
 (def ^:diag diag (atom nil))
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
-
 
 (defn safe-alias
   [al ns-sym]
@@ -41,6 +45,7 @@
   (safe-alias 'core   'scheduling-tbd.core)
   (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
   (safe-alias 'db     'scheduling-tbd.db)
+  (safe-alias 'dbt    'scheduling-tbd.db-test)
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'invt   'scheduling-tbd.interviewers-test)
   (safe-alias 'llm    'scheduling-tbd.llm)
@@ -174,7 +179,7 @@
 (defn ^:diag ask-about-ice-cream-agent
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
   ([q-txt]
-   (let [{:keys [iview-aid iview-tid]} (inv/interview-agent :process :sur-ice-cream)]
+   (let [{:keys [iview-aid iview-tid]} (inv/interview-agent :sur-ice-cream :process )]
      (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"
@@ -336,9 +341,21 @@
 (deftest process-ordering
   (testing "whether the process-ordering system agent works okay."))
 
-
-
-
+(deftest scheduling-challenges-agent
+  (testing "the scheduling-challenges agent"
+    (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
+          result (llm/query-on-thread
+                  {:aid aid :tid tid :query-text
+                   "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service.
+Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as
+ingredient availability and production line capacities.
+Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial."})
+          {:keys [challenges]} (-> result
+                                   json/read-value
+                                   (update-keys keyword)
+                                   (update :challenges #(->> % (map keyword) set)))]
+      (is (= #{:raw-material-uncertainty :product-variation :variation-in-demand :delivery-schedules :demand-uncertainty},
+             challenges)))))
 
 #_(defn migrate-project
   "Translate :message/content to html."
@@ -373,4 +390,126 @@
                   :else         obj))]
     (let [proj (db/get-project pid)
           proj-string (with-out-str (-> proj name2id pprint))]
-    (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string)))))
+      (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string)))))
+
+
+
+
+;;; THIS ONE NOT WORKING CORRECTLY!
+#_(defn ^:diag fix-the-text
+  "Text didn't have spacing and hrefs correct."
+  []
+  (letfn [(get-eid [topic] (d/q '[:find ?eid .
+                                  :in $ ?topic
+                                  :where
+                                  [?c :conversation/id ?topic]
+                                  [?c :conversation/messages ?eid]
+                                  [?eid :message/tags :conversation-intro]]
+                                @(sutil/connect-atm :sur-canned-corn)
+                                topic))]
+    (doseq [pid [:sur-ice-cream] #_(db/list-projects)]
+      (doseq [topic [:data :resources :optimality]]
+        (if-let [eid (get-eid topic)]
+          (do (log! :info (str "Doing " pid " " topic))
+              (d/transact (sutil/connect-atm pid)
+                          ;; Need retract too??? <===================================
+                          {:tx-data [[:db/add eid :message/content (get db/conversation-intros topic)]]}))
+          (log! :warn (str "No eid: pid = " pid)))))))
+
+(defn ^:diag delete-agent-without-id
+  "Bug in code caused creation of process interview agents where they aren't needed.
+   Who knows what was being used!"
+  [pid]
+  (letfn [(bad-threads [pid]
+            (d/q '[:find [?eid ...]
+                   :where
+                   [?eid :agent/thread-id]
+                   (not [?eid :agent/id])]
+                 @(sutil/connect-atm pid)))]
+    (doseq [eid (bad-threads pid)]
+      (log! :warn (str "Removing thread for pid = " pid " eid = " eid))
+      (d/transact (sutil/connect-atm pid) {:tx-data [[:db/retract eid :agent/thread-id]]}))))
+
+(defn ^:diag fix-project-generally!
+  "(1) Add intro messages to all conversations except :process.
+   (2) Mark :process conversation as done.
+   (3) Delete agents that don't have :agent/id (a bug that was fixed long ago?)
+   This is written so that you can run it multiply without messing up project.
+   It writes a new backup file in addition to updating the DB."
+  [pid]
+  (log! :info (str "***Doing project " pid))
+  (delete-agent-without-id pid)
+  (let [resource-eid (db/conversation-exists? pid :resource)]
+    (db/assert-conversation-done! pid :process)
+    (when resource-eid
+      (d/transact (sutil/connect-atm pid) {:tx-data [[:db/retract resource-eid :conversation/id :resource]]}))
+    (d/transact (sutil/connect-atm pid) {:tx-data [{:project/id pid
+                                                    :project/conversations [{:conversation/id :resources}]}]})
+    (d/transact (sutil/connect-atm pid) {:tx-data [{:project/id pid
+                                                    :project/conversations [{:conversation/id :optimality}]}]})
+    (doseq [cid [:data :resources :optimality]]
+      (when (empty? (db/get-conversation pid cid))
+        (db/add-msg {:pid pid :cid cid :from :system :text (get db/conversation-intros cid) :tags [:conversation-intro]})))
+    (db/backup-proj-db pid)
+    (db/recreate-project-db! pid)))
+
+(defn ^:diag fix-projects-generally! []
+  (doseq [pid (db/list-projects)]
+    (fix-project-generally! pid)))
+
+
+(defn ^:diag filter-claims
+  "Remove claims you don't want, fix arity on others."
+  [claims pid]
+  (as-> claims ?c
+    (remove #(uni/unify '(process-step ?x ?y ?z) %) ?c)
+    (remove #(uni/unify '(have-process-durs ?x) %) ?c)
+    (if (ru/find-claim '(cites-raw-material-challenge ?x) ?c)
+      (as-> ?c ?c1
+        (remove #(uni/unify '(cites-raw-material-challenge ?x) %) ?c1)
+        (conj ?c1 (list 'scheduling-challenge pid :raw-material-uncertainty)))
+      ?c)))
+
+(defn claim-question-type
+  [[pred & _]]
+  (case pred
+    scheduling-challenge :warm-up
+    (provides-product provides-service consulting) :work-type
+    production-location  :production-location
+    (flow-shop job-shop) :production-system-type
+    nil))
+
+(defn ^:diag migrate-claims!
+  "Rewrite the project (and make a backup) so that
+    1) claims have :claim/conversation and :claim/question-type.
+    2) claims have correct arity.
+    3) process-step claims are eliminated."
+  [pid]
+  (db/backup-proj-db pid)
+  (db/recreate-project-db! pid)
+  (letfn [(claim-obj [c]
+            (let [q-type (claim-question-type c)]
+              (cond-> {:claim/string (str c)
+                       :claim/conversation-id :process}
+                q-type (assoc :claim/question-type q-type))))]
+    (let [new-claims (as-> (db/get-claims pid) ?c
+                       (filter-claims ?c pid)
+                       (mapv claim-obj ?c))
+          eids (d/q '[:find [?eid ...]
+                      :where [?eid :claim/string]]
+                    @(sutil/connect-atm pid))]
+      (doseq [eid eids]
+        (d/transact (sutil/connect-atm pid) {:tx-data [[:db/retract eid :claim/string]]}))
+      (doseq [c new-claims]
+        (db/add-claim! pid c))))
+  (db/backup-proj-db pid))
+
+(defn ^:diag oops-conversation-id!
+  "I was calling it :claim/conversation in some places."
+  [pid]
+  (let [eids (d/q '[:find [?eid ...]
+                    :where [?eid :claim/string]]
+                  @(sutil/connect-atm pid))]
+    (doseq [eid eids]
+      (d/transact (sutil/connect-atm pid) {:tx-data [[:db/add eid :claim/conversation-id :process]]}))
+    (db/backup-proj-db pid)))

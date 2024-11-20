@@ -123,13 +123,9 @@
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
                      ($ chat/Chat {:chat-height chat-side-height :proj-info proj}))
-           :right ($ ShareUpDown
-                     {:init-height code-side-height
-                      :up ($ Editor {:text code
-                                     :name "code-editor"
-                                     :height code-side-height})
-                      :dn ($ Box)
-                      :share-fns (:right-share top-share-fns)})
+           :right ($ Editor {:text code
+                             :name "code-editor"
+                             :height code-side-height})
            :lf-pct 0.50
            :init-width width}))))
 

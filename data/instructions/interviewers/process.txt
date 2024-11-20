@@ -57,7 +57,7 @@ The six commands are as follows:
 	 (c) "claims", a string describing one or more predicate calculus statements that have been inferred from interviews thus far.
 	 (d) "responses", a list of objects containing two attributes:
 	     (i)  "question-type", which names a question-type, and,
-	     (ii) "answer", which is an interviewee's response, verbatim.
+	     (ii) "answer", which is an interviewee's response, possibly abbreviated to a one or more  ground predicate statements.
 
       An example of CONVERSATION-HISTORY is:
 	  {"command" : "CONVERSATION-HISTORY",
@@ -65,8 +65,8 @@ The six commands are as follows:
 	   "claims" : "(project-id :reman-alts) (work-type :reman-alts product) (production-motivation :reman-alts make-to-stock) (production-system-type :reman-alts flow-shop)"}.
 	   "responses":[{"question-type" : "warm-up", "answer":"We make remanufactured alternators. Our most significant scheduling problem is balancing production capacity with fluctuating supply chain availability. We face frequent delays in receiving key components such as bearings and voltage regulators, which disrupts our assembly line schedules."},
 			{"question-type" : "work-type", "answer":"PRODUCT"},
-			{"question-type" : "production-motivation", "answer":"MAKE-TO-STOCK"},
-			{"question-type" : "production-system-type", "answer":"FLOW-SHOP"}]}.
+			{"question-type" : "production-motivation", "answer" : "MAKE-TO-STOCK"},
+			{"question-type" : "production-system-type", "answer" : "FLOW-SHOP"}]}.
 
       Do not ask any questions (i.e. responding to SUPPLY-QUESTION) of types in already-answered, you have the response in the conversation-history.
       Response to a CONVERSATION-HISTORY command is always {"status" : "OK"}.

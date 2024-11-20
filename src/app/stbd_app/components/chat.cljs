@@ -23,7 +23,7 @@
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
    [stbd-app.ws         :as ws :refer [remember-promise]]
-   [taoensso.telemere.timbre   :as log :refer-macros [info debug log]]))
+   [taoensso.telemere          :as tel :refer-macros [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -93,7 +93,7 @@
   "Update the dates on the msg list."
   []
   (when (and (not ((lookup-fn :get-busy?))) (> (count @msgs-atm) 0))
-    (log/info "update-msg-times: msg-count = " (count @msgs-atm))
+    (log! :debug (str "update-msg-times: msg-count = " (count @msgs-atm)))
     ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
 ;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid.
@@ -104,7 +104,7 @@
   ([pid cid]
    (-> (dba/get-conversation-http pid cid)
        (p/then (fn [{:keys [conv cid code]}]
-                 (log/info "chat/get-conversation (return from promise): cid =" cid "count =" (count conv))
+                 (log! :info (str "chat/get-conversation (return from promise): cid = " cid " count = " (count conv)))
                  (reset! msgs-atm conv)
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
@@ -112,7 +112,7 @@
                  (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :cid cid})
                  (update-common-info! {:project/id pid :cid cid})))
        (p/catch (fn [e]
-                  (log/info "get-conversation failed:" e))))))
+                  (log! :info (str "get-conversation failed: " e)))))))
 
 (register-fn :get-conversation get-conversation)
 
@@ -128,15 +128,15 @@
 (register-fn :interviewer-busy?     (fn [{:keys [value]}]
                                       ((lookup-fn :set-busy?) value)))
 
-(register-fn :tbd-says              (fn [{:keys [p-key msg]}]
+(register-fn :tbd-says              (fn [{:keys [p-key text]}]
                                       (when p-key (remember-promise p-key))
-                                      (log/info "tbd-says msg:" msg "before =" (count @msgs-atm))
-                                      (add-msg msg :system)
-                                      (log/info "tbd-says msg:" msg "after =" (count @msgs-atm))))
+                                      (log! :info (str "tbd-says text: " text " before = " (count @msgs-atm)))
+                                      (add-msg text :system)
+                                      (log! :info (str "tbd-says text: " text " after = " (count @msgs-atm)))))
 
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
-                                      (log/info "sur-says msg:" msg)
+                                      (log! :info (str "sur-says msg: " msg))
                                       (add-msg msg :surrogate)))
 
 (defnc Chat [{:keys [chat-height proj-info]}]
@@ -150,7 +150,7 @@
               (when-not busy?
                 (if-let [pid (:project/id @common-info)]
                   (get-conversation pid to)
-                  (log/info "change-conversation-click fails: common-info =" @common-info))))
+                  (log! :info (str "change-conversation-click fails: common-info = " @common-info)))))
             (process-user-input [text]
               (when (not-empty text)
                 (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)
@@ -199,12 +199,16 @@
                           ($ Conversation {:name "Process"
                                            :active (= active-conv :process)
                                            :onClick (fn [_] (change-conversation-click :process))})
-                          ($ Conversation {:name "Resources"
-                                           :active (= active-conv :resource)
-                                           :onClick (fn [_] (change-conversation-click :resource))})
                           ($ Conversation {:name "Data"
                                            :active (= active-conv :data)
-                                           :onClick (fn [_] (change-conversation-click :data))})))
+                                           :onClick (fn [_] (change-conversation-click :data))})
+                          ($ Conversation {:name "Resources"
+                                           :active (= active-conv :resources)
+                                           :onClick (fn [_] (change-conversation-click :resources))})
+                          ($ Conversation {:name "Optimality"
+                                           :active (= active-conv :optimality)
+                                           :onClick (fn [_] (change-conversation-click :optimality))})))
+
                     ($ ChatContainer
                        ($ MessageList
                           {:typingIndicator (when busy? ($ TypingIndicator {:content "Interviewer is typing"}))
@@ -213,9 +217,9 @@
           :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!
                  ($ Stack {:direction "row" :spacing "0px"}
                     ($ ButtonGroup
-                       ($ AttachmentModal {:post-attach-fn #(log/info "attach-fn: args =" %)})) ; This has the attachment modal
+                       ($ AttachmentModal {:post-attach-fn #(log! :info (str "attach-fn: args = " %))})) ; This has the attachment modal
                     ($ MessageInput {:placeholder "Type message here...."
-                                     :onSend #(do (log/info "onSend:" %)
+                                     :onSend #(do (log! :info (str "onSend: " %))
                                                   (process-user-input %))
                                      :attachButton false
                                      :fancyScroll false
