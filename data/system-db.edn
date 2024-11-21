@@ -28,7 +28,17 @@
                   :id :answers-the-question?-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_2vhjT8fIazLPDOmTqD2Qc4Dj"}],
+                  :thread-id "thread_2vhjT8fIazLPDOmTqD2Qc4Dj"}
+          #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
+                  :base-type :data-interview-agent,
+                  :id :data-interview-agent-openai,
+                  :llm-provider :openai,
+                  :model-class :gpt}
+          #:agent{:assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
+                  :base-type :resources-interview-agent,
+                  :id :resources-interview-agent-openai,
+                  :llm-provider :openai,
+                  :model-class :gpt}],
          :default-project-id :sur-ice-cream,
          :name "SYSTEM",
          :openai-assistants

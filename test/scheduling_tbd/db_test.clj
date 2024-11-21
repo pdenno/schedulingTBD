@@ -1,12 +1,33 @@
 (ns scheduling-tbd.db-test
   (:require
+   [clojure.set    :as set]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [datahike.api                 :as d]
    ;[datahike.pull-api            :as dp]
-   [scheduling-tbd.db     :as db]
-   [scheduling-tbd.domain :as domain]
-   [scheduling-tbd.util   :as util]))
+   [scheduling-tbd.db     :as db]))
+
+(defn used-db-attrs
+  "Create a set of all used DB attrs by looking at all projects."
+  []
+  (let [used (atom #{})]
+    (letfn [(uda [x]
+              (cond (map? x)     (doseq [[k v] (seq x)] (swap! used conj k) (uda v))
+                    (vector? x)  (doall (map uda x))))]
+      (doseq [p (db/list-projects)]
+        (uda (db/get-project p))))
+    @used))
+
+(defn unused-db-attrs
+  "Return the set of unused DB attributes, as the difference of those found in project
+   and those in the schema definition."
+  []
+  (sort (set/difference db/project-schema-key? (used-db-attrs))))
+
+(deftest unused-db-attrs
+  (testing "that there isn't any junk in the DB schema."
+    (let [used-attrs (used-db-attrs)]
+      (is (empty? (unused-db-attrs))))))
 
 (def craft-brewing-desc
   "In medium-scale craft beer brewing, a significant challenge arises in the form of production scheduling. Craft breweries often produce a diverse range of beer styles with varying ingredients, fermentation times, and packaging requirements. Coordinating the brewing process to meet customer demands while optimizing resources can be complex. The production scheduling problem entails determining the most efficient sequence and timing of brewing batches, taking into account factors like ingredient availability, tank capacities, yeast propagation, and production deadlines. Balancing these variables is crucial to ensure optimal utilization of equipment, minimize idle time, reduce inventory holding costs, and meet customer expectations. Effective production scheduling plays a vital role in maintaining consistent beer quality, managing production costs, and maximizing overall brewery efficiency.")

@@ -1,35 +1,86 @@
-[#:project{:code
-           " int : nProducts = 5;\n set of int: Product = 1..nProducts;\n set of int: Day = -36..365;\n enum Task = {mill, ferment, bright};\n array [Product, Task] of int: taskDuration = [|1, 20, 20 |   % processing times for\n                                                1, 20, 20 |   % various beers, perhaps\n                                                1, 30, 11 |   % from a screenshot of a\n                                                1, 21, 11 |   % of spreadsheet the\n                                                1, 18, 19 |]; % user provided.\n\n array [Product] of Day: neededDate = [50, 80, 130, 140, 150];\n\n % We assume a task uses one major resource; resources are synonymous with tasks.\n array [Product, Task] of var Day: taskStarts; % 'var' means it is a decision variable.\n array [Product, Task] of var Day: taskEnds;\n\n % We'll use this below to ensure a resource can only be used by one product at a time.\n array [Task, Day] of var Product: busyWith;\n\n % The first two Product are already in the fermentation tank and bright tank respectively.\n constraint taskStarts[1,mill] = -35;   % Product 1 is therefore in the bright tank...\n constraint taskStarts[2,mill] = -5;    % ...and out before this one moves there.\n\n % Next task must start right after previous task ends. No place to put WIP.\n constraint forall (p in Product) (taskEnds[p, mill   ] + 1 == taskStarts[p, ferment]);\n constraint forall (p in Product) (taskEnds[p, ferment] + 1 == taskStarts[p, bright]);\n\n % A task ends taskDuration days after it starts.\n constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n % A resource(task) can only be used with one product at a time.\n constraint forall (t in Task, p in Product, d in Day where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])\n                    (busyWith[t,d] == p);\n\n % Aim to have it done when it is needed.\n solve minimize sum (p in Product) (abs(neededDate[p] - taskEnds[p,bright]));",
-           :conversations
-           [#:conversation{:id :data}
-            #:conversation{:id :resource}
-            #:conversation{:id :process,
-                           :messages
-                           [#:message{:content
-                                      "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.",
-                                      :from :system,
-                                      :id 0,
-                                      :time
-                                      #inst "2023-11-11T10:12:49.625-00:00"}
-                            #:message{:content
-                                      "We are a medium-sized craft beer brewery. We produce about 110,000 barrels/year. We run several products simultaneously and simply would like to be able to have the beer bottled and ready to ship as near as possible to the dates defined in our sales plan.",
-                                      :from :human,
-                                      :id 1,
-                                      :time
-                                      #inst "2023-11-11T10:12:49.648-00:00"}
-                            #:message{:content
-                                      "Great! We'll call your project 'craft-beer-brewery-scheduling'.",
-                                      :from :system,
-                                      :id 2,
-                                      :time
-                                      #inst "2023-11-11T10:12:49.671-00:00"}]}],
-           :current-conversation :process,
-           :desc
-           "We are a medium-sized craft beer brewery. We produce about 110,000 barrels/year. We run several products simultaneously and simply would like to be able to have the beer bottled and ready to ship as near as possible to the dates defined in our sales plan.",
-           :id :craft-beer-brewery-scheduling,
-           :name "Craft Beer Brewery Scheduling",
-           :planning-problem
-           #:problem{:domain :process-interview,
-                     :goal-string "(characterize-process ?proj)",
-                     :state-string
-                     "#{(well-known-process craft-beer) (ongoing-discussion craft-beer) (have-process-steps craft-beer) (proj-id craft-beer) (system-model craft-beer flow)}"}}]
+[
+#:project{:agents
+          [#:agent{:assistant-id "asst_PkytTl2BpwwIiEL6FcrcwQnd",
+                   :base-type :process-interview-agent,
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_gSa9YruHcIrdSeuEmKvheQNp"}],
+          :code
+          " int : nProducts = 5;\n set of int: Product = 1..nProducts;\n set of int: Day = -36..365;\n enum Task = {mill, ferment, bright};\n array [Product, Task] of int: taskDuration = [|1, 20, 20 |   % processing times for\n                                                1, 20, 20 |   % various beers, perhaps\n                                                1, 30, 11 |   % from a screenshot of a\n                                                1, 21, 11 |   % of spreadsheet the\n                                                1, 18, 19 |]; % user provided.\n\n array [Product] of Day: neededDate = [50, 80, 130, 140, 150];\n\n % We assume a task uses one major resource; resources are synonymous with tasks.\n array [Product, Task] of var Day: taskStarts; % 'var' means it is a decision variable.\n array [Product, Task] of var Day: taskEnds;\n\n % We'll use this below to ensure a resource can only be used by one product at a time.\n array [Task, Day] of var Product: busyWith;\n\n % The first two Product are already in the fermentation tank and bright tank respectively.\n constraint taskStarts[1,mill] = -35;   % Product 1 is therefore in the bright tank...\n constraint taskStarts[2,mill] = -5;    % ...and out before this one moves there.\n\n % Next task must start right after previous task ends. No place to put WIP.\n constraint forall (p in Product) (taskEnds[p, mill   ] + 1 == taskStarts[p, ferment]);\n constraint forall (p in Product) (taskEnds[p, ferment] + 1 == taskStarts[p, bright]);\n\n % A task ends taskDuration days after it starts.\n constraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n % A resource(task) can only be used with one product at a time.\n constraint forall (t in Task, p in Product, d in Day where d >= taskStarts[p,t] /\\ d <= taskEnds[p,t])\n                    (busyWith[t,d] == p);\n\n % Aim to have it done when it is needed.\n solve minimize sum (p in Product) (abs(neededDate[p] - taskEnds[p,bright]));",
+          :conversations
+          [#:conversation{:id :data,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:10.832-00:00"}
+                           #:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 6,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:52.602-00:00"}]}
+           #:conversation{:done? true,
+                          :id :process,
+                          :messages
+                          [#:message{:content
+                                     "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.",
+                                     :from :system,
+                                     :id 0,
+                                     :time
+                                     #inst "2023-11-11T10:12:49.625-00:00"}
+                           #:message{:content
+                                     "We are a medium-sized craft beer brewery. We produce about 110,000 barrels/year. We run several products simultaneously and simply would like to be able to have the beer bottled and ready to ship as near as possible to the dates defined in our sales plan.",
+                                     :from :human,
+                                     :id 1,
+                                     :time
+                                     #inst "2023-11-11T10:12:49.648-00:00"}
+                           #:message{:content
+                                     "Great! We'll call your project 'craft-beer-brewery-scheduling'.",
+                                     :from :system,
+                                     :id 2,
+                                     :time
+                                     #inst "2023-11-11T10:12:49.671-00:00"}]}
+           #:conversation{:id :resources,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:10.847-00:00"}
+                           #:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     :from :system,
+                                     :id 7,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:52.621-00:00"}]}
+           #:conversation{:id :optimality,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 5,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T12:53:10.870-00:00"}
+                           #:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 8,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-11-20T13:32:52.640-00:00"}]}],
+          :current-conversation :data,
+          :desc
+          "We are a medium-sized craft beer brewery. We produce about 110,000 barrels/year. We run several products simultaneously and simply would like to be able to have the beer bottled and ready to ship as near as possible to the dates defined in our sales plan.",
+          :id :craft-beer-brewery-scheduling,
+          :name "Craft Beer Brewery Scheduling"}
+]

@@ -15,7 +15,7 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.llm   :as llm]
    [scheduling-tbd.specs :as spec]
-   [scheduling-tbd.sutil :as sutil :refer [register-db connect-atm datahike-schema db-cfg-map resolve-db-id default-llm-provider]]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema db-cfg-map default-llm-provider register-db resolve-db-id starting-new-project?]]
    [scheduling-tbd.util  :as util :refer [now]]
    [taoensso.telemere    :refer [log!]]))
 
@@ -124,17 +124,23 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.
               For example, (:process/production-motivation make-to-stock)."}
+   :claim/conversation-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The conversation from which this claim is founded. Currently a cid."}
+   :claim/question-type
+      #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The question-type (if any) on which this claim is founded."}
    :claim/confidence
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc "a number [0,1] expressing how strongly we believe the proposition ."}
 
    ;; ---------------------- conversation
+   :conversation/done?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "true if we don't have more to add (though user might)."}
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resource}."}
-   :conversation/state-vector
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "keywords indicating the state of the conversation (i.e. what has been discussed."}
+        :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages of the conversation."}
@@ -147,7 +153,7 @@
    ;; ---------------------- message
    :message/content
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "msg-text and msg-link objects."}
+        :doc "a string with optional html links."}
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
@@ -428,6 +434,7 @@
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
 (def db-schema-proj (datahike-schema db-schema-proj+))
+(def project-schema-key? (-> db-schema-proj+ keys set))
 
 ;;; ---------------------------------- agents ----------------------------------------------
 (s/def ::agent-args (s/keys :req-un [::base-type ::instructions]
@@ -481,9 +488,34 @@
     ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
     #_#_:response-format (-> "data/instructions/interviewers/response-format.edn" slurp edn/read-string)}
 
+   {:id :data-interview-agent
+    :project-thread?  true
+    :model-class :gpt
+    :tools [{:type "file_search"}]
+    #_#_:vector-store-files ["data/instructions/interviewers/data-interview-flowchart.pdf"]
+    :instruction-path "data/instructions/interviewers/data.txt"}
+
+   {:id :resources-interview-agent
+    :project-thread?  true
+    :model-class :gpt
+    :tools [{:type "file_search"}]
+    #_#_:vector-store-files ["data/instructions/interviewers/resources-interview-flowchart.pdf"]
+    :instruction-path "data/instructions/interviewers/resources.txt"}
+
+   {:id :optimality-interview-agent
+    :project-thread?  true
+    :model-class :gpt
+    :tools [{:type "file_search"}]
+    #_#_:vector-store-files ["data/instructions/interviewers/optimality-interview-flowchart.pdf"]
+    :instruction-path "data/instructions/interviewers/optimality.txt"}
+
    {:id :answers-the-question?
     :instruction-path "data/instructions/answers-the-question.txt"
     :response-format (-> "data/instructions/boolean-response-format.edn" slurp edn/read-string)}
+
+   {:id :scheduling-challenges-agent
+    :instruction-path "data/instructions/scheduling-challenges.txt"
+    :response-format (-> "data/instructions/scheduling-challenges-response-format.edn" slurp edn/read-string)}
 
    {:id :process-dur-agent
     :instruction-path "data/instructions/process-dur-agent.txt"}
@@ -515,16 +547,16 @@
            [?e :project/id ?pid]]
          @(connect-atm pid) pid)))
 
+(defn get-current-conversation [pid] (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid)))
+
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
-  ([pid] (conversation-exists? pid (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))))
-  ([pid cid]
-   (assert (#{:process :data :resource} cid))
-   (d/q '[:find ?eid .
-          :in $ ?cid
-          :where
-          [?eid :conversation/id ?cid]]
-        @(connect-atm pid) cid)))
+  [pid cid]
+  (assert (#{:process :data :resource :resources :optimality} cid)) ; <================================
+  (d/q '[:find ?eid .
+         :in $ ?cid
+         :where [?eid :conversation/id ?cid]]
+       @(connect-atm pid) cid))
 
 (defn get-conversation-eids
   "Return a vector of the EIDs of the argument conversation's messages."
@@ -537,7 +569,7 @@
 (defn change-conversation
   [{:keys [pid cid] :as obj}]
   (try
-    (assert (#{:process :data :resource} cid))
+    (assert (#{:process :data :resources :optimality} cid))
     (let [conn (connect-atm pid)
           eid (project-exists? pid)]
       (if eid
@@ -594,21 +626,20 @@
       (dp/pull @(connect-atm pid) '[*] eid))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/question-type})
+  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/tags :message/question-type})
 
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  ([pid] (get-conversation pid (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))))
-  ([pid conversation]
-   (assert (#{:process :data :resource} conversation))
-   (if-let [eid (conversation-exists? pid conversation)]
-     (->> (resolve-db-id {:db/id eid}
-                         (connect-atm pid)
-                         :keep-set message-keep-set)
-          :conversation/messages
-          (sort-by :message/id)
-          vec)
-     [])))
+  [pid cid]
+  (assert (#{:process :data :resources :optimality} cid))
+  (if-let [eid (conversation-exists? pid cid)]
+    (->> (resolve-db-id {:db/id eid}
+                        (connect-atm pid)
+                        :keep-set message-keep-set)
+         :conversation/messages
+         (sort-by :message/id)
+         vec)
+    []))
 
 (defn get-code
   "Return the code string for the argument project (or an empty string if it does not exist)."
@@ -634,25 +665,48 @@
 
 (defn get-claims
   "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none.
-   Returns #{} if pid is :START-A-NEW-PROJECT."
-  [pid]
-  (if (= pid :START-A-NEW-PROJECT)
-    '#{(project-id :START-A-NEW-PROJECT)} ; Special treatment for new projects.
-    (if-let [facts (d/q '[:find [?s ...]
-                          :where
-                          [_ :project/claims ?pp]
-                          [?pp :claim/string ?s]]
-                        @(connect-atm pid))]
-      (-> (mapv edn/read-string facts) set)
-      #{})))
+   Returns '#{(project-id :START-A-NEW-PROJECT)} if starting-new-project."
+  [pid & {:keys [objects?]}]
+  (let [conn @(connect-atm pid)]
+    (if (starting-new-project? pid)
+      '#{(project-id :START-A-NEW-PROJECT)} ; Special treatment for new projects.
+      (if objects?
+        (let [eids (d/q '[:find [?eid ...] :where [?eid :claim/string]] conn)]
+          (for [eid eids]
+            (let [{:claim/keys [string conversation-id question-type confidence]}
+                  (dp/pull conn '[*] eid)]
+              (cond-> {:claim (edn/read-string string)}
+                conversation-id (assoc :conversation-id conversation-id)
+                question-type   (assoc :question-type question-type)
+                confidence      (assoc :confidence confidence)))))
+        ;; Otherwise just return predicate forms
+        (if-let [facts (d/q '[:find [?s ...]
+                              :where
+                              [_ :project/claims ?pp]
+                              [?pp :claim/string ?s]]
+                            conn)]
+          (-> (mapv edn/read-string facts) set)
+          #{})))))
 
-(defn add-claim
+(s/def ::claim (s/keys :req-un [:claim/string :claim/cid] :opt-un [:claim/q-type :claim/confidence]))
+(s/def :claim/string string?)
+(s/def :claim/cid #({:process :data :resources :optimality} %))
+(s/def :claim/q-type keyword?)
+(s/def :claim/confidence (s/and number? (s/or :hopeless zero? :hopeful pos?)))
+
+(defn add-claim!
   "Add the argument vector of ground proposition to state, a set. Returns true."
-  [pid claim]
-  (assert (s/valid? ::spec/proposition claim))
+  [pid {:keys [string cid q-type confidence] :as claim}]
+  (s/assert ::claim claim)
+  (assert (s/valid? ::claim claim))
   (let [conn (connect-atm pid)
         eid (d/q '[:find ?eid . :where [?eid :project/claims]] @conn)]
-    (d/transact conn {:tx-data [{:db/id eid :project/claims {:claim/string (str claim)}}]}))
+    (d/transact conn {:tx-data [{:db/id eid
+                                 :project/claims
+                                 (cond-> {:claim/string string}
+                                   cid        (assoc :claim/conversation-id cid)
+                                   q-type     (assoc :claim/question-type q-type)
+                                   confidence (assoc :claim/confidence confidence))}]}))
   true)
 
 (defn get-process
@@ -676,19 +730,29 @@
         eid (project-exists? pid)]
     (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
 
+(defn clean-project-for-schema
+  "Remove attributes that are no longer in the schema.
+   Remove nil values, these can show up after doing a :db/retract."
+  [proj]
+  (letfn [(cpfs [x]
+            (cond (map? x)      (reduce-kv (fn [m k v]
+                                             (if (project-schema-key? k)
+                                               (if (nil? v) m (assoc m k (cpfs v)))
+                                               (do (log! :warn (str "Dropping obsolete attr: " k)) m)))
+                                           {} x)
+                  (vector? x)   (->> (mapv cpfs x) (remove nil?) vec)
+                  :else         x))]
+    (cpfs proj)))
+
 ;;; ----------------------- Backup and recover project and system DB ---------------------
 (defn backup-proj-db
-  [id & {:keys [target-dir] :or {target-dir "data/projects/"}}]
-  (let [conn-atm (connect-atm id)
-        filename (str target-dir (name id) ".edn")
+  [id & {:keys [target-dir clean?] :or {target-dir "data/projects/" clean? true}}]
+  (let [filename (str target-dir (name id) ".edn")
+        proj (cond-> (get-project id)
+               clean? clean-project-for-schema)
         s (with-out-str
             (println "[")
-            (doseq [ent-id  (sutil/root-entities conn-atm)]
-              (let [obj (resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
-                ;; Write content except schema elements and transaction markers.
-                (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
-                  (pprint obj)
-                  (println))))
+            (pprint proj)
             (println "]"))]
     (log! :info (str "Writing project to " filename))
     (spit filename s)))
@@ -718,6 +782,14 @@
       (spit filename s)))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
+(defn ^:diag assistants-that-openai-deleted
+  []
+  (let [conn (connect-atm :system)
+        old-ones (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]] @conn)
+        new-ones (llm/list-assistants)]
+    (log! :warn (str "The following OpenAI assistants have been deleted (by OpenAI):\n"
+                     (with-out-str (pprint (set/difference (set old-ones) (set new-ones))))))))
+
 (defn update-assistants!
   "List what assistants the LLM-provider's currently maintains that have metadata indicating that
    they are part of our project (where they are called agents). Store this in the sytems DB."
@@ -850,13 +922,14 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to current conversation of the database with :project/id = id."
-  [{:keys[pid from text tags question-type]}]
+  [{:keys [pid cid from text tags question-type]}]
+  (assert (keyword? cid))
   (assert (#{:system :human :surrogate :developer-injected} from))
   (assert (string? text))
   (log! :debug (str "add-msg: pid = " pid "text = " text))
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid))]
-      (d/transact conn {:tx-data [{:db/id (conversation-exists? pid) ; defaults to current conversation
+      (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
                                                             (not-empty tags) (assoc :message/tags tags)
                                                             question-type    (assoc :message/question-type question-type))}]}))
@@ -869,6 +942,36 @@
               {:tx-data [{:project/id id
                           :project/name project-name
                           :project/dir dir}]}))
+
+(def conversation-intros
+  {:process
+   (str "You are at the right start point! "
+        "This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. "
+        "It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) "
+        "through which together we design a solution to your scheduling problem. "
+        "You can read more about <a href=\"about/process-conversation\">how this works</a>.")
+   :data
+   (str "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). "
+        "Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and "
+        "we can invent some similar data to run demonstrations. "
+        "Whenever someone suggests that you upload information to them, you should be cautious. "
+        "Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.")
+   :resources
+   (str "This is typically the third conversation we'll have, after discussing process and data. "
+        "(By the way, you can always go back to a conversation and add to it.) "
+        "You might have already mentioned the resources (people, machines) by which you make product or deliver services. "
+        "Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.")
+   :optimality
+   (str "This is where we discuss what you intend by 'good' and 'ideal' schedules. "
+        "With these we formulate an objective and model it in MiniZinc. "
+        "The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did "
+        "to define requirements, we think it will be successful.")})
+
+(defn add-conversation-intros
+  "Add an intro describing the topic and rationale of the conversation."
+  [pid]
+  (doseq [cid [:process :data :resources :optimality]]
+    (add-msg  {:pid pid :cid cid :from :system :text (get conversation-intros cid) :tags [:conversation-intro]})))
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
@@ -883,7 +986,7 @@
    Return the PID of the project."
   ([proj-info] (create-proj-db! proj-info {} {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
-  ([proj-info additional-info {:keys [in-mem? force-this-name?] :as opts}]
+  ([proj-info additional-info {:keys [in-mem? force-this-name?] :as _opts}]
    (s/assert ::project-info proj-info)
    (let [{id :project/id pname :project/name} (if force-this-name? proj-info (unique-proj proj-info))
          cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
@@ -909,7 +1012,9 @@
                                                                {:claim/string (str `(~'project-name ~id ~pname))}]
                                               :project/conversations [{:conversation/id :process}
                                                                       {:conversation/id :data}
-                                                                      {:conversation/id :resource}]}]})
+                                                                      {:conversation/id :resources}
+                                                                      {:conversation/id :optimality}]}]})
+     (add-conversation-intros id)
      (when (not-empty additional-info)
        (d/transact (connect-atm id) additional-info))
      ;; Add knowledge of this project to the system db.
@@ -958,6 +1063,7 @@
    from either the system DB, or if :pid is provided, the project DB.
    If :db-attrs? then return the object with DB-native attributes, not :aid :tid."
   [& {:keys [base-type llm-provider pid db-attrs?] :or {llm-provider @default-llm-provider} :as obj}]
+  ;;{:post [(-> % :aid string?) (-> % :tid string?)]}
   (reset! diag obj)
   (let [conn (if pid @(connect-atm pid) @(connect-atm :system))
         ent (when base-type
@@ -970,6 +1076,40 @@
     (when ent
       (let [a-map (dp/pull conn '[*] ent)]
         (if db-attrs? a-map (agent-info a-map))))))
+
+(defn assert-conversation-done!
+  "Set the conversation's :converation/done? attribute to true."
+  [pid cid]
+  (if-let [eid (conversation-exists? pid cid)]
+    (d/transact (connect-atm pid) {:tx-data [[:db/add eid :conversation/done? true]]})
+    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
+
+(defn ^:diag retract-conversation-done!
+  [pid cid]
+  (if-let [eid (conversation-exists? pid cid)]
+    (d/transact (connect-atm pid) {:tx-data [[:db/add eid :conversation/done? false]]})
+    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
+
+(defn conversation-done?
+  "Returns true if the conversation is completed, as far as the interviewer is concerned."
+  [pid cid]
+  (if-let [eid (conversation-exists? pid cid)]
+    (d/q '[:find ?done .
+           :in $ ?eid
+           :where [?eid :conversation/done? ?done]]
+         @(connect-atm pid) eid)
+    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
+
+(defn ^:diag update-project-for-schema!
+  "This has the ADDITIONAL side-effect of writing a backup file."
+  [pid]
+  (backup-proj-db pid)
+  (recreate-project-db! pid))
+
+(defn ^:diag update-all-projects-for-schema!
+  []
+  (doseq [p (list-projects)]
+    (update-project-for-schema! p)))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs
