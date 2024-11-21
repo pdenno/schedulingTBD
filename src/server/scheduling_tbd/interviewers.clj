@@ -12,7 +12,7 @@
    [scheduling-tbd.domain.data-analysis]
    [scheduling-tbd.domain.process-analysis :refer [the-warm-up-type-question]]
    [scheduling-tbd.domain.optimality-analysis]
-   [scheduling-tbd.domain.resource-analysis]
+   [scheduling-tbd.domain.resources-analysis]
    [scheduling-tbd.llm            :as llm]
    [scheduling-tbd.response-utils :as ru :refer [find-claim]]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm elide output-struct2clj starting-new-project?]]
