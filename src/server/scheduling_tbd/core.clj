@@ -8,14 +8,13 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.db   :refer [sys&proj-database-cfgs]] ; for mount
    [scheduling-tbd.how-made :refer [him-cfg]]            ; for mount
-;  [scheduling-tbd.planner :refer [planning]]            ; for mount
    [scheduling-tbd.interviewers :refer [iviewers]]       ; for mount
    [scheduling-tbd.surrogate :refer [surrogates]]        ; for mount
    [scheduling-tbd.util :refer [util-state]]             ; for mount
    [scheduling-tbd.web.handler :refer [app]]             ; for mount
    [scheduling-tbd.web.websockets :refer [wsock]]        ; for mount
    [ring.adapter.jetty :as jetty]
-   [taoensso.telemere.timbre  :as log])
+   [taoensso.telemere  :refer [log!]])
   (:gen-class))
 
 ;;; Here are some naming conventions we try to use throughout the server and app code.
@@ -28,9 +27,9 @@
 (Thread/setDefaultUncaughtExceptionHandler
   (reify Thread$UncaughtExceptionHandler
     (uncaughtException [_ thread ex]
-      (log/error {:what :uncaught-exception
-                  :exception ex
-                  :where (str "Uncaught exception on" (.getName thread))}))))
+      (log! :error (str {:what :uncaught-exception
+                         :exception ex
+                         :where (str "Uncaught exception on" (.getName thread))})))))
 
 (defonce system (atom nil))
 
@@ -43,13 +42,13 @@
   (try
     ;; Convert the Ring handler into a running web server.
     (GET (str "http://localhost:" port "/api/health")
-         {:handler (fn [resp] (log/info "Response through server (GET):" resp))
+         {:handler (fn [resp] (log! :info (str "Response through server (GET): " resp)))
           :error-handler (fn [{:keys [status status-text]}]
-                           (log/error "Server fails response through server: status = " status " status-text = " status-text)
+                           (log! :error (str "Server fails response through server: status = " status " status-text = " status-text))
                            (throw (ex-info "Server fails health test." {:status status :status-text status-text})))
           :timeout 1000})
-    (catch Throwable t
-      (log/error t (str "server failed to start on port: " port)))))
+    (catch Throwable _e
+      (log! :error (str "server failed to start on port: " port)))))
 
 ;;; There's a lot to learn here about the server abstraction; it is explained here: https://github.com/ring-clojure/ring/wiki
 (defn start-server [& {:keys [profile] :or {profile :dev}}]
@@ -59,14 +58,14 @@
     (try (let [server (jetty/run-jetty #'scheduling-tbd.web.handler/app {:port port, :join? false})]
            (reset! system server)
            ;(test-server port)
-           (log/info "Started server on port" port))
-         (catch Throwable t
-           (log/error t "Server failed to start on host " host " port " port ".")))))
+           (log! :info (str "Started server on port" port)))
+         (catch Throwable _e
+           (log! :error (str "Server failed to start on host " host " port " port "."))))))
 
 (defn -main [& _]
   (let [res (mount/start)
         info (str "   " (clojure.string/join ",\n    " (:started res)))]
-    (log/info "started:\n" info)))
+    (log! :info (str "started:\n" info))))
 
 ;;; This is top-most state for starting the server; it happens last.
 (defstate server
