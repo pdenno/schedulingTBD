@@ -1,13 +1,11 @@
 # schedulingTBD
 
-## Introduction
-
 SchedulingTBD is exploratory software to study human/machine teaming (HMT) in long-running cognitive tasks (work that might continue for weeks or months).
 The cognitive work we focus on is the joint (human and AI) formulation and refinement of solutions written in a domain-specific language (DSLs).
 The DSLs we use are likely to be unfamiliar to the users, so part of the teaming involves mentoring them in the use.
-Specifically, to test our ideas, we focus on collaborating in the design of manufacturing production scheduling systems by mentoring the users in the use of MiniZinc, [MiniZinc](https://www.minizinc.org/).
+Specifically, to test our ideas, we focus on collaborating in the design of manufacturing production scheduling systems by mentoring the users in the use of [MiniZinc](https://www.minizinc.org/).
 Our research goals are to help establish consensus (and eventual [standardization](https://www.iso.org/committee/6794475.html)) on the best practices of
- * AI-mediated system integration,
+ * AI-mediated systems integration,
  * designing DSLs fit for HMT,
  * running AI agent-based interviews to elicit requirements,
  * plan recognition in collaborative tasks,
@@ -16,7 +14,7 @@ Our research goals are to help establish consensus (and eventual [standardizatio
 
 In the software, we engage the user in chat-based conversation implemented with large language models (LLMs) and a multi-agent architecture.
 As of this writing, we are implementing interviewing agents to understand the goals of users and introduce them to the DSL technology.
-We are far enough along to produce, in teaming, complete MiniZinc specifications for walking the user's production process (without knowledge of resource constraints).
+We are far enough along to produce, in teaming, complete MiniZinc specifications for walking the user's production process (without knowledge of production resource constraints).
 We expect to be able to formulate entire solutions to some problems soon.
 Currently we are testing the interviewing process with surrogate human users, LLM-based agents simulating expertise in a manufacturing domain.
 We plan to test hundreds of such domain expert surrogates before enabling similar functionality for human experts.
