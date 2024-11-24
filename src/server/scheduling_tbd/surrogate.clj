@@ -85,7 +85,7 @@
   (log! :info (str "SUR follow-up:" obj))
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
         {:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)
-        cid (db/get-current-conversation pid)]
+        cid (db/get-current-cid pid)]
     (when (and assistant-id thread-id)
       (try (when-let [answer (llm/query-on-thread :aid assistant-id :tid thread-id :query-text question)]
              (log! :info (str "SUR's answer:" answer))

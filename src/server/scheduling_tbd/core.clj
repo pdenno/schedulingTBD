@@ -6,6 +6,7 @@
    [clojure.java.io :as io]
    [clojure.string]
    [mount.core :as mount :refer [defstate]]
+   [ring.adapter.jetty :as jetty]
    [scheduling-tbd.db   :refer [sys&proj-database-cfgs]] ; for mount
    [scheduling-tbd.how-made :refer [him-cfg]]            ; for mount
    [scheduling-tbd.interviewers :refer [iviewers]]       ; for mount
@@ -13,7 +14,6 @@
    [scheduling-tbd.util :refer [util-state]]             ; for mount
    [scheduling-tbd.web.handler :refer [app]]             ; for mount
    [scheduling-tbd.web.websockets :refer [wsock]]        ; for mount
-   [ring.adapter.jetty :as jetty]
    [taoensso.telemere  :refer [log!]])
   (:gen-class))
 
@@ -23,7 +23,7 @@
 ;;;   tid - a thread id (string)
 ;;;   cid - a conversation id, currently one of #{:process :data :resources :optimality}.
 
-;; log uncaught exceptions in threads
+;; Log uncaught exceptions in threads.
 (Thread/setDefaultUncaughtExceptionHandler
   (reify Thread$UncaughtExceptionHandler
     (uncaughtException [_ thread ex]
@@ -62,6 +62,7 @@
          (catch Throwable _e
            (log! :error (str "Server failed to start on host " host " port " port "."))))))
 
+;;; ToDo: Do something to stop telemere console handlers. https://github.com/taoensso/telemere/blob/master/examples.cljc
 (defn -main [& _]
   (let [res (mount/start)
         info (str "   " (clojure.string/join ",\n    " (:started res)))]

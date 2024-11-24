@@ -5,7 +5,6 @@
    [clojure.core.async       :as async :refer [<! >! go]]
    [clojure.edn              :as edn]
    [clojure.spec.alpha       :as s]
-   [clojure.walk             :as walk  :refer [keywordize-keys]]
    [mount.core               :as mount :refer [defstate]]
    [promesa.core             :as p]
    [promesa.exec             :as px]
@@ -173,9 +172,9 @@
    In that case, the old channel will eventually get destroyed by close-inactive-channels.
    Returns a map with value for key :ring.websocket/listener."
   [request]
-  (log! :debug (str "Establishing ws handler for " (-> request :query-params keywordize-keys :client-id)))
+  (log! :debug (str "Establishing ws handler for " (-> request :query-params (update-keys keyword) :client-id)))
   (when-not @inactive-channels-process (reset! inactive-channels-process (future (close-inactive-channels))))
-  (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
+  (if-let [client-id (-> request :query-params (update-keys keyword) :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]
       (swap! ping-dates #(assoc % client-id (now)))
       (error-listener client-id)   ; This and next are go loops,

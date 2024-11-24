@@ -531,7 +531,13 @@
            [?e :project/id ?pid]]
          @(connect-atm pid) pid)))
 
-(defn get-current-conversation [pid] (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid)))
+(defn get-current-cid
+  "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
+  [pid]
+  (if (starting-new-project? pid)
+    :process
+    (or (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))
+        :process)))
 
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."

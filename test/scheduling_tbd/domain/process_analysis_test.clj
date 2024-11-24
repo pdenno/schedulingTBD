@@ -1,6 +1,7 @@
 (ns scheduling-tbd.domain.process-analysis-test
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
+   [bling.core                             :refer [bling callout point-of-interest]]
    [clojure.core.unify                     :as uni]
    [clojure.test                           :refer [deftest is testing]]
    [clojure.spec.alpha                     :as s]
@@ -13,7 +14,7 @@
    [scheduling-tbd.response-utils          :as ru]
    [scheduling-tbd.sutil                   :as sutil]
    [scheduling-tbd.web.websockets          :as ws]
-   [taoensso.telemere                      :refer [log!]]))
+   [taoensso.telemere                      :as tel :refer [log!]]))
 
 ;;; THIS is the namespace I am hanging out in recently.
 (def ^:diag diag (atom nil))
@@ -513,3 +514,5 @@ Additionally, coordinating delivery schedules to ensure timely distribution with
     (doseq [eid eids]
       (d/transact (sutil/connect-atm pid) {:tx-data [[:db/add eid :claim/conversation-id :process]]}))
     (db/backup-proj-db pid)))
+
+(tel/help:signal-creators)

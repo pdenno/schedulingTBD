@@ -2,13 +2,11 @@
   (:require
    [clojure.edn              :as edn]
    [clojure.java.io          :as io]
-   [clojure.walk             :as walk :refer [keywordize-keys]]
-   [datahike.api             :as d]
+   [mount.core               :as mount :refer [defstate]]
    [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
-   [scheduling-tbd.util      :as util :refer [now]]
-   [taoensso.telemere.timbre        :as log])
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id starting-new-project?]]
+   [taoensso.telemere        :refer[log!]])
   (:import
    [java.util Date]))
 
@@ -21,43 +19,39 @@
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
    Note that this can CHANGE :project/current-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
   [request]
-  (let [{:keys [project-id cid]} (-> request :query-params keywordize-keys)]
-    ;;(log/info "get-conversation (1): project-id = " project-id "cid =" cid)
-    (when cid (db/change-conversation {:pid (keyword project-id) :cid (keyword cid)}))
-    (let [project-id (keyword project-id)
-          eid (db/project-exists? project-id)
-          cid (if eid
-                (-> (or cid
-                        (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm project-id)))
-                    keyword)
-                :process)
-          msgs    (db/get-conversation project-id cid)
-          code    (if eid (db/get-code project-id) "")]
-      ;;(log/info "get-conversation (2):" project-id "cid =" cid "message count =" (count msgs))
-      (http/ok {:project-id project-id :conv msgs :cid cid :code code}))))
+  (let [{:keys [project-id cid]}  (-> request :query-params (update-keys keyword))
+        pid (keyword project-id)
+        cid (if cid (keyword cid) (db/get-current-cid pid))]
+    (log! :info (str "get-conversation (1): pid = " pid " cid = " cid))
+    (when-not (starting-new-project? pid)
+      (db/change-conversation {:pid pid :cid cid}))
+    (let [eid (db/project-exists? pid)
+          msgs (if eid (db/get-conversation pid cid) [])
+          code (if eid (db/get-code pid) "")]
+      (log! :info (str "get-conversation (2): pid = " pid " cid = " cid " message count = " (count msgs)))
+      (http/ok {:project-id pid :conv msgs :cid cid :code code}))))
 
 (def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
 
 (defn list-projects
-  "Return a map containing :current-project, :cid, and :others, which is a sorted list of every other project in the DB."
+    "Return a map containing :current-project, :cid, and :others, which is a sorted list of every other project in the system DB.
+     Note that the server doesn't have a notion of current-project. (How could it?) Thus current conversation is out the window too."
   [_request]
   (letfn [(resolve-proj-info [pid]
             (resolve-db-id {:db/id (db/project-exists? pid)}
                            (connect-atm pid)
                            :keep-set #{:project/name :project/id :project/surrogate?}))]
     (let [proj-infos (mapv resolve-proj-info (db/list-projects))
-          current (or (db/default-project) new-proj-entry) ; ToDo: Client could tell you what its current project is.
-          cid (or (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(-> current :project/id connect-atm))
-                      :process)
+          {:project/keys [id] :as current} (or (db/default-project) new-proj-entry)
+          cid (or (db/get-current-cid id) :process)
           others (filterv #(not= % current) proj-infos)]
       (http/ok
        (cond-> {:current-project current, :cid cid}
          (not-empty others) (assoc :others others))))))
 
-
 (defn healthcheck
   [_request]
-  (log/info "Doing a health check.")
+  (log! :info "Doing a health check.")
   (http/ok
     {:time     (str (Date. (System/currentTimeMillis)))
      :up-since (str (Date. (.getStartTime (java.lang.management.ManagementFactory/getRuntimeMXBean))))}))
@@ -71,7 +65,7 @@
         proj-filename (str dir-root "/projects/" project-id "/files/" filename)]
     (if tempfile
       (try
-        (log/info (str "upload-file: Copying " tempfile "(size" size ") to " proj-filename))
+        (log! :info (str "upload-file: Copying " tempfile "(size" size ") to " proj-filename))
         (io/copy tempfile (io/as-file proj-filename))
         (io/delete-file tempfile)
         (http/ok {:name filename :size size})
@@ -82,5 +76,5 @@
 (defn run-minizinc
   [request]
   (reset! diag request)
-  (log/info "Call to run-minizinc")
+  (log! :info "Call to run-minizinc")
   (http/ok {:mzn-output "Success!"}))

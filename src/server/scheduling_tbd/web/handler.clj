@@ -30,7 +30,8 @@
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
    ;;[spec-tools.swagger.core :as swag2] ; Experimental
-   [spec-tools.spell :as spell]))
+   [spec-tools.spell :as spell]
+   [taoensso.telemere :refer [log!]]))
 
 ;;; Reitit: (pronounced "rate it") a routing library.
 ;;;   - https://github.com/metosin/reitit, (docs)
@@ -54,40 +55,6 @@
 ;;;       3) If it is get diag atoms for the offending request or response and run s/valid? and s/explain by hand.
 ;;;       4) If none of that is the problem, study what the wrappers are doing by uncommenting ev/print-context-diffs and running the code.
 ;;;   * I once had what appeared to be non-printing text in a s/def expression mess things up. Really.
-
-;;;========================================================================= End Experimental =============================================
-;;;(s/def ::id string?)
-;;;(s/def ::name string?)
-;;;(s/def ::street string?)
-;;;(s/def ::city #{:tre :hki})
-;;;(s/def ::address (s/keys :req-un [::street ::city]))
-;;;(s/def ::user (s/keys :req-un [::id ::name ::address]))
-
-
-#_(swag2/swagger-spec
-  {:swagger "2.0"
-   :info {:version "1.0.0"
-          :title "Sausages"
-          :description "Sausage description"
-          :termsOfService "http://helloreverb.com/terms/"
-          :contact {:name "My API Team"
-                    :email "foo@example.com"
-                    :url "http://www.metosin.fi"}
-          :license {:name "Eclipse Public License"
-                    :url "http://www.eclipse.org/legal/epl-v10.html"}}
-   :tags [{:name "user"
-           :description "User stuff"}]
-   :paths {"/api/ping" {:get {:responses {:default {:description ""}}}}
-           "/user/:id" {:post {:summary "User Api"
-                               :description "User Api description"
-                               :tags ["user"]
-                               ::swagger/parameters {:path (s/keys :req [::id])
-                                                     :body ::user}
-                               ::swagger/responses {200 {:schema ::user
-                                                         :description "Found it!"}
-                                                    404 {:description "Ohnoes."}}}}}})
-
-;;;========================================================================= End Experimental =============================================
 
 ;;; =========== Pages (just homepage, thus far.)  =======
 (def selmer-opts {:custom-resource-path (io/resource "html")})
@@ -122,7 +89,6 @@
 (s/def ::current-project map?)
 (s/def ::cid keyword?)
 (s/def ::list-projects-response (s/keys :req-un [::others ::current-project ::cid]))
-
 
 ;;; -------- (devl/ajax-test "/api/get-conversation" {:project-id "craft-beer-brewery-scheduling"})
 (s/def ::cid (st/spec {:spec keyword?
@@ -266,6 +232,7 @@
    (ring/create-default-handler)))
 
 (defn handler-init []
+  (log! :info "Updating handler.")
   (let [site-config (-> "system.edn" io/resource slurp edn/read-string :dev :handler/ring)
         s ^String (:cookie-secret site-config)
         cookie-store (cookie/cookie-store {:key (.getBytes s)})

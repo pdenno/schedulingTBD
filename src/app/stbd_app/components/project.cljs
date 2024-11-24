@@ -4,13 +4,17 @@
    [applied-science.js-interop :as j]
    [clojure.string :as str]
    [helix.hooks                :as hooks]
+   ["@mui/icons-material/RocketLaunch$default" :as RocketLaunch]
    ["@mui/material/FormControl$default" :as FormControl]
+   ["@mui/material/IconButton$default"  :as IconButton]
    ["@mui/material/MenuItem$default"    :as MenuItem]
    ["@mui/material/Select$default"      :as Select]
+   ["@mui/material/Stack$default"       :as Stack]
    ;;["@mui/material/styles"              :as styles :refer [createTheme themeOptions ThemeProvider]] ; WIP
    [helix.core         :as helix :refer [defnc $]]
-   [stbd-app.util      :as util :refer [lookup-fn register-fn]]
-   [taoensso.telemere.timbre  :as log :refer-macros [info debug log]]))
+   [stbd-app.ws        :as ws]
+   [stbd-app.util      :as util :refer [lookup-fn register-fn update-common-info!]]
+   [taoensso.telemere  :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -27,8 +31,6 @@
         (interpose " " ?s)
         (apply str ?s)))))
 
-(def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT" :menu-text "START A NEW PROJECT"})
-
 (defn order-projects
   "Return a vector of maps containing :project/id, :project/name and :menu-text where
    current is first, 'new-project' is second and the remainder are all other
@@ -37,9 +39,9 @@
   (let [current (assoc current :menu-text (menu-text current)) ; Awkward assoc. Necessary!
         proj-infos (mapv #(assoc % :menu-text (menu-text %)) proj-infos)
         others (->> proj-infos (remove #(= current %)) (sort-by :project/name))]
-    (if (= current new-proj-entry)
-      (into [new-proj-entry] others)
-      (into [current new-proj-entry] others))))
+    (if (= :START-A-NEW-PROJECT (:project/id current))
+      (into [{:project/id :START-A-NEW-PROJECT :menu-text "NEW PROJECT"}] others)
+      (into [current] others))))
 
 ;;; current-project and content of the others vector are keywords.
 (defnc SelectProject
@@ -52,20 +54,31 @@
     (register-fn :set-current-project set-current)
     (when current-proj
       (reset! menu-infos (order-projects (or current current-proj) proj-infos)) ; This one needed or doesn't show first time.
-      ($ FormControl {:size "small"} ; small makes a tiny difference, :sx's :margin and :height do not.
-         ($ Select {:variant "filled"
-                    :sx {:height "3vh"}
-                    :value (-> @menu-infos first :menu-text)
-                    ;; onChange: communicates up to parent to change the conversation too.
-                    :onChange (fn [_e v]
-                                (let [proj-str (j/get-in v [:props :value])
-                                      proj (some #(when (= proj-str (:menu-text %)) %) @menu-infos)]
-                                  (set-current proj)
-                                  (log/info "Select project: proj =" proj)
-                                  (reset! menu-infos (order-projects proj proj-infos))
-                                  ((lookup-fn :get-conversation) (:project/id proj))))}
-            (for [p (map :menu-text @menu-infos)]
-              ($ MenuItem {:key p :value p} p)))))))
+      ($ Stack {:direction "row"}
+         ($ IconButton {:onClick
+                        (fn [_]
+                          (set-current {:project/id :START-A-NEW-PROJECT})
+                          (update-common-info! {:project/id :START-A-NEW-PROJECT :cid :process})
+                          ((lookup-fn :update-code) {:text "Together, we'll put some MiniZinc here soon!"})
+                          ((lookup-fn :set-cs-msg-list) []) ; <========================================================== NOT SUFFICIENT
+                          ((lookup-fn :set-active-conv) :process)
+                          (ws/send-msg {:dispatch-key :resume-conversation-plan :pid :START-A-NEW-PROJECT :cid :process})
+                          )}
+            ($ RocketLaunch))
+         ($ FormControl {:size "small"} ; small makes a tiny difference, :sx's :margin and :height do not.
+            ($ Select {:variant "filled"
+                       :sx {:height "3vh"}
+                       :value (-> @menu-infos first :menu-text)
+                       ;; onChange: communicates up to parent to change the conversation too.
+                       :onChange (fn [_e v]
+                                   (let [proj-str (j/get-in v [:props :value])
+                                         proj (some #(when (= proj-str (:menu-text %)) %) @menu-infos)]
+                                     (set-current proj)
+                                     (log! :info (str "Select project: proj = " proj))
+                                     (reset! menu-infos (order-projects proj proj-infos))
+                                     ((lookup-fn :get-conversation) (:project/id proj))))}
+               (for [p (map :menu-text @menu-infos)]
+                 ($ MenuItem {:key p :value p} p))))))))
 
 ;;; This is WIP
 ;;; https://zenoo.github.io/mui-theme-creator/

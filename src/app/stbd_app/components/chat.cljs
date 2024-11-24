@@ -110,9 +110,9 @@
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
                  (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :cid cid})
-                 (update-common-info! {:project/id pid :cid cid})))
+                 (update-common-info! {:pid pid :cid cid})))
        (p/catch (fn [e]
-                  (log! :info (str "get-conversation failed: " e)))))))
+                  (log! :error (str "get-conversation failed: " e)))))))
 
 (register-fn :get-conversation get-conversation)
 
@@ -148,9 +148,9 @@
         resize-fns (make-resize-fns set-box-height)]
     (letfn [(change-conversation-click [to]
               (when-not busy?
-                (if-let [pid (:project/id @common-info)]
+                (if-let [pid (:pid @common-info)]
                   (get-conversation pid to)
-                  (log! :info (str "change-conversation-click fails: common-info = " @common-info)))))
+                  (log! :error (str "change-conversation-click fails: common-info = " @common-info)))))
             (process-user-input [text]
               (when (not-empty text)
                 (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)

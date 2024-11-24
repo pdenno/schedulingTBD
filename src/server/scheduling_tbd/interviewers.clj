@@ -498,31 +498,30 @@
    This is called even when PID is :START-A-NEW-PROJECT."
   [{:keys [client-id pid cid] :as ctx}]
   (assert (string? client-id))
+  (assert (#{:process :data :resources :optimality} cid))
   (try
-    (let [cid (or (#{:process :data :resources :optimality} cid)
-                  (db/get-current-conversation pid))] ; ToDo: I don't think this is reliable. User could get tired an switch.
-      (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
-        (redirect-user-to-discussion client-id cid :process)
-        (let [{:keys [pid] :as ctx} (if (starting-new-project? pid) (start-human-project! ctx) (ctx-surrogate ctx))]
-          (log! :debug (str "ctx = " (with-out-str (pprint ctx))))
-          ;; The conversation loop.
-          (when-not (db/conversation-done? pid cid)
-            (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-            (when @active?
-              (when (== 0 (-> (db/get-conversation-eids pid cid) count))
-                (-> ctx :pid initial-advice (tell-interviewer ctx)))
-              (-> (conversation-history pid cid) (tell-interviewer ctx))
-              (loop [cnt 0
-                     response (q-and-a ctx)]
-                (cond
-                  (> cnt 15)                      :exceeded-questions-safety-stop
-                  (= "DONE" (:status response))   (db/assert-conversation-done! pid cid)
-                  :else
-                  (when @active? ; Keep this despite (when @active? ...) above. Can set to false while running.
-                    (tell-interviewer response ctx) ; This is a INTERVIEWEES-RESPONDS
-                    (ru/analyze-response-meth (merge ctx response))
-                    (recur (inc cnt)
-                           (q-and-a ctx))))))))))
+    (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
+      (redirect-user-to-discussion client-id cid :process)
+      (let [{:keys [pid] :as ctx} (if (starting-new-project? pid) (start-human-project! ctx) (ctx-surrogate ctx))]
+        (log! :debug (str "ctx = " (with-out-str (pprint ctx))))
+        ;; The conversation loop.
+        (when-not (db/conversation-done? pid cid)
+          (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+          (when @active?
+            (when (== 0 (-> (db/get-conversation-eids pid cid) count))
+              (-> ctx :pid initial-advice (tell-interviewer ctx)))
+            (-> (conversation-history pid cid) (tell-interviewer ctx))
+            (loop [cnt 0
+                   response (q-and-a ctx)]
+              (cond
+                (> cnt 15)                      :exceeded-questions-safety-stop
+                (= "DONE" (:status response))   (db/assert-conversation-done! pid cid)
+                :else
+                (when @active? ; Keep this despite (when @active? ...) above. Can set to false while running.
+                  (tell-interviewer response ctx) ; This is a INTERVIEWEES-RESPONDS
+                  (ru/analyze-response-meth (merge ctx response))
+                  (recur (inc cnt)
+                         (q-and-a ctx)))))))))
       (finally
         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 

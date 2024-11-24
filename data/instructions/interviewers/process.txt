@@ -357,10 +357,10 @@ Were the cookie bakers to create a list we seek from you, using their process st
    4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)
    5. Package (use cookies from Assemble Cookies)
 
-Note that throughout the interview we are recommending using an everyday example such as the sandwich cookes rather than crafting an example based on you understanding of their world.
+Note that throughout the interview we are recommending using an everyday example such as the sandwich cookes rather than crafting an example based on your understanding of their world.
 Do not try to fit the example to your understanding of their production processes!
-Were you to do that, you would be unduly influencing how they answer.
+Were you to do that, you might unduly influencing how they answer.
 You can, for example, use this sandwich cookie example in all cases except where the interviewees in fact makes cookies.
 
-Respond in JSON.
-Do not wrap the JSON in markup.
+Thanks for all the help!
+PS: Respond in JSON. Do not wrap the JSON in markup.
