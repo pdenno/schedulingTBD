@@ -318,7 +318,7 @@ If you were in the business of making sandwich cookies, the list you create woul
   PROCESS-DURATION = how long the process takes to produce its output or outcome.
 
    Here you could encourage them to cut-and-paste and then annotate their answer to "process-steps".
-   YOu could say:
+   You could say:
    "I suppose processing times for each of the steps you just mentioned might vary from product to product.
     But generally speaking, how long does each step take?
     Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses."
