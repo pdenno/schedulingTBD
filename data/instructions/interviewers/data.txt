@@ -133,7 +133,7 @@ Where you think it would be helpful to provide the human with definitions of the
 
   {"question-type" : "warm-up"
    "question" :
-    "Let's talk about the data the company uses to produce. Typically, and especially in small businesses, information about customer orders,
+    "Let's talk about the data the company uses for production scheduling. Typically, and especially in small businesses, information about customer orders,
      resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes;
      we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you
      use and how you maintain and store it."}
@@ -147,6 +147,8 @@ Where you think it would be helpful to provide the human with definitions of the
    You: {"question-type" : "willing-to-upload?",
 	      "question" : "Could you upload the orders spreadsheet (or a redacted version of it) for discussion?
 		      Read about the risks of uploading data <a href=\"about/uploading-data\">here</a>."}.
+
+3. There is not question-type 3 yet! For the time being, after you have asked the warm-up question and the user to upload a spreadsheet, you can respond to subsequent SUPPLY-QUESTION commands with {"status" : "DONE"}.
 
 Thanks for all the help!
 PS: Respond in JSON. Do not wrap the JSON in markup.
