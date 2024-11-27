@@ -171,7 +171,7 @@
 
 (deftest test-warm-up-question
   (testing "Testing warm-up-question with no current project."
-    (let [claims (pan/analyze-intro-response  warm-up-fountain-pens '#{(project-id :START-A-NEW-PROJECT)})
+    (let [claims (pan/analyze-warm-up-response!  warm-up-fountain-pens '#{(project-id :START-A-NEW-PROJECT)})
           [_ ?pid] (ru/find-claim '(project-id ?x) claims)]
       (is (and (ru/find-claim (list 'project-id ?pid) claims)
                (ru/find-claim (list 'cites-raw-material-challenge ?pid) claims)
@@ -342,15 +342,20 @@
 (deftest process-ordering
   (testing "whether the process-ordering system agent works okay."))
 
+(def ice-cream-answer-warm-up
+  (str "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like "
+       "pints, quarts, and bulk containers for food service. "
+       "Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, "
+       "while managing supply chain constraints such as ingredient availability and production line capacities. "
+       "Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial."))
+
+; We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service. Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as ingredient availability and production line capacities. Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial.
+
 (deftest scheduling-challenges-agent
   (testing "the scheduling-challenges agent"
     (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
           result (llm/query-on-thread
-                  {:aid aid :tid tid :query-text
-                   "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service.
-Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as
-ingredient availability and production line capacities.
-Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial."})
+                  {:aid aid :tid tid :query-text ice-cream-answer-warm-up})
           {:keys [challenges]} (-> result
                                    json/read-value
                                    (update-keys keyword)
@@ -514,5 +519,3 @@ Additionally, coordinating delivery schedules to ensure timely distribution with
     (doseq [eid eids]
       (d/transact (sutil/connect-atm pid) {:tx-data [[:db/add eid :claim/conversation-id :process]]}))
     (db/backup-proj-db pid)))
-
-(tel/help:signal-creators)

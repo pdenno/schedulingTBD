@@ -46,6 +46,5 @@
                project-id        (assoc :pid project-id)
                pid               (assoc :pid pid)
                cid               (assoc :cid cid))))))
-
 (defn now []
   (js/Date. (.now js/Date)))

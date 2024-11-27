@@ -463,7 +463,8 @@
 ;;; (db/add-agent! {:id :process-dur-agent,,,}
 (def known-agent-info
   "The actual agent :id is the one provided here with -<llm-provider> added."
-  [{:id :process-interview-agent
+  [ ;; ---------- project-specific interview agents -------------------------
+   {:id :process-interview-agent
     :project-thread?  true
     :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
     :tools [{:type "file_search"}]
@@ -493,6 +494,7 @@
     #_#_:vector-store-files ["data/instructions/interviewers/optimality-interview-flowchart.pdf"]
     :instruction-path "data/instructions/interviewers/optimality.txt"}
 
+   ;; ----------------- more generice system agents ---------------------------------
    {:id :answers-the-question?
     :instruction-path "data/instructions/answers-the-question.txt"
     :response-format (-> "data/instructions/boolean-response-format.edn" slurp edn/read-string)}
@@ -530,6 +532,10 @@
            :where
            [?e :project/id ?pid]]
          @(connect-atm pid) pid)))
+
+(defn get-project-name [pid]
+  (when-let [eid (project-exists? pid)]
+    (-> (dp/pull @(connect-atm pid) '[:project/name] eid) :project/name)))
 
 (defn get-current-cid
   "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
@@ -799,21 +805,21 @@
      (doseq [{:keys [id instruction-path response-format project-thread? model-class tools vector-store-files]
               :or {model-class :gpt}} infos]
        (as-> {} ?res
-       (cond-> ?res
-         true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
-         true (assoc :base-type id)
-         true (assoc :llm-provider llm-provider)
-         true (assoc :instructions (slurp instruction-path))
-         true (assoc :model-class model-class)
-         tools           (assoc :tools tools)
-         project-thread? (assoc :project-thread? true)
-         response-format (assoc :response-format response-format))
-       (let [file-objs (doall (mapv #(llm/upload-file {:fname %}) vector-store-files))
-             v-store (when (not-empty file-objs) (llm/make-vector-store {:file-ids (mapv :id file-objs)}))]
-         (if (not-empty file-objs)
-           (assoc ?res :tool-resources  {"file_search" {"vector_store_ids" [(:id v-store)]}})
-           ?res))
-        (add-agent! ?res))))))
+         (cond-> ?res
+           true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
+           true (assoc :base-type id)
+           true (assoc :llm-provider llm-provider)
+           true (assoc :instructions (slurp instruction-path))
+           true (assoc :model-class model-class)
+           tools           (assoc :tools tools)
+           project-thread? (assoc :project-thread? true)
+           response-format (assoc :response-format response-format))
+         (let [file-objs (doall (mapv #(llm/upload-file {:fname %}) vector-store-files))
+               v-store (when (not-empty file-objs) (llm/make-vector-store {:file-ids (mapv :id file-objs)}))]
+           (if (not-empty file-objs)
+             (assoc ?res :tool-resources  {"file_search" {"vector_store_ids" [(:id v-store)]}})
+             ?res))
+         (add-agent! ?res))))))
 
 (defn recreate-system-db!
   "Recreate the system database from an EDN file
@@ -893,7 +899,7 @@
                          (when success (or num "0"))) similar-names)
             num (->> nums (map read-string) (apply max) inc)
             new-name (str name " " num)
-            new-id   (-> new-name (str/replace #"\s+" "-") keyword)]
+            new-id   (-> new-name str/lower-case (str/replace #"\s+" "-") keyword)]
         (-> proj-info
             (assoc :project/name new-name)
             (assoc :project/id new-id))))))
@@ -935,8 +941,7 @@
 
 (def conversation-intros
   {:process
-   (str "You are at the right start point! "
-        "This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. "
+   (str "This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. "
         "It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) "
         "through which together we design a solution to your scheduling problem. "
         "You can read more about <a href=\"about/process-conversation\">how this works</a>.")

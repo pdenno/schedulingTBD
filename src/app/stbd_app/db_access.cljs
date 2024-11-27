@@ -47,21 +47,17 @@
                                                      {:status status :status-text status-text})))})
      prom)))
 
-;;; This is used by the server/planner to update the conversation.
+;;; This is used by the server/planner to reload the conversation.
 ;;; Unlike chat/get-conversation, the function for (lookup-fn :get-conversation),
 ;;; it doesn't resume-conversation because planning is already underway.
 (register-fn
  :update-conversation-text
- (fn [{:keys [pid cid]}]
+ (fn [{:keys [pid cid pname]}]
    (assert (keyword? pid))
    (-> (get-conversation-http pid cid)
        (p/then (fn [resp]
                  (log! :info (str "update-conversation-text: msg count = " (-> resp :conv count)))
-                 (let [resp (cond-> resp
-                              (-> resp :conv empty?) ; ToDo: Impossible, right?
-                              (assoc :conv [#:message{:content "No discussion here yet.",
-                                                      :from :system,
-                                                      :time (js/Date. (.now js/Date))}]))]
-                   (update-common-info! resp)
-                   ((lookup-fn :set-cs-msg-list) (:conv resp))
-                   ((lookup-fn :set-code) (:code resp))))))))
+                 (update-common-info! resp)
+                 ((lookup-fn :set-current-project) pname)
+                 ((lookup-fn :set-cs-msg-list) (:conv resp))
+                 ((lookup-fn :set-code) (:code resp)))))))

@@ -22,14 +22,12 @@
   "Add :menu-text to argument project-info."
   [{:project/keys [id]}]
   (when id
-    (if (= id :START-A-NEW-PROJECT)
-      "START A NEW PROJECT"
-      (as-> id ?s ; ToDo: What is the point of :project/name if I'm doing this?
-        (name ?s)
-        (str/split ?s #"-")
-        (map str/capitalize ?s)
-        (interpose " " ?s)
-        (apply str ?s)))))
+    (as-> id ?s ; ToDo: What is the point of :project/name if I'm doing this?
+      (name ?s)
+      (str/split ?s #"-")
+      (map str/capitalize ?s)
+      (interpose " " ?s)
+      (apply str ?s))))
 
 (defn order-projects
   "Return a vector of maps containing :project/id, :project/name and :menu-text where
@@ -59,11 +57,8 @@
                         (fn [_]
                           (set-current {:project/id :START-A-NEW-PROJECT})
                           (update-common-info! {:project/id :START-A-NEW-PROJECT :cid :process})
-                          ((lookup-fn :update-code) {:text "Together, we'll put some MiniZinc here soon!"})
-                          ((lookup-fn :set-cs-msg-list) []) ; <========================================================== NOT SUFFICIENT
-                          ((lookup-fn :set-active-conv) :process)
-                          (ws/send-msg {:dispatch-key :resume-conversation-plan :pid :START-A-NEW-PROJECT :cid :process})
-                          )}
+                          ((lookup-fn :update-code) {:text "Together, we'll put a MiniZinc solution here soon!"})
+                          ((lookup-fn :get-conversation) :START-A-NEW-PROJECT))} ; Calls resume-conversation-plan
             ($ RocketLaunch))
          ($ FormControl {:size "small"} ; small makes a tiny difference, :sx's :margin and :height do not.
             ($ Select {:variant "filled"

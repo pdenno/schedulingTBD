@@ -2,8 +2,9 @@
   (:require
    [clojure.edn              :as edn]
    [clojure.java.io          :as io]
-   [mount.core               :as mount :refer [defstate]]
+   [datahike.pull-api        :as dp]
    [ring.util.http-response  :as http]
+   [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id starting-new-project?]]
    [taoensso.telemere        :refer[log!]])
@@ -26,10 +27,11 @@
     (when-not (starting-new-project? pid)
       (db/change-conversation {:pid pid :cid cid}))
     (let [eid (db/project-exists? pid)
+          pname (db/get-project-name pid)
           msgs (if eid (db/get-conversation pid cid) [])
           code (if eid (db/get-code pid) "")]
       (log! :info (str "get-conversation (2): pid = " pid " cid = " cid " message count = " (count msgs)))
-      (http/ok {:project-id pid :conv msgs :cid cid :code code}))))
+      (http/ok {:project-id pid :project-name pname :conv msgs :cid cid :code code}))))
 
 (def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
 
@@ -78,3 +80,14 @@
   (reset! diag request)
   (log! :info "Call to run-minizinc")
   (http/ok {:mzn-output "Success!"}))
+
+(defn respond-init []
+  (mount/stop  (find-var 'scheduling-tbd.web.handler/app))
+  (mount/start (find-var 'scheduling-tbd.web.handler/app))
+
+  #_(mount/stop  (find-var 'scheduling-tbd.core/server))
+  #_(mount/start (find-var 'scheduling-tbd.core/server))
+  [:htt-responses])
+
+(defstate http-responses
+  :start (respond-init))

@@ -2,11 +2,12 @@
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:refer-clojure :exclude [send])
   (:require
-   [clojure.spec.alpha     :as s]
-   [clojure.core.unify     :as uni]
-   [clojure.pprint        :refer [cl-format]]
-   [scheduling-tbd.db     :as db]
-   [taoensso.telemere     :refer [log!]]))
+   [clojure.spec.alpha            :as s]
+   [clojure.core.unify            :as uni]
+   [clojure.pprint                :refer [cl-format]]
+   [scheduling-tbd.db             :as db]
+   [scheduling-tbd.web.websockets :as ws]
+   [taoensso.telemere             :refer [log!]]))
 
 ;;; Program behavior differs in places depending on whether the agent is human or surrogate. Most obviously,
 ;;; in Step (1) ws/send-msg is used for humans, whereas llm/query-on-thread is used for surrogates.
@@ -51,16 +52,14 @@
   [fact fact-list]
   (some #(when (uni/unify fact %) %) fact-list))
 
-(defn make-human-project
-  "Surrogate already has a project db, but human doesn't. This creates the db and returns and returns state (possibly updated).
-   This is called after inv/prelim-analysis, which looks at the human response to define a project-name predicate."
-  [state]
-  (log! :info (str "Human project: state = " state))
-  (if-let [[_ pname] (find-claim '(project-name ?x) state)]
-    (let [[_ orig-pid] (find-claim '(project-id ?x) state)
-          pid (db/create-proj-db! {:project/name pname :project/id (keyword orig-pid)})]
-      (if (not= orig-pid pid) ; creating the DB may assign a different PID. ToDo: Need a (project-name too).
-        (conj (filterv #(not= % orig-pid) state)
-              `(~'project-id ~(name pid)))
-        state))
-    (throw (ex-info "Couldn't find PID in human project." {:state state}))))
+(defn refresh-client
+  "Send a message to the client to reload the conversation.
+  Typically done with surrogate or starting a new project."
+  [client-id pid cid]
+  (assert (string? client-id))
+  (ws/send-to-chat {:promise? false
+                    :client-id client-id
+                    :dispatch-key :update-conversation-text
+                    :pname (db/get-project-name pid)
+                    :pid pid
+                    :cid cid}))

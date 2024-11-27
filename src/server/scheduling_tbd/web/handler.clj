@@ -25,7 +25,7 @@
    [reitit.http.interceptors.multipart :as multipart]
    [reitit.http.interceptors.dev :as dev] ; for testing
    [reitit.http.spec :as spec]
-   [scheduling-tbd.web.controllers.respond :as resp]
+   [scheduling-tbd.web.controllers.respond :as resp :refer [http-responses]] ; For mount
    [scheduling-tbd.web.websockets   :as wsock]
    [selmer.parser :as parser] ; kit influence
    [spec-tools.core  :as st]
@@ -106,10 +106,15 @@
 (s/def ::conv (s/coll-of map?))
 (s/def ::code string?)
 (s/def ::mzn-output string?)
-(s/def ::get-conversation-response (s/keys :req-un [::project-id ::conv] :opt-un [::code ::cid]))
+(s/def ::get-conversation-response (s/keys :req-un [::project-id ::project-name ::conv] :opt-un [::code ::cid]))
 (s/def ::project-id (st/spec {:spec #(or (string? %) (keyword? %))
                               :name "project-id"
                               :description "A kebab-case string (will be keywordized) unique to the system DB identifying a project."
+                              :json-schema/default "sur-craft-beer"}))
+
+(s/def ::project-name (st/spec {:spec string?
+                              :name "project-name"
+                              :description "The name of a project."
                               :json-schema/default "sur-craft-beer"}))
 
 (s/def ::run-minizinc-request (st/spec {:spec (s/keys :req-un [::client-id ::project-id])

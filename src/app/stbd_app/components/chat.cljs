@@ -50,9 +50,11 @@
 
 (defn msg-with-title
   [content from]
-  (cond (= from :surrogate)               (str "<b>Surrogate Expert</b><br/>" content)
-        (= from :developer-interjected)   (str "<b>Developer Interjected Question</b><br/>" content)
-        :else                             content))
+  (assert (#{:surrogate :system :developer-interjected :human} from))
+  (case from
+      :surrogate               (str "<b>Surrogate Expert</b><br/>" content)
+      :developer-interjected   (str "<b>Developer Interjected Question</b><br/>" content)
+      content))
 
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
@@ -86,7 +88,7 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as as function.
+(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function.
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
 (defn update-msg-times
@@ -121,6 +123,7 @@
    This is typically used for individual messages that come through :tbd-says or :sur-says,
    as opposed to bulk update through get-conversation."
   [text from]
+  (assert (#{:system :surrogate :human :developer-interjected} from))
   (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))]
     (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
     ((lookup-fn :set-cs-msg-list) @msgs-atm)))
@@ -130,15 +133,16 @@
 
 (register-fn :tbd-says              (fn [{:keys [p-key text]}]
                                       (when p-key (remember-promise p-key))
-                                      (log! :info (str "tbd-says text: " text " before = " (count @msgs-atm)))
+                                      (log! :debug (str "tbd-says text: " text " before = " (count @msgs-atm)))
                                       (add-msg text :system)
-                                      (log! :info (str "tbd-says text: " text " after = " (count @msgs-atm)))))
+                                      (log! :debug (str "tbd-says text: " text " after = " (count @msgs-atm)))))
 
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
                                       (log! :info (str "sur-says msg: " msg))
                                       (add-msg msg :surrogate)))
 
+;;; There is just one Chat instance in our app. It is switched between different conversations.
 (defnc Chat [{:keys [chat-height proj-info]}]
   (let [[msg-list set-msg-list]         (hooks/use-state [])
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
@@ -168,6 +172,7 @@
                   (when ask-llm?
                     (set-msg-list (conj msg-list {:message/content (str "<b>[Side discussion with LLM]</b><br/>" question)
                                                   :message/from :system})))
+                  (set-msg-list (add-msg text :human))
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.

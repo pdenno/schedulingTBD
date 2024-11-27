@@ -2,12 +2,9 @@
   "Do lowest level configuration (logging, etc.) used by both the server and app."
   (:require
    [bling.core                      :as bling :refer [bling callout point-of-interest print-bling]]
-   [clojure.pprint                  :refer [cl-format]]
-   [clojure.string                  :as str]
    [clojure.pprint                  :refer [pprint]]
-   #?@(:clj [[datahike.api          :as d]
-             [datahike.pull-api     :as dp]
-             [taoensso.telemere.tools-logging :as tel-log]])
+   [clojure.string                  :as str]
+   #?@(:clj [[taoensso.telemere.tools-logging :as tel-log]])
    [mount.core                      :as mount :refer [defstate]]
    [taoensso.telemere               :as tel :refer [log!]]
    [taoensso.timbre                 :as timbre])) ; To stop pesky datahike :debug messages.
@@ -76,14 +73,14 @@
   (tel/remove-handler! :default/console)
   (tel/add-handler!    :default/console (tel/handler:console)))
 
-(def max-duration
+#_(def max-duration
   "This is used in places where doing set-clock might not make sense."
   30000)
 
-(def timeout-info "Used for calls to cljs-ajax and progress bar."
+#_(def timeout-info "Used for calls to cljs-ajax and progress bar."
   (atom {:valid? false :max-millis max-duration :start-time nil :timeout-at nil}))
 
-(defn invalidate-timeout-info
+#_(defn invalidate-timeout-info
   []
   (swap! timeout-info #(assoc % :valid? false)))
 
@@ -92,7 +89,7 @@
    :cljs
    (defn now [] (.now js/Date) #_(.getTime (js/Date.))))
 
-(defn start-clock
+#_(defn start-clock
   "Set the timeout-info object and return the argument."
   ([] (start-clock max-duration))
   ([max-millis]

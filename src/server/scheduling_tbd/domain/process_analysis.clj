@@ -9,13 +9,13 @@
    [scheduling-tbd.db                         :as db]
    [scheduling-tbd.llm                        :as llm :refer [query-llm]]
    [scheduling-tbd.minizinc                   :as mzn]
-   [scheduling-tbd.response-utils             :as ru :refer [defanalyze find-claim make-human-project]]
+   [scheduling-tbd.response-utils             :as ru :refer [defanalyze find-claim]]
    [scheduling-tbd.sutil                      :as sutil :refer [elide starting-new-project?]]
    [scheduling-tbd.web.websockets             :as ws]
    [taoensso.telemere                         :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
-(declare analyze-intro-response analyze-process-steps-response analyze-process-durs-response analyze-batch-size-response analyze-process-ordering-response)
+(declare analyze-warm-up-response! analyze-process-steps-response analyze-process-durs-response analyze-batch-size-response analyze-process-ordering-response)
 
 (def the-warm-up-type-question
   (str "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."))
@@ -31,23 +31,14 @@
 ;;; Note that pid here can be :START-A-NEW-PROJECT. In that case, we don't have a DB for the project yet. We make it here.
 (defanalyze :process/warm-up [{:keys [response client-id pid] :as _ctx}]
   (log! :debug (str "*******analysis :process/warm-up, response = " response))
-  (let [init-state (db/get-claims pid)
-        new-claims (analyze-intro-response response init-state)
-        all-claims (into init-state new-claims)
-        surrogate? (find-claim '(surrogate ?x) init-state)] ; return state props project-id and project-name if human, otherwise argument state.
-    (when-not surrogate? (make-human-project (into init-state new-claims)))
-    ;;--------  Now human/surrogate can be treated nearly identically ---------
-    (let [[_ pid]     (find-claim '(project-id ?pid) all-claims)
-          [_ _ pname] (find-claim '(project-name ?pid ?pname) all-claims)]
-      (doseq [claim new-claims]
+  (let [init-claims (if (starting-new-project? pid) '#{(project-id :START-A-NEW-PROJECT)} (db/get-claims pid))
+        all-claims (analyze-warm-up-response! response init-claims) ;
+        ;;--------  Now human/surrogate can be treated nearly identically ---------
+        [_ pid]     (find-claim '(project-id ?pid) all-claims)
+        [_ _ pname] (find-claim '(project-name ?pid ?pname) all-claims)]
+      (doseq [claim all-claims]
         (db/add-claim! pid {:string (str claim) :cid :process :q-type :warm-up}))
-      (db/add-msg {:pid pid
-                   :cid :process
-                   :from :system
-                   :text (format "Great, we'll call your project %s." pname)
-                   :tags [:!describe-challenge :informative]})
-      (ws/refresh-client client-id pid :process)
-      pid))) ; Need this when you made a new project.
+      pid)) ; Need this when you made a new project.
 
 (defanalyze :process/work-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid)
@@ -99,7 +90,7 @@
                      :from :system
                      :text see-code-msg
                      :tags [:info-to-user :minizinc]})
-        (ws/refresh-client client-id pid :process)
+        (ru/refresh-client client-id pid :process)
         (doseq [claim new-claims]
           (db/add-claim! pid {:string (str claim) :cid :process :q-type :process-durations})))
       (ws/send-to-chat
@@ -117,78 +108,63 @@
   (log! :info (str "process-ordering: response = " response))
   (analyze-process-ordering-response response))
 
-;;; ================================ Supporting functions ===========================================
-;;; ------------------------------- project name --------------------------------------
-;;; The user would be prompted: "Tell us what business you are in and what your scheduling problem is."
-;;; Also might want a prompt for what business they are in.
-(def project-name-partial
-  "This is used to name the project.  Wrap the user's paragraph in square brackets."
-  [{:role "system"    :content "You are a helpful assistant."}
-   {:role "user"      :content "Produce a Clojure map containing 1 key, :project-name, the value of which is a string of 3 words or less describing the scheduling project being discussed in the text in square brackets.
-                                If the text says something like 'We make <x>', <x> ought to be part of your answer."}
+(s/def ::scheduling-challenges-response (s/keys :req-un [::product-or-service-name, ::challenges ::one-more-thing]))
+(s/def ::product-or-service-name string?)
+(s/def ::challenges (s/coll-of keyword? :kind vector?))
+(s/def ::one-more-thing string?)
 
-   {:role "user"      :content "[We produce clothes for firefighting (PPE). Our most significant scheduling problem is about deciding how many workers to assign to each product.]"}
-   {:role "assistant" :content "{:project-name \"PPE production scheduling\"}"}
-
-   {:role "user"      :content "[We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.]"}
-   {:role "assistant" :content "{:project-name \"road construction and repaving scheduling\"}"}
-   {:role "user"      :content "WRONG. That is more than 3 words."} ; This doesn't help, except with GPT-4!
-
-   {:role "user"      :content "[We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.]"}
-   {:role "assistant" :content "{:project-name \"supply chain scheduling\"}"}
-   {:role "user"      :content "WRONG. Be more specific!"} ; This doesn't help, except with GPT-4!
-
-   {:role "user"      :content "[Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.]"}
-   {:role "assistant" :content "{:project-name \"job shop scheduling\"}"}])
-
-(defn project-name-llm-query
-  "Wrap the user-text in square brackets and send it to an LLM to suggest a project name.
-   Returns a string consisting of just a few words."
-  [user-text]
-  (as-> (conj project-name-partial
-              {:role "user" :content (str "[ " user-text " ]")}) ?r
-    (query-llm ?r {:model-class :gpt :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
-    (:project-name ?r)
-    (if (string? ?r) ?r (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text})))))
-
-(defn scheduling-challenges-claims
-  "Analyze the response for a fixed set of 'scheduling challenges' and add claims to the DB
-   for the ones that are evident in the response. This is particularly useful for planning detailed conversation.
-   Returns a map {:challenge <keywords naming challenges> :one-more-thing <a string>}."
+(defn run-scheduling-challenges-agent
+  "Analyze the response for project name,a fixed set of 'scheduling challenges' and 'one-more-thing', an observation.
+   Returns a map {:project-or-service-name, :challenge <keywords naming challenges> :one-more-thing <a string>}."
   [response]
   (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
-        res (llm/query-on-thread {:aid aid :tid tid :query-text response :tries 2})
-        {:keys [one-more-thing] :as result} (-> res
-                                                json/read-value
-                                                (update-keys keyword)
-                                                (update :challenges #(mapv keyword %)))]
+        {:keys [one-more-thing] :as res}  (-> (llm/query-on-thread {:aid aid :tid tid :query-text response :tries 2})
+                                              json/read-value
+                                              (update-keys str/lower-case)
+                                              (update-keys keyword)
+                                              (update :challenges #(mapv keyword %)))]
     (when (not-empty one-more-thing)
       (log! :info (str "one-more-thing: " one-more-thing))) ; This just to see whether another claim should be added to the agent.
-    result))
+    (when-not (s/valid? ::scheduling-challenges-response res)
+      (log! :error (str "Invalid scheduling-challenges-response: " (with-out-str (pprint res)))))
+    res))
 
-(defn analyze-intro-response
+;;; (pan/analyze-warm-up-response! ice-cream-answer-warm-up '#{(project-id :START-A-NEW-PROJECT)})
+(defn analyze-warm-up-response!
   "Analyze the response to the initial question.
-   If init-state argument is just #{(project-id :START-A-NEW-PROJECT)}, we are talking to humans and there is not yet a project.
-   Returns a map containing (possibly new) pid, and claims."
-  [response init-state]
-  (log! :info (-> (str "analyze-intro-response: init-state = " init-state " response = " response) (elide 150)))
-  (let [[_ pid] (find-claim '(project-id ?x) init-state)
-        new-claims (atom #{})]
-    (when (starting-new-project? pid)
-      (let [project-name (as-> (project-name-llm-query response) ?s
+   If init-claims argument is just #{(project-id :START-A-NEW-PROJECT)}, we are talking to humans and there is not yet a project.
+   In that case, we haven't made the project DB yet, and we don't really know what the PID will be until we do.
+   Returns a map containing the union of init-claims and new claims including scheduling-challenges and, if it is a new project,
+   project-id and project-name predicates."
+  [response init-claims]
+  (log! :info (-> (str "analyze-warm-up-response!: init-claims = " init-claims " response = " response) (elide 150)))
+  (let [{:keys [product-or-service-name challenges]}  (run-scheduling-challenges-agent response)
+        [_ pid] (ru/find-claim '(project-id ?pid) init-claims)]
+    (if (starting-new-project? pid)
+      (let [project-name (as-> product-or-service-name ?s
                            (str/trim ?s)
                            (str/split ?s #"\s+")
                            (map str/capitalize ?s)
                            (interpose " " ?s)
                            (apply str ?s))
-            pid (as-> project-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (keyword ?s))]
-        (reset! new-claims (into (filterv #(not= % '(project-id :START-A-NEW-PROJECT)) init-state)
-                                 `[(~'project-id ~pid)
-                                   (~'project-name ~project-name)]))))
-    (let [{:keys [challenges]} (scheduling-challenges-claims response) ; ToDo keep one-more-thing?
-          more-claims (for [claim challenges]
-                        (list 'scheduling-challenge pid claim))]
-        (into @new-claims more-claims))))
+            pid (as-> product-or-service-name ?s
+                  (str/trim ?s)
+                  (str/lower-case ?s)
+                  (str/split ?s #"\s+")
+                  (interpose "-" ?s)
+                  (apply str ?s)
+                  (keyword ?s))
+            zippy (log! :info (str "pid suggested to DB: " pid))
+            pid (db/create-proj-db! {:project/name project-name :project/id pid})]
+        (log! :info (str "Actual pid: " pid))
+        ;; New projects don't use init-claims, which is just #{(project-id :START-A-NEW-PROJECT)}.
+        ;; db/create-proj-db! adds the project-id and project-name predicates.
+        (into (conj (db/get-claims pid) `(~'principal-expertise ~pid ~product-or-service-name))
+              (for [claim challenges] (list 'scheduling-challenge pid claim))))
+      ;; Surrogate, combine argument init-claims and others.
+      (-> init-claims
+          (conj (~'principal-expertise ~pid ~product-or-service-name))
+          (into (for [claim challenges] (list 'scheduling-challenge pid claim)))))))
 
 ;;; ToDo: I can't decide whether or not I want these process-steps in claims. I suppose it can't hurt.
 (defn analyze-process-steps-response

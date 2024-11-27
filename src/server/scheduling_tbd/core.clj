@@ -11,7 +11,6 @@
    [scheduling-tbd.how-made :refer [him-cfg]]            ; for mount
    [scheduling-tbd.interviewers :refer [iviewers]]       ; for mount
    [scheduling-tbd.surrogate :refer [surrogates]]        ; for mount
-   [scheduling-tbd.util :refer [util-state]]             ; for mount
    [scheduling-tbd.web.handler :refer [app]]             ; for mount
    [scheduling-tbd.web.websockets :refer [wsock]]        ; for mount
    [taoensso.telemere  :refer [log!]])
@@ -60,7 +59,8 @@
            ;(test-server port)
            (log! :info (str "Started server on port" port)))
          (catch Throwable _e
-           (log! :error (str "Server failed to start on host " host " port " port "."))))))
+           (log! :error (str "Server failed to start on host " host " port " port ".")))))
+  [:http-server])
 
 ;;; ToDo: Do something to stop telemere console handlers. https://github.com/taoensso/telemere/blob/master/examples.cljc
 (defn -main [& _]
