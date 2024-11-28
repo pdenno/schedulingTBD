@@ -111,7 +111,7 @@
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
-                 (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :cid cid})
+                 (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid})
                  (update-common-info! {:pid pid :cid cid})))
        (p/catch (fn [e]
                   (log! :error (str "get-conversation failed: " e)))))))
@@ -190,6 +190,7 @@
       ;; ----------------- component UI structure.
       ($ ShareUpDown
          {:init-height chat-height
+          :up-portion 0.8
           :share-fns resize-fns
           :up ($ Box {:sx ; This work!
                       #js {:overflowY "auto"  ; Creates a scroll bar

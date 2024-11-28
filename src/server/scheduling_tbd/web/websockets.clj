@@ -152,7 +152,7 @@
               (swap! socket-channels #(assoc-in % [client-id :exit?] true))
               (let [prom (px/submit! (fn [] (dispatch msg)))]
                 (-> prom
-                    (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation-plan don't return anything themselves.
+                    (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation don't return anything themselves.
                     (p/catch (fn [err]
                                (let [trace (->> (.getStackTrace err) (map str) (interpose "\n") (apply str))]
                                  (log! :error (str "Error dispatching: msg = " msg " err = " err "\ntrace:\n" trace))))))))
@@ -218,7 +218,7 @@
   [p-key]
   (swap! promise-stack (fn [stack] (remove #(= p-key (:p-key %)) stack))))
 
-(defn new-promise
+(defn new-promise!
   "Return a vector of [key, promise] to a new promise.
    We use this key to match returning responses from ws-send :domain-expert-says, to know
    what is being responded to." ; ToDo: This is not fool-proof.
@@ -226,6 +226,7 @@
   (let [k (-> (gensym "promise-") keyword)
         p (p/deferred)
         obj {:prom p :p-key k :client-id client-id :timestamp (java.util.Date.)}]
+    (log! :info (str "New promise: " obj))
     (swap! promise-stack #(conj % obj))
     ;; Because I saw it messed up once...
     (when-not (every? #(s/valid? ::promise %) @promise-stack)
@@ -274,7 +275,7 @@
   (s/assert ::spec/chat-msg-obj content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]
-    (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
+    (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))
           msg-obj (cond-> content
                     p-key               (assoc :p-key p-key)
                     true                (assoc :timestamp (now)))]
@@ -307,7 +308,7 @@
 (defn init-dispatch-table!
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets.
    Other entries in this table include (they are added by register-ws-dispatch):
-       :resume-conversation-plan plan/resume-conversation
+       :resume-conversation      interviewers/resume-conversation
        :surrogate-call           sur/start-surrogate
        :ask-llm                  llm/llm-directly."
   []
@@ -347,9 +348,10 @@
     (forget-client id))
   (doseq [prom-obj @promise-stack]
     (p/reject! (:prom prom-obj) :restarting))
-  (mount/stop  (find-var 'scheduling-tbd.llm/llm-tools))
-  (mount/stop  (find-var 'scheduling-tbd.surrogate/surrogates))
-  (mount/stop  (find-var 'scheduling-tbd.interviewers/iviewers))
+  ;; The following have ws/register-ws-dispatch, which need to be re-established.
+  (mount/stop (find-var 'scheduling-tbd.llm/llm-tools))
+  (mount/stop (find-var 'scheduling-tbd.surrogate/surrogates))
+  (mount/stop (find-var 'scheduling-tbd.interviewers/iviewers))
   (reset! promise-stack '())
   [:closed-sockets])
 

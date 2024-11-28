@@ -23,6 +23,23 @@
   (let [{:keys [project-id cid]}  (-> request :query-params (update-keys keyword))
         pid (keyword project-id)
         cid (if cid (keyword cid) (db/get-current-cid pid))]
+    (assert (not= pid :START-A-NEW-PROJECT))
+    (log! :info (str "get-conversation (1): pid = " pid " cid = " cid))
+    (let [eid (db/project-exists? pid)
+          pname (db/get-project-name pid)
+          msgs (if eid (db/get-conversation pid cid) [])
+          code (if eid (db/get-code pid) "")]
+      (http/ok {:project-id pid :project-name pname :conv msgs :cid cid :code code}))))
+
+#_(defn get-conversation
+  "Return a sorted vector of the messages of the argument project or current project if not specified.
+   get-conversation always returns the conversation corresponding to :project/current-converation in the project's DB.
+   Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
+   Note that this can CHANGE :project/current-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
+  [request]
+  (let [{:keys [project-id cid]}  (-> request :query-params (update-keys keyword))
+        pid (keyword project-id)
+        cid (if cid (keyword cid) (db/get-current-cid pid))]
     (log! :info (str "get-conversation (1): pid = " pid " cid = " cid))
     (when-not (starting-new-project? pid)
       (db/change-conversation {:pid pid :cid cid}))
@@ -33,7 +50,7 @@
       (log! :info (str "get-conversation (2): pid = " pid " cid = " cid " message count = " (count msgs)))
       (http/ok {:project-id pid :project-name pname :conv msgs :cid cid :code code}))))
 
-(def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
+#_(def new-proj-entry {:project/id :START-A-NEW-PROJECT :project/name "START A NEW PROJECT"})
 
 (defn list-projects
     "Return a map containing :current-project, :cid, and :others, which is a sorted list of every other project in the system DB.
@@ -44,7 +61,7 @@
                            (connect-atm pid)
                            :keep-set #{:project/name :project/id :project/surrogate?}))]
     (let [proj-infos (mapv resolve-proj-info (db/list-projects))
-          {:project/keys [id] :as current} (or (db/default-project) new-proj-entry)
+          {:project/keys [id] :as current} (or (db/default-project) #_new-proj-entry)
           cid (or (db/get-current-cid id) :process)
           others (filterv #(not= % current) proj-infos)]
       (http/ok

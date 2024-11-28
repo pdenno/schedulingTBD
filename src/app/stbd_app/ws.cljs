@@ -14,7 +14,6 @@
 (def check-count "After a certain number of check for readiness, if still not ready, we try connect! again." (atom 0))
 (def ping-process "A process run intermittently by js/window.setInterval" (atom nil))
 
-
 ;;; readystate:  0=connecting, 1=open, 2=closing, 3=closed.
 (defn channel-ready? [] (and @channel (= 1 (.-readyState @channel))))
 
@@ -130,9 +129,9 @@
 (def send-msg-type?
   #{:alive-confirm             ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected. ToDo: Remove it? Not implemented.
     :ask-llm                   ; User asked a "LLM:..." question at the chat prompt.
-    :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation-plan.
+    :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation
     :surrogate-follow-up       ; User wrote "SUR?" <some question about dialog to date>
-    :resume-conversation-plan  ; Restart the planner (works for :START-A-NEW-PROJECT too).
+    :resume-conversation       ; Restart the planner (works for :START-A-NEW-PROJECT too).
     :close-channel             ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
     :ping                      ; Ping server.
     :domain-expert-says        ; Human user wrote at the chat prompt (typically answering a question).

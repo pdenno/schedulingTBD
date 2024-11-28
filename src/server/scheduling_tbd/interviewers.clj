@@ -32,7 +32,7 @@
    :client-id "455c85e2-0e01-4580-9d4a-219fcabd6828",
    :pid :sur-plate-glass,
    :cid :process,
-   :dispatch-key :resume-conversation-plan,
+   :dispatch-key :resume-conversation,
    :responder-role :surrogate}
 
 (def diag (atom nil))
@@ -441,40 +441,29 @@
           b) add scheduling challenge claims.
       2) Update the client's chat with the response ti
    Return an updated context (s/valid? ::human-ctx) which most importantly contains the pid."
-  [{:keys [pid client-id] :as ctx} & {:keys [use-this-answer] :as _opts}]
-  (assert (or use-this-answer (starting-new-project? pid))) ; use-this-answer is for debugging.
+  [{:keys [pid client-id response] :as ctx} & {:keys [use-this-answer] :as _opts}]
   (try
-    (let [_for-effect! (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id
-                                         :text (str "You want to start a new project? This is the right place. "
-                                                    (db/conversation-intros :process))})
-          response (or use-this-answer
-                       (-> (loop-for-answer (merge ctx {:responder-role :human
-                                                        :question-type :process/warm-up
-                                                        :question the-warm-up-type-question}))
-                           :response))]
-      (log! :info (str "------------------------ Return loop-for-answer: " response))
-      (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
       ;; This, the :warm-up method of defanalyze creates the project and provides claims.
-      (let [pid (ru/analyze-response-meth (merge ctx {:question-type :process/warm-up :response response}))
-            ctx (assoc ctx :pid pid)
-            [_ _ pname] (ru/find-claim '(project-name ?pid ?x) (db/get-claims pid))]
-        (db/add-msg {:pid pid
+    (let [pid (ru/analyze-response-meth (merge ctx {:question-type :process/warm-up :response response}))
+          ctx (assoc ctx :pid pid)
+          [_ _ pname] (ru/find-claim '(project-name ?pid ?x) (db/get-claims pid))]
+      (db/add-msg {:pid pid
                      :cid :process
-                     :from :human
-                     :question-type :process/warm-up
-                     :text response
-                     :tags [:process/warm-up :response]})
-        (db/add-msg {:pid pid
-                     :cid :process
-                     :from :system
-                     :text (str "Great, we'll call your project " pname ".")
-                     :tags [:process/warm-up :name-project :informative]})
-        (ru/refresh-client client-id pid :process)
-        (let [ctx (merge ctx (ctx-human pid :process))]
-          (s/assert ::human-ctx ctx)
-          (-> (initial-advice pid) (tell-interviewer ctx))
-          ctx)))
-    (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+                   :from :human
+                   :question-type :process/warm-up
+                   :text response
+                   :tags [:process/warm-up :response]})
+      (db/add-msg {:pid pid
+                   :cid :process
+                   :from :system
+                   :text (str "Great, we'll call your project " pname ".")
+                   :tags [:process/warm-up :name-project :informative]})
+      (ru/refresh-client client-id pid :process) ; <================================= Move to start-conversation
+      (let [ctx (merge ctx (ctx-human pid :process))]
+        (s/assert ::human-ctx ctx)
+        (-> (initial-advice pid) (tell-interviewer ctx))
+        ctx)))
+  (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
@@ -500,20 +489,39 @@
 
 (defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
 
+;;; ToDo: starting-new-project? should not exist!
+(defn start-conversation
+  "Ask first question, create a project and call resume-conversation.
+   :start-conversation is a dispatch-key form the client."
+  [{:keys [client-id use-this-answer] :as ctx}]
+  (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :promise? true
+                    :text (str "You want to start a new project? This is the right place. "
+                               (db/conversation-intros :process))})
+  (let [response (or use-this-answer
+                     (-> (loop-for-answer (merge ctx {:responder-role :human
+                                                      :question-type :process/warm-up
+                                                      :question the-warm-up-type-question}))
+                         :response))]
+    (log! :info (str "------------------------ Return loop-for-answer: " response))
+    (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+
+
+     [pid (start-human-project! ctx)]
+      (assoc
+
+
+
 (defn resume-conversation
-  "Start the interview loop. :resume-conversation-plan is a dispatch key from client.
+  "Start the interview loop. :resume-conversation is a dispatch key from client.
    This is called even when PID is :START-A-NEW-PROJECT."
   [{:keys [client-id pid cid] :as ctx}]
   (assert (string? client-id))
   (assert (#{:process :data :resources :optimality} cid))
+  (log! :info (str "--------- Resume conversation: ctx = " (with-out-str (pprint ctx))))
   (try
     (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
       (redirect-user-to-discussion client-id cid :process)
-      (let [{:keys [pid cid] :as ctx} (if (starting-new-project? pid)
-                                        (start-human-project! ctx)
-                                        (if (surrogate? pid)
-                                          (ctx-surrogate ctx)
-                                          (ctx-human pid cid)))]
+      (let [{:keys [pid cid] :as ctx} (if (surrogate? pid) (ctx-surrogate ctx)(ctx-human pid cid))]
         ;; The conversation loop.
         (when-not (db/conversation-done? pid cid)
           (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
@@ -538,7 +546,7 @@
 ;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-iviewers!
   []
-  (ws/register-ws-dispatch :resume-conversation-plan resume-conversation))
+  (ws/register-ws-dispatch :resume-conversation resume-conversation))
 
 (defstate iviewers
   :start (init-iviewers!))

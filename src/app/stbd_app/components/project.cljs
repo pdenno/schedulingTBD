@@ -12,8 +12,8 @@
    ["@mui/material/Stack$default"       :as Stack]
    ;;["@mui/material/styles"              :as styles :refer [createTheme themeOptions ThemeProvider]] ; WIP
    [helix.core         :as helix :refer [defnc $]]
-   [stbd-app.ws        :as ws]
-   [stbd-app.util      :as util :refer [lookup-fn register-fn update-common-info!]]
+   [stbd-app.ws        :as ws    :refer [send-msg]]
+   [stbd-app.util      :as util  :refer [lookup-fn register-fn update-common-info!]]
    [taoensso.telemere  :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -58,7 +58,8 @@
                           (set-current {:project/id :START-A-NEW-PROJECT})
                           (update-common-info! {:project/id :START-A-NEW-PROJECT :cid :process})
                           ((lookup-fn :update-code) {:text "Together, we'll put a MiniZinc solution here soon!"})
-                          ((lookup-fn :get-conversation) :START-A-NEW-PROJECT))} ; Calls resume-conversation-plan
+                          (ws/send-msg {:dispatch-key :resume-conversation :pid :START-A-NEW-PROJECT :cid :process})
+                          ((lookup-fn :resume-conversation) :START-A-NEW-PROJECT))} ; Calls resume-conversation
             ($ RocketLaunch))
          ($ FormControl {:size "small"} ; small makes a tiny difference, :sx's :margin and :height do not.
             ($ Select {:variant "filled"
@@ -71,7 +72,7 @@
                                      (set-current proj)
                                      (log! :info (str "Select project: proj = " proj))
                                      (reset! menu-infos (order-projects proj proj-infos))
-                                     ((lookup-fn :get-conversation) (:project/id proj))))}
+                                      ((lookup-fn :get-conversation) (:project/id proj))))}
                (for [p (map :menu-text @menu-infos)]
                  ($ MenuItem {:key p :value p} p))))))))
 

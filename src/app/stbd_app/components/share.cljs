@@ -28,12 +28,12 @@
   "Create a Stack with two children (props :up and :down) where the
    area shared between the two can be distributed by dragging the Stack divider,
    a black bar that could be viewed as the frame dividing the two."
-  [{:keys [up dn init-height share-fns] :or {init-height 300}}] ; ToDo: Are defaults necessary?
+  [{:keys [up dn init-height share-fns up-portion] :or {init-height 300 up-portion 0.5}}] ; ToDo: Are defaults necessary?
   {:helix/features {:check-invalid-hooks-usage true}}
   (let [{:keys [on-resize-up on-resize-dn on-stop-drag-up on-stop-drag-dn]
          :or   {on-resize-up resize on-resize-dn resize}} share-fns
-        [up-height set-up-height]     (hooks/use-state (int (/ init-height 2)))
-        [dn-height set-dn-height]     (hooks/use-state (int (/ init-height 2)))
+        [up-height set-up-height]     (hooks/use-state (int (* init-height up-portion)))
+        [dn-height set-dn-height]     (hooks/use-state (int (* init-height (- 1.0 up-portion))))
         [parent-dims set-parent-dims] (hooks/use-state {:height init-height :ubound nil :dbound nil})
         u-div (hooks/use-ref nil)
         d-div (hooks/use-ref nil)
@@ -70,10 +70,11 @@
           (when-let [ddiv (j/get d-div :current)]
             (let [ubound (j/get (.getBoundingClientRect udiv) :top)
                   dbound (+ ubound init-height)
-                  height (int (- (/ init-height 2) 2))]
+                  uheight (int (- (* init-height up-portion) 2))
+                  dheight (int (- (* init-height (- 1.0 up-portion)) 2))]
               (set-parent-dims {:height init-height :ubound ubound :dbound dbound})
-              (when on-resize-up (on-resize-up udiv nil height))
-              (when on-resize-dn (on-resize-dn ddiv nil height))))))
+              (when on-resize-up (on-resize-up udiv nil uheight))
+              (when on-resize-dn (on-resize-dn ddiv nil dheight))))))
       ($ Stack
          {:direction "column" :display "flex" :width "100%":height "100%" :alignItems "stretch" :spacing 0
           :divider ($ Divider {:variant "activeHoriz" :color "black"
