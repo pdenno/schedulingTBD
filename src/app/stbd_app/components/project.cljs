@@ -58,8 +58,7 @@
                           (set-current {:project/id :START-A-NEW-PROJECT})
                           (update-common-info! {:project/id :START-A-NEW-PROJECT :cid :process})
                           ((lookup-fn :update-code) {:text "Together, we'll put a MiniZinc solution here soon!"})
-                          (ws/send-msg {:dispatch-key :resume-conversation :pid :START-A-NEW-PROJECT :cid :process})
-                          ((lookup-fn :resume-conversation) :START-A-NEW-PROJECT))} ; Calls resume-conversation
+                          (ws/send-msg {:dispatch-key :start-conversation}))}
             ($ RocketLaunch))
          ($ FormControl {:size "small"} ; small makes a tiny difference, :sx's :margin and :height do not.
             ($ Select {:variant "filled"

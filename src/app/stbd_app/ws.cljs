@@ -131,6 +131,7 @@
     :ask-llm                   ; User asked a "LLM:..." question at the chat prompt.
     :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation
     :surrogate-follow-up       ; User wrote "SUR?" <some question about dialog to date>
+    :start-conversation        ; Start a conversation. All that is needed is the client-id, I think.
     :resume-conversation       ; Restart the planner (works for :START-A-NEW-PROJECT too).
     :close-channel             ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
     :ping                      ; Ping server.

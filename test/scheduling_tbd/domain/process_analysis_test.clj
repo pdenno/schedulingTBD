@@ -180,7 +180,7 @@
 (defn ^:diag ask-about-ice-cream-agent
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
   ([q-txt]
-   (let [{:keys [iview-aid iview-tid]} (inv/interview-agent :sur-ice-cream :process )]
+   (let [{:keys [iview-aid iview-tid]} (inv/create-interview-agent! :sur-ice-cream :process )]
      (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"

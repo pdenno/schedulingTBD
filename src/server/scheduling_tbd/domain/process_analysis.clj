@@ -1,21 +1,22 @@
 (ns scheduling-tbd.domain.process-analysis
   "Analysis of the process interview"
   (:require
-   [clojure.edn                               :as edn]
-   [clojure.pprint                            :refer [pprint]]
-   [clojure.spec.alpha                        :as s]
-   [clojure.string                            :as str]
-   [jsonista.core                             :as json]
-   [scheduling-tbd.db                         :as db]
-   [scheduling-tbd.llm                        :as llm :refer [query-llm]]
-   [scheduling-tbd.minizinc                   :as mzn]
-   [scheduling-tbd.response-utils             :as ru :refer [defanalyze find-claim]]
-   [scheduling-tbd.sutil                      :as sutil :refer [elide starting-new-project?]]
-   [scheduling-tbd.web.websockets             :as ws]
-   [taoensso.telemere                         :as tel :refer [log!]]))
+   [clojure.core.unify                 :as uni]
+   [clojure.edn                        :as edn]
+   [clojure.pprint                     :refer [pprint]]
+   [clojure.spec.alpha                 :as s]
+   [clojure.string                     :as str]
+   [jsonista.core                      :as json]
+   [scheduling-tbd.db                  :as db]
+   [scheduling-tbd.llm                 :as llm]
+   [scheduling-tbd.minizinc            :as mzn]
+   [scheduling-tbd.response-utils      :as ru :refer [defanalyze]]
+   [scheduling-tbd.sutil               :as sutil]
+   [scheduling-tbd.web.websockets      :as ws]
+   [taoensso.telemere                  :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
-(declare analyze-warm-up-response! analyze-process-steps-response analyze-process-durs-response analyze-batch-size-response analyze-process-ordering-response)
+(declare analyze-warm-up-response analyze-process-steps-response analyze-process-durs-response analyze-batch-size-response analyze-process-ordering-response)
 
 (def the-warm-up-type-question
   (str "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."))
@@ -28,17 +29,16 @@
 ;;; ensuring we have enough skilled workers available when needed, adds another layer of complexity to our operations.",
 ;;; This might get into skills classification, delivery schedules, downtime, machine utilization.
 
-;;; Note that pid here can be :START-A-NEW-PROJECT. In that case, we don't have a DB for the project yet. We make it here.
-(defanalyze :process/warm-up [{:keys [response client-id pid] :as _ctx}]
-  (log! :debug (str "*******analysis :process/warm-up, response = " response))
-  (let [init-claims (if (starting-new-project? pid) '#{(project-id :START-A-NEW-PROJECT)} (db/get-claims pid))
-        all-claims (analyze-warm-up-response! response init-claims) ;
-        ;;--------  Now human/surrogate can be treated nearly identically ---------
-        [_ pid]     (find-claim '(project-id ?pid) all-claims)
-        [_ _ pname] (find-claim '(project-name ?pid ?pname) all-claims)]
-      (doseq [claim all-claims]
-        (db/add-claim! pid {:string (str claim) :cid :process :q-type :warm-up}))
-      pid)) ; Need this when you made a new project.
+;;; start-conversation doesn't call this it calls analyze-warm-up-response directly; This is only used by surrogates, so far.
+(defanalyze :process/warm-up [{:keys [response pid] :as _ctx}]
+  (assert (db/project-exists? pid)) ; This is only called where the project already exists.
+  (let [warm-up-claims (analyze-warm-up-response response)
+        needed-claims (remove #('#{temp-project-id temp-project-name} (first %)) warm-up-claims)
+        bindings {'?pid pid}]
+      (doseq [claim needed-claims]
+        (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
+                            :q-type :process-warm-up
+                            :cid :process}))))
 
 (defanalyze :process/work-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid)
@@ -130,41 +130,36 @@
     res))
 
 ;;; (pan/analyze-warm-up-response! ice-cream-answer-warm-up '#{(project-id :START-A-NEW-PROJECT)})
-(defn analyze-warm-up-response!
+(defn analyze-warm-up-response
   "Analyze the response to the initial question.
-   If init-claims argument is just #{(project-id :START-A-NEW-PROJECT)}, we are talking to humans and there is not yet a project.
-   In that case, we haven't made the project DB yet, and we don't really know what the PID will be until we do.
-   Returns a map containing the union of init-claims and new claims including scheduling-challenges and, if it is a new project,
-   project-id and project-name predicates."
-  [response init-claims]
-  (log! :info (-> (str "analyze-warm-up-response!: init-claims = " init-claims " response = " response) (elide 150)))
+   Returns a collection of new NON-GROUND claims, including scheduling-challenges and project-id and project-name predicates.
+   Not everything here will be asserted as claims:
+     1) Actual project-name and project-id are calculated by db/create-proj-db, which already happened for surrogate.
+
+   If this is called by a human project the project-id and project-name can be retracted later.
+   If this is called by a surrogate project, the project-id and project-name are already known."
+  [response]
   (let [{:keys [product-or-service-name challenges]}  (run-scheduling-challenges-agent response)
-        [_ pid] (ru/find-claim '(project-id ?pid) init-claims)]
-    (if (starting-new-project? pid)
-      (let [project-name (as-> product-or-service-name ?s
-                           (str/trim ?s)
-                           (str/split ?s #"\s+")
-                           (map str/capitalize ?s)
-                           (interpose " " ?s)
-                           (apply str ?s))
-            pid (as-> product-or-service-name ?s
-                  (str/trim ?s)
-                  (str/lower-case ?s)
-                  (str/split ?s #"\s+")
-                  (interpose "-" ?s)
-                  (apply str ?s)
-                  (keyword ?s))
-            zippy (log! :info (str "pid suggested to DB: " pid))
-            pid (db/create-proj-db! {:project/name project-name :project/id pid})]
-        (log! :info (str "Actual pid: " pid))
-        ;; New projects don't use init-claims, which is just #{(project-id :START-A-NEW-PROJECT)}.
-        ;; db/create-proj-db! adds the project-id and project-name predicates.
-        (into (conj (db/get-claims pid) `(~'principal-expertise ~pid ~product-or-service-name))
-              (for [claim challenges] (list 'scheduling-challenge pid claim))))
-      ;; Surrogate, combine argument init-claims and others.
-      (-> init-claims
-          (conj (~'principal-expertise ~pid ~product-or-service-name))
-          (into (for [claim challenges] (list 'scheduling-challenge pid claim)))))))
+        project-name (as-> product-or-service-name ?s
+                       (str/trim ?s)
+                       (str/split ?s #"\s+")
+                       (map str/capitalize ?s)
+                       (interpose " " ?s)
+                       (apply str ?s))
+        pid (as-> product-or-service-name ?s
+              (str/trim ?s)
+              (str/lower-case ?s)
+              (str/split ?s #"\s+")
+              (interpose "-" ?s)
+              (apply str ?s)
+              (keyword ?s))]
+    ;; We will unify on DB's ?pid later.
+    (-> #{}
+        (conj (list 'temp-project-id pid))                 ; Used to create project database if human.
+        (conj (list 'temp-project-name '?pid project-name)   ; Used to create project database if human.
+        (conj (list 'principal-expertise '?pid project-name))
+        (into (for [claim challenges]
+                (list 'scheduling-challenge '?pid claim)))))))
 
 ;;; ToDo: I can't decide whether or not I want these process-steps in claims. I suppose it can't hurt.
 (defn analyze-process-steps-response

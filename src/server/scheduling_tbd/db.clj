@@ -931,6 +931,7 @@
                                                             question-type    (assoc :message/question-type question-type))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
+
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
   [id project-name dir]
@@ -978,7 +979,9 @@
      additional - a vector of maps to add to the database.
      opts -  {:force-this-name? - overwrite project with same name}
    This always destroys DBs with the same name as that calculated here.
-   Return the PID of the project."
+   Sets claims for project-id  to calculated PID and project-name.
+   Return the PID of the project, which may be different than the project/id argument
+   owing to the need for PIDs to be unique in the context of all projects managed by the system DB."
   ([proj-info] (create-proj-db! proj-info {} {}))
   ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
   ([proj-info additional-info {:keys [in-mem? force-this-name?] :as _opts}]

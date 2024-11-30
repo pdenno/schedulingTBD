@@ -109,7 +109,7 @@
   "Diagnostic for one interaction with interviewer."
   [cmd {:keys [pid cid] :as ctx}]
   (inv/tell-interviewer cmd
-                        (merge ctx (inv/interview-agent pid cid))))
+                        (merge ctx (inv/create-interview-agent! pid cid))))
 
 (deftest finished-process-test
   (testing "Testing that :sur-ice-cream has finished all process questions."
