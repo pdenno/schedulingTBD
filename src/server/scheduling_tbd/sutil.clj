@@ -247,8 +247,3 @@
     (catch Exception _e
       (reset! diag str)
       (log/error "Could not read string returned from OpenAI:" str))))
-
-(defn starting-new-project?
-  "Returns true if pid = :START-A-NEW-PROJECT."
-  [pid]
-  (= pid :START-A-NEW-PROJECT))

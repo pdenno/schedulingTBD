@@ -15,7 +15,7 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.llm   :as llm]
    [scheduling-tbd.specs :as spec]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema db-cfg-map default-llm-provider register-db resolve-db-id starting-new-project?]]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema db-cfg-map default-llm-provider register-db resolve-db-id]]
    [scheduling-tbd.util  :as util :refer [now]]
    [taoensso.telemere    :refer [log!]]))
 
@@ -495,9 +495,9 @@
     :instruction-path "data/instructions/interviewers/optimality.txt"}
 
    ;; ----------------- more generice system agents ---------------------------------
-   {:id :answers-the-question?
-    :instruction-path "data/instructions/answers-the-question.txt"
-    :response-format (-> "data/instructions/boolean-response-format.edn" slurp edn/read-string)}
+   {:id :response-analysis-agent
+    :instruction-path "data/instructions/response-analysis-agent.txt"
+    :response-format (-> "data/instructions/response-analysis-format.edn" slurp edn/read-string)}
 
    {:id :scheduling-challenges-agent
     :instruction-path "data/instructions/scheduling-challenges.txt"
@@ -540,15 +540,13 @@
 (defn get-current-cid
   "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
   [pid]
-  (if (starting-new-project? pid)
-    :process
-    (or (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))
-        :process)))
+  (or (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))
+      :process))
 
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
   [pid cid]
-  (assert (#{:process :data :resource :resources :optimality} cid)) ; <================================
+  (assert (#{:process :data :resource :resources :optimality} cid))
   (d/q '[:find ?eid .
          :in $ ?cid
          :where [?eid :conversation/id ?cid]]
@@ -562,19 +560,7 @@
          :conversation/messages
          (mapv :db/id))))
 
-(defn change-conversation
-  [{:keys [pid cid] :as obj}]
-  (try
-    (assert (#{:process :data :resources :optimality} cid))
-    (let [conn (connect-atm pid)
-          eid (project-exists? pid)]
-      (if eid
-        (d/transact conn {:tx-data [[:db/add eid :project/current-conversation cid]]})
-        (log! :info (str "No change with change-conversation (1): " obj))))
-    (catch Throwable _e (log! :info (str "No change with change-conversation (2): " obj)) nil))
-  nil)
-
-(defn get-project
+(defn ^:diag get-project
   "Return the project structure.
    Throw an error if :error is true (default) and project does not exist."
   [pid & {:keys [drop-set error?]
@@ -660,29 +646,26 @@
     (d/transact conn {:tx-data [[:db/add eid :project/code code-text]]})))
 
 (defn get-claims
-  "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none.
-   Returns '#{(project-id :START-A-NEW-PROJECT)} if starting-new-project."
+  "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
   [pid & {:keys [objects?]}]
   (let [conn @(connect-atm pid)]
-    (if (starting-new-project? pid)
-      '#{(project-id :START-A-NEW-PROJECT)} ; Special treatment for new projects.
-      (if objects?
-        (let [eids (d/q '[:find [?eid ...] :where [?eid :claim/string]] conn)]
-          (for [eid eids]
-            (let [{:claim/keys [string conversation-id question-type confidence]}
-                  (dp/pull conn '[*] eid)]
-              (cond-> {:claim (edn/read-string string)}
-                conversation-id (assoc :conversation-id conversation-id)
-                question-type   (assoc :question-type question-type)
-                confidence      (assoc :confidence confidence)))))
-        ;; Otherwise just return predicate forms
-        (if-let [facts (d/q '[:find [?s ...]
-                              :where
-                              [_ :project/claims ?pp]
-                              [?pp :claim/string ?s]]
-                            conn)]
-          (-> (mapv edn/read-string facts) set)
-          #{})))))
+    (if objects?
+      (let [eids (d/q '[:find [?eid ...] :where [?eid :claim/string]] conn)]
+        (for [eid eids]
+          (let [{:claim/keys [string conversation-id question-type confidence]}
+                (dp/pull conn '[*] eid)]
+            (cond-> {:claim (edn/read-string string)}
+              conversation-id (assoc :conversation-id conversation-id)
+              question-type   (assoc :question-type question-type)
+              confidence      (assoc :confidence confidence)))))
+      ;; Otherwise just return predicate forms
+      (if-let [facts (d/q '[:find [?s ...]
+                            :where
+                            [_ :project/claims ?pp]
+                            [?pp :claim/string ?s]]
+                          conn)]
+        (-> (mapv edn/read-string facts) set)
+        #{}))))
 
 (s/def ::claim (s/keys :req-un [:claim/string :claim/cid] :opt-un [:claim/q-type :claim/confidence]))
 (s/def :claim/string string?)
@@ -930,7 +913,6 @@
                                                             (not-empty tags) (assoc :message/tags tags)
                                                             question-type    (assoc :message/question-type question-type))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
-
 
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."

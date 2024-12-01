@@ -285,3 +285,15 @@
 (deftest test-start-human-project!
   (testing "that you can make a human project from an answer to warm-up text."
     (inv/start-human-project! {:use-this-answer warm-up-text})))
+
+(deftest response-analysis-agent-test
+  (testing "that the response-analysis-agent does the right thing."
+    (let [{:keys [answers-the-question? raises-a-question? wants-a-break?] :as res}
+          (inv/response-analysis
+           "Would you characterize some process as being a relatively persistent bottleneck?"
+           "Yes, sewing is typically the bottleneck.")]
+      (is (= #{:answers-the-question? :raises-a-question? :wants-a-break?}
+             (-> res keys set)))
+      (is (string? answers-the-question?))
+      (is (false? raises-a-question?))
+      (is (false? wants-a-break?)))))
