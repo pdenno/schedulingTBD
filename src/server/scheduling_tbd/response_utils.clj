@@ -28,22 +28,20 @@
        (do (log! :debug (cl-format nil "<-- ~A (act) returns ~S" ~tag res#))
            res#))))
 
-(s/def ::response-ctx (s/keys :req-un [::response ::question-type ::cid]))
-(s/def ::response string?)
-(s/def ::question-type keyword?)
-(s/def ::cid #(#{:process :data :resources :optimality} %))
+(s/def ::dispatch-args (s/keys :req-un [::question-type]))
+(s/def ::question-type (s/and keyword?
+                              #(#{"process" "data" "resources" "optimality"} (namespace %))))
 
 (defn analyze-response--dispatch
   "Parameters to analyze-response is a object with at least a :plan-step in it and a response from operator-meth (user response)."
-  [{:keys [response question-type cid] :as ctx}]
-  (s/assert ::response-ctx ctx)
-  (log! :debug (str "analyze-response-dispatch: ctx = " ctx "response = " response))
+  [{:keys [question-type cid] :as args}]
+  (reset! diag args)
+  (s/assert ::dispatch-args args)
   (if (and question-type cid)
     (keyword (name cid) (name question-type))
     (do
-      (reset! diag ctx)
-      (log! :error (str "analyze-response-dispatch: No dispatch for question-type. ctx = " ctx))
-      (throw (ex-info "No method to analyze response: " {:ctx ctx})))))
+      (log! :error (str "analyze-response-dispatch: No dispatch for question-type. ctx = " args))
+      (throw (ex-info "No method to analyze response: " {:args args})))))
 
 (defmulti analyze-response-meth #'analyze-response--dispatch)
 

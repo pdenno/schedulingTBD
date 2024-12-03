@@ -209,9 +209,10 @@
   ([client-id]
    (doseq [p (filter #(= client-id (:client-id %)) @promise-stack)]
      (log! :info (str "Clearing (rejecting) promise " p))
-     (try (p/reject! (:prom p) (ex-info "client forgotten" {}))
-          (catch Exception _e nil)))
-   (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %))))
+     (-> p
+         (p/catch (fn [p] (log! :warn (str "Clearing promise: " p))))
+         (p/reject! (:prom p) (ex-info "client forgotten" {})))
+     (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %)))))
 
 (defn remove-promise!
   "Remove the promise identified by the argument :p-key from the promise-stack."
@@ -226,7 +227,7 @@
   (let [k (-> (gensym "promise-") keyword)
         p (p/deferred)
         obj {:prom p :p-key k :client-id client-id :timestamp (java.util.Date.)}]
-    (log! :info (str "New promise: " obj))
+    (log! :debug (str "New promise: " obj))
     (swap! promise-stack #(conj % obj))
     ;; Because I saw it messed up once...
     (when-not (every? #(s/valid? ::promise %) @promise-stack)

@@ -61,6 +61,7 @@
 ;; THIS is 2 (the other namespace I am hanging out in recently).
 ;;; Remember to db/backup-system-db once you get things straight.
 
+;;; (invt/recreate-agent! :response-analysis-agent)
 ;;; (invt/recreate-agent! :process-interview-agent)
 ;;; (invt/recreate-agent! :scheduling-challenges-agent)
 (defn ^:diag recreate-agent!
@@ -109,7 +110,7 @@
   "Diagnostic for one interaction with interviewer."
   [cmd {:keys [pid cid] :as ctx}]
   (inv/tell-interviewer cmd
-                        (merge ctx (inv/create-interview-agent! pid cid))))
+                        (merge ctx (inv/ensure-interview-agent! pid cid))))
 
 (deftest finished-process-test
   (testing "Testing that :sur-ice-cream has finished all process questions."
@@ -141,19 +142,41 @@
    :question "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING."
    :status "OK"})
 
-;;; (invt/ask-one-question q-work-type)
+#_(invt/ask-one-question {:question "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
+                          :question-type :process/warm-up
+                          :responder-role :surrogate
+                          :pid :sur-ice-cream})
+
 (defn ask-one-question
   "Use inv/chat-pair to get back an answer"
-  [pid {:keys [question question-type]}]
-  (let [{:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
-    (inv/loop-for-answer
-     {:pid pid
-      :sur-aid assistant-id
-      :sur-tid thread-id
-      :responder-role :surrogate
-      :client-id (ws/recent-client!)
-      :question question
-      :question-type question-type})))
+  [{:keys [question question-type pid responder-role client-id]
+    :or {client-id (ws/recent-client!)}
+    :as ctx}]
+  (assert (#{:human :surrogate} responder-role))
+  (assert (string? question))
+  (assert (keyword? question-type))
+   (let [ctx (assoc ctx :client-id client-id)]
+     (when (= responder-role :surrogate) (assert pid))
+     (if (= responder-role :surrogate)
+       (let [{:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
+         (inv/get-an-answer
+          (merge ctx {:sur-aid assistant-id
+                      :sur-tid thread-id})))
+       (inv/get-an-answer ctx)))) ; ToDo: Have special behavior for a client-id="dev-null".
+
+(deftest test-get-an-answer
+  (testing "get-an-answer for surrogates"
+    (if (db/project-exists? :sur-ice-cream)
+      (let [result (ask-one-question {:question "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
+                                      :question-type :process/warm-up
+                                      :responder-role :surrogate
+                                      :pid :sur-ice-cream})]
+        (is (and (vector? result)
+                 (== 2 (count result))
+                 (= :query (-> result first :tags first))
+                 (= :response (-> result second :tags first)))))
+      (log! :warn "Need project :sur-ice-cream to run this test."))))
+
 
 (deftest question-asking
   (testing "Testing question asking capability through loop-for-answer."

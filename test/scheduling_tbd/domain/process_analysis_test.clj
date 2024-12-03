@@ -21,6 +21,17 @@
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
 
+(defn ^:diag ns-start-over!
+  "This one has been useful. If you get an error evaluate this ns, (the declaration above) run this and try again."
+  []
+  (map (partial ns-unalias *ns*) (keys (ns-aliases *ns*))))
+
+(defn ^:diag remove-alias
+  "This one has NOT been useful!"
+  [al ns-sym]
+  (swap! alias? (fn [val] (->> val (remove #(= % al)) set)))
+  (ns-unalias (find-ns ns-sym) al))
+
 (defn safe-alias
   [al ns-sym]
   (when (and (not (@alias? al))
@@ -171,7 +182,7 @@
 
 (deftest test-warm-up-question
   (testing "Testing warm-up-question with no current project."
-    (let [claims (pan/analyze-warm-up-response!  warm-up-fountain-pens '#{(project-id :START-A-NEW-PROJECT)})
+    (let [claims (pan/analyze-warm-up-response  warm-up-fountain-pens '#{(project-id :START-A-NEW-PROJECT)})
           [_ ?pid] (ru/find-claim '(project-id ?x) claims)]
       (is (and (ru/find-claim (list 'project-id ?pid) claims)
                (ru/find-claim (list 'cites-raw-material-challenge ?pid) claims)
@@ -180,7 +191,7 @@
 (defn ^:diag ask-about-ice-cream-agent
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
   ([q-txt]
-   (let [{:keys [iview-aid iview-tid]} (inv/create-interview-agent! :sur-ice-cream :process )]
+   (let [{:keys [iview-aid iview-tid]} (inv/ensure-interview-agent! :sur-ice-cream :process )]
      (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"

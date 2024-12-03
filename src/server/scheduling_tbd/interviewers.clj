@@ -54,14 +54,14 @@
      2) :response is added. Typically its value is a string."
   [{:keys [question sur-aid sur-tid responder-role preprocess-fn tries client-id] :as ctx
     :or {tries 1 preprocess-fn identity}}]
-  (log! :info (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
+  (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
   (let [prom (if (= :human responder-role)
                (do
                  (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
                  (ws/send-to-chat (-> ctx                        ; This cannot timeout.
-                                        (assoc :text question)
-                                        (assoc :promise? true)
-                                        (assoc :dispatch-key :tbd-says))))
+                                      (assoc :text question)
+                                      (assoc :promise? true)
+                                      (assoc :dispatch-key :tbd-says))))
                (px/submit! (fn [] ; surrogate responder...
                              (try
                                  (llm/query-on-thread :aid sur-aid   ; This can timeout.
@@ -73,15 +73,16 @@
     (-> prom p/await)))
 
 ;;; For use of chat-pair and other things defined below.
-(s/def ::chat-pair-ctx (s/or :surrogate (s/and #(s/valid? ::surrogate-ctx %) #(s/valid? ::common-ctx %))
-                             :human     (s/and #(s/valid? ::human-ctx %)     #(s/valid? ::common-ctx %))))
+(s/def ::chat-pair-ctx (s/and ::common-ctx
+                              (s/or :surrogate (s/and #(s/valid? ::surrogate-ctx %) #(s/valid? ::common-ctx %))
+                                    :human     (s/and #(s/valid? ::human-ctx %)     #(s/valid? ::common-ctx %)))))
 
-(s/def ::common-ctx (s/keys :req-un [::client-id ::question]))
-(s/def ::surrogate-ctx (s/and ::common-ctx (s/keys :req-un [:sur/responder-role ::sur-aid ::sur-tid ])))
-(s/def ::human-ctx     (s/and ::common-ctx (s/keys :req-un [:hum/responder-role])))
+(s/def ::common-ctx (s/keys :req-un [::client-id ::question])) ; ::question-type not needed here.
+(s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-role ::sur-aid ::sur-tid ]))
+(s/def ::human-ctx     (s/keys :req-un [:hum/responder-role]))
 
-(s/def :sur/responder-role #(= % :surrogate)) ; Keep. Bug in kondo?
-(s/def :hum/responder-role #(= % :human))     ; Keep. Bug in kondo?
+(s/def :sur/responder-role #(= % :surrogate))
+(s/def :hum/responder-role #(= % :human))
 (s/def ::client-id string?)
 (s/def ::sur-aid string?)
 (s/def ::sur-tid string?)
@@ -111,8 +112,8 @@
 
 ;;; Note that in OpenAI every thread has its own separate context window, which stores the conversation history specific to
 ;;; that thread, preventing cross-contamination with other threads.
-(defn create-interview-agent!
-  "Return a map with project agent info (aid, tid). The agent is shared by all projects, but the threads are project-specific.
+(defn ensure-interview-agent!
+  "Return a map with project agent info (iview-aid, iview-tid). The agent is shared by all projects, but the threads are project-specific.
    If a thread has not yet been created for this project, this creates it and stores that in the DB before returning the info."
   [pid cid]
   (assert (#{:process :data :resources :optimality} cid))
@@ -134,20 +135,6 @@
                     {}
                     @interview-agent-atm)
          (s/assert ::interview-agent))))
-
-;;; Remember to put this into the project when done!
-(defn create-process-interview-agent
-  "Get an interview agent and thread but don't store it in the project (which may not exist yet)."
-  []
-  (let [user  (-> (System/getenv) (get "USER"))
-        agent (db/get-agent :base-type :process-interview-agent :db-attrs? true)
-        tid   (:id (llm/make-thread {:assistant-id (:agent/assistant-id agent)
-                                     :llm-provider :openai
-                                     :metadata {:usage :stbd-project-agent :user user}}))]
-    (-> agent
-        (assoc :agent/thread-id tid)
-        (dissoc :db/id))))
-
 
 ;;; To check the structure of commands to the interviewer:
 (s/def ::interviewer-cmd (s/and (s/keys :req-un [::command])
@@ -177,7 +164,7 @@
 (defn tell-interviewer
   "Send a command to an interviewer agent and wait for response; translate it.
    :aid and :tid in the ctx should be for the interviewer agent."
-  [cmd {:keys [iview-aid iview-tid] :as _ctx}]
+  [cmd {:keys [iview-aid iview-tid cid] :as _ctx}]
   (when-not (s/valid? ::interviewer-cmd cmd) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid interviewer-cmd: " (with-out-str (pprint cmd)))))
   (log! :info (-> (str "Interviewer told: " cmd) (elide 150)))
@@ -185,7 +172,9 @@
         res (-> {:aid iview-aid :tid iview-tid :role "user" :query-text cmd-string}
                 llm/query-on-thread
                 output-struct2clj)
-        res (if (contains? res :question-type) (update res :question-type keyword) res)]
+        res (if (contains? res :question-type)
+              (update res :question-type #(keyword (name cid) %))
+              res)]
     (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
     res))
 
@@ -222,48 +211,48 @@
         (update-keys keyword)
         (update-vals #(if (empty? %) false %)))))
 
-(defn ^:diag response-category
-  "Return a keyword indicating the class of the interviewee response to the interviewer's prior statement."
-  [_viewer-txt _viewee-txt]
-  :other) ; ToDo: Write an agent.
+;;; ToDo: Implement these (next three). They will probably involve some looping.
+(defn handle-wants-a-break
+  [_question response _ctx]
+  (log! :warn (str "handle-wants-a-break not yet implemented: response = " response))
+  [])
 
-(defn handle-wants-a-break [& _])
-
-;;; ToDo: Implement this. It will probably take a few agents.
 (defn handle-raises-a-question
   "The responder-role is :human. Handle a digression returning when the original-question is answered.
    Return a vector of the entire digression."
-  [& _])
-;  [original-question original-response {:keys [client-id] :as ctx}]
-;  (let [conversation (atom nil...)]
-;    (letfn [(lfa-aux []
-;              (loop [response (chat-pair ctx)]))])))
-;        (let [handle-and-reprompt (text-for-non-responsive
-;                     (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :text handle-and-reprompt})
-;                     (recur (chat-pair (-> ctx (assoc :question handle-and-reprompt))))))
-;     (lfa-aux)
-;     @conversation)
+  [_question response _ctx]
+  (log! :warn (str "handle-raises-a-question not yet implemented: response = " response))
+  [])
 
-;;; The design question I have here is how to get back on track when the user's response doesn't answer the question.
+(defn handle-other-non-responsive
+  [_question response _ctx]
+  (log! :warn (str "handle-other-non-responsive not yet implemented: response = " response))
+  [])
+
+;;; ToDo: The design question I still have here is how to get back on track when the user's response doesn't answer the question.
+;;;       This is mostly a matter for handle-raises-a-question ...(Thread/sleep 20000).
 (defn get-an-answer
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    Return a vector of the conversation (objects suitable for db/add-msg) terminating in an answer to the question.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
   [{:keys [question question-type responder-role] :as ctx}]
   (s/assert ::chat-pair-ctx ctx)
-  (let [conversation [{:text question :question-type question-type :tags [:query]}]
-        response  (chat-pair ctx)
+  (let [conversation [{:text question :from :system :question-type question-type :tags [:query]}]
+        response  (chat-pair ctx) ; response here is just text.
         answered? (= :surrogate responder-role) ; Surrogate doesn't beat around the bush, I think!
-        {:keys [answers-the-question? raises-a-question? wants-a-break?]}
-        (when-not answered? (response-analysis question response))
+        {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when-not answered? (response-analysis question response))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
       (let [same-question (str "Okay, but we are still interested in this: " question)]
         (into conversation (get-an-answer (-> ctx (assoc :question same-question)))))
       (cond-> conversation
-        answered?              (conj {:text response :question-type question-type :tags [:response]})
-        wants-a-break?         (into (handle-wants-a-break question response ctx))
-        raises-a-question?     (into (handle-raises-a-question question response ctx))))))
+        answered?                  (conj {:text response :from responder-role :question-type question-type :tags [:response]})
+        wants-a-break?             (into (handle-wants-a-break question response ctx))
+        raises-a-question?         (into (handle-raises-a-question question response ctx))
+        (not
+         (or answered?
+             wants-a-break?
+             raises-a-question?))  (into (handle-other-non-responsive question response ctx))))))
 
 (defn already-answered?
   "Return a set of what has already been answered."
@@ -277,7 +266,8 @@
            @(connect-atm pid) cid)
       set))
 
-;;; ToDo: It isn't obvious that the interview agent needs to see this. Only useful when the thread was destroyed?
+;;; ToDo: It isn't obvious that the interview agent needs to see all this. Only useful when the thread was destroyed?
+;;;       It might be sufficient to explain the claims.
 (defn conversation-history
   "Construct a conversation-history command structure for the argument project.
    This tells the interview agent what has already been asked. If the thread hasn't been deleted
@@ -301,22 +291,12 @@
      :already-answered (vec (already-answered? pid cid))
      :responses msgs}))
 
-(defn starting-new-project?
-  "Returns true if pid = :START-A-NEW-PROJECT."
-  [{:keys [dispatch-key question-type] :as _ctx}]
-  (and (= question-type :process/warm-up)
-       (= dispatch-key :start-conversation)))
-
 (defn supply-question
   "Create a supply question command for the conversation."
-  [{:keys [pid cid] :as ctx}]
-  (if (starting-new-project? ctx)
-    {:command "SUPPLY-QUESTION"
-     :already-answered []
-     :claims []}
+  [{:keys [pid cid] :as _ctx}]
     {:command "SUPPLY-QUESTION"
      :already-answered (already-answered? pid cid)
-     :claims (->> (db/get-claims pid) (interpose " ") vec (apply str))}))
+     :claims (->> (db/get-claims pid) (interpose " ") vec (apply str))})
 
 (declare fix-off-course)
 ;;; ToDo: These should be methods with tags in response-utils.
@@ -374,7 +354,7 @@
       :optimality true)))
 
 (defn off-course--invalid-response
-  [candidate-q {:keys [pid cid] :as ctx}]
+  [candidate-q ctx]
   (log! :warn (str "Not a valid response to SUPPLY-QUESTION: " candidate-q))
   (tell-interviewer {:command "COURSE-CORRECTION"
                      :advice (str "Responses to SUPPLY-QUESTION should be either "
@@ -398,19 +378,17 @@
   [{:keys [question-type status] :as candidate-q}
    {:keys [pid cid] :as ctx}]
   (when @active?
-    (if (starting-new-project? ctx)
-      candidate-q
-      (let [prior (conversation-history pid cid)]
-        (cond  (not (s/valid? ::supply-q-response candidate-q))               (off-course--invalid-response candidate-q ctx),
-               (and (= status "DONE") (not (done? pid cid)))                  (off-course--not-done ctx),
-               :else
-               (case cid
-                 :process  (cond (and (-> prior :already-answered empty?)
-                                      (not= :process/warm-up question-type))  (off-course--do-warm-up ctx), ; This for surrogate.
-                                 :else                                        candidate-q)
-                 :data       candidate-q ; NYI
-                 :resources  candidate-q ; NYI
-                 :optimality candidate-q)))))) ; NYI
+    (let [prior (conversation-history pid cid)]
+      (cond  (not (s/valid? ::supply-q-response candidate-q))               (off-course--invalid-response candidate-q ctx),
+             (and (= status "DONE") (not (done? pid cid)))                  (off-course--not-done ctx),
+             :else
+             (case cid
+               :process  (cond (and (-> prior :already-answered empty?)
+                                    (not= :process/warm-up question-type))  (off-course--do-warm-up ctx), ; This for surrogate.
+                               :else                                        candidate-q)
+               :data       candidate-q ; NYI
+               :resources  candidate-q ; NYI
+               :optimality candidate-q))))) ; NYI
 
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
 ;;; over and over and the interview will advance each time until you get back DONE.
@@ -419,14 +397,14 @@
   "Call interviewer to supply a question; call  get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
    Returns a vector of message objects suitable for db/add-msg."
   [ctx]
-  (reset! diag ctx)
-  (let [{:keys [status] :as resp}
-        (-> (supply-question ctx)
-            (tell-interviewer ctx)
-            (fix-off-course ctx))]
-    (if (= status "DONE")
-      (-> (merge ctx resp) (assoc :status "DONE") vector) ; This in lieu of a vector of messages.
-      (get-an-answer (merge ctx resp)))))
+  (let [supplied-question
+        (-> (supply-question ctx)   ; This just makes the question map.
+            (tell-interviewer ctx)  ; This translates it to JSON and tells it to the agent.
+            (fix-off-course ctx))]  ; This will return the argument if it is okay, otherwise has a conversation with the interviewer to fix things.
+    (log! :info (str "supplied-question = " supplied-question))
+    (if (= (:status supplied-question) "DONE")
+      (-> (assoc ctx :status "DONE") vector) ; This in lieu of a vector of messages.
+      (get-an-answer (merge ctx (dissoc supplied-question :status))))))
 
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
@@ -455,7 +433,7 @@
   [{:keys [pid cid] :as ctx}]
   (let [sur (db/get-surrogate-agent-info pid)
         ctx (-> ctx
-                (merge (create-interview-agent! pid cid))
+                (merge (ensure-interview-agent! pid cid))
                 (assoc :responder-role :surrogate)
                 (assoc :sur-aid (:surrogate/assistant-id sur))
                 (assoc :sur-tid (:surrogate/thread-id sur)))]
@@ -467,8 +445,8 @@
 
 (defn ctx-human
   "Return  part of context specific to humans."
-  [pid cid]
-  (merge {:responder-role :human} (create-interview-agent! pid cid)))
+  [{:keys [pid cid]}]
+  (merge {:responder-role :human} (ensure-interview-agent! pid cid)))
 
 (defn start-human-project!
   "This does a few things to 'catch up' with the surrogate-mode of operation, which alreadys knows what the project is about.
@@ -477,7 +455,7 @@
           b) add scheduling challenge claims.
       2) Add the process-interview-agent.
    Return pid of new project."
-  [response iview-agent]
+  [response]
   (let [warm-up-claims (pan/analyze-warm-up-response response)
         [_ pid] (ru/find-claim '(temp-project-id ?pid) warm-up-claims)
         [_ _ pname] (ru/find-claim '(temp-project-name ?pid ?pname) warm-up-claims)
@@ -488,8 +466,6 @@
         (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
                             :q-type :process/warm-up
                             :cid :process}))
-      (let [eid (d/q '[:find ?eid . :where [?eid :project/id _]] @(connect-atm pid))]
-        (d/transact (connect-atm pid) {:tx-data [{:db/id eid :project/agents iview-agent}]}))
       pid))
 
 (defn resume-conversation
@@ -498,33 +474,38 @@
   [{:keys [client-id pid cid] :as ctx}]
   (assert (string? client-id))
   (assert (#{:process :data :resources :optimality} cid))
-  (log! :debug (str "--------- Resume conversation: ctx = " (with-out-str (pprint ctx))))
+  (log! :info (str "--------- Resume conversation: ctx:\n" (with-out-str (pprint ctx))))
   (try
     (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
-      (when-not (db/conversation-done? pid cid)
-        (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-        (when @active?
-          (when (== 0 (-> (db/get-conversation-eids pid cid) count))
-            (-> ctx :pid initial-advice (tell-interviewer ctx)))
-          (-> (conversation-history pid cid) (tell-interviewer ctx))
-          (loop [cnt 0
-                 conversation (q-and-a ctx)]
-            (let [response (-> conversation last)]
-              (doseq [m conversation]
-                (let [{:keys [from text tags question-type status]} m]
-                  (when-not (= status "DONE")
-                    (db/add-msg {:pid pid :cid cid :from from :tags tags :text text :question-type question-type}))))
-              (cond
-                (> cnt 15)                      :exceeded-questions-safety-stop
-                (= "DONE" (-> conversation last :status))   (db/assert-conversation-done! pid cid)
-                :else
-                (when @active? ; Keep this despite (when @active? ...) above. Can set to false while running.
-                  (tell-interviewer {:command "INTERVIEWEES-RESPOND" :response (:text response) :question-type (:question-type response)} ctx)
-                  (ru/analyze-response-meth (merge ctx response))
-                  (recur (inc cnt)
-                         (q-and-a ctx)))))))))
+      (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
+        (when-not (db/conversation-done? pid cid)
+          (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+          (when @active?
+            (when (== 0 (-> (db/get-conversation-eids pid cid) count))
+              (-> ctx :pid initial-advice (tell-interviewer ctx)))
+            (-> (conversation-history pid cid) (tell-interviewer ctx))
+            (loop [cnt 0
+                   conversation (q-and-a ctx)] ; Returns a vec of msg objects suitable for db/add-msg.
+              (let [response (-> conversation last)]
+                (doseq [msg conversation]
+                  (when-not (= (:status msg) "DONE")
+                    (db/add-msg (merge {:pid pid :cid cid} msg))))
+                (cond
+                  (> cnt 15)                                  :exceeded-questions-safety-stop
+                  (= "DONE" (-> conversation last :status))   (db/assert-conversation-done! pid cid)
+                  :else
+                  (when @active? ; Keep this despite (when @active? ...) above. Can set to false while running.
+                    (ru/analyze-response-meth (merge ctx
+                                                     {:response (:text response)
+                                                      :question-type (:question-type response)}))
+                    (tell-interviewer {:command "INTERVIEWEES-RESPOND"
+                                       :response (:text response)
+                                       :question-type (:question-type response)}
+                                      ctx)
+                    (recur (inc cnt)
+                           (q-and-a ctx))))))))))
       (finally
         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
@@ -536,28 +517,25 @@
                     :text (str "You want to start a new project? This is the right place! "
                                (db/conversation-intros :process))})
   (try
-    (let [iview-agent (create-process-interview-agent)
-          ctx (merge ctx {:iview-aid (:agent/assistant-id iview-agent) :iview-tid (:agent/thread-id iview-agent)})
-          ctx (merge ctx {:responder-role :human :question-type :process/warm-up :question the-warm-up-type-question})
-          conversation (q-and-a ctx)
+    (let [ctx (merge ctx {:responder-role :human :question-type :process/warm-up :question the-warm-up-type-question})
+          conversation (get-an-answer ctx)
           response (-> conversation last :text) ; ToDo: Could be more to it...wants-a-break?.
-          _zippy   (log! :info (str "After q-and-a,  response = " response))
           _effect! (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-          pid (start-human-project! response iview-agent)
+          pid (start-human-project! response)
           [_ _ pname] (ru/find-claim '(project-name ?pid ?pname) (db/get-claims pid))]
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
       (doseq [m conversation]
         (let [{:keys [from text tags question-type status]} m]
-          (when-not (= status "DONE")
+          (when-not (= status "DONE") ; ToDo: Set :status "DONE" if they back-out of starting a project.
             (db/add-msg {:pid pid :cid :process :from from :tags tags :text text :question-type question-type}))))
       (db/add-msg {:pid pid
                    :cid :process
                    :from :system
                    :text (str "Great, we'll call your project " pname ".")
                    :tags [:process/warm-up :name-project :informative]})
-      (ru/refresh-client client-id pid :process)
-      (resume-conversation (merge (-> ctx (assoc :cid :process) (assoc :dispatch-key :resume-conversation))
-                                  (ctx-human pid :process))))
+      ;; This will cause a resume-conversation:
+      (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
+                        :new-proj-map {:project/name pname :project/id pid}}))
     (finally
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 

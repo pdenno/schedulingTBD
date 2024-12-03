@@ -16,7 +16,8 @@
    [taoensso.telemere                  :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
-(declare analyze-warm-up-response analyze-process-steps-response analyze-process-durs-response analyze-batch-size-response analyze-process-ordering-response)
+(declare analyze-warm-up-response analyze-process-steps-response analyze-process-durs-response
+         analyze-batch-size-response analyze-process-ordering-response)
 
 (def the-warm-up-type-question
   (str "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."))
@@ -29,7 +30,7 @@
 ;;; ensuring we have enough skilled workers available when needed, adds another layer of complexity to our operations.",
 ;;; This might get into skills classification, delivery schedules, downtime, machine utilization.
 
-;;; start-conversation doesn't call this it calls analyze-warm-up-response directly; This is only used by surrogates, so far.
+;;; start-conversation doesn't call this. It calls analyze-warm-up-response directly. This is only used by surrogates, so far.
 (defanalyze :process/warm-up [{:keys [response pid] :as _ctx}]
   (assert (db/project-exists? pid)) ; This is only called where the project already exists.
   (let [warm-up-claims (analyze-warm-up-response response)
@@ -37,20 +38,20 @@
         bindings {'?pid pid}]
       (doseq [claim needed-claims]
         (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
-                            :q-type :process-warm-up
+                            :q-type :process/warm-up
                             :cid :process}))))
 
 (defanalyze :process/work-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid)
                        (re-matches #".*(?i)SERVICE.*" response) (list 'provides-service pid)
                        :else                                    (list 'fails-query 'work-type pid))]
-    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :work-type})))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :process/work-type})))
 
 (defanalyze :process/production-location [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'production-location pid 'factory)
                        (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'production-location pid 'customer-site)
                        :else                                    (list 'fails-query 'production-location pid))]
-    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-location})))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :process/production-location})))
 
 
 (defanalyze :process/production-motivation [{:keys [pid response] :as _ctx}]
@@ -58,19 +59,19 @@
                        (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        (list 'production-mode pid 'make-to-order)
                        (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    (list 'production-mode pid 'engineer-to-order)
                        :else                                                 (list 'fails-query 'production-mode pid))]
-    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-motivation})))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :process/production-motivation})))
 
 (defanalyze :process/production-system-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)FLOW-SHOP.*" response)  (list 'flow-shop pid)
                        (re-matches #".*(?i)JOB-SHOP.*"  response)  (list 'job-shop pid)
                        :else                                       (list 'fails-query 'flow-vs-job pid))]
-    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-system-type})))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :process/production-system-type})))
 
 (defanalyze :process/process-steps [{:keys [pid] :as obj}]
   (let [new-claims (analyze-process-steps-response obj)]
     (log! :debug (str "---------------------- !query-process-steps: new-claims = " new-claims))
     (doseq [claim new-claims]
-      (db/add-claim! pid {:string (str claim) :cid :process :q-type :process-steps}))))
+      (db/add-claim! pid {:string (str claim) :cid :process :q-type :process/process-steps}))))
 
 (defanalyze :process/process-durations [{:keys [client-id response pid] :as obj}]
   (log! :info (str "process-durations (action): response =\n" response))
@@ -92,7 +93,7 @@
                      :tags [:info-to-user :minizinc]})
         (ru/refresh-client client-id pid :process)
         (doseq [claim new-claims]
-          (db/add-claim! pid {:string (str claim) :cid :process :q-type :process-durations})))
+          (db/add-claim! pid {:string (str claim) :cid :process :q-type :process/process-durations})))
       (ws/send-to-chat
        {:client-id client-id
         :dispatch-key :tbd-says
@@ -129,7 +130,7 @@
       (log! :error (str "Invalid scheduling-challenges-response: " (with-out-str (pprint res)))))
     res))
 
-;;; (pan/analyze-warm-up-response! ice-cream-answer-warm-up '#{(project-id :START-A-NEW-PROJECT)})
+;;; (pan/analyze-warm-up-response ice-cream-answer-warm-up '#{(project-id :START-A-NEW-PROJECT)})
 (defn analyze-warm-up-response
   "Analyze the response to the initial question.
    Returns a collection of new NON-GROUND claims, including scheduling-challenges and project-id and project-name predicates.
@@ -156,10 +157,10 @@
     ;; We will unify on DB's ?pid later.
     (-> #{}
         (conj (list 'temp-project-id pid))                 ; Used to create project database if human.
-        (conj (list 'temp-project-name '?pid project-name)   ; Used to create project database if human.
+        (conj (list 'temp-project-name '?pid project-name))   ; Used to create project database if human.
         (conj (list 'principal-expertise '?pid project-name))
         (into (for [claim challenges]
-                (list 'scheduling-challenge '?pid claim)))))))
+                (list 'scheduling-challenge '?pid claim))))))
 
 ;;; ToDo: I can't decide whether or not I want these process-steps in claims. I suppose it can't hurt.
 (defn analyze-process-steps-response

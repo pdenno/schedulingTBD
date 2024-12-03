@@ -105,6 +105,7 @@
   ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
   ([pid cid]
    (-> (dba/get-conversation-http pid cid)
+       (p/catch (fn [e] (log! :error (str "get-conversation failed: " e))))
        (p/then (fn [{:keys [conv cid code]}]
                  (log! :info (str "chat/get-conversation (return from promise): cid = " cid " count = " (count conv)))
                  (reset! msgs-atm conv)
@@ -112,9 +113,7 @@
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
                  (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid})
-                 (update-common-info! {:pid pid :cid cid})))
-       (p/catch (fn [e]
-                  (log! :error (str "get-conversation failed: " e)))))))
+                 (update-common-info! {:pid pid :cid cid}))))))
 
 (register-fn :get-conversation get-conversation)
 
