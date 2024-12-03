@@ -130,7 +130,7 @@
       (log! :error (str "Invalid scheduling-challenges-response: " (with-out-str (pprint res)))))
     res))
 
-;;; (pan/analyze-warm-up-response ice-cream-answer-warm-up '#{(project-id :START-A-NEW-PROJECT)})
+;;; (pan/analyze-warm-up-response pant/ice-cream-answer-warm-up)
 (defn analyze-warm-up-response
   "Analyze the response to the initial question.
    Returns a collection of new NON-GROUND claims, including scheduling-challenges and project-id and project-name predicates.

@@ -150,7 +150,9 @@
             (when-not (#{:ping :alive-confirm} (:dispatch-key msg)) (log! :debug (str "Received message: "  msg)))
             (if (= :stop (:dispatch-key msg))
               (swap! socket-channels #(assoc-in % [client-id :exit?] true))
-              (let [prom (px/submit! (fn [] (dispatch msg)))]
+              (let [prom (px/submit! (fn []
+                                       (reset! diag (str "In the px/submit! msg = " msg))
+                                       (dispatch msg)))]
                 (-> prom
                     (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation don't return anything themselves.
                     (p/catch (fn [err]
@@ -208,11 +210,11 @@
   ([] (reset! promise-stack '()))
   ([client-id]
    (doseq [p (filter #(= client-id (:client-id %)) @promise-stack)]
-     (log! :info (str "Clearing (rejecting) promise " p))
-     (-> p
-         (p/catch (fn [p] (log! :warn (str "Clearing promise: " p))))
-         (p/reject! (:prom p) (ex-info "client forgotten" {})))
-     (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %)))))
+     (log! :debug (str "Clearing (rejecting) promise " p))
+     (when-let [prom (:prom p)]
+       (when (p/promise? prom)
+         (p/reject! (:prom p) (ex-info "client forgotten" {})))))
+   (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %))))
 
 (defn remove-promise!
   "Remove the promise identified by the argument :p-key from the promise-stack."
@@ -281,7 +283,7 @@
                     p-key               (assoc :p-key p-key)
                     true                (assoc :timestamp (now)))]
       (when-not (= :alive? dispatch-key)
-        (event! ::send-to-client {:level :debug :msg (elide (str "send-to-chat: msg-obj =" msg-obj) 80)}))
+        (event! ::send-to-client {:level :info :msg (elide (str "send-to-chat: msg-obj =" msg-obj) 80)}))
       (go (>! out (str msg-obj)))
       prom)
     (log! :error (str "Could not find out async channel for client " client-id))))
@@ -321,8 +323,7 @@
 ;;; When you recompile this, recompile surrogate.clj, interviewers.clj and llm.clj.
 (defn dispatch [{:keys [dispatch-key] :as msg}]
   (when-not (#{:ping :alive-confirm} dispatch-key)
-    (event! ::dispatch {:level :debug :msg (str "dispatch: Received msg: " msg)}))
-
+    (log! :info (elide (str "Received msg: " msg) 130)))
   (let [res (cond (= dispatch-key :stop)                        nil ; What needs to be done has already been done.
                   (contains? @dispatch-table dispatch-key)      ((get @dispatch-table dispatch-key) msg)
                   :else                                         (log! :error (str "No dispatch function for " msg "."
@@ -334,6 +335,8 @@
       res)))
 
 ;;;------------------- Starting and stopping ---------------
+;;; ToDo: Not clear why the the starts referenced here run twice on start and restart.
+;;;       They run once on compile.
 (defn wsock-start []
   (clear-promises!)
   (reset! ping-dates {})
@@ -348,7 +351,8 @@
   (doseq [id (keys @socket-channels)]
     (forget-client id))
   (doseq [prom-obj @promise-stack]
-    (p/reject! (:prom prom-obj) :restarting))
+    (p/reject! (:prom prom-obj) (ex-info (str "restarting: Rejecting promise: " prom-obj)
+                                         {:prom-obj prom-obj})))
   ;; The following have ws/register-ws-dispatch, which need to be re-established.
   (mount/stop (find-var 'scheduling-tbd.llm/llm-tools))
   (mount/stop (find-var 'scheduling-tbd.surrogate/surrogates))

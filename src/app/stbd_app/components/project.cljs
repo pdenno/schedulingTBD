@@ -37,8 +37,8 @@
   (let [current (assoc current :menu-text (menu-text current)) ; Awkward assoc. Necessary!
         proj-infos (mapv #(assoc % :menu-text (menu-text %)) proj-infos)
         others (->> proj-infos (remove #(= current %)) (sort-by :project/name))]
-    (if (= :START-A-NEW-PROJECT (:project/id current))
-      (into [{:project/id :START-A-NEW-PROJECT :menu-text "NEW PROJECT"}] others)
+    (if (= :NEW-PROJECT (:project/id current))
+      (into [{:project/id :NEW-PROJECT :menu-text "NEW PROJECT"}] others)
       (into [current] others))))
 
 ;;; current-project and content of the others vector are keywords.
@@ -55,8 +55,9 @@
       ($ Stack {:direction "row"}
          ($ IconButton {:onClick
                         (fn [_]
-                          (set-current {:project/id :START-A-NEW-PROJECT})
-                          (update-common-info! {:project/id :START-A-NEW-PROJECT :cid :process})
+                          ((lookup-fn :clear-msgs))
+                          (set-current {:project/id :NEW-PROJECT})
+                          (update-common-info! {:project/id :NEW-PROJECT :cid :process})
                           ((lookup-fn :update-code) {:text "Together, we'll put a MiniZinc solution here soon!"})
                           (ws/send-msg {:dispatch-key :start-conversation}))}
             ($ RocketLaunch))

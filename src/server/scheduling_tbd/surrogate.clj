@@ -128,8 +128,8 @@
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []
-  (ws/register-ws-dispatch :start-surrogate start-surrogate!)         ; User types SUR:
-  (ws/register-ws-dispatch :surrogate-follow-up surrogate-follow-up) ; User types SUR?:
+  (ws/register-ws-dispatch :start-surrogate start-surrogate!)         ; User types 'SUR:'
+  (ws/register-ws-dispatch :surrogate-follow-up surrogate-follow-up)  ; User types 'SUR?:'
   :surrogate-ws-fns-registered)
 
 (defn stop-surrogates! []

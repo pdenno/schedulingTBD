@@ -2,7 +2,6 @@
   (:require
    [clojure.edn              :as edn]
    [clojure.java.io          :as io]
-   [datahike.pull-api        :as dp]
    [ring.util.http-response  :as http]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.db        :as db]
@@ -20,11 +19,10 @@
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
    Note that this can CHANGE :project/current-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
   [request]
-  (let [{:keys [project-id cid]}  (-> request :query-params (update-keys keyword))
+  (let [{:keys [project-id cid client-id]}  (-> request :query-params (update-keys keyword))
         pid (keyword project-id)
         cid (if cid (keyword cid) (db/get-current-cid pid))]
-    (assert (not= pid :START-A-NEW-PROJECT))
-    (log! :info (str "get-conversation (1): pid = " pid " cid = " cid))
+    (log! :info (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
     (let [eid (db/project-exists? pid)
           pname (db/get-project-name pid)
           msgs (if eid (db/get-conversation pid cid) [])

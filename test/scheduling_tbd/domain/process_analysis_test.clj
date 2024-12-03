@@ -56,6 +56,7 @@
   (safe-alias 'px     'promesa.exec)
   (safe-alias 'core   'scheduling-tbd.core)
   (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
+  (safe-alias 'pant   'scheduling-tbd.domain.process-analysis-test)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'dbt    'scheduling-tbd.db-test)
   (safe-alias 'how    'scheduling-tbd.how-made)

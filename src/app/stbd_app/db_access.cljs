@@ -2,7 +2,6 @@
   "Functions for HTTP-based reading/writing from/to the server."
   (:require
    [ajax.core         :refer [GET]]
-   [bling.core        :refer [bling callout point-of-interest print-bling]]
    [promesa.core      :as p]
    [stbd-app.util     :as util :refer [lookup-fn register-fn update-common-info!]]
    [stbd-app.ws       :as ws]

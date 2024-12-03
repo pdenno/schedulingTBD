@@ -153,7 +153,7 @@
 (s/def ::advice string?)
 (s/def ::already-answered (s/coll-of keyword?))
 (s/def ::answer string?)
-(s/def ::answers keyword?)
+(s/def ::answers string?)
 (s/def ::claims string?)
 (s/def ::conclusions string?)
 (s/def ::command string?)
@@ -396,15 +396,17 @@
 (defn q-and-a
   "Call interviewer to supply a question; call  get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
    Returns a vector of message objects suitable for db/add-msg."
-  [ctx]
-  (let [supplied-question
-        (-> (supply-question ctx)   ; This just makes the question map.
-            (tell-interviewer ctx)  ; This translates it to JSON and tells it to the agent.
-            (fix-off-course ctx))]  ; This will return the argument if it is okay, otherwise has a conversation with the interviewer to fix things.
-    (log! :info (str "supplied-question = " supplied-question))
-    (if (= (:status supplied-question) "DONE")
-      (-> (assoc ctx :status "DONE") vector) ; This in lieu of a vector of messages.
-      (get-an-answer (merge ctx (dissoc supplied-question :status))))))
+  [{:keys [client-id] :as ctx}]
+  (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+  (try (let [supplied-question
+             (-> (supply-question ctx)   ; This just makes the question map.
+                 (tell-interviewer ctx)  ; This translates it to JSON and tells it to the agent.
+                 (fix-off-course ctx))]  ; This will return the argument if it is okay, otherwise has a conversation with the interviewer to fix things.
+         (if (= (:status supplied-question) "DONE")
+           (-> (assoc ctx :status "DONE") vector) ; This in lieu of a vector of messages.
+           (do (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
+               (get-an-answer (merge ctx (dissoc supplied-question :status))))))
+       (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
@@ -468,20 +470,20 @@
                             :cid :process}))
       pid))
 
+;;; resume-conversation is typically called by client dispatch :resume-conversation.
+;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
 (defn resume-conversation
-  "Start the interview loop. :resume-conversation is a dispatch key from client.
-   This is called even when PID is :START-A-NEW-PROJECT."
+  "Resume the interview loop for an established project and given cid."
   [{:keys [client-id pid cid] :as ctx}]
   (assert (string? client-id))
   (assert (#{:process :data :resources :optimality} cid))
-  (log! :info (str "--------- Resume conversation: ctx:\n" (with-out-str (pprint ctx))))
+  (log! :info (str "--------- Resume conversation: ctx: " ctx))
   (try
     (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
       (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
         (when-not (db/conversation-done? pid cid)
-          (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
           (when @active?
             (when (== 0 (-> (db/get-conversation-eids pid cid) count))
               (-> ctx :pid initial-advice (tell-interviewer ctx)))
@@ -502,7 +504,7 @@
                                                       :question-type (:question-type response)}))
                     (tell-interviewer {:command "INTERVIEWEES-RESPOND"
                                        :response (:text response)
-                                       :question-type (:question-type response)}
+                                       :answers (-> response :question-type name)}
                                       ctx)
                     (recur (inc cnt)
                            (q-and-a ctx))))))))))

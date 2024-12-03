@@ -21,7 +21,7 @@
    [stbd-app.rm-mode.parser :as parser]
    [stbd-app.rm-mode.state :as state]
    [stbd-app.util          :as util :refer [register-fn]]
-   [taoensso.telemere.timbre      :as log :refer-macros [info debug log]]))
+   [taoensso.telemere      :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -87,7 +87,7 @@
 (defn update-code
   "Update the code as specified in the arguments."
   [{:keys [text]}]
-  (log/info "update-code: text =" text)
+  (log! :debug (str "update-code: text = " text))
   (set-editor-text text))
 
 (register-fn :update-code update-code)
@@ -118,7 +118,7 @@
 
 (defnc Editor
   [{:keys [text name height]}]
-  ;;(log/info "Editor height =" height) ; This changes when window size changes, not the share.
+  (log! :debug (str "Editor height = " height)) ; This changes when window size changes, not the share.
   (let [ed-ref (hooks/use-ref nil)
         view-dom (atom nil)]
     (hooks/use-effect :once ; [name]

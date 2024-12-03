@@ -171,10 +171,12 @@
                   (when ask-llm?
                     (set-msg-list (conj msg-list {:message/content (str "<b>[Side discussion with LLM]</b><br/>" question)
                                                   :message/from :system})))
-                  (set-msg-list (add-msg text :human))
+                  ;;(set-msg-list (add-msg text :human))
+                  (add-msg text :human)
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
+        (register-fn :clear-msgs   (fn [] (set-cs-msg-list []) (reset! msgs-atm [])))
         (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
         (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
         (register-fn :set-active-conv set-active-conv)
