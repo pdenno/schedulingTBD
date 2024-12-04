@@ -142,7 +142,7 @@ Where you think it would be helpful to provide the human with definitions of the
    
    You should ask this question early in the conversation to gauge whether analysis of their spreadsheets will be possible at all. 
 
-   Here is an example of you asking this question:
+   Here is an example of you providing the question to the SUPPLY-QUESTION command:
 
    You: {"question-type" : "willing-to-upload?",
 	      "question" : "Could you upload the orders spreadsheet (or a redacted version of it) for discussion?
