@@ -10,6 +10,7 @@
      [mount.core                    :as mount :refer [defstate]]
      [promesa.core                  :as p]
      [promesa.exec                  :as px]
+     [scheduling-tbd.agent-db       :as adb]
      [scheduling-tbd.db             :as db]
      [scheduling-tbd.domain.data-analysis]
      [scheduling-tbd.domain.process-analysis  :as pan :refer [the-warm-up-type-question]]
@@ -64,7 +65,7 @@
                                       (assoc :dispatch-key :tbd-says))))
                (px/submit! (fn [] ; surrogate responder...
                              (try
-                                 (llm/query-on-thread :aid sur-aid   ; This can timeout.
+                                 (adb/query-on-thread :aid sur-aid   ; This can timeout.
                                                       :tid sur-tid
                                                       :query-text question
                                                       :tries tries
@@ -118,8 +119,8 @@
   [pid cid]
   (assert (#{:process :data :resources :optimality} cid))
   (let [agent-type (-> cid name (str "-interview-agent") keyword)
-        interview-agent-atm (atom (or (db/get-agent :base-type agent-type :pid pid :db-attrs? true)
-                                      (db/get-agent :base-type agent-type :db-attrs? true)))]
+        interview-agent-atm (atom (or (adb/ensure-agent! :base-type agent-type :pid pid) ; <====================== Simplify
+                                      (adb/ensure-agent! :base-type agent-type)))]
     (when-not (:agent/thread-id @interview-agent-atm)
       (let [user (-> (System/getenv) (get "USER"))
             aid (:agent/assistant-id @interview-agent-atm)
@@ -181,7 +182,7 @@
   (log! :info (-> (str "Interviewer told: " cmd) (elide 150)))
   (let [cmd-string (json/write-value-as-string cmd)
         res (-> {:aid iview-aid :tid iview-tid :role "user" :query-text cmd-string}
-                llm/query-on-thread
+                adb/query-on-thread
                 output-struct2clj)
         res (if (contains? res :question-type)
               (update res :question-type #(keyword (name cid) %))
@@ -213,7 +214,7 @@
   [q-txt a-txt]
   (assert (string? q-txt))
   (assert (string? a-txt))
-    (-> (llm/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt))
+    (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt))
         json/read-value
         (update-keys str/lower-case)
         (update-keys keyword)

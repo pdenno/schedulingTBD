@@ -5,14 +5,12 @@
    but are not available directly to the user except through the operators (e.g. the dot, and &
    respectively for navigation to a property and concatenation)."
   (:require
-   [clojure.datafy               :refer [datafy]]
    [clojure.edn                  :as edn]
    [clojure.java.io              :as io]
    [clojure.spec.alpha           :as s]
-   [scheduling-tbd.sutil         :as sutil :refer [api-credentials default-llm-provider markdown2html connect-atm]]
+   [scheduling-tbd.sutil         :as sutil :refer [api-credentials default-llm-provider markdown2html]]
    [scheduling-tbd.util          :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
-   [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
    [taoensso.telemere            :as tel :refer [log!]]
    [wkok.openai-clojure.api      :as openai]))
@@ -94,7 +92,7 @@
        reverse
        (mapv (fn [x] (update x :created #(-> % (* 1000) java.time.Instant/ofEpochMilli str))))))
 
-(defn list-azure-models
+(defn ^:diag list-azure-models
   "List id and create date of all available models.
    BTW, if there is no internet connection, on startup, this will be the first complaint."
   []
@@ -197,123 +195,6 @@
     (swap! thread-memo #(assoc % tid res))
     res))
 
-(defn agent-exists?
-  "Return true if the aid and tid exist.
-   There is currently no way (within OpenaAI) to know whether the aid and tid are related."
-  [aid tid & {:keys [llm-provider] :or {llm-provider @default-llm-provider} :as opts}]
-  (and (get-assistant aid opts)
-       (get-thread tid opts)))
-
-(defn openai-messages-matching
-  "Argument is a vector of openai messages from an assistant.
-   Return a vector of messages matching the argument conditions.
-     :role  - #{'assistant', 'user'}
-     :text  - A complete match on the (-> % :content first :text value).
-     :after - Messages with :created_at >= than this."
-  [msg-list {:keys [role text after]}]
-  (cond->> msg-list
-    role     (filterv #(= role (:role %)))
-    text     (filterv #(= text (-> % :content first :text :value)))
-    after    (filterv #(<= after (:created_at %)))))
-
-(defn response-msg
-  "Return the text that is response to the argument question."
-  [question msg-list]
-  (when-let [question-time (-> (openai-messages-matching msg-list {:role "user" :text question}) first :created_at)]
-    (when-let [responses (openai-messages-matching msg-list {:role "assistant" :after question-time})]
-      (->> responses (sort-by :created_at) first :content first :text :value))))
-
-;;; You can also use this with role 'assistant', but the use cases might be a bit esoteric. (I can't think of any.)
-;;; https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-role
-(defn query-on-thread-aux
-  "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
-    aid      - assistant ID (the OpenAI notion)
-    tid      - thread ID (ttheOpenAI notion)
-    role     - #{'user' 'assistant'},
-    query-text - a string.
-   Returns text but uses promesa internally to deal with errors."
-  [aid tid role query-text timeout-secs llm-provider]
-  (assert (string? aid))
-  (assert (string? tid))
-  (assert (#{"user" "assistant"} role))
-  (assert (number? timeout-secs))
-  (assert (keyword? llm-provider))
-  (assert (and (string? query-text) (not-empty query-text)))
-  (let [creds (api-credentials llm-provider)
-        ;; Apparently the thread_id links the run to msg.
-        _msg (openai/create-message {:thread_id tid :role role :content query-text} creds)
-        ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
-        ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
-        run (openai/create-run {:thread_id tid :assistant_id aid} creds)
-        timestamp (inst-ms (java.time.Instant/now))
-        timeout   (+ timestamp (* timeout-secs 1000))]
-    (loop [now timeout]
-      (Thread/sleep 1000)
-      (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
-            msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data) ; ToDo: 20 is a guess.
-            response (response-msg query-text msg-list)]
-        (cond (> now timeout)                        (do (log! :warn "Timeout")
-                                                         (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text}))),
-
-              (and (= "completed" (:status r))
-                   (not-empty response))              (markdown2html response),
-
-              (and (= "completed" (:status r))
-                   (empty? response))                 (do (log! :warn "empty response")
-                                                          (throw (ex-info "query-on-thread empty response:" {:status (:status r)}))),
-
-
-              (#{"expired" "failed"} (:status r))     (do (log! :warn (str "failed/expired last_error = " (:last_error r)))
-                                                          (throw (ex-info "query-on-thread failed:" {:status (:status r)}))),
-
-              :else                                   (recur (inst-ms (java.time.Instant/now))))))))
-
-;;; ToDo: This one is a bit out-of-place because it assumes system DB schema.
-;;;       It might make sense to have a sutil routine that captures at start-up all the information
-;;;       needed to do a-b-t. This would include surrogate assistant/id, which are not handled here.
-(defn agent-base-type
-  "Return the base-type (keyword) of the agent with the given aid or :unknown-<aid> if you can't find the agent.
-   This only looks for system-level agents, so :unknown-<aid> will happen occassionally."
-  [aid]
-  (or
-   (d/q '[:find ?base-type .
-          :in $ ?aid
-          :where
-          [?eid :agent/assistant-id ?aid]
-          [?eid :agent/base-type ?base-type]]
-        @(connect-atm :system) aid)
-   (-> (format "unknown-%s" aid) keyword)))
-
-
-(defn query-on-thread
-  "Wrap query-on-thread-aux to allow multiple tries at the same query.
-    :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
-    :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
-  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn]
-      :or {test-fn (fn [_] true), preprocess-fn identity
-           llm-provider @default-llm-provider
-           timeout-secs 60
-           role "user"} :as obj}]
-  (let [obj (cond-> obj ; All recursive calls will contains? :tries.
-              (or (not (contains? obj :tries))
-                  (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
-    (assert (< (:tries obj) 10))
-    (if (> (:tries obj) 0)
-      (try
-        (do (tel/with-kind-filter {:allow :agents} ; ToDo: agent-base-type is a project/system DB concept.
-              (tel/signal! {:kind :agents :level :info :msg (str "\n\n" (agent-base-type aid) " ===> " query-text)}))
-            (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
-                  res (preprocess-fn raw)]
-              (tel/with-kind-filter {:allow :agents}
-                (tel/signal! {:kind :agents :level :info :msg (str "\n" (agent-base-type aid) " <=== " raw)}))
-              (if (test-fn res) res (throw (ex-info "Try again" {:res res})))))
-            (catch Exception e
-             (let [d-e (datafy e)]
-               (log! :warn (str "query-on-thread failed (tries = " (:tries obj) "): "
-                                (or (:cause d-e) (-> d-e :via first :message)))))
-             (query-on-thread (update obj :tries dec))))
-      (log! :warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
-
 (defn ^:diag list-thread-messages
   "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
   ([tid] (list-thread-messages tid 20 {:llm-provider @default-llm-provider}))
@@ -383,16 +264,6 @@
 (defn ^:diag throw-it
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
-
-(defn query-agent
-  "Make a query to a named agent."
-  [base-type query-text & {:keys [pid llm-provider] :or {llm-provider @default-llm-provider} :as opts}]
-  (let [{:keys [aid tid]} (sutil/get-agent (assoc opts :base-type base-type))]
-    (if-not (and aid tid)
-      (throw (ex-info "Could not find the agent requested. (Not created for this LLM provider?:" {:llm-provider llm-provider}))
-      (try (query-on-thread {:aid aid :tid tid :query-text query-text})
-           (catch Exception e
-             (log! :error (str "query-agent failed: " e)))))))
 
 (def moderation-checking?
   "Set to true if you want to filter immoderate user text."

@@ -208,7 +208,17 @@
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_N46uwAlm596aRHP8ZNA3Spq9"}],
+                   :thread-id "thread_N46uwAlm596aRHP8ZNA3Spq9"}
+           #:agent{:base-type :sur-aluminum-cans,
+                   :thread-id "thread_fEVzOdryRUjtVA38Q3IMiu6L",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes aluminum cans.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_wMY6Ic3N9JThpv5Q08lw13NW",
+                   :id :sur-aluminum-cans-openai,
+                   :expertise "aluminum cans",
+                   :timestamp #inst "2024-12-08T16:12:48.451-00:00"}],
           :processes
           [#:process{:desc
                      "1. Material Procurement: 2 days\n2. Coil Slitting: 1 hour\n3. Cupping: 30 minutes\n4. Drawing and Ironing: 1 hour\n5. Trimming: 15 minutes\n6. Washing and Drying: 30 minutes\n7. Internal Coating: 45 minutes\n8. Baking: 1 hour\n9. Printing: 2 hours\n10. Necking: 30 minutes\n11. Packing and Shipment: 1 hour",
@@ -294,12 +304,5 @@
                                 :var-name "packShip"}]}],
           :current-conversation :process,
           :name "SUR Aluminum Cans",
-          :surrogate
-          #:surrogate{:assistant-id "asst_wMY6Ic3N9JThpv5Q08lw13NW",
-                      :id :sur-aluminum-cans,
-                      :subject-of-expertise "aluminum cans",
-                      :system-instruction
-                      "You manage a company that makes aluminum cans.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_fEVzOdryRUjtVA38Q3IMiu6L"},
           :id :sur-aluminum-cans}
 ]

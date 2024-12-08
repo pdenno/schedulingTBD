@@ -243,7 +243,17 @@
                    :id :data-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_cGmzuhNrzz9rXDGHpyTQlhzi"}],
+                   :thread-id "thread_cGmzuhNrzz9rXDGHpyTQlhzi"}
+           #:agent{:base-type :sur-craft-beer,
+                   :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes craft beer.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",
+                   :id :sur-craft-beer-openai,
+                   :expertise "craft beer",
+                   :timestamp #inst "2024-12-08T16:12:48.520-00:00"}],
           :processes
           [#:process{:id :sur-craft-beer,
                      :interview-class :initial-unordered,
@@ -415,12 +425,5 @@
            #:claim{:conversation-id :process,
                    :string "(project-id :sur-craft-beer)"}],
           :name "SUR Craft Beer",
-          :surrogate
-          #:surrogate{:assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",
-                      :id :sur-craft-beer,
-                      :subject-of-expertise "craft beer",
-                      :system-instruction
-                      "You manage a company that makes craft beer.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av"},
           :id :sur-craft-beer}
 ]

@@ -4,6 +4,7 @@
    [clojure.spec.alpha            :as s]
    [clojure.test                  :refer [deftest is testing]]
    [datahike.api                  :as d]
+   [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.interviewers   :as inv]
    [scheduling-tbd.llm            :as llm]
@@ -69,15 +70,15 @@
    Use, for example process-read-the-flowchart.txt rather than the full instructions."
   ([] (recreate-agent! :production-challenges-agent))
   ([id]
-   (if-let [info (some #(when (= (:id %) id) %) db/known-agent-info)]
-     (db/recreate-system-agents! [info])
+   (if-let [info (some #(when (= (:id %) id) %) adb/agent-infos)]
+     (adb/ensure-agent! info)
      (log! :error (str "No such agent: " id)))))
 
 ;;; Used to query the flowchart using the process-interview-agent.
 (defonce process-interview-system-agent (atom {}))
 
 (defn ^:diag setup-flowchart-with-agent! []
-  (let [agent (db/get-agent :base-type :process-interview-agent)
+  (let [agent (adb/ensure-agent! :base-type :process-interview-agent)
         thread (llm/make-thread :assistant-id (:aid agent))]
     (reset! process-interview-system-agent {:aid (:aid agent) :tid (:id thread)})))
 
@@ -102,7 +103,7 @@
 ;;; ultimately helping in designing an effective scheduling system for their FLOW-SHOP production system.
 (defn ^diag ask-about-flowchart
   [query {:keys [aid tid]}]
-  (println (llm/query-on-thread :aid aid :tid tid :query-text query)))
+  (println (adb/query-on-thread :aid aid :tid tid :query-text query)))
 
 (defn ^:diag ask-about-flowchart:inverviewer [])
 
@@ -129,8 +130,8 @@
 (defn ^:diag check-instructions
   "It might be the case that the system instructions were too long. This asks what it knows about."
   []
-  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)]
-    (llm/query-on-thread
+  (let [{:keys [aid tid]} (-> (adb/ensure-agent! :base-type :process-dur-agent) adb/agent-db2proj)]
+    (adb/query-on-thread
      {:aid aid :tid tid :role "user"
       :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
                        "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))

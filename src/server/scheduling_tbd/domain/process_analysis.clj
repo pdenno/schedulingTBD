@@ -7,6 +7,7 @@
    [clojure.spec.alpha                 :as s]
    [clojure.string                     :as str]
    [jsonista.core                      :as json]
+   [scheduling-tbd.agent-db            :as adb]
    [scheduling-tbd.db                  :as db]
    [scheduling-tbd.llm                 :as llm]
    [scheduling-tbd.minizinc            :as mzn]
@@ -117,8 +118,8 @@
   "Analyze the response for project name,a fixed set of 'scheduling challenges' and 'one-more-thing', an observation.
    Returns a map {:project-or-service-name, :challenge <keywords naming challenges> :one-more-thing <a string>}."
   [response]
-  (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
-        {:keys [one-more-thing] :as res}  (-> (llm/query-on-thread {:aid aid :tid tid :query-text response :tries 2})
+  (let [{:keys [aid tid]} (adb/ensure-agent! :base-type :scheduling-challenges-agent)
+        {:keys [one-more-thing] :as res}  (-> (adb/query-on-thread {:aid aid :tid tid :query-text response :tries 2})
                                               json/read-value
                                               (update-keys str/lower-case)
                                               (update-keys keyword)
@@ -285,12 +286,12 @@
 (defn run-process-dur-agent-steps
   "Run the steps of the process agent, checking work after each step."
   [response]
-  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)
+  (let [{:keys [aid tid]} (-> (adb/ensure-agent! :base-type :process-dur-agent) adb/agent-db2proj)
         past-rev (atom response)]
     (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]] ; These are also spec defs, thus ns-qualified.
       (log! :info (str "process-dur-agent, rev " (name rev)))
       (when @past-rev
-        (let [result (llm/query-on-thread
+        (let [result (adb/query-on-thread
                       {:aid aid :tid tid :role "user"
                        :tries 3 :test-fn (fn [resp] (s/valid? rev resp))
                        :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))
@@ -338,12 +339,12 @@
 (defn analyze-process-ordering-response
   "Return structured object for process ordering question."
   [{:keys [response] :as _ctx}]
-    (let [{:keys [aid tid]} (db/get-agent :base-type :process-ordering-agent)
+    (let [{:keys [aid tid]} (adb/ensure-agent! :base-type :process-ordering-agent)
         past-step (atom response)]
     (doseq [step [::step-1 ::step-2]]
       (log! :info (str "Starting step " (name step)))
       (when @past-step
-        (let [result (llm/query-on-thread
+        (let [result (adb/query-on-thread
                       {:aid aid :tid tid :role "user"
                        :tries 3 :test-fn (fn [_resp] true #_(s/valid? step resp)) ; ToDo: check s/valid?
                        :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))

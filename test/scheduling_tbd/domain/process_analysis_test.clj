@@ -5,12 +5,15 @@
    [clojure.test                           :refer [deftest is testing]]
    [clojure.spec.alpha                     :as s]
    [datahike.api                           :as d]
+   [datahike.pull-api                      :as dp]
    [jsonista.core                          :as json]
-   [scheduling-tbd.domain.process-analysis :as pan]
+   [scheduling-tbd.agent-db                :as adb]
    [scheduling-tbd.db                      :as db]
+   [scheduling-tbd.domain.process-analysis :as pan]
    [scheduling-tbd.interviewers            :as inv :refer [tell-interviewer]]
    [scheduling-tbd.llm                     :as llm :refer [query-llm]]
    [scheduling-tbd.response-utils          :as ru]
+   [scheduling-tbd.util                    :as util]
    [scheduling-tbd.sutil                   :as sutil]
    [scheduling-tbd.web.websockets          :as ws]
    [taoensso.telemere                      :as tel :refer [log!]]))
@@ -82,7 +85,7 @@
 
 (deftest interviewer-question-ordering
   (testing "that interviews for flow-shop manufacturing follow the correct processes."
-    (let [aid (:aid (db/get-agent :base-type :process-interview-agent))
+    (let [aid (:aid (adb/get-agent :base-type :process-interview-agent))
           tid (:id (llm/make-thread {:assistant-id aid
                                      :llm-provider :openai
                                      :metadata {:usage :project-agent}}))
@@ -195,7 +198,7 @@
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
   ([q-txt]
    (let [{:keys [iview-aid iview-tid]} (inv/ensure-interview-agent! :sur-ice-cream :process )]
-     (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
+     (adb/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"
   {:snack-food "We make snack food.
@@ -367,8 +370,8 @@
 
 (deftest scheduling-challenges-agent
   (testing "the scheduling-challenges agent"
-    (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
-          result (llm/query-on-thread
+    (let [{:keys [aid tid]} (adb/ensure-agent! {:base-type :scheduling-challenges-agent})
+          result (adb/query-on-thread
                   {:aid aid :tid tid :query-text ice-cream-answer-warm-up})
           {:keys [challenges]} (-> result
                                    json/read-value
@@ -533,3 +536,51 @@
     (doseq [eid eids]
       (d/transact (sutil/connect-atm pid) {:tx-data [[:db/add eid :claim/conversation-id :process]]}))
     (db/backup-proj-db pid)))
+
+(def surs [:sur-aluminum-cans
+           :sur-canned-corn
+           :sur-canned-vegetables
+           :sur-carpet
+           :sur-craft-beer
+           :sur-fountain-pens
+           :sur-garage-doors
+           :sur-ice-cream
+           :sur-ice-hockey-sticks
+           :sur-injection-molds
+           :sur-inline-skates
+           :sur-key-blanks
+           :sur-plate-glass
+           :sur-remanufactured-alternators
+           :sur-stoneware])
+
+(defn migrate-surrogate!
+  "Rewrite the project with surrogates as agent, rather than project/surrogate."
+  [pid]
+  (let [conn-atm (sutil/connect-atm pid)
+        eid (d/q '[:find ?eid . :where [?eid :surrogate/id]] @conn-atm)
+        {:surrogate/keys [assistant-id thread-id subject-of-expertise system-instruction] :as sur-obj} (dp/pull @conn-atm '[*] eid)
+        ;sur-obj (dissoc sur-obj :db/id)
+        eid-agents (d/q '[:find ?eid . :where [?eid :project/agents]] @conn-atm)
+        sur-agent #:agent{:id (-> (str (name pid) "-openai") keyword)
+                          :base-type pid
+                          :surrogate? true
+                          :expertise subject-of-expertise
+                          :system-instruction system-instruction
+                          :llm-provider :openai
+                          :assistant-id assistant-id
+                          :thread-id thread-id}
+        eid-project (d/q '[:find ?eid . :where [?eid :project/id]] @conn-atm)]
+    (d/transact conn-atm {:tx-data [{:db/id eid-agents :project/agents sur-agent}]})
+    (d/transact conn-atm {:tx-data [[:db/retract eid-project :project/surrogate (:db/id sur-obj)]]})))
+
+
+(defn oops-add-timestamp! []
+  (doseq [pid surs]
+    (let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] @(sutil/connect-atm pid))]
+      (d/transact (sutil/connect-atm pid) {:tx-data [[:db/add eid :agent/timestamp (util/now)]]}))))
+
+
+(defn migrate-surrogates!
+  "Rewrite the project with surrogates as agent, rather than project/surrogate."
+  []
+  (doseq [pid surs] (migrate-surrogate! pid)))

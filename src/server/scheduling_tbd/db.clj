@@ -68,19 +68,19 @@
         :doc "a string, same as the :project/name in the project's DB."}
 
 ;;; ---------------------- system
+   :system/agents
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}
    :system/default-project-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
         :doc "a keyword providing a project-id clients get when starting up."}
    :system/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
         :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
-   :system/agents
+   :system/projects
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}
-   ;; ---------------------- openai (about all stbd-related assistants on the running account)
-   :system/openai-assistants
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
-        :doc "All stbd-related assistants in existance. (See recreate-system-db for how this is updated.)"}})
+        :doc "the projects known by the system."}
+})
 
 
 ;;;========================================================== Project DBs ==========================================
@@ -97,6 +97,9 @@
    :agent/base-type
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "Indicates the purpose and instructions given."}
+   :agent/expertise
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a description of what the agent is good at (used in surrogates, at least)."}
    :agent/llm-provider
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "Currently either :openai or :azure."}
@@ -106,6 +109,9 @@
    :agent/surrogate?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "True if the agent is a human surrogate."}
+   :agent/system-instruction
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "This is only used with surrogates, it is the system instruction verbatim."}
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
@@ -644,9 +650,7 @@
 
 (defn recreate-system-db!
   "Recreate the system database from an EDN file
-   By default this creates new agents.
-     :update-assistants! - if true, list extant OpenAI assistants. (OpenAI doesn't keep them forever.)
-     :new-agents? - Make new agents based on instructions."
+   By default this creates new agents."
   [& {:keys [target-dir]
       :or {target-dir "data/"}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
@@ -760,10 +764,13 @@
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
   [id project-name dir]
-  (d/transact (connect-atm :system)
-              {:tx-data [{:project/id id
-                          :project/name project-name
-                          :project/dir dir}]}))
+  (reset! diag [id project-name dir])
+  (let [conn-atm (connect-atm :system)
+        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn-atm)]
+    (d/transact conn-atm {:tx-data [{:db/id eid
+                                     :system/projects {:project/id id
+                                                       :project/name project-name
+                                                       :project/dir dir}}]})))
 
 (def conversation-intros
   {:process
@@ -897,11 +904,24 @@
   (doseq [id (list-projects {:from-storage? true})]
     (register-db id (db-cfg-map {:type :project :id id}))))
 
+(defn add-surrogate-agent-infos
+  "Add an agent-info object to adb/agent-infos for every project's surrogate."
+  []
+  (doseq [pid (list-projects)]
+    (let [conn @(connect-atm pid)]
+      (when-let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] conn)]
+        (let [{:agent/keys [system-instruction expertise]} (dp/pull conn '[*] eid)]
+          (adb/add-agent-info! pid {:base-type pid
+                                    :model-class :gpt
+                                    :instruction-string system-instruction
+                                    :expertise expertise}))))))
+
 (defn init-dbs
   "Register DBs using "
   []
   (register-project-dbs)
   (register-db :system (db-cfg-map {:type :system}))
+  (add-surrogate-agent-infos)
   {:sys-cfg (db-cfg-map {:type :system})})
 
 (defstate sys&proj-database-cfgs

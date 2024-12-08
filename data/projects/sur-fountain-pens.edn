@@ -221,7 +221,17 @@
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_78FyjeCJ32H0w2qYlWwWJ1s7"}],
+                   :thread-id "thread_78FyjeCJ32H0w2qYlWwWJ1s7"}
+           #:agent{:base-type :sur-fountain-pens,
+                   :thread-id "thread_dGPypen7TGZMyonWURXE9BBd",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes fountain pens.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_I6brRBNe6fpzNebgUg9mznNd",
+                   :id :sur-fountain-pens-openai,
+                   :expertise "fountain pens",
+                   :timestamp #inst "2024-12-08T16:12:48.538-00:00"}],
           :processes
           [#:process{:id :sur-fountain-pens,
                      :interview-class :initial-unordered,
@@ -321,12 +331,5 @@
            #:claim{:conversation-id :process,
                    :string "(surrogate :sur-fountain-pens)"}],
           :name "SUR Fountain Pens",
-          :surrogate
-          #:surrogate{:assistant-id "asst_I6brRBNe6fpzNebgUg9mznNd",
-                      :id :sur-fountain-pens,
-                      :subject-of-expertise "fountain pens",
-                      :system-instruction
-                      "You manage a company that makes fountain pens.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_dGPypen7TGZMyonWURXE9BBd"},
           :id :sur-fountain-pens}
 ]
