@@ -28,6 +28,29 @@
        (do (log! :debug (cl-format nil "<-- ~A (act) returns ~S" ~tag res#))
            res#))))
 
+;;; Needs work: I get scheduling_tbd/web/websockets.clj:289 - Could not find out async channel for client
+#_(defmacro defanalyze
+  "Macro to wrap methods for updating the project's database for effects from running an operation.
+   Returned value is not meaningful."
+  {:clj-kondo/lint-as 'clojure.core/defmacro
+   :arglists '(tag [arg-map] & body)}
+  [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
+  (let [as-var# (:as arg-map)]
+    `(defmethod analyze-response-meth ~tag [~arg-map]
+       (try
+         (do
+           (when-let [client-id# (:client-id ~as-var#)]
+             (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id#}))
+           (log! :debug (cl-format nil "==> ~A (act)" ~tag))
+           (let [res# (do ~@body)]
+             (if (seq? res#) (doall res#) res#)
+             (log! :debug (cl-format nil "<-- ~A (act) returns ~S" ~tag res#))
+             res#))
+         (finally
+           (when-let [client-id# (:client-id ~as-var#)]
+             (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id#})))))))
+
+
 (s/def ::dispatch-args (s/keys :req-un [::question-type]))
 (s/def ::question-type (s/and keyword?
                               #(#{"process" "data" "resources" "optimality"} (namespace %))))

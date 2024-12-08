@@ -1,12 +1,12 @@
 (ns scheduling-tbd.util
   "Do lowest level configuration (logging, etc.) used by both the server and app."
   (:require
-   [bling.core                      :as bling :refer [bling callout point-of-interest print-bling]]
-   [clojure.pprint                  :refer [pprint]]
+   [bling.core                      :as bling :refer [bling print-bling]]  ; print-pling is used (clj)!
+   [clojure.pprint                  :refer [pprint]]                       ; pprint is used (clj)!
    [clojure.string                  :as str]
    #?@(:clj [[taoensso.telemere.tools-logging :as tel-log]])
    [mount.core                      :as mount :refer [defstate]]
-   [taoensso.telemere               :as tel :refer [log!]]
+   [taoensso.telemere               :as tel :refer [log!]]                ; log is used!
    [taoensso.timbre                 :as timbre])) ; To stop pesky datahike :debug messages.
 
 (def diag (atom nil))
@@ -20,41 +20,35 @@
   "I don't want to see hostname and time, etc. in console logging."
   ([] :can-be-a-no-op) ; for shutdown, at least.
   ([signal]
-   (reset! diag signal)
-   (let [{:keys [kind level location msg_]} signal
-         file (:file location)
-         file (when (string? file)
-               (let [[_ stbd-file] (re-matches #?(:clj #"^.*(scheduling_tbd.*)$" :cljs #"^.*(stbd_app.*)$") file)]
-                 (or stbd-file file)))
-         line (:line location)
-         msg (if (string? msg_) msg_ (deref msg_))
-         heading (-> (str "\n" (name kind) "/" (name level) " ") str/upper-case)]
-     (cond (= :error level)      (pr-bling (bling [:bold.red.white-bg heading] " " [:red    (str file ":" line " - " msg)]))
-           (= :warn  level)      (pr-bling (bling [:bold.blue heading]         " " [:yellow (str file ":" line " - " msg)]))
-           :else                 (pr-bling (bling [:bold.blue heading]         " "  (str file ":" line " - " msg)))))))
+   (when-not (= (:kind signal) :agents)
+     (let [{:keys [kind level location msg_]} signal
+           file (:file location)
+           file (when (string? file)
+                  (let [[_ stbd-file] (re-matches #?(:clj #"^.*(scheduling_tbd.*)$" :cljs #"^.*(stbd_app.*)$") file)]
+                    (or stbd-file file)))
+           line (:line location)
+           msg (if-let [s (not-empty (force msg_))] s "\"\"")
+           heading (-> (str "\n" (name kind) "/" (name level) " ") str/upper-case)]
+       (cond (= :error level)      (pr-bling (bling [:bold.red.white-bg heading] " " [:red    (str file ":" line " - " msg)]))
+             (= :warn  level)      (pr-bling (bling [:bold.blue heading]         " " [:yellow (str file ":" line " - " msg)]))
+             :else                 (pr-bling (bling [:bold.blue heading]         " "  (str file ":" line " - " msg))))))))
 
-;;;#?(:cljs ; WIP
-;;;(defn cljs-repl-output-fn
-;;;  "I don't want to see hostname and time, etc. in console logging."
-;;;  ([] :can-be-a-no-op) ; for shutdown, at least.
-;;;  ([signal]
-;;;   (let [{:keys [kind level location msg_]} signal
-;;;         file (:file location)
-;;;         file (when (string? file)
-;;;                (let [[_ stbd-file] (re-matches #?(:clj #"^.*(scheduling_tbd.*)$" :cljs #"^.*(stbd_app.*)$") file)]
-;;;                  (or stbd-file file)))
-;;;         line (:line location)
-;;;         msg (if (string? msg_) msg_ (deref msg_))
-;;;         heading (-> (str "\n" (name kind) "/" (name level) " ") str/upper-case)]
-;;;     ;; (print-bling (bling msg) #(println %)) ; For REPL; WIP.
-;;;     (cond (= :error level)      (pr-bling (bling [:bold.red.white-bg heading] " " [:red    (str file ":" line " - " msg)]))
-;;;           (= :warn  level)      (pr-bling (bling [:bold.blue heading]         " " [:yellow (str file ":" line " - " msg)]))
-;;;           :else                 (pr-bling (bling [:bold.blue heading]         " "  (str file ":" line " - " msg))))))))
+(defn agents-log-output-fn
+  "Output verbatim agent interactions to a log file."
+  ([] :can-be-a-no-op)
+  ([signal]
+   (when (= (:kind signal) :agents)
+     (let [{:keys [inst msg_]} signal
+           msg (if-let [s (not-empty (force msg_))] s "\"\"")]
+       (str inst ": " msg "\n")))))
 
 (defn config-log!
   "Configure Telemere: set reporting levels and specify a custom :output-fn."
   []
   (tel/add-handler! :default/console (tel/handler:console {:output-fn custom-console-output-fn}))
+  #?(:clj (tel/add-handler! :agent/log (tel/handler:file  {:output-fn agents-log-output-fn
+                                                           :path "./logs/agents-log.txt"
+                                                           :interval :daily})))
 ;;; Alternative to above; separate handlers; not working:
 ;;;  #?(:clj  (tel/add-handler! :default/console (tel/handler:console {:output-fn custom-console-output-fn})))
 ;;;  #?(:cljs (tel/add-handler! :cljs/repl       (tel/handler:console {:output-fn cljs-repl-output-fn})))

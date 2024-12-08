@@ -202,6 +202,13 @@
                                      #inst "2024-11-20T13:32:52.887-00:00"}]}],
           :code
           "enum Task = {material, coil, cupping, drawing, trimming, washing, internal, baking, printing, necking, packing};",
+          :agents
+          [#:agent{:assistant-id "asst_Zz3XcnFcPnVJ622Z0RU5zCYJ",
+                   :base-type :process-interview-agent,
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_N46uwAlm596aRHP8ZNA3Spq9"}],
           :processes
           [#:process{:desc
                      "1. Material Procurement: 2 days\n2. Coil Slitting: 1 hour\n3. Cupping: 30 minutes\n4. Drawing and Ironing: 1 hour\n5. Trimming: 15 minutes\n6. Washing and Drying: 30 minutes\n7. Internal Coating: 45 minutes\n8. Baking: 1 hour\n9. Printing: 2 hours\n10. Necking: 30 minutes\n11. Packing and Shipment: 1 hour",

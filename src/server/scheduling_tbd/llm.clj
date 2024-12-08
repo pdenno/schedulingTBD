@@ -9,8 +9,7 @@
    [clojure.edn                  :as edn]
    [clojure.java.io              :as io]
    [clojure.spec.alpha           :as s]
-   [datahike.api                 :as d]
-   [scheduling-tbd.sutil         :refer [api-credentials default-llm-provider markdown2html connect-atm]]
+   [scheduling-tbd.sutil         :as sutil :refer [api-credentials default-llm-provider markdown2html connect-atm]]
    [scheduling-tbd.util          :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
    [clojure.string               :as str]
@@ -144,13 +143,12 @@
      :tools - a vector containing maps, for example [{:type 'code_interpreter'}]."
   [& {:keys [name model-class instructions tools tool-resources metadata llm-provider response-format]
       :or {model-class :gpt
-           llm-provider @default-llm-provider
-           metadata {:usage :stbd-agent}} :as obj}]
+           llm-provider @default-llm-provider} :as obj}]
   (s/valid? ::assistant-args obj)
   (openai/create-assistant {:name            name
                             :model           (pick-llm model-class llm-provider)
                             :response_format response-format
-                            :metadata        metadata
+                            :metadata        (merge {:usage :stbd-agent} metadata)
                             :instructions    instructions
                             :tools           tools
                             :tool_resources  tool-resources}
@@ -166,12 +164,45 @@
                                         (api-credentials llm-provider))))
 
 (defn make-thread
-  [& {:keys [assistant-id metadata llm-provider] :or
-      {metadata {:usage :stbd-agent}
-       llm-provider @default-llm-provider}}]
+  [& {:keys [assistant-id metadata llm-provider]
+      :or {llm-provider @default-llm-provider}}]
   (openai/create-thread {:assistant_id assistant-id
-                         :metadata metadata}
+                         :metadata (merge {:usage :stbd-agent} metadata)}
                         (api-credentials llm-provider)))
+
+;;; I don't use clojure.core/memoize here because I want to clear the atom on mount/start.
+;;; We could populate this at startup, see list-assistants below, but it might mean keeping objects for lots of unused assistants.
+;;; BTW, this is not case with get-thread-memo; there is no way to list all the threads.
+(def assistant-memo "A map of aid to assistant object, for memoization" (atom {}))
+(defn get-assistant
+  "Return a assistant object if the assistant exists, or nil otherwise."
+  [aid & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (let [res (or (get @assistant-memo aid)
+                (try
+                  (openai/retrieve-assistant {:assistant_id aid}
+                                             (api-credentials llm-provider))
+                  (catch Exception _e nil)))]
+    (swap! assistant-memo #(assoc % aid res))
+    res))
+
+(def thread-memo "A map of tid to thread object, for memoization" (atom {}))
+(defn get-thread
+  "Return a thread object if the thread exists, or nil otherwise."
+  [tid & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (let [res (or (get @thread-memo tid)
+                (try
+                  (openai/retrieve-thread {:thread_id tid}
+                                          (api-credentials llm-provider))
+                  (catch Exception _e nil)))]
+    (swap! thread-memo #(assoc % tid res))
+    res))
+
+(defn agent-exists?
+  "Return true if the aid and tid exist.
+   There is currently no way (within OpenaAI) to know whether the aid and tid are related."
+  [aid tid & {:keys [llm-provider] :or {llm-provider @default-llm-provider} :as opts}]
+  (and (get-assistant aid opts)
+       (get-thread tid opts)))
 
 (defn openai-messages-matching
   "Argument is a vector of openai messages from an assistant.
@@ -237,6 +268,23 @@
 
               :else                                   (recur (inst-ms (java.time.Instant/now))))))))
 
+;;; ToDo: This one is a bit out-of-place because it assumes system DB schema.
+;;;       It might make sense to have a sutil routine that captures at start-up all the information
+;;;       needed to do a-b-t. This would include surrogate assistant/id, which are not handled here.
+(defn agent-base-type
+  "Return the base-type (keyword) of the agent with the given aid or :unknown-<aid> if you can't find the agent.
+   This only looks for system-level agents, so :unknown-<aid> will happen occassionally."
+  [aid]
+  (or
+   (d/q '[:find ?base-type .
+          :in $ ?aid
+          :where
+          [?eid :agent/assistant-id ?aid]
+          [?eid :agent/base-type ?base-type]]
+        @(connect-atm :system) aid)
+   (-> (format "unknown-%s" aid) keyword)))
+
+
 (defn query-on-thread
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
@@ -251,10 +299,15 @@
                   (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
     (assert (< (:tries obj) 10))
     (if (> (:tries obj) 0)
-      (try (let [raw (reset! diag (query-on-thread-aux aid tid role query-text timeout-secs llm-provider))
-                 res (preprocess-fn raw)]
-             (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
-           (catch Exception e
+      (try
+        (do (tel/with-kind-filter {:allow :agents} ; ToDo: agent-base-type is a project/system DB concept.
+              (tel/signal! {:kind :agents :level :info :msg (str "\n\n" (agent-base-type aid) " ===> " query-text)}))
+            (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
+                  res (preprocess-fn raw)]
+              (tel/with-kind-filter {:allow :agents}
+                (tel/signal! {:kind :agents :level :info :msg (str "\n" (agent-base-type aid) " <=== " raw)}))
+              (if (test-fn res) res (throw (ex-info "Try again" {:res res})))))
+            (catch Exception e
              (let [d-e (datafy e)]
                (log! :warn (str "query-on-thread failed (tries = " (:tries obj) "): "
                                 (or (:cause d-e) (-> d-e :via first :message)))))
@@ -331,30 +384,15 @@
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
 
-
 (defn query-agent
   "Make a query to a named agent."
-  [base-type query & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
-  (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
-                                     :keys aid tid
-                                     :in $ ?base-type ?provider
-                                     :where
-                                     [?e :agent/base-type ?base-type]
-                                     [?e :agent/llm-provider ?provider]
-                                     [?e :agent/assistant-id ?aid]
-                                     [?e :agent/thread-id ?tid]]
-                                   @(connect-atm :system)
-                                   base-type llm-provider)
-                              first)]
+  [base-type query-text & {:keys [pid llm-provider] :or {llm-provider @default-llm-provider} :as opts}]
+  (let [{:keys [aid tid]} (sutil/get-agent (assoc opts :base-type base-type))]
     (if-not (and aid tid)
       (throw (ex-info "Could not find the agent requested. (Not created for this LLM provider?:" {:llm-provider llm-provider}))
-      (let [result (-> (query-on-thread {:aid aid :tid tid :query-text query})
-                       (str/replace #"\s+" " "))]
-        (try (->> (edn/read-string result)
-                  (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
-             (catch Exception _e
-               (log! :error (str "query-agent failed: " result))
-               nil))))))
+      (try (query-on-thread {:aid aid :tid tid :query-text query-text})
+           (catch Exception e
+             (log! :error (str "query-agent failed: " e)))))))
 
 (def moderation-checking?
   "Set to true if you want to filter immoderate user text."
@@ -386,10 +424,11 @@
 (defn make-vector-store
   [& {:keys [name file-ids metadata llm-provider]
       :or {llm-provider @default-llm-provider
-           name "STBD agent vector store"
-           metadata {:usage :stbd-agent}}}]
+           name "STBD agent vector store"}}]
   (openai/create-vector-store
-   {:name name :file_ids file-ids :metadata metadata}
+   {:name name
+    :file_ids file-ids
+    :metadata (merge {:usage :stbd-agent} metadata)}
    (api-credentials llm-provider)))
 
 (defn list-vector-stores
@@ -413,7 +452,6 @@
   [& {:keys [vector-store-id llm-provider] :or {llm-provider @default-llm-provider}}]
   (modify-vector-store {:vector-store-id vector-store-id :llm-provider llm-provider}))
 
-
 (defn delete-vector-store
   [& {:keys [vector-store-id llm-provider] :or {llm-provider @default-llm-provider}}]
   (openai/delete-vector-store {:vector_store_id vector-store-id}
@@ -425,6 +463,8 @@
   (ws/register-ws-dispatch :ask-llm llm-directly)
   (ws/register-ws-dispatch :run-long run-long)
   (ws/register-ws-dispatch :throw-it throw-it)
+  (reset! assistant-memo {})
+  (reset! thread-memo {})
   [:llm-fns-registered-for-ws-dispatch])
 
 (defn llm-stop []

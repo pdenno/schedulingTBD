@@ -89,7 +89,6 @@
 
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
-        [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
         [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
         [code set-code]                       (hooks/use-state "")
         useful-height (int (- height banner-height))
@@ -98,13 +97,7 @@
     (hooks/use-effect :once
       (log! :debug "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
-      (register-fn :set-code set-code)
-    (-> (dba/get-project-list) ;  Resolves to map with client's :current-project :others, and cid the first two are maps of :projec/id :project/name.
-        (p/then (fn [{:keys [current-project others cid] :as _resp}]
-                  (set-proj-infos (conj others current-project))
-                  (set-proj current-project)
-                  (update-common-info! current-project)
-                  ((lookup-fn :get-conversation) (:project/id current-project) cid)))))
+      (register-fn :set-code set-code))
     ;; ------- component (end of use-effect :once)
     ($ Stack {:direction "column" :height useful-height}
        ($ Typography
@@ -117,7 +110,7 @@
           ($ Stack {:direction "row"}
              "schedulingTBD"
              ($ Box
-                ($ SelectProject {:current-proj proj :proj-infos proj-infos}))))
+                ($ SelectProject))))
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
                      ($ chat/Chat {:chat-height chat-side-height :proj-info proj}))
@@ -180,6 +173,6 @@
   (when-let [proc @ws/check-process] (js/window.clearInterval proc))
   (when-let [proc @chat/update-msg-dates-process] (js/window.clearInterval proc))
   (when (ws/channel-ready?)
-    (log! :info (str "Telling server to close channel for client-id = " @ws/client-id))
+    (log! :info (str "Telling server to close channel for client-id = " ws/client-id))
     (ws/send-msg {:dispatch-key :close-channel}) ; The client-id is appended by send-message!.
-    (log! :info (str "Message sent for client-id = " @ws/client-id))))
+    (log! :info (str "Message sent for client-id = " ws/client-id))))

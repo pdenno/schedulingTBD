@@ -161,10 +161,21 @@
 (s/def ::responses (s/coll-of (s/keys :req-un [::question-type ::answer])))
 (s/def ::told-what string?)
 
+(def course-correction-count (atom 0))
+
+(defn too-many-course-corrections!
+  "If many course-corrections have occurred, stop the conversation."
+  [{:keys [command]}]
+  (when (= command "COURSE-CORRECTION")
+    (swap! course-correction-count inc))
+  (when (> @course-correction-count 5)
+    (reset! active? false)))
+
 (defn tell-interviewer
   "Send a command to an interviewer agent and wait for response; translate it.
    :aid and :tid in the ctx should be for the interviewer agent."
   [cmd {:keys [iview-aid iview-tid cid] :as _ctx}]
+  (too-many-course-corrections! cmd)
   (when-not (s/valid? ::interviewer-cmd cmd) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid interviewer-cmd: " (with-out-str (pprint cmd)))))
   (log! :info (-> (str "Interviewer told: " cmd) (elide 150)))
@@ -202,14 +213,11 @@
   [q-txt a-txt]
   (assert (string? q-txt))
   (assert (string? a-txt))
-  (let [{:keys [aid tid]} (db/get-agent :base-type :response-analysis-agent)]
-    (-> (llm/query-on-thread
-         {:aid aid :tid tid
-          :query-text (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt)})
+    (-> (llm/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt))
         json/read-value
         (update-keys str/lower-case)
         (update-keys keyword)
-        (update-vals #(if (empty? %) false %)))))
+        (update-vals #(if (empty? %) false %))))
 
 ;;; ToDo: Implement these (next three). They will probably involve some looping.
 (defn handle-wants-a-break
@@ -377,7 +385,7 @@
    Return the question (candidate-q) that should be asked. That might be the argument question, of course."
   [{:keys [question-type status] :as candidate-q}
    {:keys [pid cid] :as ctx}]
-  (when @active?
+  (if @active?
     (let [prior (conversation-history pid cid)]
       (cond  (not (s/valid? ::supply-q-response candidate-q))               (off-course--invalid-response candidate-q ctx),
              (and (= status "DONE") (not (done? pid cid)))                  (off-course--not-done ctx),
@@ -386,9 +394,11 @@
                :process  (cond (and (-> prior :already-answered empty?)
                                     (not= :process/warm-up question-type))  (off-course--do-warm-up ctx), ; This for surrogate.
                                :else                                        candidate-q)
-               :data       candidate-q ; NYI
-               :resources  candidate-q ; NYI
-               :optimality candidate-q))))) ; NYI
+               :data       candidate-q    ; NYI
+               :resources  candidate-q    ; NYI
+               :optimality candidate-q))) ; NYI
+    (log! :warn "Exiting because of the active? atom.")))
+
 
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
 ;;; over and over and the interview will advance each time until you get back DONE.
@@ -477,39 +487,45 @@
   [{:keys [client-id pid cid] :as ctx}]
   (assert (string? client-id))
   (assert (#{:process :data :resources :optimality} cid))
-  (log! :info (str "--------- Resume conversation: ctx: " ctx))
+  ;(log! :info (str "--------- Resume conversation: ctx: " ctx))
+  (reset! course-correction-count 0)
+  (println "1")
   (try
     (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
       (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
+        (println "2")
         (when-not (db/conversation-done? pid cid)
-          (when @active?
-            (when (== 0 (-> (db/get-conversation-eids pid cid) count))
-              (-> ctx :pid initial-advice (tell-interviewer ctx)))
-            (-> (conversation-history pid cid) (tell-interviewer ctx))
-            (loop [cnt 0
-                   conversation (q-and-a ctx)] ; Returns a vec of msg objects suitable for db/add-msg.
-              (let [response (-> conversation last)]
-                (doseq [msg conversation]
-                  (when-not (= (:status msg) "DONE")
-                    (db/add-msg (merge {:pid pid :cid cid} msg))))
-                (cond
-                  (> cnt 15)                                  :exceeded-questions-safety-stop
-                  (= "DONE" (-> conversation last :status))   (db/assert-conversation-done! pid cid)
-                  :else
-                  (when @active? ; Keep this despite (when @active? ...) above. Can set to false while running.
-                    (ru/analyze-response-meth (merge ctx
-                                                     {:response (:text response)
-                                                      :question-type (:question-type response)}))
-                    (tell-interviewer {:command "INTERVIEWEES-RESPOND"
-                                       :response (:text response)
-                                       :answers (-> response :question-type name)}
-                                      ctx)
-                    (recur (inc cnt)
-                           (q-and-a ctx))))))))))
-      (finally
-        (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+          (if @active?
+            (do (when (== 0 (-> (db/get-conversation-eids pid cid) count))
+                  (-> ctx :pid initial-advice (tell-interviewer ctx)))
+                (-> (conversation-history pid cid) (tell-interviewer ctx))
+                (loop [cnt 0
+                       conversation (q-and-a ctx)] ; Returns a vec of msg objects suitable for db/add-msg.
+                  (if @active?
+                    (let [response (-> conversation last)]
+                      (doseq [msg conversation]
+                        (when-not (= (:status msg) "DONE")
+                          (db/add-msg (merge {:pid pid :cid cid} msg))))
+                      (cond
+                        (> cnt 15)                                  :exceeded-questions-safety-stop
+                        (= "DONE" (-> conversation last :status))   (db/assert-conversation-done! pid cid)
+                        :else
+                        (do
+                          (ru/analyze-response-meth (merge ctx
+                                                           {:response (:text response)
+                                                            :question-type (:question-type response)}))
+                          (tell-interviewer {:command "INTERVIEWEES-RESPOND"
+                                             :response (:text response)
+                                             :answers (-> response :question-type name)}
+                                            ctx)
+                          (when (surrogate? pid) (ru/refresh-client client-id pid cid))
+                          (recur (inc cnt)
+                                 (q-and-a ctx)))))
+                    (log! :warn "Exiting because active? atom is false."))))
+            (log! :warn "Exiting because active? atom is false.")))))
+    (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn start-conversation
   "Ask first question, create a project and call resume-conversation.

@@ -173,7 +173,8 @@
                                      :tags [:response],
                                      :time
                                      #inst "2024-11-20T22:20:41.747-00:00"}]}
-           #:conversation{:id :data,
+           #:conversation{:done? true,
+                          :id :data,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -181,8 +182,25 @@
                                      :id 2,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T22:17:15.155-00:00"}]}
-           #:conversation{:id :resources,
+                                     #inst "2024-11-20T22:17:15.155-00:00"}
+                           #:message{:content
+                                     "Let's talk about the data you use to do your work. Typically, and especially in small businesses, information about customer orders, resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you use and how you maintain and store it.",
+                                     :from :system,
+                                     :id 25,
+                                     :question-type :warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-20T22:29:24.568-00:00"}
+                           #:message{:content
+                                     "We maintain most of our production and scheduling information using an integrated ERP system, which centralizes data on customer orders, inventory levels, production schedules, and supplier information. This system helps us track raw materials, manage production processes, and predict lead times. For smaller, departmental needs or ad-hoc analyses, we occasionally use spreadsheets to handle specific datasets like production efficiency reports or to simulate scheduling scenarios. Data from both the ERP system and spreadsheets are regularly backed up and stored on secure servers to ensure data integrity and accessibility.",
+                                     :from :surrogate,
+                                     :id 26,
+                                     :question-type :warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-20T22:29:24.626-00:00"}]}
+           #:conversation{:done? true,
+                          :id :resources,
                           :messages
                           [#:message{:content
                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
@@ -190,8 +208,25 @@
                                      :id 3,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T22:17:15.187-00:00"}]}
-           #:conversation{:id :optimality,
+                                     #inst "2024-11-20T22:17:15.187-00:00"}
+                           #:message{:content
+                                     "If you've already contributed to the \"data\" conversation you may have already mentioned resources used in production. We will certainly study what you said there for this interview about resources. Here will go into more detail. To get started, please write a few new thoughts (a few sentences) about resources, for example, skills required for particular processes, equipment maintenance schedules, equipment capacities and capabilities...whatever you think is most relevant to scheduling.",
+                                     :from :system,
+                                     :id 27,
+                                     :question-type :warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-20T22:31:29.618-00:00"}
+                           #:message{:content
+                                     "In our production process, key resources include skilled operators proficient in handling dyeing and weaving machinery, and technicians who can perform routine maintenance to minimize downtime. Each piece of equipment has specific maintenance schedules, typically aligned with production dips to prevent disruptions. The capacity of our equipment, like the weaving machines, can handle up to 500 square meters per batch, influencing batch scheduling and order prioritization. Additionally, our dyeing process requires careful coordination with skilled labor to achieve consistent quality, making scheduling based on workforce availability equally critical.",
+                                     :from :surrogate,
+                                     :id 28,
+                                     :question-type :warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-20T22:31:29.647-00:00"}]}
+           #:conversation{:done? true,
+                          :id :optimality,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
@@ -199,7 +234,23 @@
                                      :id 4,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T22:17:15.213-00:00"}]}],
+                                     #inst "2024-11-20T22:17:15.213-00:00"}
+                           #:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. Thus far we've assumed that your goal is what operations researchers call     <a href=\"term/makespan\">MAKESPAN</a>, getting everything done as soon as possible. That probably isn't your goal; it might not even make sense!     So please spend a little time here (write a few sentences) to explain your scheduling goal. This might repeat some of what you said way back     in the process interview. You might take a look at what you wrote back then.",
+                                     :from :system,
+                                     :id 29,
+                                     :question-type :warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-20T23:17:03.968-00:00"}
+                           #:message{:content
+                                     "Our primary scheduling goal is to achieve a balance between meeting customer order deadlines and maximizing production efficiency. This means minimizing idle time for workers and machinery while ensuring that we can flexibly accommodate last-minute changes in order priorities or urgent requests. Ideally, our schedule should align resource allocation—including labor, materials, and equipment—with demand fluctuations, enabling us to deliver high-quality products on time consistently. Moreover, considerations such as minimizing waste and reducing excess inventory also play a role in determining an optimal schedule. A well-constructed schedule, therefore, not only meets demands promptly but also supports sustainable operations and cost-effectiveness.",
+                                     :from :surrogate,
+                                     :id 30,
+                                     :question-type :warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-20T23:17:03.994-00:00"}]}],
           :code
           "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {fiberPrep, dyeingColor, yarnSpin, weaveTuft, backAttach, finishTreat, qualityInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 3.500, 4.500, 7.000, 2.500, 1.500, 1.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, fiberPrep] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, fiberPrep] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, fiberPrep] == taskStarts[p, dyeingColor]);\nconstraint forall (p in Product) (taskEnds[p, dyeingColor] == taskStarts[p, yarnSpin]);\nconstraint forall (p in Product) (taskEnds[p, yarnSpin] == taskStarts[p, weaveTuft]);\nconstraint forall (p in Product) (taskEnds[p, weaveTuft] == taskStarts[p, backAttach]);\nconstraint forall (p in Product) (taskEnds[p, backAttach] == taskStarts[p, finishTreat]);\nconstraint forall (p in Product) (taskEnds[p, finishTreat] == taskStarts[p, qualityInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, qualityInspect]);",
           :agents
@@ -208,7 +259,25 @@
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_1EeBQ4XHrUAkYI3a1OaDtZ7I"}],
+                   :thread-id "thread_1EeBQ4XHrUAkYI3a1OaDtZ7I"}
+           #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
+                   :base-type :data-interview-agent,
+                   :id :data-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_m7RQP4Zo9PhpyjJwQCKOXHVY"}
+           #:agent{:assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
+                   :base-type :resources-interview-agent,
+                   :id :resources-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_Dt0rSIWxd3IrzMqjKNktoFjQ"}
+           #:agent{:assistant-id "asst_d3bE53OkEhzf1PYs9eldZCkf",
+                   :base-type :optimality-interview-agent,
+                   :id :optimality-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_dCLOH6P49tCjtSBv5QC1Ol3S"}],
           :processes
           [#:process{:id :sur-carpet,
                      :interview-class :initial-unordered,
@@ -327,7 +396,7 @@
                                 :step-number 9,
                                 :supply-chain? true,
                                 :var-name "packaging"}]}],
-          :current-conversation :process,
+          :current-conversation :optimality,
           :claims
           [#:claim{:string "(project-id :sur-carpet)"}
            #:claim{:string "(project-name :sur-carpet \"SUR Carpet\")"}

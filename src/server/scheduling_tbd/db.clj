@@ -13,11 +13,10 @@
    [datahike.api                 :as d]
    [datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.llm   :as llm]
-   [scheduling-tbd.specs :as spec]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema db-cfg-map default-llm-provider register-db resolve-db-id]]
-   [scheduling-tbd.util  :as util :refer [now]]
-   [taoensso.telemere    :refer [log!]]))
+   [scheduling-tbd.agent-db :as adb]
+   [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema db-cfg-map default-llm-provider register-db resolve-db-id]]
+   [scheduling-tbd.util     :as util :refer [now]]
+   [taoensso.telemere       :refer [log!]]))
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
@@ -42,6 +41,9 @@
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
+   :agent/timestamp
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
+        :doc "The time at which the agent was created."}
 
    ;; ---------------------- agent-files files that assistants can use
    :agent-file/id
@@ -101,9 +103,15 @@
    :agent/model-class
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "One of the classes of LLM model defined in the system. See llm.clj."}
+   :agent/surrogate?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "True if the agent is a human surrogate."}
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
+   :agent/timestamp
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
+        :doc "The time at which the agent was created."}
 
    ;; ---------------------- box
    :box/string-val
@@ -336,25 +344,6 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
         :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
 
-   ;; ---------------------- surrogate
-   :surrogate/assistant-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant id(a string) associated with this surrogate."}
-   :surrogate/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A project-oriented string that uniquely identifies this surrogate, for example, 'craft beer-1'."}
-   :surrogate/subject-of-expertise
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The short string identifying what this surrogate is good at minus the verb, which is in the system instruction.
-              For example, this might just be 'craft beer'."}
-   :surrogate/system-instruction
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The complete instruction provided in configuring an OpenAI (or similar) assistant.
-              Typically this substitutes the subject-of-expertise into a template string."}
-   :surrogate/thread-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread that this surrogate uses."}
-
    ;; ------------------------ table
    :table/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
@@ -419,106 +408,6 @@
 (def db-schema-sys  (datahike-schema db-schema-sys+))
 (def db-schema-proj (datahike-schema db-schema-proj+))
 (def project-schema-key? (-> db-schema-proj+ keys set))
-
-;;; ---------------------------------- agents ----------------------------------------------
-(s/def ::agent-args (s/keys :req-un [::base-type ::instructions]
-                            :opt-un [::response-format ::llm-provider ::model-class ::project-thread? ::tools ::tool-resources]))
-(s/def ::base-type keyword?)
-(s/def ::instructions string?)
-(s/def ::response-format string?) ;; ToDo: Valid JSON schema.
-(s/def ::llm-provider #{:openai :azure})
-(s/def ::project-thread? boolean?)
-(s/def ::tools (s/and vector? (s/coll-of ::tool)))
-(s/def ::tool (s/keys :req-un [::type]))
-
-(defn add-agent!
-  "Create an agent, an OpenAI Assistant that responds to various queries with a vector of Clojure maps.
-   Store what is needed to identify it in system DB. Return the OpenAI Assistent object."
-  [{:keys [id base-type llm-provider #_response-format project-thread? model-class #_tools #_tool-resources]
-    :or {llm-provider @default-llm-provider model-class :gpt} :as args}]
-  (s/valid? ::agent-args args)
-  (let [user (-> (System/getenv) (get "USER"))
-        assist (llm/make-assistant (-> args
-                                       (assoc :name (name id))
-                                       (assoc :metadata {:usage :stbd-agent :user user})))
-        aid    (:id assist)
-        thread (when-not project-thread?
-                 (llm/make-thread {:assistant-id aid
-                                   :llm-provider llm-provider
-                                   :metadata {:usage :stbd-agent :user user}}))
-        tid    (:id thread)
-        conn   (connect-atm :system)
-        eid    (d/q '[:find ?eid .
-                      :where [?eid :system/name "SYSTEM"]]
-                    @(connect-atm :system))]
-    (d/transact conn {:tx-data [{:db/id eid
-                                 :system/agents (cond-> {:agent/id id
-                                                         :agent/base-type base-type
-                                                         :agent/llm-provider llm-provider
-                                                         :agent/model-class model-class
-                                                         :agent/assistant-id aid}
-                                                  tid (assoc :agent/thread-id tid))}]})
-    assist))
-
-;;; (db/add-agent! {:id :process-dur-agent,,,}
-(def known-agent-info
-  "The actual agent :id is the one provided here with -<llm-provider> added."
-  [ ;; ---------- project-specific interview agents -------------------------
-   {:id :process-interview-agent
-    :project-thread?  true
-    :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
-    :tools [{:type "file_search"}]
-    :vector-store-files ["data/instructions/interviewers/process-interview-flowchart.pdf"]
-    :instruction-path "data/instructions/interviewers/process.txt"
-    ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
-    #_#_:response-format (-> "data/instructions/interviewers/response-format.edn" slurp edn/read-string)}
-
-   {:id :data-interview-agent
-    :project-thread?  true
-    :model-class :gpt
-    :tools [{:type "file_search"}]
-    #_#_:vector-store-files ["data/instructions/interviewers/data-interview-flowchart.pdf"]
-    :instruction-path "data/instructions/interviewers/data.txt"}
-
-   {:id :resources-interview-agent
-    :project-thread?  true
-    :model-class :gpt
-    :tools [{:type "file_search"}]
-    #_#_:vector-store-files ["data/instructions/interviewers/resources-interview-flowchart.pdf"]
-    :instruction-path "data/instructions/interviewers/resources.txt"}
-
-   {:id :optimality-interview-agent
-    :project-thread?  true
-    :model-class :gpt
-    :tools [{:type "file_search"}]
-    #_#_:vector-store-files ["data/instructions/interviewers/optimality-interview-flowchart.pdf"]
-    :instruction-path "data/instructions/interviewers/optimality.txt"}
-
-   ;; ----------------- more generice system agents ---------------------------------
-   {:id :response-analysis-agent
-    :instruction-path "data/instructions/response-analysis-agent.txt"
-    :response-format (-> "data/instructions/response-analysis-format.edn" slurp edn/read-string)}
-
-   {:id :scheduling-challenges-agent
-    :instruction-path "data/instructions/scheduling-challenges.txt"
-    :response-format (-> "data/instructions/scheduling-challenges-response-format.edn" slurp edn/read-string)}
-
-   {:id :process-dur-agent
-    :instruction-path "data/instructions/process-dur-agent.txt"}
-
-   {:id :process-ordering-agent
-    :instruction-path "data/instructions/process-ordering-agent.txt"}
-
-   {:id :text-function-agent
-    :instruction-path "data/instructions/text-function-agent.txt"}])
-
-(defn ^:diag agent-exists?
-  "Return true if agent still exists (LLM-providers typiclly don't keep them forever)."
-  [aid]
-  (d/q '[:find ?eid .
-         :in $ ?aid
-         :where [?eid :system/openai-assistants ?aid]]
-       @(connect-atm :system) aid))
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 (defn project-exists?
@@ -599,13 +488,6 @@
               @(connect-atm :system))
          sort
          vec))))
-
-(defn get-surrogate-agent-info
-  "Return a map about the expert surrogate agent aid, tid, instruction..."
-  [pid]
-  (when (project-exists? pid)
-    (when-let [eid (d/q '[:find ?sur . :where [_ :project/surrogate ?sur]]  @(connect-atm pid))]
-      (dp/pull @(connect-atm pid) '[*] eid))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
   #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/tags :message/question-type})
@@ -760,57 +642,13 @@
       (log! :info (str "Writing system DB to " filename))
       (spit filename s)))
 
-;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
-(defn ^:diag assistants-that-openai-deleted
-  []
-  (let [conn (connect-atm :system)
-        old-ones (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]] @conn)
-        new-ones (llm/list-assistants)]
-    (log! :warn (str "The following OpenAI assistants have been deleted (by OpenAI):\n"
-                     (with-out-str (pprint (set/difference (set old-ones) (set new-ones))))))))
-
-(defn update-assistants!
-  "List what assistants the LLM-provider's currently maintains that have metadata indicating that
-   they are part of our project (where they are called agents). Store this in the sytems DB."
-  []
-  (let [conn (connect-atm :system)
-        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn)
-        old-ones (d/q '[:find [?s ...] :where [_ :system/openai-assistants ?s]] @conn)
-        new-ones (llm/list-assistants)]
-    (d/transact conn {:tx-data (vec (for [o old-ones] [:db/retract eid :system/openai-assistants o]))})
-    (d/transact conn {:tx-data (vec (for [n new-ones] [:db/add     eid :system/openai-assistants n]))})))
-
-(defn recreate-system-agents!
-  "Recreate the system agents for the agent infos given (db/known-agent-info if called with no args)."
-  ([] (recreate-system-agents! known-agent-info))
-  ([infos]
-   (doseq [llm-provider [:openai]]
-     (doseq [{:keys [id instruction-path response-format project-thread? model-class tools vector-store-files]
-              :or {model-class :gpt}} infos]
-       (as-> {} ?res
-         (cond-> ?res
-           true (assoc :id (-> id name (str "-" (name llm-provider)) keyword))
-           true (assoc :base-type id)
-           true (assoc :llm-provider llm-provider)
-           true (assoc :instructions (slurp instruction-path))
-           true (assoc :model-class model-class)
-           tools           (assoc :tools tools)
-           project-thread? (assoc :project-thread? true)
-           response-format (assoc :response-format response-format))
-         (let [file-objs (doall (mapv #(llm/upload-file {:fname %}) vector-store-files))
-               v-store (when (not-empty file-objs) (llm/make-vector-store {:file-ids (mapv :id file-objs)}))]
-           (if (not-empty file-objs)
-             (assoc ?res :tool-resources  {"file_search" {"vector_store_ids" [(:id v-store)]}})
-             ?res))
-         (add-agent! ?res))))))
-
 (defn recreate-system-db!
   "Recreate the system database from an EDN file
    By default this creates new agents.
      :update-assistants! - if true, list extant OpenAI assistants. (OpenAI doesn't keep them forever.)
      :new-agents? - Make new agents based on instructions."
-  [& {:keys [target-dir new-agents? update-assistants?]
-      :or {target-dir "data/" new-agents? true update-assistants? true}}]
+  [& {:keys [target-dir]
+      :or {target-dir "data/"}}]
   (if (.exists (io/file (str target-dir "system-db.edn")))
     (let [cfg (db-cfg-map {:type :system})]
       (log! :info "Recreating the system database.")
@@ -820,8 +658,6 @@
       (let [conn (connect-atm :system)]
         (d/transact conn db-schema-sys)
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string))
-        (when update-assistants? (update-assistants!))
-        (when new-agents? (recreate-system-agents!)); This is just about system agents, of course.
         cfg))
       (log! :error "Not recreating system DB: No backup file.")))
 
@@ -865,6 +701,13 @@
   (set/difference
    (set (list-projects {:from-storage? true}))
    (set (list-projects))))
+
+(defn get-surrogate-agent-info
+  "Return a map about the expert surrogate agent aid, tid, instruction..."
+  [pid]
+  (when (project-exists? pid)
+    (when-let [eid (d/q '[:find ?sur . :where [_ :project/surrogate ?sur]]  @(connect-atm pid))]
+      (dp/pull @(connect-atm pid) '[*] eid))))
 
 ;;; ----------------------- Creating a project DB ----------------------
 (defn unique-proj
@@ -1001,7 +844,7 @@
      (log! :info (str "Created project database for " id))
      id)))
 
-(defn delete-project!
+(defn ^:diag delete-project!
   "Remove project from the system."
   [pid]
   (if (some #(= % pid) (list-projects))
@@ -1012,50 +855,6 @@
           (sutil/deregister-db pid)
           nil)))
     (log! :warn (str "Delete-project: Project not found: " pid))))
-
-(defn ^:diag known-agents
-  "Return a set of all the agents recorded in the system DB."
-  []
-  (-> (d/q '[:find [?id ...] :where [_ :agent/id ?id]] @(connect-atm :system))
-      set))
-
-(defn agent-info
-  "Return a map of agent info (keys :aid :tid, :role, and sometimes, :expertise) for a ordinary agent or surrogate."
-  [agent]
-  (cond (contains? agent :agent/id)       (reduce-kv (fn [m k v]
-                                                       (cond (= k :agent/assistant-id) (assoc m :aid v)
-                                                             (= k :agent/thread-id)    (assoc m :tid v)
-                                                             (= k :agent/base-type)    (assoc m :role v)
-                                                             :else m))
-                                                     {}
-                                                     agent)
-        (contains? agent :surrogate/id)   (reduce-kv (fn [m k v]
-                                                       (cond (= k :surrogate/assistant-id)         (assoc m :aid v)
-                                                             (= k :surrogate/thread-id)            (assoc m :tid v)
-                                                             (= k :surrogate/id)                   (assoc m :role :surrogate)
-                                                             (= k :surrogate/subject-of-expertise) (assoc m :expertise v)
-                                                             :else m))
-                                                     {}
-                                                     agent)))
-
-(defn get-agent
-  "Return a map of {:aid <string> and :tid <string> for the argument agent-id (a keyword)
-   from either the system DB, or if :pid is provided, the project DB.
-   If :db-attrs? then return the object with DB-native attributes, not :aid :tid."
-  [& {:keys [base-type llm-provider pid db-attrs?] :or {llm-provider @default-llm-provider} :as obj}]
-  ;;{:post [(-> % :aid string?) (-> % :tid string?)]}
-  (reset! diag obj)
-  (let [conn (if pid @(connect-atm pid) @(connect-atm :system))
-        ent (when base-type
-              (d/q '[:find ?e .
-                     :in $ ?base-type ?llm-provider
-                     :where
-                     [?e :agent/base-type ?base-type]
-                     [?e :agent/llm-provider ?llm-provider]]
-                   conn base-type llm-provider))]
-    (when ent
-      (let [a-map (dp/pull conn '[*] ent)]
-        (if db-attrs? a-map (agent-info a-map))))))
 
 (defn assert-conversation-done!
   "Set the conversation's :converation/done? attribute to true."

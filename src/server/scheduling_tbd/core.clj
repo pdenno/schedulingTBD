@@ -57,7 +57,7 @@
     (try (let [server (jetty/run-jetty #'scheduling-tbd.web.handler/app {:port port, :join? false})]
            (reset! system server)
            ;(test-server port)
-           (log! :info (str "Started server on port" port)))
+           (log! :info (str "Started server on port " port)))
          (catch Throwable _e
            (log! :error (str "Server failed to start on host " host " port " port ".")))))
   [:http-server])

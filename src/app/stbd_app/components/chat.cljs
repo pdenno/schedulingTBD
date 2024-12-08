@@ -88,7 +88,7 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function.
+(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function. <========================
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
 (defn update-msg-times
@@ -98,7 +98,7 @@
     (log! :debug (str "update-msg-times: msg-count = " (count @msgs-atm)))
     ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
-;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid.
+;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid. <======================== So why not put it in db_access.cljs? Answer: msgs-atm but see above!
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
   "Using an HTTP GET, get the conversation, and also the code, if any."
@@ -142,7 +142,7 @@
                                       (add-msg msg :surrogate)))
 
 ;;; There is just one Chat instance in our app. It is switched between different conversations.
-(defnc Chat [{:keys [chat-height proj-info]}]
+(defnc Chat [{:keys [chat-height]}]
   (let [[msg-list set-msg-list]         (hooks/use-state [])
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
@@ -161,7 +161,7 @@
                       [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" text)
                       msg (cond  ask-llm?       {:dispatch-key :ask-llm :question question}
                                  surrogate?     {:dispatch-key :start-surrogate :product product}
-                                 sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:project/id proj-info) :question q}
+                                 sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:pid @common-info) :question q}
                                  :else          {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
                   ;; ToDo: Human-interjected questions, though some of them are stored, don't store the human-interjected annotation.
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.

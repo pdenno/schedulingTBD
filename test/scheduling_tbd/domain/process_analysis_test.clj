@@ -1,7 +1,6 @@
 (ns scheduling-tbd.domain.process-analysis-test
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
-   [bling.core                             :refer [bling callout point-of-interest]]
    [clojure.core.unify                     :as uni]
    [clojure.test                           :refer [deftest is testing]]
    [clojure.spec.alpha                     :as s]
@@ -41,6 +40,7 @@
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
+  (ns-start-over!)
   (reset! alias? (-> (ns-aliases *ns*) keys set))
   (safe-alias 'io     'clojure.java.io)
   (safe-alias 's      'clojure.spec.alpha)
@@ -50,10 +50,12 @@
   (safe-alias 'str    'clojure.string)
   (safe-alias 'd      'datahike.api)
   (safe-alias 'dp     'datahike.pull-api)
+  (safe-alias 'jt     'java-time.api)
   (safe-alias 'json   'jsonista.core)
   (safe-alias 'mount  'mount.core)
   (safe-alias 'p      'promesa.core)
   (safe-alias 'px     'promesa.exec)
+  (safe-alias 'adb    'scheduling-tbd.agent-db)
   (safe-alias 'core   'scheduling-tbd.core)
   (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
   (safe-alias 'pant   'scheduling-tbd.domain.process-analysis-test)

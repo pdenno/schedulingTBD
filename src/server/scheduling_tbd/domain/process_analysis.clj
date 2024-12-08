@@ -91,7 +91,6 @@
                      :from :system
                      :text see-code-msg
                      :tags [:info-to-user :minizinc]})
-        (ru/refresh-client client-id pid :process)
         (doseq [claim new-claims]
           (db/add-claim! pid {:string (str claim) :cid :process :q-type :process/process-durations})))
       (ws/send-to-chat

@@ -35,16 +35,17 @@
   "Update the common-info atom from an app action or server response.
    Returns the value of the common-info atom."
   [resp]
-  (log! :debug (str "update-common-info: resp = " resp))
+  (log! :info (str "update-common-info: resp = " resp))
   (swap! common-info
          (fn [info]
            (let [{:keys [current-project project-id cid]} resp
-                 {pid :project/id} resp]
+                 pid (or (:project/id resp) (:pid resp))]
              (cond-> info
                (not (contains? resp :cid))     (assoc :cid :process)
                current-project   (assoc :pid current-project)
                project-id        (assoc :pid project-id)
                pid               (assoc :pid pid)
                cid               (assoc :cid cid))))))
+
 (defn now []
   (js/Date. (.now js/Date)))
