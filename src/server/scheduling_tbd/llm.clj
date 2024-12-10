@@ -180,8 +180,8 @@
                   (openai/retrieve-assistant {:assistant_id aid}
                                              (api-credentials llm-provider))
                   (catch Exception _e nil)))]
-    (swap! assistant-memo #(assoc % aid res))
-    res))
+    (swap! assistant-memo #(assoc % aid (if (map? res) (dissoc res :instructions) :missing)))
+    (if (= res :missing) nil res)))
 
 (def thread-memo "A map of tid to thread object, for memoization" (atom {}))
 (defn get-thread
@@ -192,8 +192,8 @@
                   (openai/retrieve-thread {:thread_id tid}
                                           (api-credentials llm-provider))
                   (catch Exception _e nil)))]
-    (swap! thread-memo #(assoc % tid res))
-    res))
+    (swap! thread-memo #(assoc % tid (or res :missing)))
+    (if (= res :missing) nil res)))
 
 (defn ^:diag list-thread-messages
   "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"

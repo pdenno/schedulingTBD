@@ -53,7 +53,7 @@
    Returns promise which will resolve to the original obj argument except:
      1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
      2) :response is added. Typically its value is a string."
-  [{:keys [question sur-aid sur-tid responder-role preprocess-fn tries client-id] :as ctx
+  [{:keys [question surrogate-agent responder-role preprocess-fn tries client-id] :as ctx
     :or {tries 1 preprocess-fn identity}}]
   (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
   (let [prom (if (= :human responder-role)
@@ -65,11 +65,9 @@
                                       (assoc :dispatch-key :tbd-says))))
                (px/submit! (fn [] ; surrogate responder...
                              (try
-                                 (adb/query-on-thread :aid sur-aid   ; This can timeout.
-                                                      :tid sur-tid
-                                                      :query-text question
-                                                      :tries tries
-                                                      :preprocess-fn preprocess-fn)
+                                 (adb/query-agent question (-> surrogate-agent  ; This can timeout.
+                                                               :tries tries
+                                                               :preprocess-fn preprocess-fn))
                                (catch Exception e {:error e})))))]
     (-> prom p/await)))
 
@@ -79,14 +77,14 @@
                                     :human     (s/and #(s/valid? ::human-ctx %)     #(s/valid? ::common-ctx %)))))
 
 (s/def ::common-ctx (s/keys :req-un [::client-id ::question])) ; ::question-type not needed here.
-(s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-role ::sur-aid ::sur-tid ]))
-(s/def ::human-ctx     (s/keys :req-un [:hum/responder-role]))
-
+(s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-role ::surrogate-agent ::interviewer-agent]))
+(s/def ::human-ctx     (s/keys :req-un [:hum/responder-role ::interviewer-agent]))
+(s/def ::interviewer-agent (s/keys :req-un [::aid ::tid]))
+(s/def ::aid string?)
+(s/def ::tid string?)
 (s/def :sur/responder-role #(= % :surrogate))
 (s/def :hum/responder-role #(= % :human))
 (s/def ::client-id string?)
-(s/def ::sur-aid string?)
-(s/def ::sur-tid string?)
 (s/def ::question-type (s/and keyword? namespace))
 (s/def ::question string?)
 
@@ -175,15 +173,13 @@
 (defn tell-interviewer
   "Send a command to an interviewer agent and wait for response; translate it.
    :aid and :tid in the ctx should be for the interviewer agent."
-  [cmd {:keys [iview-aid iview-tid cid] :as _ctx}]
+  [cmd {:keys [interviewer-agent cid] :as _ctx}]
   (too-many-course-corrections! cmd)
   (when-not (s/valid? ::interviewer-cmd cmd) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid interviewer-cmd: " (with-out-str (pprint cmd)))))
   (log! :info (-> (str "Interviewer told: " cmd) (elide 150)))
   (let [cmd-string (json/write-value-as-string cmd)
-        res (-> {:aid iview-aid :tid iview-tid :role "user" :query-text cmd-string}
-                adb/query-on-thread
-                output-struct2clj)
+        res (-> (adb/query-agent cmd-string interviewer-agent) output-struct2clj) ;<======================== Untested.
         res (if (contains? res :question-type)
               (update res :question-type #(keyword (name cid) %))
               res)]
@@ -444,12 +440,13 @@
 (defn ctx-surrogate
   "Return context updated with surrogate info."
   [{:keys [pid cid] :as ctx}]
-  (let [sur (db/get-surrogate-agent-info pid)
+  (let [interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
+                                                 (assoc :pid pid)))
+        surrogate-agent   (adb/ensure-agent! (get @adb/agent-infos pid))
         ctx (-> ctx
-                (merge (ensure-interview-agent! pid cid))
                 (assoc :responder-role :surrogate)
-                (assoc :sur-aid (:surrogate/assistant-id sur))
-                (assoc :sur-tid (:surrogate/thread-id sur)))]
+                (assoc :interviewer-agent interviewer-agent)
+                (assoc :surrogate-agent surrogate-agent))]
     (if (s/valid? ::surrogate-ctx ctx)
       ctx
       (do
@@ -459,7 +456,9 @@
 (defn ctx-human
   "Return  part of context specific to humans."
   [{:keys [pid cid]}]
-  (merge {:responder-role :human} (ensure-interview-agent! pid cid)))
+   {:responder-role :human
+    :interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
+                                              (assoc :pid pid)))})
 
 (defn start-human-project!
   "This does a few things to 'catch up' with the surrogate-mode of operation, which alreadys knows what the project is about.

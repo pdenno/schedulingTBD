@@ -706,13 +706,6 @@
    (set (list-projects {:from-storage? true}))
    (set (list-projects))))
 
-(defn get-surrogate-agent-info
-  "Return a map about the expert surrogate agent aid, tid, instruction..."
-  [pid]
-  (when (project-exists? pid)
-    (when-let [eid (d/q '[:find ?sur . :where [_ :project/surrogate ?sur]]  @(connect-atm pid))]
-      (dp/pull @(connect-atm pid) '[*] eid))))
-
 ;;; ----------------------- Creating a project DB ----------------------
 (defn unique-proj
   "If necessary to ensure uniqueness, update the project name and id."
@@ -774,7 +767,7 @@
 
 (def conversation-intros
   {:process
-   (str "This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. "
+   (str "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. "
         "It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) "
         "through which together we design a solution to your scheduling problem. "
         "You can read more about <a href=\"about/process-conversation\">how this works</a>.")
@@ -788,7 +781,7 @@
    (str "This is typically the third conversation we'll have, after discussing process and data. "
         "(By the way, you can always go back to a conversation and add to it.) "
         "You might have already mentioned the resources (people, machines) by which you make product or deliver services. "
-        "Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.")
+        "Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.")
    :optimality
    (str "This is where we discuss what you intend by 'good' and 'ideal' schedules. "
         "With these we formulate an objective and model it in MiniZinc. "
@@ -905,16 +898,23 @@
     (register-db id (db-cfg-map {:type :project :id id}))))
 
 (defn add-surrogate-agent-infos
-  "Add an agent-info object to adb/agent-infos for every project's surrogate."
+  "Add an agent-info object to adb/agent-infos for every project's surrogate.
+   Check that it is viable (assistant and thread are still maintained by llm provider).
+   Make it anew if needed."
   []
   (doseq [pid (list-projects)]
     (let [conn @(connect-atm pid)]
       (when-let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] conn)]
-        (let [{:agent/keys [system-instruction expertise]} (dp/pull conn '[*] eid)]
-          (adb/add-agent-info! pid {:base-type pid
-                                    :model-class :gpt
-                                    :instruction-string system-instruction
-                                    :expertise expertise}))))))
+        (let [{:agent/keys [system-instruction expertise]} (dp/pull conn '[*] eid)
+              info {:base-type pid
+                    :agent-type :project
+                    :model-class :gpt
+                    :instruction-string system-instruction
+                    :surrogate? true
+                    :llm-provider @default-llm-provider
+                    :expertise expertise}]
+          (adb/add-agent-info! pid info)
+          #_(adb/ensure-agent! info))))))
 
 (defn init-dbs
   "Register DBs using "

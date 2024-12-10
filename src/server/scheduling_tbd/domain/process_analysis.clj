@@ -286,7 +286,7 @@
 (defn run-process-dur-agent-steps
   "Run the steps of the process agent, checking work after each step."
   [response]
-  (let [{:keys [aid tid]} (-> (adb/ensure-agent! :base-type :process-dur-agent) adb/agent-db2proj)
+  (let [{:keys [aid tid]} (adb/ensure-agent! :base-type :process-dur-agent)
         past-rev (atom response)]
     (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]] ; These are also spec defs, thus ns-qualified.
       (log! :info (str "process-dur-agent, rev " (name rev)))

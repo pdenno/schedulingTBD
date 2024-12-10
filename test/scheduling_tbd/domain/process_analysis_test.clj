@@ -197,8 +197,7 @@
 (defn ^:diag ask-about-ice-cream-agent
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
   ([q-txt]
-   (let [{:keys [iview-aid iview-tid]} (inv/ensure-interview-agent! :sur-ice-cream :process )]
-     (adb/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
+     (adb/query-agent q-txt (adb/ensure-agent! {:base-type :sur-ice-cream}))))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"
   {:snack-food "We make snack food.
@@ -370,9 +369,7 @@
 
 (deftest scheduling-challenges-agent
   (testing "the scheduling-challenges agent"
-    (let [{:keys [aid tid]} (adb/ensure-agent! {:base-type :scheduling-challenges-agent})
-          result (adb/query-on-thread
-                  {:aid aid :tid tid :query-text ice-cream-answer-warm-up})
+    (let [result (adb/query-agent ice-cream-answer-warm-up {:base-type :scheduling-challenges-agent :agent-type :system})
           {:keys [challenges]} (-> result
                                    json/read-value
                                    (update-keys keyword)

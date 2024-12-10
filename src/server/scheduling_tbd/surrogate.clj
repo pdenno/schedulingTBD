@@ -23,42 +23,31 @@
    Your answers typically are short, just a few sentences each.
    If you don’t have information to answer my questions, you provide a plausible answer nonetheless." role))
 
-(defn ensure-surrogate!
-  "If a surrogate with given expertise exists and force-new?=false, return the DB map of it.
-   Otherwise create and store a project with the given expertise and return the DB map of its surrogate."
-  [pid force-new?]
-  (if force-new?
-    (let [conn-atm (connect-atm pid)
-          project-name (d/q '[:find ?pname . :where [_ :project/name ?pname]] @conn-atm)
-          [_ _ expertise] (re-matches #"(SUR )?(.*)" project-name)
-          expertise (str/lower-case expertise)
-          instructions (system-instruction expertise)
-          agent-info {:pid pid :base-type pid :instruction-string instructions :surrogate? true}]
-      (adb/add-agent-info! pid agent-info)
-      (adb/ensure-agent! agent-info)
-      (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
-      (db/get-surrogate-agent-info pid))
-    (db/get-surrogate-agent-info pid)))
-
 ;;; (sur/start-surrogate! {:product "optical fiber" :client-id (ws/recent-client!)})
 (defn start-surrogate!
-  "Create or recover a surrogate and ask client to :load-proj.
-   :load-proj will cause the client to get-conversation (http and chat). The chat part will :resume-conversation (call back to server to restart planner).
+   "Create a surrogate and ask client to :load-proj.
+   :load-proj will cause the client to get-conversation (http and chat). The chat part will :resume-conversation (call back to server).
     product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
                Any of the :segment/name from the 'How it's Made' DB would work here.
-    force? - This is about naming of the DB. Unrelated to this is the fact that any old DB having the pid calculated here is deleted."
+    force? - This is about naming of the DB. Any old DB having this pid is deleted."
   [{:keys [product client-id]} & {:keys [force?] :or {force? true}}]
   (log! :info (str "======= Starting a surrogate: product = " product " ======================="))
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
-        pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})]
-      (try
-        (ensure-surrogate! pid force?)
+        [_ _ expertise] (re-matches #"(SUR )?(.*)" pname)
+        expertise (str/lower-case expertise)
+        pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
+        instructions (system-instruction expertise)]
+    (try
+      (let [agent-info {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise}]
+        (adb/add-agent-info! pid agent-info)
+        (adb/ensure-agent! (assoc agent-info :force-new? true)) ; force-new? means new assistant and thread.
+        (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
         (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
-                          :new-proj-map {:project/name pname :project/id pid}})
-        (catch Exception e
-          (log! :warn "Failed to start surrogate.")
-          (log! :error (str "Error starting surrogate:" e))))))
+                          :new-proj-map {:project/name pname :project/id pid}}))
+      (catch Exception e
+        (log! :warn "Failed to start surrogate.")
+        (log! :error (str "Error starting surrogate:" e))))))
 
 (defn surrogate-follow-up
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."
