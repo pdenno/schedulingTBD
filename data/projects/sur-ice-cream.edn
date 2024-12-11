@@ -200,13 +200,7 @@
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_Af7PPLVuyyJkrkEaeFSxYrX5"}
-           #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
-                   :base-type :data-interview-agent,
-                   :id :data-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_H93OzH5wmhXMkvYlew34qDfI"}],
+                   :thread-id "thread_Af7PPLVuyyJkrkEaeFSxYrX5"}],
           :processes
           [#:process{:id :sur-ice-cream,
                      :interview-class :initial-unordered,
