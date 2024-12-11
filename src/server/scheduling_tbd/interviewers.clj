@@ -76,12 +76,15 @@
                               (s/or :surrogate (s/and #(s/valid? ::surrogate-ctx %) #(s/valid? ::common-ctx %))
                                     :human     (s/and #(s/valid? ::human-ctx %)     #(s/valid? ::common-ctx %)))))
 
-(s/def ::common-ctx (s/keys :req-un [::client-id ::question])) ; ::question-type not needed here.
+(s/def ::common-ctx    (s/keys :req-un [::client-id ::question])) ; ::question-type not needed here.
 (s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-role ::surrogate-agent ::interviewer-agent]))
 (s/def ::human-ctx     (s/keys :req-un [:hum/responder-role ::interviewer-agent]))
-(s/def ::interviewer-agent (s/keys :req-un [::aid ::tid]))
+(s/def ::basic-agent (s/keys :req-un [::aid ::tid ::base-type]))
+(s/def ::interviewer-agent ::basic-agent)
+(s/def ::surrogate-agent ::basic-agent)
 (s/def ::aid string?)
 (s/def ::tid string?)
+(s/def ::base-type keyword?)
 (s/def :sur/responder-role #(= % :surrogate))
 (s/def :hum/responder-role #(= % :human))
 (s/def ::client-id string?)

@@ -331,9 +331,9 @@
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []
   (select-llm-models!)
-  (ws/register-ws-dispatch :ask-llm llm-directly)
-  (ws/register-ws-dispatch :run-long run-long)
-  (ws/register-ws-dispatch :throw-it throw-it)
+  (ws/register-ws-dispatch :ask-llm llm-directly) ; User types 'LLM:'
+  (ws/register-ws-dispatch :run-long run-long)    ; Diag
+  (ws/register-ws-dispatch :throw-it throw-it)    ; Diag
   (reset! assistant-memo {})
   (reset! thread-memo {})
   [:llm-fns-registered-for-ws-dispatch])

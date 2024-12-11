@@ -11,6 +11,8 @@
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere        :refer [log!]]))
 
+(def ^:diag diag (atom nil))
+
 ;;; ToDo: Fix this: "You manage a company that makes %s." The problem that some are services and we want to start well.
 ;;; I think we could use an independent LLM call to guess whether "paving" or "general contracting" are services.
 ;;; With that function we can choose between "makes" and "provides the services of"
@@ -41,31 +43,29 @@
     (try
       (let [agent-info {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise}]
         (adb/add-agent-info! pid agent-info)
-        (adb/ensure-agent! (assoc agent-info :force-new? true)) ; force-new? means new assistant and thread.
+        (adb/ensure-agent! (-> agent-info (assoc :pid pid) (assoc :force-new? true))) ; force-new? means new assistant and thread.
         (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
         (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
                           :new-proj-map {:project/name pname :project/id pid}}))
       (catch Exception e
-        (log! :warn "Failed to start surrogate.")
-        (log! :error (str "Error starting surrogate:" e))))))
+        (reset! diag e)
+        (log! :error (str "Error starting surrogate:\n" e))))))
 
 (defn surrogate-follow-up
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."
   [{:keys [client-id pid question] :as obj}]
   (log! :info (str "SUR follow-up:" obj))
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
-        {:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)
         cid (db/get-current-cid pid)]
-    (when (and assistant-id thread-id)
-      (try (when-let [answer (adb/query-on-thread :aid assistant-id :tid thread-id :query-text question)]
-             (log! :info (str "SUR's answer:" answer))
-             (when (string? answer)
-               (ws/send-to-chat (assoc chat-args :text answer))
-               (db/add-msg {:pid pid :cid cid :from :system :text question})
-               (db/add-msg {:pid pid :cid cid :from :surrogate :text answer})))
-           (catch Exception e
-             (log! :error (str "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message)))
-             (ws/send-to-chat (assoc chat-args :text "We had a problem answering this questions.")))))))
+    (try (when-let [answer (adb/query-agent question (adb/ensure-agent! {:base-type pid}))]
+           (log! :info (str "SUR's answer:" answer))
+           (when (string? answer)
+             (ws/send-to-chat (assoc chat-args :text answer))
+             (db/add-msg {:pid pid :cid cid :from :system :text question})
+             (db/add-msg {:pid pid :cid cid :from :surrogate :text answer})))
+         (catch Exception e
+           (log! :error (str "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message)))
+           (ws/send-to-chat (assoc chat-args :text "We had a problem answering this questions."))))))
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn init-surrogates! []

@@ -9,10 +9,6 @@
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere             :refer [log!]]))
 
-;;; Program behavior differs in places depending on whether the agent is human or surrogate. Most obviously,
-;;; in Step (1) ws/send-msg is used for humans, whereas adb/query-on-thread is used for surrogates.
-;;; For the most part, we look at the state vector and use the function (surogate? state) to vary the behavior.
-
 (def ^:diag diag (atom nil))
 
 (defmacro defanalyze
