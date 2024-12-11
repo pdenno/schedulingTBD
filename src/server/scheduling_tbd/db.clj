@@ -170,8 +170,6 @@
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
-   :message/question-name
-   #:db{:cardinality :db.cardinality/one :valueType :db.type/keyword}
 
    ;; ---------------------- objective (about a scheduling objective)
    :objective/code
@@ -292,9 +290,6 @@
    :project/tables
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "true if domain expertise is provided by an artificial agent."}
-   :project/planning-problem
-   #:db{:cardinality :db.cardinality/many :valueType :db.type/ref
-        :doc "the project's explicit problem"}
 
    ;; ---------------------- quantity (an amount of something)
    :quantity/value-string
@@ -359,17 +354,6 @@
    :surrogate/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread that this surrogate uses."}
-
-   ;;------------------------ problem
-   :problem/domain
-   #:db{:cardinality :db.cardinality/one :valueType :db.type/keyword}
-
-   :problem/goal-string
-   #:db{:cardinality :db.cardinality/one :valueType :db.type/string}
-
-   :problem/state-string
-   #:db{:cardinality :db.cardinality/one :valueType :db.type/string}
-
 
    ;; ------------------------ table
    :table/id
