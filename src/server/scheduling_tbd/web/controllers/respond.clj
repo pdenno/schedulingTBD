@@ -22,7 +22,7 @@
   (let [{:keys [project-id cid client-id]}  (-> request :query-params (update-keys keyword))
         pid (keyword project-id)
         cid (if cid (keyword cid) (db/get-current-cid pid))]
-    (log! :info (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
+    (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
     (let [eid (db/project-exists? pid)
           pname (db/get-project-name pid)
           msgs (if eid (db/get-conversation pid cid) [])

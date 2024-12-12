@@ -493,15 +493,13 @@
   [{:keys [client-id pid cid] :as ctx}]
   (assert (string? client-id))
   (assert (#{:process :data :resources :optimality} cid))
-  ;(log! :info (str "--------- Resume conversation: ctx: " ctx))
+  (log! :debug (str "--------- Resume conversation: ctx: " ctx))
   (reset! course-correction-count 0)
-  (println "1")
   (try
     (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
       (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
-        (println "2")
         (when-not (db/conversation-done? pid cid)
           (if @active?
             (do (when (== 0 (-> (db/get-conversation-eids pid cid) count))
