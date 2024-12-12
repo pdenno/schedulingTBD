@@ -38,7 +38,8 @@
    known projects sorted alphabetically."
   [current proj-infos]
   (reset! diag {:current current :proj-infos proj-infos})
-  (let [current (cond (map? current)     (assoc current :menu-text (menu-text current)) ; Awkward assoc. Necessary!
+  (let [current (cond (nil? current)     #:project{:name "New Project" :id :new-project}
+                      (map? current)     (assoc current :menu-text (menu-text current)) ; Awkward assoc. Necessary!
                       (string? current)  (-> {:project/name current}
                                              (assoc :project/id (as-> current ?s
                                                                      (str/trim ?s)

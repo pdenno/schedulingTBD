@@ -2,6 +2,7 @@
   (:require
    [applied-science.js-interop :as j]
    [helix.core :as helix :refer [defnc $ <>]]
+   [helix.experimental.refresh :as refresh]
    [helix.hooks :as hooks]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/colors" :as colors]
@@ -152,10 +153,16 @@
           ($ Top {:width  (:width  @carry-dims-atm)
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
-(defonce root (react-dom/createRoot (js/document.getElementById "app")))
+(defonce root nil)
 
 ;;; --------------- https://code.thheller.com/blog/shadow-cljs/2019/08/25/hot-reload-in-clojurescript.html ----------------------
+(defn ^dev/after-load reload
+  []
+  (refresh/refresh!))
+
 (defn ^{:after-load true, :dev/after-load true} start []
+  (refresh/inject-hook!)
+  (set! root (react-dom/createRoot (js/document.getElementById "app")))
   (config-log!)
   (ws/connect!)
   (.render root ($ app)))
