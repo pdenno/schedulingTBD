@@ -256,29 +256,34 @@
           :agents
           [#:agent{:assistant-id "asst_PkytTl2BpwwIiEL6FcrcwQnd",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_1EeBQ4XHrUAkYI3a1OaDtZ7I"}
+                   :thread-id "thread_LzAxrMXSXV1CzN6Vc3BQEi2T"}
            #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
                    :base-type :data-interview-agent,
+                   :agent-type :shared-assistant
                    :id :data-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_m7RQP4Zo9PhpyjJwQCKOXHVY"}
            #:agent{:assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
                    :base-type :resources-interview-agent,
+                   :agent-type :shared-assistant
                    :id :resources-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_Dt0rSIWxd3IrzMqjKNktoFjQ"}
            #:agent{:assistant-id "asst_d3bE53OkEhzf1PYs9eldZCkf",
                    :base-type :optimality-interview-agent,
+                   :agent-type :shared-assistant
                    :id :optimality-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_dCLOH6P49tCjtSBv5QC1Ol3S"}
+                   :thread-id "thread_h8wj3GtfK7ZLRQ25xgr73QXF"}
            #:agent{:base-type :sur-carpet,
+                   :agent-type :project
                    :thread-id "thread_Hj40gg9N9o19VXsSETc4owrH",
                    :llm-provider :openai,
                    :system-instruction

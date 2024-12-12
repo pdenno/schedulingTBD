@@ -1,0 +1,105 @@
+[
+#:project{:agents
+          [#:agent{:assistant-id "asst_dfyrBhOIZMK4DZKbBk8umIkl",
+                   :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_3bI4fLhOUxfC0vInaWOoMc5x",
+                   :timestamp #inst "2024-12-05T21:39:33.255-00:00"}],
+          :claims
+          [#:claim{:string "(project-id :ice-cream-2)"}
+           #:claim{:string
+                   "(project-name :ice-cream-2 \"Ice Cream 2\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :ice-cream-2 \"Ice Cream\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :ice-cream-2 :bottleneck-processes)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :ice-cream-2 :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :ice-cream-2 :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :ice-cream-2 :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :ice-cream-2 :variation-in-demand)"}],
+          :conversations
+          [#:conversation{:id :process,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-12-06T12:03:12.285-00:00"}
+                           #:message{:content
+                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 5,
+                                     :question-type :process/warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-06T12:03:12.528-00:00"}
+                           #:message{:content
+                                     "<span style=\"font-size: 15.04px;\">We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service. Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as ingredient availability and production line capacities. Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial.</span>",
+                                     :from :human,
+                                     :id 6,
+                                     :question-type :process/warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-06T12:03:12.549-00:00"}
+                           #:message{:content
+                                     "Great, we'll call your project Ice Cream 2.",
+                                     :from :system,
+                                     :id 7,
+                                     :tags
+                                     [:informative
+                                      :name-project
+                                      :process/warm-up],
+                                     :time
+                                     #inst "2024-12-06T12:03:12.576-00:00"}]}
+           #:conversation{:id :data,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-12-06T12:03:12.316-00:00"}]}
+           #:conversation{:id :resources,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-12-06T12:03:12.344-00:00"}]}
+           #:conversation{:id :optimality,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-12-06T12:03:12.366-00:00"}]}],
+          :current-conversation :process,
+          :id :ice-cream-2,
+          :name "Ice Cream 2"}
+]

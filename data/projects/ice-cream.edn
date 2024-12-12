@@ -176,6 +176,7 @@
           :agents
           [#:agent{:assistant-id "asst_Zz3XcnFcPnVJ622Z0RU5zCYJ",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,

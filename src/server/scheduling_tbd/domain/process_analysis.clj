@@ -118,8 +118,7 @@
   "Analyze the response for project name,a fixed set of 'scheduling challenges' and 'one-more-thing', an observation.
    Returns a map {:project-or-service-name, :challenge <keywords naming challenges> :one-more-thing <a string>}."
   [response]
-  (let [{:keys [one-more-thing] :as res}  (-> response
-                                              (adb/query-agent (adb/ensure-agent! {:base-type :scheduling-challenge-agent :tries 2}))
+  (let [{:keys [one-more-thing] :as res}  (-> (adb/query-agent :scheduling-challenges-agent response {:tries 2})
                                               json/read-value
                                               (update-keys str/lower-case)
                                               (update-keys keyword)
@@ -290,12 +289,12 @@
     (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]] ; These are also spec defs, thus ns-qualified.
       (log! :info (str "process-dur-agent, rev " (name rev)))
       (when @past-rev
-        (let [result (-> (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)
-                         (adb/query-agent
-                          (adb/ensure-agent! {:base-type :process-dur-agent
-                                              :tries 3
-                                              :test-fn (fn [resp] (s/valid? rev resp))
-                                              :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))})))]
+        (let [action-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)
+              result (adb/query-agent :process-dur-agent
+                                      action-text
+                                      {:tries 3
+                                       :test-fn (fn [resp] (s/valid? rev resp))
+                                       :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))})]
           (reset! past-rev result)
           (log! :debug (str "process-dur-agent " (name rev) " =\n" (with-out-str (pprint @past-rev)))))))
     @past-rev))
@@ -343,12 +342,12 @@
     (doseq [step [::step-1 ::step-2]]
       (log! :info (str "Starting step " (name step)))
       (when @past-step
-        (let [result (-> (str "Perform " (-> step name str/upper-case) " on the following:\n\n" @past-step)
-                         (adb/query-agent
-                          (adb/ensure-agent! {:base-type :process-ordering-agent
-                                              :tries 3
-                                              :test-fn (fn [_resp] true #_(s/valid? step resp)) ; ToDo: check s/valid?
-                                              :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))})))]
+        (let [action-text (str "Perform " (-> step name str/upper-case) " on the following:\n\n" @past-step)
+              result (adb/query-agent :process-ordering-agent
+                                      action-text
+                                      {:tries 3
+                                       :test-fn (fn [_resp] true #_(s/valid? step resp)) ; ToDo: check s/valid?
+                                       :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))})]
           (reset! past-step result)
           (log! :debug (str "process-ordering-agent " (name step) " :\n" (with-out-str (pprint @past-step)))))))
     @past-step))

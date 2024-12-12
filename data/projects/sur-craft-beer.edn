@@ -234,17 +234,20 @@
           :agents
           [#:agent{:assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_S6odTkFTcgXrV1nwxy2iNPpw"}
            #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
                    :base-type :data-interview-agent,
+                   :agent-type :shared-assistant
                    :id :data-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_cGmzuhNrzz9rXDGHpyTQlhzi"}
            #:agent{:base-type :sur-craft-beer,
+                   :agent-type :project
                    :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av",
                    :llm-provider :openai,
                    :system-instruction

@@ -36,7 +36,7 @@
    :pid :sur-plate-glass,
    :cid :process,
    :dispatch-key :resume-conversation,
-   :responder-role :surrogate}
+   :responder-type :surrogate}
 
 (def diag (atom nil))
 (s/def ::pid keyword?)
@@ -53,10 +53,10 @@
    Returns promise which will resolve to the original obj argument except:
      1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
      2) :response is added. Typically its value is a string."
-  [{:keys [question surrogate-agent responder-role preprocess-fn tries client-id] :as ctx
+  [{:keys [question surrogate-agent responder-type preprocess-fn tries client-id] :as ctx
     :or {tries 1 preprocess-fn identity}}]
   (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
-  (let [prom (if (= :human responder-role)
+  (let [prom (if (= :human responder-type)
                (do
                  (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
                  (ws/send-to-chat (-> ctx                        ; This cannot timeout.
@@ -65,9 +65,10 @@
                                       (assoc :dispatch-key :tbd-says))))
                (px/submit! (fn [] ; surrogate responder...
                              (try
-                                 (adb/query-agent question (-> surrogate-agent  ; This can timeout.
-                                                               :tries tries
-                                                               :preprocess-fn preprocess-fn))
+                               (adb/query-agent surrogate-agent  ; This can timeout.
+                                                question
+                                                {:tries tries
+                                                 :preprocess-fn preprocess-fn})
                                (catch Exception e {:error e})))))]
     (-> prom p/await)))
 
@@ -77,16 +78,16 @@
                                     :human     (s/and #(s/valid? ::human-ctx %)     #(s/valid? ::common-ctx %)))))
 
 (s/def ::common-ctx    (s/keys :req-un [::client-id ::question])) ; ::question-type not needed here.
-(s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-role ::surrogate-agent ::interviewer-agent]))
-(s/def ::human-ctx     (s/keys :req-un [:hum/responder-role ::interviewer-agent]))
+(s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-type ::surrogate-agent ::interviewer-agent]))
+(s/def ::human-ctx     (s/keys :req-un [:hum/responder-type ::interviewer-agent]))
 (s/def ::basic-agent (s/keys :req-un [::aid ::tid ::base-type]))
 (s/def ::interviewer-agent ::basic-agent)
 (s/def ::surrogate-agent ::basic-agent)
 (s/def ::aid string?)
 (s/def ::tid string?)
 (s/def ::base-type keyword?)
-(s/def :sur/responder-role #(= % :surrogate))
-(s/def :hum/responder-role #(= % :human))
+(s/def :sur/responder-type #(= % :surrogate))
+(s/def :hum/responder-type #(= % :human))
 (s/def ::client-id string?)
 (s/def ::question-type (s/and keyword? namespace))
 (s/def ::question string?)
@@ -99,10 +100,10 @@
 (defn chat-pair
   "Call to run ask and wait for an answer, returns the response, a string.
    If response is immoderate return '===IMMODERATE==='."
-  [{:keys [responder-role client-id] :as ctx}]
+  [{:keys [responder-type client-id] :as ctx}]
   (let [response-text (chat-pair-aux ctx)]
     (if (string? response-text)
-      (if (and (= :human responder-role) (llm/immoderate? response-text))
+      (if (and (= :human responder-type) (llm/immoderate? response-text))
         (do (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :text "This is not helpful."})
             "===IMMODERATE===") ; ToDo: Continue with this to stop interactions.
         response-text)
@@ -182,7 +183,7 @@
     (log! :warn (str "Invalid interviewer-cmd: " (with-out-str (pprint cmd)))))
   (log! :info (-> (str "Interviewer told: " cmd) (elide 150)))
   (let [cmd-string (json/write-value-as-string cmd)
-        res (-> (adb/query-agent cmd-string interviewer-agent) output-struct2clj) ;<======================== Untested.
+        res (-> (adb/query-agent interviewer-agent cmd-string) output-struct2clj)
         res (if (contains? res :question-type)
               (update res :question-type #(keyword (name cid) %))
               res)]
@@ -213,11 +214,11 @@
   [q-txt a-txt]
   (assert (string? q-txt))
   (assert (string? a-txt))
-    (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt))
-        json/read-value
-        (update-keys str/lower-case)
-        (update-keys keyword)
-        (update-vals #(if (empty? %) false %))))
+  (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt))
+      json/read-value
+      (update-keys str/lower-case)
+      (update-keys keyword)
+      (update-vals #(if (empty? %) false %))))
 
 ;;; ToDo: Implement these (next three). They will probably involve some looping.
 (defn handle-wants-a-break
@@ -226,7 +227,7 @@
   [])
 
 (defn handle-raises-a-question
-  "The responder-role is :human. Handle a digression returning when the original-question is answered.
+  "The responder-type is :human. Handle a digression returning when the original-question is answered.
    Return a vector of the entire digression."
   [_question response _ctx]
   (log! :warn (str "handle-raises-a-question not yet implemented: response = " response))
@@ -243,18 +244,18 @@
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    Return a vector of the conversation (objects suitable for db/add-msg) terminating in an answer to the question.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
-  [{:keys [question question-type responder-role] :as ctx}]
+  [{:keys [question question-type responder-type] :as ctx}]
   (s/assert ::chat-pair-ctx ctx)
   (let [conversation [{:text question :from :system :question-type question-type :tags [:query]}]
         response  (chat-pair ctx) ; response here is just text.
-        answered? (= :surrogate responder-role) ; Surrogate doesn't beat around the bush, I think!
+        answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
         {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when-not answered? (response-analysis question response))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
       (let [same-question (str "Okay, but we are still interested in this: " question)]
         (into conversation (get-an-answer (-> ctx (assoc :question same-question)))))
       (cond-> conversation
-        answered?                  (conj {:text response :from responder-role :question-type question-type :tags [:response]})
+        answered?                  (conj {:text response :from responder-type :question-type question-type :tags [:response]})
         wants-a-break?             (into (handle-wants-a-break question response ctx))
         raises-a-question?         (into (handle-raises-a-question question response ctx))
         (not
@@ -443,23 +444,26 @@
 (defn ctx-surrogate
   "Return context updated with surrogate info."
   [{:keys [pid cid] :as ctx}]
+  (reset! diag ctx)
   (let [interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
                                                  (assoc :pid pid)))
-        surrogate-agent   (adb/ensure-agent! (get @adb/agent-infos pid))
+        surrogate-agent   (adb/ensure-agent! (-> (get @adb/agent-infos pid)
+                                                 (assoc :base-type pid)))
         ctx (-> ctx
-                (assoc :responder-role :surrogate)
+                (dissoc :client-id :dispatch-key)
+                (assoc :responder-type :surrogate)
                 (assoc :interviewer-agent interviewer-agent)
                 (assoc :surrogate-agent surrogate-agent))]
     (if (s/valid? ::surrogate-ctx ctx)
       ctx
       (do
         (reset! diag ctx)
-        (throw (ex-info "invalid surrogate context:" {:ctx ctx}))))))
+        (throw (ex-info "Invalid surrogate context:" {:ctx ctx}))))))
 
 (defn ctx-human
   "Return  part of context specific to humans."
   [{:keys [pid cid]}]
-   {:responder-role :human
+   {:responder-type :human
     :interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
                                               (assoc :pid pid)))})
 
@@ -538,7 +542,7 @@
                     :text (str "You want to start a new project? This is the right place! "
                                (db/conversation-intros :process))})
   (try
-    (let [ctx (merge ctx {:responder-role :human :question-type :process/warm-up :question the-warm-up-type-question})
+    (let [ctx (merge ctx {:responder-type :human :question-type :process/warm-up :question the-warm-up-type-question})
           conversation (get-an-answer ctx)
           response (-> conversation last :text) ; ToDo: Could be more to it...wants-a-break?.
           _effect! (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})

@@ -183,6 +183,10 @@
     (swap! assistant-memo #(assoc % aid (if (map? res) (dissoc res :instructions) :missing)))
     (if (= res :missing) nil res)))
 
+(defn ^:diag get-thread-force
+  [tid]
+  (openai/retrieve-thread {:thread_id tid} (api-credentials @default-llm-provider)))
+
 (def thread-memo "A map of tid to thread object, for memoization" (atom {}))
 (defn get-thread
   "Return a thread object if the thread exists, or nil otherwise."

@@ -1,70 +1,87 @@
 [
 #:system{:agents
-         [#:agent{:assistant-id "asst_GJo2RAqB0fAvaJLki6DhDy4E",
-                  :base-type :process-dur-agent,
-                  :id :process-dur-agent-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
+         [#:agent{:base-type :process-dur-agent,
+                  :agent-type :system,
                   :thread-id "thread_p4kt0o1EzAeaYf2SWAEuvVpp",
-                  :timestamp #inst "2024-12-05T21:39:36.898-00:00"}
-          #:agent{:assistant-id "asst_goTNbqcqjK78EPbRMtNwL50S",
-                  :base-type :text-function-agent,
-                  :id :text-function-agent-openai,
-                  :llm-provider :openai,
                   :model-class :gpt,
+                  :llm-provider :openai,
+                  :assistant-id "asst_UqSUIn2hPTykDGOKBcBLtybw",
+                  :id :process-dur-agent-openai,
+                  :timestamp #inst "2024-12-12T11:58:52.848-00:00"}
+          #:agent{:base-type :text-function-agent,
+                  :agent-type :system,
                   :thread-id "thread_sLkB7PdJlAgKzcD1keSEY7rB",
-                  :timestamp #inst "2024-12-05T21:39:38.200-00:00"}
-          #:agent{:assistant-id "asst_5eDrNKn7FlQpaGfWGrZYl6EV",
-                  :base-type :process-ordering-agent,
-                  :id :process-ordering-agent-openai,
-                  :llm-provider :openai,
                   :model-class :gpt,
+                  :llm-provider :openai,
+                  :assistant-id "asst_goTNbqcqjK78EPbRMtNwL50S",
+                  :id :text-function-agent-openai,
+                  :timestamp #inst "2024-12-05T21:39:38.200-00:00"}
+          #:agent{:base-type :process-ordering-agent,
+                  :agent-type :system,
                   :thread-id "thread_1kgHH7xN613JxIvT4BZm4Hj8",
+                  :model-class :gpt,
+                  :llm-provider :openai,
+                  :assistant-id "asst_5eDrNKn7FlQpaGfWGrZYl6EV",
+                  :id :process-ordering-agent-openai,
                   :timestamp #inst "2024-12-05T21:39:37.396-00:00"}
-          #:agent{:assistant-id "asst_dfyrBhOIZMK4DZKbBk8umIkl",
+          #:agent{:agent-type :shared-assistant,
+                  :assistant-id "asst_rfGIKnBEJ8vP7y6nAGlBxTLV",
                   :base-type :process-interview-agent,
                   :id :process-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2024-12-05T21:39:33.255-00:00"}
-          #:agent{:assistant-id "asst_eaxRDWsEwmdWHObw5MjTiPQP",
+                  :timestamp #inst "2024-12-10T16:14:54.156-00:00"}
+          #:agent{:agent-type :system,
+                  :assistant-id "asst_eaxRDWsEwmdWHObw5MjTiPQP",
                   :base-type :answers-the-question?,
                   :id :answers-the-question?-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
                   :thread-id "thread_2vhjT8fIazLPDOmTqD2Qc4Dj"}
-          #:agent{:assistant-id "asst_wQtaRFA9jHBBxfRZHbca1mqN",
+          #:agent{:agent-type :shared-assistant,
+                  :assistant-id "asst_wQtaRFA9jHBBxfRZHbca1mqN",
                   :base-type :data-interview-agent,
                   :id :data-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
                   :timestamp #inst "2024-12-05T21:39:34.070-00:00"}
-          #:agent{:assistant-id "asst_aaDLAj0gxcfigOPWPrO5dUrE",
+          #:agent{:agent-type :shared-assistant,
+                  :assistant-id "asst_aaDLAj0gxcfigOPWPrO5dUrE",
                   :base-type :resources-interview-agent,
                   :id :resources-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
                   :timestamp #inst "2024-12-05T21:39:34.439-00:00"}
-          #:agent{:assistant-id "asst_WHTICk0i2iLZzk9KBrLyElVV",
-                  :base-type :scheduling-challenges-agent,
-                  :id :scheduling-challenges-agent-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
+          #:agent{:base-type :scheduling-challenges-agent,
+                  :agent-type :system,
                   :thread-id "thread_a3nSM1zg3MB0V8pucd1SuqGd",
+                  :model-class :gpt,
+                  :llm-provider :openai,
+                  :assistant-id "asst_WHTICk0i2iLZzk9KBrLyElVV",
+                  :id :scheduling-challenges-agent-openai,
                   :timestamp #inst "2024-12-05T21:39:36.347-00:00"}
-          #:agent{:assistant-id "asst_Rx6NcEXEVGZi5WtBffD7umSF",
+          #:agent{:agent-type :shared-assistant,
+                  :assistant-id "asst_Rx6NcEXEVGZi5WtBffD7umSF",
                   :base-type :optimality-interview-agent,
                   :id :optimality-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
                   :timestamp #inst "2024-12-05T21:39:34.846-00:00"}
-          #:agent{:assistant-id "asst_sZty03R7NqYeyl9Ky7h7Uiwu",
-                  :base-type :response-analysis-agent,
+          #:agent{:base-type :response-analysis-agent,
+                  :agent-type :system,
+                  :thread-id "thread_k4t294r5MZJh4GVnL45d7gKo",
+                  :model-class :gpt,
+                  :llm-provider :openai,
+                  :assistant-id "asst_0SZIeyRobSR17lkk68MmsCzD",
                   :id :response-analysis-agent-openai,
+                  :timestamp #inst "2024-12-11T16:00:07.420-00:00"}
+          #:agent{:agent-type :system,
+                  :assistant-id "asst_a0lK1BYchdZUN7oza6sU68AP",
+                  :base-type :helpful,
+                  :id :helpful-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :thread-id "thread_2PyCsnMo3WRoul7KRxPRlstX",
-                  :timestamp #inst "2024-12-08T00:10:14.158-00:00"}],
+                  :timestamp #inst "2024-12-12T12:46:06.528-00:00"}],
          :default-project-id :sur-ice-cream,
          :name "SYSTEM",
          :projects
@@ -95,9 +112,9 @@
                     :id :sur-remanufactured-alternators,
                     :name "Sur Remanufactured Alternators"}
           #:project{:dir
-                    "/opt/scheduling/projects/sur-ice-hockey-sticks",
+                    "/opt/scheduling/projects/sur-ice-hockey-sticks/db/",
                     :id :sur-ice-hockey-sticks,
-                    :name "Sur Ice Hockey Sticks"}
+                    :name "SUR Ice Hockey Sticks"}
           #:project{:dir "/opt/scheduling/projects/sur-craft-beer",
                     :id :sur-craft-beer,
                     :name "Sur Craft Beer"}
@@ -141,6 +158,10 @@
                     :name "SUR Key Blanks"}
           #:project{:dir "/opt/scheduling/projects/ice-cream-2/db/",
                     :id :ice-cream-2,
-                    :name "Ice Cream 2"}]}
+                    :name "Ice Cream 2"}
+          #:project{:dir
+                    "/opt/scheduling/projects/sur-optical-fiber/db/",
+                    :id :sur-optical-fiber,
+                    :name "SUR Optical Fiber"}]}
 
 ]

@@ -26,6 +26,9 @@
    :agent/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A unique ID for each agent to ensure only one of each type is available."}
+   :agent/agent-type
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Currently one of #{:system :project :shared-assistant}."}
    :agent/assistant-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant id (a string) associated with this surrogate."}
@@ -91,6 +94,9 @@
    :agent/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A unique ID for each agent to ensure only one of each type is available."}
+   :agent/agent-type
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "Currently one of #{:system :project :shared-assistant}."}
    :agent/assistant-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant id (a string) associated with this surrogate."}
@@ -897,31 +903,11 @@
   (doseq [id (list-projects {:from-storage? true})]
     (register-db id (db-cfg-map {:type :project :id id}))))
 
-(defn add-surrogate-agent-infos
-  "Add an agent-info object to adb/agent-infos for every project's surrogate.
-   Check that it is viable (assistant and thread are still maintained by llm provider).
-   Make it anew if needed."
-  []
-  (doseq [pid (list-projects)]
-    (let [conn @(connect-atm pid)]
-      (when-let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] conn)]
-        (let [{:agent/keys [system-instruction expertise]} (dp/pull conn '[*] eid)
-              info {:base-type pid
-                    :agent-type :project
-                    :model-class :gpt
-                    :instruction-string system-instruction
-                    :surrogate? true
-                    :llm-provider @default-llm-provider
-                    :expertise expertise}]
-          (adb/add-agent-info! pid info)
-          #_(adb/ensure-agent! info))))))
-
 (defn init-dbs
   "Register DBs using "
   []
   (register-project-dbs)
   (register-db :system (db-cfg-map {:type :system}))
-  (add-surrogate-agent-infos)
   {:sys-cfg (db-cfg-map {:type :system})})
 
 (defstate sys&proj-database-cfgs

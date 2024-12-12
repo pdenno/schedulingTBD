@@ -2,11 +2,13 @@
 #:project{:agents
           [#:agent{:assistant-id "asst_EK84QXpYS5TIN9PqssvClSAk",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_oYrNhKNhQratke4QofD0spm0"}
            #:agent{:base-type :sur-canned-corn,
+                   :agent-type :project
                    :thread-id "thread_PaNG176R7upH82TJEeDXsNVg",
                    :llm-provider :openai,
                    :system-instruction

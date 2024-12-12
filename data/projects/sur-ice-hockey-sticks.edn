@@ -1,233 +1,59 @@
 [
-#:project{:code
-          "enum Task = {material, molding, curing, finishing, quality, packaging};",
+#:project{:agents
+          [#:agent{:base-type :sur-ice-hockey-sticks,
+                   :agent-type :project
+                   :thread-id "thread_8GVKucNupYMURrM7szT4Wsi3",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_qbBKB7AcejuHY9ujauoSymE9",
+                   :id :sur-ice-hockey-sticks-openai,
+                   :expertise "ice hockey sticks",
+                   :timestamp #inst "2024-12-12T12:43:14.282-00:00"}],
+          :claims
+          [#:claim{:string "(project-id :sur-ice-hockey-sticks)"}
+           #:claim{:string
+                   "(project-name :sur-ice-hockey-sticks \"SUR Ice Hockey Sticks\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-ice-hockey-sticks)"}],
           :conversations
-          [#:conversation{:done? true,
-                          :id :process,
+          [#:conversation{:id :process,
                           :messages
                           [#:message{:content
-                                     "Describe your most significant scheduling problem in a few sentences.",
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
                                      :from :system,
                                      :id 1,
-                                     :tags [:initial-question :query],
+                                     :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-05-31T00:04:08.525-00:00"}
-                           #:message{:content
-                                     "Our most significant scheduling problem is coordinating the synchronization of raw material deliveries with the production cycles of various hockey stick models to optimize manufacturing throughput and reduce downtime. Additionally, managing labor shifts and machine maintenance schedules in a way that maximizes productivity and minimizes operational disruptions is challenging, especially during peak production periods. These issues often lead to bottlenecks that can delay order fulfillment and impact overall efficiency.",
-                                     :from :surrogate,
-                                     :id 2,
-                                     :tags
-                                     [:initial-question :response],
-                                     :time
-                                     #inst "2024-05-31T00:04:08.554-00:00"}
-                           #:message{:content
-                                     "Great, we'll call your project SUR Ice Hockey Sticks.",
-                                     :from :system,
-                                     :id 3,
-                                     :tags [:informative],
-                                     :time
-                                     #inst "2024-05-31T00:04:09.323-00:00"}
-                           #:message{:content
-                                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
-                                     :from :system,
-                                     :id 4,
-                                     :time
-                                     #inst "2024-05-31T00:04:09.343-00:00"}
-                           #:message{:content
-                                     "Please briefly describe your production processes.",
-                                     :from :system,
-                                     :id 5,
-                                     :time
-                                     #inst "2024-05-31T00:04:16.674-00:00"}
-                           #:message{:content
-                                     "Our production process for ice hockey sticks involves several key steps:\n\n1. <b>Material Preparation</b>: We begin by sourcing and preparing materials, primarily composite fibers or wood, depending on the model.\n\n2. <b>Molding and Shaping</b>: For composite sticks, layers of carbon fiber or fiberglass are shaped and molded under heat and pressure to form the shaft and blade. Wood sticks are cut to shape and sanded.\n\n3. <b>Curing</b>: The molded sticks are cured in a temperature-controlled environment to ensure they harden and maintain the desired properties.\n\n4. <b>Finishing</b>: Once cured, the sticks are sanded, painted, and decals are applied. A protective coating is also added.\n\n5. <b>Quality Control</b>: Every stick undergoes strict quality control to ensure it meets our performance and durability standards.\n\n6. <b>Packaging and Shipping</b>: Approved sticks are then packaged and prepared for shipping to distributors or direct customers.\n\nEach step must be carefully timed and coordinated to maximize efficiency and reduce waste, particularly during the molding and curing phases where timing is crucial for product quality.",
-                                     :from :surrogate,
-                                     :id 6,
-                                     :tags [:process-description],
-                                     :time
-                                     #inst "2024-05-31T00:04:16.748-00:00"}
-                           #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
-                                     :from :system,
-                                     :id 7,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-05-31T00:04:19.653-00:00"}
-                           #:message{:content "PRODUCT",
-                                     :from :surrogate,
-                                     :id 8,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-05-31T00:04:19.707-00:00"}
-                           #:message{:content
-                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
-                                     :from :system,
-                                     :id 9,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-05-31T00:04:22.720-00:00"}
-                           #:message{:content "MAKE-TO-STOCK",
-                                     :from :surrogate,
-                                     :id 10,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-05-31T00:04:22.746-00:00"}
-                           #:message{:content
-                                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
-                                     :from :system,
-                                     :id 11,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-05-31T00:04:25.726-00:00"}
-                           #:message{:content "OUR-FACILITY",
-                                     :from :surrogate,
-                                     :id 12,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-05-31T00:04:25.742-00:00"}
-                           #:message{:content
-                                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
-                                     :from :system,
-                                     :id 13,
-                                     :time
-                                     #inst "2024-05-31T00:04:29.071-00:00"}
-                           #:message{:content "FLOW-SHOP",
-                                     :from :surrogate,
-                                     :id 14,
-                                     :time
-                                     #inst "2024-05-31T00:04:29.141-00:00"}
-                           #:message{:content
-                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
-                                     :from :system,
-                                     :id 15,
-                                     :tags [:process-steps :query],
-                                     :time
-                                     #inst "2024-05-31T00:04:32.653-00:00"}
-                           #:message{:content
-                                     "1. Material Preparation\n2. Molding and Shaping\n3. Curing\n4. Finishing\n5. Quality Control\n6. Packaging and Shipping",
-                                     :from :surrogate,
-                                     :id 16,
-                                     :tags [:process-steps :response],
-                                     :time
-                                     #inst "2024-05-31T00:04:32.687-00:00"}
-                           #:message{:content
-                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. The 'enum values' name the steps of your process in the order they are executed for each product.",
-                                     :from :system,
-                                     :id 17,
-                                     :tags [:info-to-user :minizinc],
-                                     :time
-                                     #inst "2024-05-31T00:04:32.745-00:00"}
-                           #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. material (some amount of time)\n2. molding (some amount of time)...",
-                                     :from :system,
-                                     :id 18,
-                                     :tags [:process-durs :query],
-                                     :time
-                                     #inst "2024-05-31T00:04:37.434-00:00"}
-                           #:message{:content
-                                     "1. Material Preparation (30 minutes)\n2. Molding and Shaping (2 hours)\n3. Curing (4 hours)\n4. Finishing (1 hour)\n5. Quality Control (30 minutes)\n6. Packaging and Shipping (1 hour)",
-                                     :from :surrogate,
-                                     :id 19,
-                                     :tags [:process-durs :response],
-                                     :time
-                                     #inst "2024-05-31T00:04:37.466-00:00"}]}
+                                     #inst "2024-12-12T12:43:13.235-00:00"}]}
            #:conversation{:id :data,
                           :messages
                           [#:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
                                      :from :system,
-                                     :id 20,
+                                     :id 2,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T12:53:11.940-00:00"}
-                           #:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
-                                     :from :system,
-                                     :id 23,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-11-20T13:32:53.918-00:00"}]}
+                                     #inst "2024-12-12T12:43:13.256-00:00"}]}
            #:conversation{:id :resources,
                           :messages
                           [#:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
                                      :from :system,
-                                     :id 21,
+                                     :id 3,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T12:53:11.957-00:00"}
-                           #:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
-                                     :from :system,
-                                     :id 24,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-11-20T13:32:53.934-00:00"}]}
+                                     #inst "2024-12-12T12:43:13.283-00:00"}]}
            #:conversation{:id :optimality,
                           :messages
                           [#:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
-                                     :id 22,
+                                     :id 4,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T12:53:11.974-00:00"}
-                           #:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
-                                     :from :system,
-                                     :id 25,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-11-20T13:32:53.952-00:00"}]}],
+                                     #inst "2024-12-12T12:43:13.302-00:00"}]}],
           :current-conversation :process,
           :id :sur-ice-hockey-sticks,
-          :name "SUR Ice Hockey Sticks",
-          :processes
-          [#:process{:desc
-                     "1. Material Preparation (30 minutes)\n2. Molding and Shaping (2 hours)\n3. Curing (4 hours)\n4. Finishing (1 hour)\n5. Quality Control (30 minutes)\n6. Packaging and Shipping (1 hour)",
-                     :id :sur-ice-hockey-sticks,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "30"},
-                                :id
-                                :sur-ice-hockey-sticks--materialPrep,
-                                :var-name "materialPrep"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "2"},
-                                :id :sur-ice-hockey-sticks--moldShape,
-                                :pre-processes
-                                [:sur-ice-hockey-sticks--materialPrep],
-                                :var-name "moldShape"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "4"},
-                                :id :sur-ice-hockey-sticks--curing,
-                                :pre-processes
-                                [:sur-ice-hockey-sticks--moldShape],
-                                :var-name "curing"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id :sur-ice-hockey-sticks--finishing,
-                                :pre-processes
-                                [:sur-ice-hockey-sticks--curing],
-                                :var-name "finishing"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "30"},
-                                :id
-                                :sur-ice-hockey-sticks--qualityCtrl,
-                                :pre-processes
-                                [:sur-ice-hockey-sticks--finishing],
-                                :var-name "qualityCtrl"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id :sur-ice-hockey-sticks--packShip,
-                                :pre-processes
-                                [:sur-ice-hockey-sticks--qualityCtrl],
-                                :supply-chain? true,
-                                :var-name "packShip"}]}]}
+          :name "SUR Ice Hockey Sticks"}
 ]

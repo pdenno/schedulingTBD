@@ -33,6 +33,7 @@
 
    The whole quantity map could be #:box{:string-val 'variable'}, in which case duration is set to -1."
   [target-units {:quantity/keys [units value-string] :as _qty-map}]
+  (reset! diag {:target-units target-units :qty-map _qty-map})
   (s/assert ::uom units)
   (assert (#{:minutes :hours :days :8-hour-shifts} target-units))
   (let [src-val (edn/read-string value-string)]
@@ -45,6 +46,7 @@
                    :hours  (/ src-val 60)
                    :8-hour-shifts (/ src-val 480)
                    :days   (/ src-val 1440))
+
         :hours (case target-units
                  :minutes (* src-val 60)
                  :hours src-val
@@ -55,13 +57,33 @@
                 :minutes (* src-val 1440)
                 :hours (* src-val 24)
                 :8-hour-shifts (* src-val 3)
-                :days src-val)
+                :days src-val
+                :weeks (* src-val 5)) ; 5-day work week.
+
+        :weeks (case target-units
+                :hours (* src-val 8 5) ; 5-day, 8 hour work week.
+                :8-hour-shifts (* src-val 3 5)
+                :days (* src-val 5)
+                :weeks src-val)
 
         :months (case target-units
                   :minutes (* src-val 43200)
                   :hours (* src-val 720)
                   :8-hour-shifts (* src-val 30) ; Guessing that's what they mean!
                   :days (* src-val 30))))))
+
+;;; ToDo: Might be silly. I think I use the -1 idea later.
+(defn number-heuristic
+  "Produce some kind of number out of something that might not be a number."
+  [s]
+  (let [val (edn/read-string s)]
+    (if (number? val)
+      val
+      (let [st (str/lower-case s)]
+        (cond
+          (#{"few" "a few"} st) 3,
+          (#{"several"} st)     5,
+          :else                 -1)))))
 
 (defn process-dur-avg
   "Return the argument the process definition with where :process/duration in the case where
@@ -70,7 +92,7 @@
   [{:process/keys [duration] :as process}]
   (if (contains? duration :quantity-range/low)
     (let [low-uom (-> duration :quantity-range/low :quantity/units)
-          low-val (-> duration :quantity-range/low :quantity/value-string edn/read-string)
+          low-val (-> duration :quantity-range/low :quantity/value-string number-heuristic)
           high-val (convert-duration low-uom (:quantity-range/high duration))]
       (assoc process :process/duration {:quantity/value-string (cl-format nil "~,3f" (/ (+ high-val low-val) 2.0))
                                         :quantity/units low-uom}))

@@ -283,7 +283,7 @@
                     p-key               (assoc :p-key p-key)
                     true                (assoc :timestamp (now)))]
       (when-not (= :alive? dispatch-key)
-        (event! ::send-to-client {:level :info :msg (elide (str "send-to-chat: msg-obj =" msg-obj) 130)}))
+        (log! :debug (elide (str "send-to-chat: msg-obj =" msg-obj) 130)))
       (go (>! out (str msg-obj)))
       prom)
     (log! :error (str "Could not find out async channel for client " client-id))))

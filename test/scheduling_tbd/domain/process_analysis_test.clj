@@ -197,7 +197,7 @@
 (defn ^:diag ask-about-ice-cream-agent
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
   ([q-txt]
-     (adb/query-agent q-txt (adb/ensure-agent! {:base-type :sur-ice-cream}))))
+     (adb/query-agent :sur-ice-cream q-txt)))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"
   {:snack-food "We make snack food.
@@ -369,7 +369,7 @@
 
 (deftest scheduling-challenges-agent
   (testing "the scheduling-challenges agent"
-    (let [result (adb/query-agent ice-cream-answer-warm-up {:base-type :scheduling-challenges-agent :agent-type :system})
+    (let [result (adb/query-agent :scheduling-challenges-agent ice-cream-answer-warm-up)
           {:keys [challenges]} (-> result
                                    json/read-value
                                    (update-keys keyword)

@@ -2,6 +2,7 @@
 #:project{:agents
           [#:agent{:assistant-id "asst_PkytTl2BpwwIiEL6FcrcwQnd",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,

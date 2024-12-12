@@ -246,39 +246,47 @@
           :code
           "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {mixIngredients, pasteurizeMix, homogenizeMix, ageMixture, addFlavors, freezeMix, fillContainers, hardenIceCream, packaging, labelAndInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|0.500, 0.250, 0.167, 4.000, 0.333, 0.500, 0.333, 3.000, 0.250, 0.167|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, mixIngredients] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, mixIngredients] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, mixIngredients] == taskStarts[p, pasteurizeMix]);\nconstraint forall (p in Product) (taskEnds[p, pasteurizeMix] == taskStarts[p, homogenizeMix]);\nconstraint forall (p in Product) (taskEnds[p, homogenizeMix] == taskStarts[p, ageMixture]);\nconstraint forall (p in Product) (taskEnds[p, ageMixture] == taskStarts[p, addFlavors]);\nconstraint forall (p in Product) (taskEnds[p, addFlavors] == taskStarts[p, freezeMix]);\nconstraint forall (p in Product) (taskEnds[p, freezeMix] == taskStarts[p, fillContainers]);\nconstraint forall (p in Product) (taskEnds[p, fillContainers] == taskStarts[p, hardenIceCream]);\nconstraint forall (p in Product) (taskEnds[p, hardenIceCream] == taskStarts[p, packaging]);\nconstraint forall (p in Product) (taskEnds[p, packaging] == taskStarts[p, labelAndInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, labelAndInspect]);",
           :agents
-          [#:agent{:assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
+          [#:agent{:assistant-id "asst_qTM7IIAfUZckAroJXXqjbf7D",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_Af7PPLVuyyJkrkEaeFSxYrX5"}
+                   :thread-id "thread_2k2XHltP83tMQGp8bmrEuTn1",
+                   :timestamp #inst "2024-12-10T16:12:13.503-00:00"}
            #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
                    :base-type :data-interview-agent,
+                   :agent-type :shared-assistant
                    :id :data-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_H93OzH5wmhXMkvYlew34qDfI"}
            #:agent{:assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
                    :base-type :resources-interview-agent,
+                   :agent-type :shared-assistant
                    :id :resources-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_T6shGG4JM0XpJgvcyfdRJlO8"}
            #:agent{:assistant-id "asst_M4c6cgeuw306KAXr4nR6E61S",
                    :base-type :optimality-interview-agent,
+                   :agent-type :shared-assistant
                    :id :optimality-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_WiPmnuON2iUlrpEt67MKrekm"}
            #:agent{:base-type :sur-ice-cream,
-                   :thread-id "thread_g64Pkn9wvd6sLdGBIllYAolQ",
+                   :agent-type :project
+                   :thread-id "thread_PZuu9HhT6Ok3C7QGZIRsJSyF",
+                   :model-class :gpt,
                    :llm-provider :openai,
                    :system-instruction
                    "You manage a company that makes ice cream.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
                    :surrogate? true,
-                   :assistant-id "asst_2Uv2cpwG5GuRAsp1nzkIMGDH",
+                   :assistant-id "asst_oqkCqei6l8yEUYKjqeoy4HPI",
                    :id :sur-ice-cream-openai,
-                   :expertise "ice cream"}],
+                   :expertise "ice cream",
+                   :timestamp #inst "2024-12-09T22:34:22.772-00:00"}],
           :processes
           [#:process{:id :sur-ice-cream,
                      :interview-class :initial-unordered,

@@ -218,11 +218,13 @@
           :agents
           [#:agent{:assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_78FyjeCJ32H0w2qYlWwWJ1s7"}
            #:agent{:base-type :sur-fountain-pens,
+                   :agent-type :project
                    :thread-id "thread_dGPypen7TGZMyonWURXE9BBd",
                    :llm-provider :openai,
                    :system-instruction

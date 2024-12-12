@@ -3,11 +3,11 @@
   (:require
    [clojure.string           :as str]
    [datahike.api             :as d]
+   [datahike.pull-api        :as dp]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.agent-db  :as adb]
    [scheduling-tbd.db        :as db]
-   [scheduling-tbd.llm       :as llm]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
+   [scheduling-tbd.sutil     :as sutil :refer [connect-atm]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere        :refer [log!]]))
 
@@ -42,7 +42,7 @@
         instructions (system-instruction expertise)]
     (try
       (let [agent-info {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise}]
-        (adb/add-agent-info! pid agent-info)
+        (adb/put-agent-info! pid agent-info)
         (adb/ensure-agent! (-> agent-info (assoc :pid pid) (assoc :force-new? true))) ; force-new? means new assistant and thread.
         (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
         (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
@@ -57,7 +57,7 @@
   (log! :info (str "SUR follow-up:" obj))
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
         cid (db/get-current-cid pid)]
-    (try (when-let [answer (adb/query-agent question (adb/ensure-agent! {:base-type pid}))]
+    (try (when-let [answer (adb/query-agent pid question)]
            (log! :info (str "SUR's answer:" answer))
            (when (string? answer)
              (ws/send-to-chat (assoc chat-args :text answer))
@@ -68,7 +68,27 @@
            (ws/send-to-chat (assoc chat-args :text "We had a problem answering this questions."))))))
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
+(defn add-surrogate-agent-infos
+  "Add an agent-info object to adb/agent-infos for every project's surrogate.
+   Does not check that it is viable (does not check that the assistant and thread are still
+   maintained by llm provider). Thus, it is lazy, with updating done by adb/ensure-agent! as needed."
+  []
+  (log! :info "Adding surrogates from all project so adb/agent-infos.")
+  (doseq [pid (db/list-projects)]
+    (let [conn @(connect-atm pid)]
+      (when-let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] conn)]
+        (let [{:agent/keys [system-instruction expertise]} (dp/pull conn '[*] eid)
+              info {:base-type pid
+                    :agent-type :project
+                    :model-class :gpt
+                    :instruction-string (or system-instruction "++ elsewhere ++") ; ToDo: Investigate.
+                    :surrogate? true
+                    :expertise expertise}]
+          (adb/put-agent-info! pid info))))))
+
 (defn init-surrogates! []
+  (mount/start (find-var 'scheduling-tbd.db/sys&proj-database-cfgs)) ; ToDo: Investigate. I expected this to have happened already.
+  (add-surrogate-agent-infos)
   (ws/register-ws-dispatch :start-surrogate start-surrogate!)         ; User types 'SUR:'
   (ws/register-ws-dispatch :surrogate-follow-up surrogate-follow-up)  ; User types 'SUR?:'
   :surrogate-ws-fns-registered)
