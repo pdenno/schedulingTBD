@@ -2,15 +2,14 @@
     "Planning operators for the data interview"
   (:require
    [clojure.edn                               :as edn]
-   [clojure.pprint                            :refer [pprint]]
    [clojure.spec.alpha                        :as s]
    [clojure.string                            :as str]
    [jsonista.core                             :as json]
    [scheduling-tbd.db                         :as db]
-   [scheduling-tbd.llm                        :as llm :refer [query-llm]]
+   [scheduling-tbd.llm                        :as llm]
    [scheduling-tbd.minizinc                   :as mzn]
-   [scheduling-tbd.response-utils             :as ru :refer [defanalyze find-claim make-human-project]]
-   [scheduling-tbd.sutil                      :as sutil :refer [elide starting-new-project?]]
+   [scheduling-tbd.response-utils             :as ru :refer [defanalyze]]
+   [scheduling-tbd.sutil                      :as sutil]
    [scheduling-tbd.web.websockets             :as ws]
    [taoensso.telemere                         :as tel :refer [log!]]))
 
