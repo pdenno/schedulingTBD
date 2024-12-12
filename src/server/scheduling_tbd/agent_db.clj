@@ -124,6 +124,20 @@
          [?e :agent/llm-provider ?llm-provider]]
        @conn-atm base-type llm-provider))
 
+(defn enrich-agent-info
+  "Calls to agent-status and put-agent! need the info argument to qualify as s/valid? ::agent-info.
+   Calls to ensure-agent! do not. This adds information from the agent-info, which must be in adb.agent-infos."
+  [{:keys [base-type] :as info}]
+  (assert base-type)
+  (let [more-info (get @agent-infos base-type)]
+    (when-not more-info
+      (throw (ex-info "Unknown agent base-type:" {:base-type base-type})))
+    (let [info (merge more-info info)
+          res (cond-> info
+                (:surrogate? info)   (assoc :pid base-type))]
+      (s/assert ::agent-info res)
+      res)))
+
 (defn get-agent
   "Return the agent map in db attributes. If there is no eid, even though the pid is provided,
    then it pulls from the system DB, if it is not there also, then it returns nil."
@@ -176,7 +190,7 @@
         aid    (:id assist)]
      (cond-> {:agent/id a-name
               :agent/base-type base-type
-              ;;:agent/agent-type agent-type
+              :agent/agent-type agent-type
               :agent/llm-provider llm-provider
               :agent/model-class model-class
               :agent/timestamp (util/now)
@@ -228,20 +242,6 @@
       (tel/with-kind-filter {:allow :agents}
         (tel/signal! {:kind :agents :level :info :msg (str "\n\n A thread will be made for agent " base-type ".")})))
     res))
-
-(defn enrich-agent-info
-  "Calls to agent-status and put-agent! need the info argument to qualify as s/valid? ::agent-info.
-   Calls to ensure-agent! do not. This adds information from the agent-info, which must be in adb.agent-infos."
-  [{:keys [base-type] :as info}]
-  (assert base-type)
-  (let [more-info (get @agent-infos base-type)]
-    (when-not more-info
-      (throw (ex-info "Unknown agent base-type:" {:base-type base-type})))
-    (let [info (merge more-info info)
-          res (cond-> info
-                (:surrogate? info)   (assoc :pid base-type))]
-      (s/assert ::agent-info res)
-      res)))
 
 (defn db-agents
   "Return a map with indexes :system and/or :project which indicates what is known about the subject agent in that context."
@@ -341,19 +341,30 @@
   "Create on the llm-provider a thread and add it to the project's db if pid is provided.
    Otherwise assume it is in the :system db.
    Return the DB agent object."
-  [{:agent/keys [assistant-id] :as agent} ; ToDo: This is where it would be useful to have agent-type in the DB!
+  [{:agent/keys [assistant-id agent-type] :as agent}
    {:keys [pid llm-provider base-type] :or {llm-provider @default-llm-provider} :as agent-info}]
   (let [tid (-> (llm/make-thread :assistant-id assistant-id) :id)
-        conn-atm (if pid (connect-atm pid) (connect-atm :system))
-        eid (if pid
-              (d/q '[:find ?eid . :where [?eid :project/id]] @conn-atm)
-              (d/q '[:find ?eid . :where [?eid :system/agents]] @conn-atm))
         agent (assoc agent :agent/thread-id tid)]
-    (log! :info (str "Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
-    (tel/with-kind-filter {:allow :agents}
-      (tel/signal! {:kind :agents :level :info :msg (str "\n\n Adding thread " tid " to project " pid ".")}))
-    (d/transact conn-atm {:tx-data [{:db/id eid :project/agents agent}]})
-    (dp/pull @conn-atm '[*] (agent-eid base-type llm-provider conn-atm))))
+    (case agent-type
+      :system
+      (let [conn-atm (connect-atm :system)
+            eid (d/q '[:find ?eid . :where [?eid :system/agents]] @conn-atm)]
+        (d/transact conn-atm {:tx-data [{:db/id eid :system/agents agent}]})
+        (log! :info (str "Adding thread " tid " to system DB.\n" (with-out-str (pprint agent))))
+        (tel/with-kind-filter {:allow :agents}
+          (tel/signal! {:kind :agents :level :info
+                        :msg (str "\n\n Adding thread " tid " to system DB\n" (with-out-str (pprint agent)))}))
+        (dp/pull @conn-atm '[*] (agent-eid base-type llm-provider conn-atm)))
+
+      (:project :shared-assistant)
+      (let [conn-atm (connect-atm pid)
+            eid (d/q '[:find ?eid . :where [?eid :project/id]] @conn-atm)]
+        (d/transact conn-atm {:tx-data [{:db/id eid :project/agents agent}]})
+        (log! :debug (str "Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
+        (tel/with-kind-filter {:allow :agents}
+          (tel/signal! {:kind :agents :level :info
+                        :msg (str "\n\n Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent)))}))
+        (dp/pull @conn-atm '[*] (agent-eid base-type llm-provider conn-atm))))))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
 ;;; Once the agent is created, and checks on aid and sid memoized, this executes in less than 5 milliseconds.

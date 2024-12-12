@@ -244,8 +244,8 @@
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    Return a vector of the conversation (objects suitable for db/add-msg) terminating in an answer to the question.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
-  [{:keys [question question-type responder-type] :as ctx}]
-  (s/assert ::chat-pair-ctx ctx)
+  [{:keys [question question-type responder-type human-starting?] :as ctx}]
+  (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
   (let [conversation [{:text question :from :system :question-type question-type :tags [:query]}]
         response  (chat-pair ctx) ; response here is just text.
         answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
@@ -325,14 +325,14 @@
 
 (def process-flow-shop-questions
   "All questions that should be asked for a flow-shop."
-  [:warm-up
-   :work-type
-   :production-location
-   :production-motivation
-   :production-system-type
-   :process-steps
-   :process-durations
-   :process-ordering])
+  [:process/warm-up
+   :process/work-type
+   :process/production-location
+   :process/production-motivation
+   :process/production-system-type
+   :process/process-steps
+   :process/process-durations
+   :process/process-ordering])
 
 (defn off-course--not-done
   "This is called when interviewer sends {:status 'DONE'} but it wasn't
@@ -342,7 +342,7 @@
   (let [answered? (already-answered? pid cid)
         ask-next (have keyword? (some #(when (not (answered? %)) %) process-flow-shop-questions))]
     (tell-interviewer {:command "COURSE-CORRECTION"
-                       :advice (str "You are not done."
+                       :advice (str "You are not done. "
                                     "Next time we send you a SUPPLY-QUESTION command "
                                     (name ask-next) ".")}
                       ctx)
@@ -399,7 +399,6 @@
                :resources  candidate-q    ; NYI
                :optimality candidate-q))) ; NYI
     (log! :warn "Exiting because of the active? atom.")))
-
 
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
 ;;; over and over and the interview will advance each time until you get back DONE.
@@ -535,14 +534,17 @@
     (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn start-conversation
-  "Ask first question, create a project and call resume-conversation.
-   :start-conversation is a dispatch-key form the client."
+  "Ask a human the first question, create a project and call resume-conversation.
+   :start-conversation is a dispatch-key from the client, providing, perhaps only the client-id."
   [{:keys [client-id] :as ctx}]
   (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :promise? true
                     :text (str "You want to start a new project? This is the right place! "
                                (db/conversation-intros :process))})
   (try
-    (let [ctx (merge ctx {:responder-type :human :question-type :process/warm-up :question the-warm-up-type-question})
+    (let [ctx (merge ctx {:responder-type :human
+                          :human-starting? true
+                          :question-type :process/warm-up
+                          :question the-warm-up-type-question})
           conversation (get-an-answer ctx)
           response (-> conversation last :text) ; ToDo: Could be more to it...wants-a-break?.
           _effect! (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
