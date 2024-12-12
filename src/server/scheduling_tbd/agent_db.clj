@@ -223,7 +223,7 @@
    it won't be recreated, even if the assistant instructions are outdated relative to what the agent is using.
    This choice is to preserve the context already built up by the current agent.
    You can force a fresh instance in ensure-agent! with :force? = true."
-  [{:keys [base-type agent-type missing-here missing-at-provider outdated?] :as status}]
+  [{:keys [base-type agent-type missing-here missing-at-provider outdated? substitute-aid] :as status}]
   (let [missing? (or missing-here missing-at-provider)
         res (case agent-type
               (:project :system)    (cond-> status
@@ -233,6 +233,11 @@
                                       (:assistant missing-at-provider)  (-> (assoc :make-agent? true)
                                                                             (assoc :make-thread? true))
                                       (:thread missing-at-provider)     (assoc :make-thread? true)))]
+    (when substitute-aid
+      (log! :info (str "Agent " base-type " will use an updated assistant: " substitute-aid "."))
+      (tel/with-kind-filter {:allow :agents}
+        (tel/signal! {:kind :agents :level :info :msg
+                      (str "Agent " base-type " will use an updated assistant: " substitute-aid ".")})))
     (when (:make-agent? res)
       (log! :info (str "Agent " base-type " will be created."))
       (tel/with-kind-filter {:allow :agents}
@@ -275,16 +280,20 @@
         missing-here (cond-> #{}
                        (not project-aid)      (conj :assistant)
                        (not project-tid)      (conj :thread))
-        provider-aid? (when system-aid (llm/get-assistant project-aid))
+        project-provider-aid? (llm/get-assistant project-aid)
+        system-provider-aid?  (llm/get-assistant system-aid)
+        substitute-aid        (when (and system-provider-aid? (not project-provider-aid?)) system-aid)
         provider-tid? (when system-tid  (llm/get-thread project-tid))
         missing-provider (cond-> #{}
-                           (not provider-aid?)            (conj :assistant)
-                           (and pid (not provider-tid?))  (conj :thread))
+                           (and (not system-provider-aid?)
+                                (not project-provider-aid?)) (conj :assistant)
+                           (and pid (not provider-tid?))     (conj :thread))
         status (cond-> {:base-type base-type,
                         :agent-type agent-type
                         :same-assistant? same-assistant?
                         :agent-date (-> db-info :system :agent/timestamp)}
                  pid                                    (assoc :project-has-thread project-tid)
+                 substitute-aid                         (assoc :substitute-aid substitute-aid)
                  (not pid)                              (assoc :project-has-thread :not-applicable)
                  system-more-modern?                    (assoc :system-more-modern? true)
                  files-modify-date                      (assoc :files-data files-modify-date)
@@ -378,11 +387,16 @@
    The agent-info is 'enriched' here with information from the agent-infos map."
   [& {:as agent-info}]
   (let [{:keys [force-new?] :as info} (enrich-agent-info agent-info)
-        {:keys [make-agent? make-thread?] :as _status} (agent-status info)
+        {:keys [make-agent? make-thread? substitute-aid] :as _status} (agent-status info)
         agent (if (or force-new? make-agent?)
-                (-> info make-agent-assistant (put-agent! info))
+                (if (= :process-interview-agent (:base-type agent-info))
+                  (do (reset! diag {:info info :status _status})
+                      (throw (ex-info "NO!" {:info info :status _status})))
+                  (-> info make-agent-assistant (put-agent! info)))
                 (get-agent info))
-        agent  (cond-> agent  make-thread? (add-thread! info))]
+        agent  (cond-> agent
+                 substitute-aid   (assoc :agent/assistant-id substitute-aid)
+                 make-thread?     (add-thread! info))]
     (reset! diag {:status _status :info info})
     (-> agent (dissoc :db/id) agent-db2proj)))
 
