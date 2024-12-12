@@ -1,9 +1,0 @@
-{:type "json_schema",
- :json_schema {:name "scheduling_challenges", ; No spaces allowed.
-               :strict true,
-               :schema {:type "object",
-                        :properties {:challenges     {:type "array"
-                                                      :items {:type "string"}}
-                                     :one-more-thing {:type "string"}}
-                        :required ["challenges" "one-more-thing"],
-                        :additionalProperties false}}}

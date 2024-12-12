@@ -1,5 +1,26 @@
 [
-#:project{:conversations
+#:project{:agents
+          [#:agent{:assistant-id "asst_EK84QXpYS5TIN9PqssvClSAk",
+                   :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_oYrNhKNhQratke4QofD0spm0"}
+           #:agent{:base-type :sur-canned-corn,
+                   :agent-type :project
+                   :thread-id "thread_PaNG176R7upH82TJEeDXsNVg",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes canned corn.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_g91VMowymiHxQYwm3n3QAgsi",
+                   :id :sur-canned-corn-openai,
+                   :expertise "canned corn",
+                   :timestamp #inst "2024-12-08T16:12:48.475-00:00"}],
+          :code
+          "enum Task = {receiving, husking, cleaning, blanching, cutting, filling, sealing, labeling};",
+          :conversations
           [#:conversation{:done? true,
                           :id :process,
                           :messages
@@ -191,27 +212,11 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:53.034-00:00"}]}],
-          :code
-          "enum Task = {receiving, husking, cleaning, blanching, cutting, filling, sealing, labeling};",
-          :agents
-          [#:agent{:assistant-id "asst_EK84QXpYS5TIN9PqssvClSAk",
-                   :base-type :process-interview-agent,
-                   :id :process-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_oYrNhKNhQratke4QofD0spm0"}],
+          :current-conversation :process,
+          :id :sur-canned-corn,
+          :name "SUR Canned Corn",
           :processes
           [#:process{:desc
                      "1. Receiving and Inspection (30 minutes)\n2. Husking (15 minutes)\n3. Cleaning (10 minutes)\n4. Blanching (5 minutes)\n5. Cutting (20 minutes)\n6. Filling (15 minutes)\n7. Sealing and Sterilizing (25 minutes)\n8. Labeling and Packaging (10 minutes)",
-                     :id :sur-canned-corn}],
-          :current-conversation :process,
-          :name "SUR Canned Corn",
-          :surrogate
-          #:surrogate{:assistant-id "asst_g91VMowymiHxQYwm3n3QAgsi",
-                      :id :sur-canned-corn,
-                      :subject-of-expertise "canned corn",
-                      :system-instruction
-                      "You manage a company that makes canned corn.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_PaNG176R7upH82TJEeDXsNVg"},
-          :id :sur-canned-corn}
+                     :id :sur-canned-corn}]}
 ]

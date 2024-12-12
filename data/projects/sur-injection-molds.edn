@@ -138,12 +138,5 @@
                                      #inst "2024-11-20T13:32:54.087-00:00"}]}],
           :current-conversation :process,
           :id :sur-injection-molds,
-          :name "SUR Injection Molds",
-          :surrogate
-          #:surrogate{:assistant-id "asst_rJvpJDLIoiGrDPgDOOCmqQXr",
-                      :id :sur-injection-molds,
-                      :subject-of-expertise "injection molds",
-                      :system-instruction
-                      "You manage a company that makes injection molds.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_yZdRmmaSTnzY1IWop7JblfX3"}}
+          :name "SUR Injection Molds"}
 ]

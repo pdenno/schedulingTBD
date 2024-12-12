@@ -50,9 +50,11 @@
 
 (defn msg-with-title
   [content from]
-  (cond (= from :surrogate)               (str "<b>Surrogate Expert</b><br/>" content)
-        (= from :developer-interjected)   (str "<b>Developer Interjected Question</b><br/>" content)
-        :else                             content))
+  (assert (#{:surrogate :system :developer-interjected :human} from))
+  (case from
+      :surrogate               (str "<b>Surrogate Expert</b><br/>" content)
+      :developer-interjected   (str "<b>Developer Interjected Question</b><br/>" content)
+      content))
 
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
@@ -86,7 +88,7 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as as function.
+(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function. <========================
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
 (defn update-msg-times
@@ -96,23 +98,22 @@
     (log! :debug (str "update-msg-times: msg-count = " (count @msgs-atm)))
     ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
-;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid.
+;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid. <======================== So why not put it in db_access.cljs? Answer: msgs-atm but see above!
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
   "Using an HTTP GET, get the conversation, and also the code, if any."
   ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
   ([pid cid]
    (-> (dba/get-conversation-http pid cid)
+       (p/catch (fn [e] (log! :error (str "get-conversation failed: " e))))
        (p/then (fn [{:keys [conv cid code]}]
                  (log! :info (str "chat/get-conversation (return from promise): cid = " cid " count = " (count conv)))
                  (reset! msgs-atm conv)
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
-                 (ws/send-msg {:dispatch-key :resume-conversation-plan :pid pid :cid cid})
-                 (update-common-info! {:project/id pid :cid cid})))
-       (p/catch (fn [e]
-                  (log! :info (str "get-conversation failed: " e)))))))
+                 (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid})
+                 (update-common-info! {:pid pid :cid cid}))))))
 
 (register-fn :get-conversation get-conversation)
 
@@ -121,6 +122,7 @@
    This is typically used for individual messages that come through :tbd-says or :sur-says,
    as opposed to bulk update through get-conversation."
   [text from]
+  (assert (#{:system :surrogate :human :developer-interjected} from))
   (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))]
     (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
     ((lookup-fn :set-cs-msg-list) @msgs-atm)))
@@ -130,16 +132,17 @@
 
 (register-fn :tbd-says              (fn [{:keys [p-key text]}]
                                       (when p-key (remember-promise p-key))
-                                      (log! :info (str "tbd-says text: " text " before = " (count @msgs-atm)))
+                                      (log! :debug (str "tbd-says text: " text " before = " (count @msgs-atm)))
                                       (add-msg text :system)
-                                      (log! :info (str "tbd-says text: " text " after = " (count @msgs-atm)))))
+                                      (log! :debug (str "tbd-says text: " text " after = " (count @msgs-atm)))))
 
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
                                       (log! :info (str "sur-says msg: " msg))
                                       (add-msg msg :surrogate)))
 
-(defnc Chat [{:keys [chat-height proj-info]}]
+;;; There is just one Chat instance in our app. It is switched between different conversations.
+(defnc Chat [{:keys [chat-height]}]
   (let [[msg-list set-msg-list]         (hooks/use-state [])
         [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
         [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
@@ -148,9 +151,9 @@
         resize-fns (make-resize-fns set-box-height)]
     (letfn [(change-conversation-click [to]
               (when-not busy?
-                (if-let [pid (:project/id @common-info)]
+                (if-let [pid (:pid @common-info)]
                   (get-conversation pid to)
-                  (log! :info (str "change-conversation-click fails: common-info = " @common-info)))))
+                  (log! :error (str "change-conversation-click fails: common-info = " @common-info)))))
             (process-user-input [text]
               (when (not-empty text)
                 (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)
@@ -158,7 +161,7 @@
                       [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" text)
                       msg (cond  ask-llm?       {:dispatch-key :ask-llm :question question}
                                  surrogate?     {:dispatch-key :start-surrogate :product product}
-                                 sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:project/id proj-info) :question q}
+                                 sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:pid @common-info) :question q}
                                  :else          {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
                   ;; ToDo: Human-interjected questions, though some of them are stored, don't store the human-interjected annotation.
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.
@@ -168,9 +171,12 @@
                   (when ask-llm?
                     (set-msg-list (conj msg-list {:message/content (str "<b>[Side discussion with LLM]</b><br/>" question)
                                                   :message/from :system})))
+                  ;;(set-msg-list (add-msg text :human))
+                  (add-msg text :human)
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
+        (register-fn :clear-msgs   (fn [] (set-cs-msg-list []) (reset! msgs-atm [])))
         (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
         (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
         (register-fn :set-active-conv set-active-conv)
@@ -185,6 +191,7 @@
       ;; ----------------- component UI structure.
       ($ ShareUpDown
          {:init-height chat-height
+          :up-portion 0.8
           :share-fns resize-fns
           :up ($ Box {:sx ; This work!
                       #js {:overflowY "auto"  ; Creates a scroll bar

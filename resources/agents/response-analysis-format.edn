@@ -1,0 +1,9 @@
+{:type "json_schema",
+ :json_schema {:name "response_analysis", ; No spaces allowed.
+               :strict true,
+               :schema {:type "object",
+                        :properties {:ANSWERS-THE-QUESTION? {:type "string"}
+                                     :RAISES-A-QUESTION?    {:type "string"}
+                                     :WANTS-A-BREAK?        {:type "string"}}
+                        :required ["ANSWERS-THE-QUESTION?", "RAISES-A-QUESTION?", "WANTS-A-BREAK?"],
+                        :additionalProperties false}}}

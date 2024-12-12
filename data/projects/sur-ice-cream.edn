@@ -165,7 +165,8 @@
                                      :tags [:response],
                                      :time
                                      #inst "2024-11-16T19:57:39.488-00:00"}]}
-           #:conversation{:id :data,
+           #:conversation{:done? true,
+                          :id :data,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -173,8 +174,25 @@
                                      :id 21,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T15:43:59.083-00:00"}]}
-           #:conversation{:id :resources,
+                                     #inst "2024-11-20T15:43:59.083-00:00"}
+                           #:message{:content
+                                     "Let's talk about the data you use to do your work. Typically, and especially in small businesses, information about customer orders, resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you use and how you maintain and store it.",
+                                     :from :system,
+                                     :id 24,
+                                     :question-type :warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-20T19:35:45.835-00:00"}
+                           #:message{:content
+                                     "In our company, we primarily use spreadsheets to manage and track production schedules, ingredient inventory levels, and customer orders. Each production batch is logged with details about the production date, ingredients used, and quantities produced. We also maintain spreadsheets to monitor supply chain data, such as supplier contact details, order history, and delivery schedules. Customer orders are recorded with relevant details like order quantities, delivery dates, and customer preferences. This data helps us ensure that we align production with demand and manage our resources efficiently.",
+                                     :from :surrogate,
+                                     :id 25,
+                                     :question-type :warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-20T19:35:45.856-00:00"}]}
+           #:conversation{:done? true,
+                          :id :resources,
                           :messages
                           [#:message{:content
                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
@@ -182,8 +200,25 @@
                                      :id 22,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T15:43:59.101-00:00"}]}
-           #:conversation{:id :optimality,
+                                     #inst "2024-11-20T15:43:59.101-00:00"}
+                           #:message{:content
+                                     "If you've already contributed to the \"data\" conversation you may have already mentioned resources used in production. We will certainly study what you said there for this interview about resources. Here we will go into more detail. To get started, please write a few new thoughts (a few sentences) about resources, for example, skills required for particular processes, equipment maintenance schedules, equipment capacities and capabilities...whatever you think is most relevant to scheduling.",
+                                     :from :system,
+                                     :id 26,
+                                     :question-type :warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-20T20:54:01.726-00:00"}
+                           #:message{:content
+                                     "In our ice cream production facility, essential resources include skilled personnel for operating machinery and managing quality control at each production stage. Each process step, such as mixing, pasteurizing, and freezing, requires specific equipment like mixers, pasteurizers, homogenizers, and freezers with defined capacities and maintenance schedules to ensure optimal performance and minimize downtime. For instance, our freezer capacity limits batch sizes, and maintenance is routinely scheduled to prevent disruptions. Additionally, operator training is crucial to handle equipment safely and efficiently, ensuring that production timelines are met without compromising product quality. Resource availability and equipment capacities are critical factors in scheduling to maintain seamless production flow and timely delivery.",
+                                     :from :surrogate,
+                                     :id 27,
+                                     :question-type :warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-20T20:54:01.777-00:00"}]}
+           #:conversation{:done? true,
+                          :id :optimality,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
@@ -191,16 +226,67 @@
                                      :id 23,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T15:43:59.119-00:00"}]}],
+                                     #inst "2024-11-20T15:43:59.119-00:00"}
+                           #:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. Thus far we've assumed that your goal is what operations researchers  call <a href=\"term/makespan\">makespan</a>, getting everything done as soon as possible. That probably isn't your goal; it might not even make sense!  So please spend a little time here (write a few sentences) to explain your scheduling goal. This might repeat some of what you said way back  in the process interview. You might take a look at what you wrote back then.",
+                                     :from :system,
+                                     :id 28,
+                                     :question-type :warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-24T17:32:19.619-00:00"}
+                           #:message{:content
+                                     "Our goal in scheduling is to balance efficiently utilizing our production resources while meeting customer demands promptly. A good schedule ensures that we produce the necessary amount of ice cream to satisfy current and upcoming orders without overwhelming our storage or supply chain capacities. We aim to minimize lead time between order receipt and delivery, aligning production with demand peaks, such as seasonality or promotional events, to maximize customer satisfaction and market responsiveness. Additionally, managing equipment maintenance within the schedule is essential to avoid downtimes, guaranteeing a smooth production process. Ultimately, an ideal schedule allows us to fulfill orders on time, maintain product quality, and operate cost-effectively, leveraging both predictable demand patterns and just-in-time principles.",
+                                     :from :surrogate,
+                                     :id 29,
+                                     :question-type :warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-24T17:32:19.644-00:00"}]}],
           :code
           "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {mixIngredients, pasteurizeMix, homogenizeMix, ageMixture, addFlavors, freezeMix, fillContainers, hardenIceCream, packaging, labelAndInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|0.500, 0.250, 0.167, 4.000, 0.333, 0.500, 0.333, 3.000, 0.250, 0.167|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, mixIngredients] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, mixIngredients] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, mixIngredients] == taskStarts[p, pasteurizeMix]);\nconstraint forall (p in Product) (taskEnds[p, pasteurizeMix] == taskStarts[p, homogenizeMix]);\nconstraint forall (p in Product) (taskEnds[p, homogenizeMix] == taskStarts[p, ageMixture]);\nconstraint forall (p in Product) (taskEnds[p, ageMixture] == taskStarts[p, addFlavors]);\nconstraint forall (p in Product) (taskEnds[p, addFlavors] == taskStarts[p, freezeMix]);\nconstraint forall (p in Product) (taskEnds[p, freezeMix] == taskStarts[p, fillContainers]);\nconstraint forall (p in Product) (taskEnds[p, fillContainers] == taskStarts[p, hardenIceCream]);\nconstraint forall (p in Product) (taskEnds[p, hardenIceCream] == taskStarts[p, packaging]);\nconstraint forall (p in Product) (taskEnds[p, packaging] == taskStarts[p, labelAndInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, labelAndInspect]);",
           :agents
-          [#:agent{:assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
+          [#:agent{:assistant-id "asst_qTM7IIAfUZckAroJXXqjbf7D",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_Af7PPLVuyyJkrkEaeFSxYrX5"}],
+                   :thread-id "thread_2k2XHltP83tMQGp8bmrEuTn1",
+                   :timestamp #inst "2024-12-10T16:12:13.503-00:00"}
+           #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
+                   :base-type :data-interview-agent,
+                   :agent-type :shared-assistant
+                   :id :data-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_H93OzH5wmhXMkvYlew34qDfI"}
+           #:agent{:assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
+                   :base-type :resources-interview-agent,
+                   :agent-type :shared-assistant
+                   :id :resources-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_T6shGG4JM0XpJgvcyfdRJlO8"}
+           #:agent{:assistant-id "asst_M4c6cgeuw306KAXr4nR6E61S",
+                   :base-type :optimality-interview-agent,
+                   :agent-type :shared-assistant
+                   :id :optimality-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_WiPmnuON2iUlrpEt67MKrekm"}
+           #:agent{:base-type :sur-ice-cream,
+                   :agent-type :project
+                   :thread-id "thread_PZuu9HhT6Ok3C7QGZIRsJSyF",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes ice cream.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_oqkCqei6l8yEUYKjqeoy4HPI",
+                   :id :sur-ice-cream-openai,
+                   :expertise "ice cream",
+                   :timestamp #inst "2024-12-09T22:34:22.772-00:00"}],
           :processes
           [#:process{:id :sur-ice-cream,
                      :interview-class :initial-unordered,
@@ -285,7 +371,7 @@
                                 :name "Label and Inspect",
                                 :step-number 10,
                                 :var-name "labelAndInspect"}]}],
-          :current-conversation :data,
+          :current-conversation :process,
           :claims
           [#:claim{:conversation-id :process,
                    :question-type :warm-up,
@@ -312,12 +398,5 @@
                    :string
                    "(project-name :sur-ice-cream \"SUR Ice Cream\")"}],
           :name "SUR Ice Cream",
-          :surrogate
-          #:surrogate{:assistant-id "asst_2Uv2cpwG5GuRAsp1nzkIMGDH",
-                      :id :sur-ice-cream,
-                      :subject-of-expertise "ice cream",
-                      :system-instruction
-                      "You manage a company that makes ice cream.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless. If you are asked to upload a spreadsheet, say you cannot upload one.",
-                      :thread-id "thread_g64Pkn9wvd6sLdGBIllYAolQ"},
           :id :sur-ice-cream}
 ]

@@ -4,6 +4,7 @@
    [clojure.spec.alpha            :as s]
    [clojure.test                  :refer [deftest is testing]]
    [datahike.api                  :as d]
+   [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.interviewers   :as inv]
    [scheduling-tbd.llm            :as llm]
@@ -61,6 +62,7 @@
 ;; THIS is 2 (the other namespace I am hanging out in recently).
 ;;; Remember to db/backup-system-db once you get things straight.
 
+;;; (invt/recreate-agent! :response-analysis-agent)
 ;;; (invt/recreate-agent! :process-interview-agent)
 ;;; (invt/recreate-agent! :scheduling-challenges-agent)
 (defn ^:diag recreate-agent!
@@ -68,15 +70,15 @@
    Use, for example process-read-the-flowchart.txt rather than the full instructions."
   ([] (recreate-agent! :production-challenges-agent))
   ([id]
-   (if-let [info (some #(when (= (:id %) id) %) db/known-agent-info)]
-     (db/recreate-system-agents! [info])
+   (if-let [info (some #(when (= (:id %) id) %) adb/agent-infos)]
+     (adb/ensure-agent! info)
      (log! :error (str "No such agent: " id)))))
 
 ;;; Used to query the flowchart using the process-interview-agent.
 (defonce process-interview-system-agent (atom {}))
 
 (defn ^:diag setup-flowchart-with-agent! []
-  (let [agent (db/get-agent :base-type :process-interview-agent)
+  (let [agent (adb/ensure-agent! :base-type :process-interview-agent)
         thread (llm/make-thread :assistant-id (:aid agent))]
     (reset! process-interview-system-agent {:aid (:aid agent) :tid (:id thread)})))
 
@@ -101,7 +103,7 @@
 ;;; ultimately helping in designing an effective scheduling system for their FLOW-SHOP production system.
 (defn ^diag ask-about-flowchart
   [query {:keys [aid tid]}]
-  (println (llm/query-on-thread :aid aid :tid tid :query-text query)))
+  (println (adb/query-on-thread :aid aid :tid tid :query-text query)))
 
 (defn ^:diag ask-about-flowchart:inverviewer [])
 
@@ -109,7 +111,7 @@
   "Diagnostic for one interaction with interviewer."
   [cmd {:keys [pid cid] :as ctx}]
   (inv/tell-interviewer cmd
-                        (merge ctx (inv/interview-agent pid cid))))
+                        (merge ctx (inv/ensure-interview-agent! pid cid))))
 
 (deftest finished-process-test
   (testing "Testing that :sur-ice-cream has finished all process questions."
@@ -128,8 +130,8 @@
 (defn ^:diag check-instructions
   "It might be the case that the system instructions were too long. This asks what it knows about."
   []
-  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)]
-    (llm/query-on-thread
+  (let [{:keys [aid tid]} (-> (adb/ensure-agent! :base-type :process-dur-agent) adb/agent-db2proj)]
+    (adb/query-on-thread
      {:aid aid :tid tid :role "user"
       :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
                        "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))
@@ -141,19 +143,41 @@
    :question "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING."
    :status "OK"})
 
-;;; (invt/ask-one-question q-work-type)
+#_(invt/ask-one-question {:question "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
+                          :question-type :process/warm-up
+                          :responder-role :surrogate
+                          :pid :sur-ice-cream})
+
 (defn ask-one-question
   "Use inv/chat-pair to get back an answer"
-  [pid {:keys [question question-type]}]
-  (let [{:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
-    (inv/loop-for-answer
-     {:pid pid
-      :sur-aid assistant-id
-      :sur-tid thread-id
-      :responder-role :surrogate
-      :client-id (ws/recent-client!)
-      :question question
-      :question-type question-type})))
+  [{:keys [question question-type pid responder-role client-id]
+    :or {client-id (ws/recent-client!)}
+    :as ctx}]
+  (assert (#{:human :surrogate} responder-role))
+  (assert (string? question))
+  (assert (keyword? question-type))
+   (let [ctx (assoc ctx :client-id client-id)]
+     (when (= responder-role :surrogate) (assert pid))
+     (if (= responder-role :surrogate)
+       (let [{:surrogate/keys [assistant-id thread-id]} (db/get-surrogate-agent-info pid)]
+         (inv/get-an-answer
+          (merge ctx {:sur-aid assistant-id
+                      :sur-tid thread-id})))
+       (inv/get-an-answer ctx)))) ; ToDo: Have special behavior for a client-id="dev-null".
+
+(deftest test-get-an-answer
+  (testing "get-an-answer for surrogates"
+    (if (db/project-exists? :sur-ice-cream)
+      (let [result (ask-one-question {:question "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
+                                      :question-type :process/warm-up
+                                      :responder-role :surrogate
+                                      :pid :sur-ice-cream})]
+        (is (and (vector? result)
+                 (== 2 (count result))
+                 (= :query (-> result first :tags first))
+                 (= :response (-> result second :tags first)))))
+      (log! :warn "Need project :sur-ice-cream to run this test."))))
+
 
 (deftest question-asking
   (testing "Testing question asking capability through loop-for-answer."
@@ -285,3 +309,15 @@
 (deftest test-start-human-project!
   (testing "that you can make a human project from an answer to warm-up text."
     (inv/start-human-project! {:use-this-answer warm-up-text})))
+
+(deftest response-analysis-agent-test
+  (testing "that the response-analysis-agent does the right thing."
+    (let [{:keys [answers-the-question? raises-a-question? wants-a-break?] :as res}
+          (inv/response-analysis
+           "Would you characterize some process as being a relatively persistent bottleneck?"
+           "Yes, sewing is typically the bottleneck.")]
+      (is (= #{:answers-the-question? :raises-a-question? :wants-a-break?}
+             (-> res keys set)))
+      (is (string? answers-the-question?))
+      (is (false? raises-a-question?))
+      (is (false? wants-a-break?)))))

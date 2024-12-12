@@ -5,20 +5,34 @@
    [clojure.test                           :refer [deftest is testing]]
    [clojure.spec.alpha                     :as s]
    [datahike.api                           :as d]
+   [datahike.pull-api                      :as dp]
    [jsonista.core                          :as json]
-   [scheduling-tbd.domain.process-analysis :as pan]
+   [scheduling-tbd.agent-db                :as adb]
    [scheduling-tbd.db                      :as db]
+   [scheduling-tbd.domain.process-analysis :as pan]
    [scheduling-tbd.interviewers            :as inv :refer [tell-interviewer]]
    [scheduling-tbd.llm                     :as llm :refer [query-llm]]
    [scheduling-tbd.response-utils          :as ru]
+   [scheduling-tbd.util                    :as util]
    [scheduling-tbd.sutil                   :as sutil]
    [scheduling-tbd.web.websockets          :as ws]
-   [taoensso.telemere                      :refer [log!]]))
+   [taoensso.telemere                      :as tel :refer [log!]]))
 
 ;;; THIS is the namespace I am hanging out in recently.
 (def ^:diag diag (atom nil))
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
+
+(defn ^:diag ns-start-over!
+  "This one has been useful. If you get an error evaluate this ns, (the declaration above) run this and try again."
+  []
+  (map (partial ns-unalias *ns*) (keys (ns-aliases *ns*))))
+
+(defn ^:diag remove-alias
+  "This one has NOT been useful!"
+  [al ns-sym]
+  (swap! alias? (fn [val] (->> val (remove #(= % al)) set)))
+  (ns-unalias (find-ns ns-sym) al))
 
 (defn safe-alias
   [al ns-sym]
@@ -29,6 +43,7 @@
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
+  (ns-start-over!)
   (reset! alias? (-> (ns-aliases *ns*) keys set))
   (safe-alias 'io     'clojure.java.io)
   (safe-alias 's      'clojure.spec.alpha)
@@ -38,12 +53,15 @@
   (safe-alias 'str    'clojure.string)
   (safe-alias 'd      'datahike.api)
   (safe-alias 'dp     'datahike.pull-api)
+  (safe-alias 'jt     'java-time.api)
   (safe-alias 'json   'jsonista.core)
   (safe-alias 'mount  'mount.core)
   (safe-alias 'p      'promesa.core)
   (safe-alias 'px     'promesa.exec)
+  (safe-alias 'adb    'scheduling-tbd.agent-db)
   (safe-alias 'core   'scheduling-tbd.core)
   (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
+  (safe-alias 'pant   'scheduling-tbd.domain.process-analysis-test)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'dbt    'scheduling-tbd.db-test)
   (safe-alias 'how    'scheduling-tbd.how-made)
@@ -67,7 +85,7 @@
 
 (deftest interviewer-question-ordering
   (testing "that interviews for flow-shop manufacturing follow the correct processes."
-    (let [aid (:aid (db/get-agent :base-type :process-interview-agent))
+    (let [aid (:aid (adb/get-agent :base-type :process-interview-agent))
           tid (:id (llm/make-thread {:assistant-id aid
                                      :llm-provider :openai
                                      :metadata {:usage :project-agent}}))
@@ -170,7 +188,7 @@
 
 (deftest test-warm-up-question
   (testing "Testing warm-up-question with no current project."
-    (let [claims (pan/analyze-intro-response  warm-up-fountain-pens '#{(project-id :START-A-NEW-PROJECT)})
+    (let [claims (pan/analyze-warm-up-response  warm-up-fountain-pens '#{(project-id :START-A-NEW-PROJECT)})
           [_ ?pid] (ru/find-claim '(project-id ?x) claims)]
       (is (and (ru/find-claim (list 'project-id ?pid) claims)
                (ru/find-claim (list 'cites-raw-material-challenge ?pid) claims)
@@ -179,8 +197,7 @@
 (defn ^:diag ask-about-ice-cream-agent
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
   ([q-txt]
-   (let [{:keys [iview-aid iview-tid]} (inv/interview-agent :sur-ice-cream :process )]
-     (llm/query-on-thread {:aid iview-aid :tid iview-tid :query-text q-txt}))))
+     (adb/query-agent :sur-ice-cream q-txt)))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"
   {:snack-food "We make snack food.
@@ -341,15 +358,18 @@
 (deftest process-ordering
   (testing "whether the process-ordering system agent works okay."))
 
+(def ice-cream-answer-warm-up
+  (str "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like "
+       "pints, quarts, and bulk containers for food service. "
+       "Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, "
+       "while managing supply chain constraints such as ingredient availability and production line capacities. "
+       "Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial."))
+
+; We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service. Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as ingredient availability and production line capacities. Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial.
+
 (deftest scheduling-challenges-agent
   (testing "the scheduling-challenges agent"
-    (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
-          result (llm/query-on-thread
-                  {:aid aid :tid tid :query-text
-                   "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service.
-Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as
-ingredient availability and production line capacities.
-Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial."})
+    (let [result (adb/query-agent :scheduling-challenges-agent ice-cream-answer-warm-up)
           {:keys [challenges]} (-> result
                                    json/read-value
                                    (update-keys keyword)
@@ -513,3 +533,51 @@ Additionally, coordinating delivery schedules to ensure timely distribution with
     (doseq [eid eids]
       (d/transact (sutil/connect-atm pid) {:tx-data [[:db/add eid :claim/conversation-id :process]]}))
     (db/backup-proj-db pid)))
+
+(def surs [:sur-aluminum-cans
+           :sur-canned-corn
+           :sur-canned-vegetables
+           :sur-carpet
+           :sur-craft-beer
+           :sur-fountain-pens
+           :sur-garage-doors
+           :sur-ice-cream
+           :sur-ice-hockey-sticks
+           :sur-injection-molds
+           :sur-inline-skates
+           :sur-key-blanks
+           :sur-plate-glass
+           :sur-remanufactured-alternators
+           :sur-stoneware])
+
+(defn migrate-surrogate!
+  "Rewrite the project with surrogates as agent, rather than project/surrogate."
+  [pid]
+  (let [conn-atm (sutil/connect-atm pid)
+        eid (d/q '[:find ?eid . :where [?eid :surrogate/id]] @conn-atm)
+        {:surrogate/keys [assistant-id thread-id subject-of-expertise system-instruction] :as sur-obj} (dp/pull @conn-atm '[*] eid)
+        ;sur-obj (dissoc sur-obj :db/id)
+        eid-agents (d/q '[:find ?eid . :where [?eid :project/agents]] @conn-atm)
+        sur-agent #:agent{:id (-> (str (name pid) "-openai") keyword)
+                          :base-type pid
+                          :surrogate? true
+                          :expertise subject-of-expertise
+                          :system-instruction system-instruction
+                          :llm-provider :openai
+                          :assistant-id assistant-id
+                          :thread-id thread-id}
+        eid-project (d/q '[:find ?eid . :where [?eid :project/id]] @conn-atm)]
+    (d/transact conn-atm {:tx-data [{:db/id eid-agents :project/agents sur-agent}]})
+    (d/transact conn-atm {:tx-data [[:db/retract eid-project :project/surrogate (:db/id sur-obj)]]})))
+
+
+(defn oops-add-timestamp! []
+  (doseq [pid surs]
+    (let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] @(sutil/connect-atm pid))]
+      (d/transact (sutil/connect-atm pid) {:tx-data [[:db/add eid :agent/timestamp (util/now)]]}))))
+
+
+(defn migrate-surrogates!
+  "Rewrite the project with surrogates as agent, rather than project/surrogate."
+  []
+  (doseq [pid surs] (migrate-surrogate! pid)))

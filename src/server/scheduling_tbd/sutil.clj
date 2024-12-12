@@ -5,7 +5,7 @@
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
    [jsonista.core            :as json]
-   [taoensso.telemere.timbre :as log]))
+   [taoensso.telemere        :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -20,8 +20,8 @@
                          :impl :azure})]
     (when-not (:api-key res)
       (if (= provider :openai)
-        (log/error "Specify an API key in the environment variable OPENAI_API_KEY")
-        (log/error "Specify an API key in the environment variable AZURE_OPENAI_API_KEY")))
+        (log! :error "Specify an API key in the environment variable OPENAI_API_KEY")
+        (log! :error "Specify an API key in the environment variable AZURE_OPENAI_API_KEY")))
     res))
 
 (defonce databases-atm (atom {}))
@@ -31,13 +31,13 @@
 (defn register-db
   "Add a DB configuration."
   [k config]
-  ;(log/info "Registering DB" k "config =" config)
+  (log! :debug (str "Registering DB " k "config = " config))
   (swap! databases-atm #(assoc % k config)))
 
 (defn deregister-db
   "Add a DB configuration."
   [k]
-  (log/info "Deregistering DB" k)
+  (log! :info (str "Deregistering DB " k))
   (swap! databases-atm #(dissoc % k)))
 
 (def db-template
@@ -181,8 +181,8 @@
   [[timeout] & body]
   `(-> (p/future (with-out-str ~@body))
        (p/await ~timeout)
-       (p/then #(log/info "Long-running:" %))
-       (p/catch #(log/warn "Long-running (exception):" %))))
+       (p/then #(log! :info (str "Long-running: " %)))
+       (p/catch #(log! :warn (str "Long-running (exception): " %)))))
 
 (defn chat-status
   "Create a string to explain in the chat the error we experienced."
@@ -240,15 +240,9 @@
 ;;; This became complicated once I couldn't use strict schema results.
 (defn output-struct2clj
   "Translate the OpenAI API output structure (a string) to a map with keyword keys."
-  [str]
+  [s-in]
   (try
-    (let [str (remove-preamble str)]
-      (update-keys (json/read-value str) keyword))
+    (let [s (remove-preamble s-in)]
+      (update-keys (json/read-value s) keyword))
     (catch Exception _e
-      (reset! diag str)
-      (log/error "Could not read string returned from OpenAI:" str))))
-
-(defn starting-new-project?
-  "Returns true if pid = :START-A-NEW-PROJECT."
-  [pid]
-  (= pid :START-A-NEW-PROJECT))
+      (throw (ex-info  "Could not read object returned from OpenAI (should be a string):" {:s-in s-in })))))

@@ -16,10 +16,11 @@
   :kaochaSTBD ;-------------- Testing cljs ------------------------------
   {:target           :browser-test
    :test-dir         "target/kaocha-test"
-   :runner-ns        kaocha.cljs2.shadow-runner
+   #_#_:runner-ns        kaocha.cljs2.shadow-runner
+   :runner-ns        lambdaisland.chui.shadow.browser-runner
    :ns-regexp        ".*-test$"
    :compiler-options {:externs ["datascript/externs.js"]}
    :devtools         {:http-port 1818
                       :http-root "target/kaocha-test"
                       :after-load dev.kaocha/reload ; dev.kaocha/reload is an attempt to suppress useless log output.
-                      :preloads [lambdaisland.chui.remote #_dev.kaocha/reload]}}}}
+                      :preloads [lambdaisland.chui.remote #_dev.kaocha/reload]}}}} ; Not found

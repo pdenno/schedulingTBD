@@ -17,7 +17,7 @@
    [scheduling-tbd.llm  :as llm]                           ; Because of deep synchronization problems when this is from mount.
    [scheduling-tbd.interviewers :refer [iviewers]]         ; for mount
    [scheduling-tbd.web.handler]                            ; for mount, defines rm.server.config/config, and router stuff.
-   [taoensso.telemere.timbre :as log]))
+   [taoensso.telemere :as tel :refer [log!]]))
 
 ;;; If you get stuck do: (clojure.tools.namespace.repl/refresh)
 
@@ -28,17 +28,20 @@
 (add-tap (bound-fn* clojure.pprint/pprint))
 (set-refresh-dirs "src/server/scheduling_tbd" #_"test/scheduling_tbd")  ; Put here as many as you need. test messes with ns-setup!
 (s/check-asserts true) ; Error on s/assert, run s/valid? rather than just returning the argument.
+(tel/call-on-shutdown! tel/stop-handlers!)
 
 (defn start
   "Start the web server"
   []
   (let [res (mount/start)
         info (str "   " (clojure.string/join ",\n    " (:started res)))]
-    (log/info "started:\n" info)))
+    (log! :info (str "started:\n" info))))
 
 (defn stop
   "Stop the web server"
   []
+
+
   (mount/stop))
 
 (defn restart

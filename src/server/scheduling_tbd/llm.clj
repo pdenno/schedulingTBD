@@ -5,15 +5,12 @@
    but are not available directly to the user except through the operators (e.g. the dot, and &
    respectively for navigation to a property and concatenation)."
   (:require
-   [clojure.datafy               :refer [datafy]]
    [clojure.edn                  :as edn]
    [clojure.java.io              :as io]
    [clojure.spec.alpha           :as s]
-   [datahike.api                 :as d]
-   [scheduling-tbd.sutil         :refer [api-credentials default-llm-provider markdown2html connect-atm]]
+   [scheduling-tbd.sutil         :as sutil :refer [api-credentials default-llm-provider markdown2html]]
    [scheduling-tbd.util          :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
-   [clojure.string               :as str]
    [mount.core                   :as mount :refer [defstate]]
    [taoensso.telemere            :as tel :refer [log!]]
    [wkok.openai-clojure.api      :as openai]))
@@ -95,7 +92,7 @@
        reverse
        (mapv (fn [x] (update x :created #(-> % (* 1000) java.time.Instant/ofEpochMilli str))))))
 
-(defn list-azure-models
+(defn ^:diag list-azure-models
   "List id and create date of all available models.
    BTW, if there is no internet connection, on startup, this will be the first complaint."
   []
@@ -144,13 +141,12 @@
      :tools - a vector containing maps, for example [{:type 'code_interpreter'}]."
   [& {:keys [name model-class instructions tools tool-resources metadata llm-provider response-format]
       :or {model-class :gpt
-           llm-provider @default-llm-provider
-           metadata {:usage :stbd-agent}} :as obj}]
+           llm-provider @default-llm-provider} :as obj}]
   (s/valid? ::assistant-args obj)
   (openai/create-assistant {:name            name
                             :model           (pick-llm model-class llm-provider)
                             :response_format response-format
-                            :metadata        metadata
+                            :metadata        (merge {:usage :stbd-agent} metadata)
                             :instructions    instructions
                             :tools           tools
                             :tool_resources  tool-resources}
@@ -166,100 +162,42 @@
                                         (api-credentials llm-provider))))
 
 (defn make-thread
-  [& {:keys [assistant-id metadata llm-provider] :or
-      {metadata {:usage :stbd-agent}
-       llm-provider @default-llm-provider}}]
+  [& {:keys [assistant-id metadata llm-provider]
+      :or {llm-provider @default-llm-provider}}]
   (openai/create-thread {:assistant_id assistant-id
-                         :metadata metadata}
+                         :metadata (merge {:usage :stbd-agent} metadata)}
                         (api-credentials llm-provider)))
 
-(defn openai-messages-matching
-  "Argument is a vector of openai messages from an assistant.
-   Return a vector of messages matching the argument conditions.
-     :role  - #{'assistant', 'user'}
-     :text  - A complete match on the (-> % :content first :text value).
-     :after - Messages with :created_at >= than this."
-  [msg-list {:keys [role text after]}]
-  (cond->> msg-list
-    role     (filterv #(= role (:role %)))
-    text     (filterv #(= text (-> % :content first :text :value)))
-    after    (filterv #(<= after (:created_at %)))))
+;;; I don't use clojure.core/memoize here because I want to clear the atom on mount/start.
+;;; We could populate this at startup, see list-assistants below, but it might mean keeping objects for lots of unused assistants.
+;;; BTW, this is not case with get-thread-memo; there is no way to list all the threads.
+(def assistant-memo "A map of aid to assistant object, for memoization" (atom {}))
+(defn get-assistant
+  "Return a assistant object if the assistant exists, or nil otherwise."
+  [aid & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (let [res (or (get @assistant-memo aid)
+                (try
+                  (openai/retrieve-assistant {:assistant_id aid}
+                                             (api-credentials llm-provider))
+                  (catch Exception _e nil)))]
+    (swap! assistant-memo #(assoc % aid (if (map? res) (dissoc res :instructions) :missing)))
+    (if (= res :missing) nil res)))
 
-(defn response-msg
-  "Return the text that is response to the argument question."
-  [question msg-list]
-  (when-let [question-time (-> (openai-messages-matching msg-list {:role "user" :text question}) first :created_at)]
-    (when-let [responses (openai-messages-matching msg-list {:role "assistant" :after question-time})]
-      (->> responses (sort-by :created_at) first :content first :text :value))))
+(defn ^:diag get-thread-force
+  [tid]
+  (openai/retrieve-thread {:thread_id tid} (api-credentials @default-llm-provider)))
 
-;;; You can also use this with role 'assistant', but the use cases might be a bit esoteric. (I can't think of any.)
-;;; https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-role
-(defn query-on-thread-aux
-  "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
-    aid      - assistant ID (the OpenAI notion)
-    tid      - thread ID (ttheOpenAI notion)
-    role     - #{'user' 'assistant'},
-    query-text - a string.
-   Returns text but uses promesa internally to deal with errors."
-  [aid tid role query-text timeout-secs llm-provider]
-  (assert (string? aid))
-  (assert (string? tid))
-  (assert (#{"user" "assistant"} role))
-  (assert (number? timeout-secs))
-  (assert (keyword? llm-provider))
-  (assert (and (string? query-text) (not-empty query-text)))
-  (let [creds (api-credentials llm-provider)
-        ;; Apparently the thread_id links the run to msg.
-        _msg (openai/create-message {:thread_id tid :role role :content query-text} creds)
-        ;; https://platform.openai.com/docs/assistants/overview?context=without-streaming
-        ;; Once all the user Messages have been added to the Thread, you can Run the Thread with any Assistant.
-        run (openai/create-run {:thread_id tid :assistant_id aid} creds)
-        timestamp (inst-ms (java.time.Instant/now))
-        timeout   (+ timestamp (* timeout-secs 1000))]
-    (loop [now timeout]
-      (Thread/sleep 1000)
-      (let [r (openai/retrieve-run {:thread_id tid :run-id (:id run)} creds)
-            msg-list (-> (openai/list-messages {:thread_id tid :limit 20} creds) :data) ; ToDo: 20 is a guess.
-            response (response-msg query-text msg-list)]
-        (cond (> now timeout)                        (do (log! :warn "Timeout")
-                                                         (throw (ex-info "query-on-thread: Timeout:" {:query-text query-text}))),
-
-              (and (= "completed" (:status r))
-                   (not-empty response))              (markdown2html response),
-
-              (and (= "completed" (:status r))
-                   (empty? response))                 (do (log! :warn "empty response")
-                                                          (throw (ex-info "query-on-thread empty response:" {:status (:status r)}))),
-
-
-              (#{"expired" "failed"} (:status r))     (do (log! :warn (str "failed/expired last_error = " (:last_error r)))
-                                                          (throw (ex-info "query-on-thread failed:" {:status (:status r)}))),
-
-              :else                                   (recur (inst-ms (java.time.Instant/now))))))))
-
-(defn query-on-thread
-  "Wrap query-on-thread-aux to allow multiple tries at the same query.
-    :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
-    :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
-  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn]
-      :or {test-fn (fn [_] true), preprocess-fn identity
-           llm-provider @default-llm-provider
-           timeout-secs 60
-           role "user"} :as obj}]
-  (let [obj (cond-> obj ; All recursive calls will contains? :tries.
-              (or (not (contains? obj :tries))
-                  (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
-    (assert (< (:tries obj) 10))
-    (if (> (:tries obj) 0)
-      (try (let [raw (reset! diag (query-on-thread-aux aid tid role query-text timeout-secs llm-provider))
-                 res (preprocess-fn raw)]
-             (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
-           (catch Exception e
-             (let [d-e (datafy e)]
-               (log! :warn (str "query-on-thread failed (tries = " (:tries obj) "): "
-                                (or (:cause d-e) (-> d-e :via first :message)))))
-             (query-on-thread (update obj :tries dec))))
-      (log! :warn "Query on thread exhausted all tries.")))) ; ToDo: Or throw?
+(def thread-memo "A map of tid to thread object, for memoization" (atom {}))
+(defn get-thread
+  "Return a thread object if the thread exists, or nil otherwise."
+  [tid & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
+  (let [res (or (get @thread-memo tid)
+                (try
+                  (openai/retrieve-thread {:thread_id tid}
+                                          (api-credentials llm-provider))
+                  (catch Exception _e nil)))]
+    (swap! thread-memo #(assoc % tid (or res :missing)))
+    (if (= res :missing) nil res)))
 
 (defn ^:diag list-thread-messages
   "Return a vector of maps describing the discussion that has occurred on the thread in the order it occurred"
@@ -331,31 +269,6 @@
   [& _]
   (throw (ex-info "Just because I felt like it." {})))
 
-
-(defn query-agent
-  "Make a query to a named agent."
-  [base-type query & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
-  (let [{:keys [aid tid]} (-> (d/q '[:find ?aid ?tid
-                                     :keys aid tid
-                                     :in $ ?base-type ?provider
-                                     :where
-                                     [?e :agent/base-type ?base-type]
-                                     [?e :agent/llm-provider ?provider]
-                                     [?e :agent/assistant-id ?aid]
-                                     [?e :agent/thread-id ?tid]]
-                                   @(connect-atm :system)
-                                   base-type llm-provider)
-                              first)]
-    (if-not (and aid tid)
-      (throw (ex-info "Could not find the agent requested. (Not created for this LLM provider?:" {:llm-provider llm-provider}))
-      (let [result (-> (query-on-thread {:aid aid :tid tid :query-text query})
-                       (str/replace #"\s+" " "))]
-        (try (->> (edn/read-string result)
-                  (mapv (fn [m] (update-keys m #(-> % name str/lower-case keyword)))))
-             (catch Exception _e
-               (log! :error (str "query-agent failed: " result))
-               nil))))))
-
 (def moderation-checking?
   "Set to true if you want to filter immoderate user text."
   (atom false))
@@ -386,10 +299,11 @@
 (defn make-vector-store
   [& {:keys [name file-ids metadata llm-provider]
       :or {llm-provider @default-llm-provider
-           name "STBD agent vector store"
-           metadata {:usage :stbd-agent}}}]
+           name "STBD agent vector store"}}]
   (openai/create-vector-store
-   {:name name :file_ids file-ids :metadata metadata}
+   {:name name
+    :file_ids file-ids
+    :metadata (merge {:usage :stbd-agent} metadata)}
    (api-credentials llm-provider)))
 
 (defn list-vector-stores
@@ -413,7 +327,6 @@
   [& {:keys [vector-store-id llm-provider] :or {llm-provider @default-llm-provider}}]
   (modify-vector-store {:vector-store-id vector-store-id :llm-provider llm-provider}))
 
-
 (defn delete-vector-store
   [& {:keys [vector-store-id llm-provider] :or {llm-provider @default-llm-provider}}]
   (openai/delete-vector-store {:vector_store_id vector-store-id}
@@ -422,9 +335,11 @@
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []
   (select-llm-models!)
-  (ws/register-ws-dispatch :ask-llm llm-directly)
-  (ws/register-ws-dispatch :run-long run-long)
-  (ws/register-ws-dispatch :throw-it throw-it)
+  (ws/register-ws-dispatch :ask-llm llm-directly) ; User types 'LLM:'
+  (ws/register-ws-dispatch :run-long run-long)    ; Diag
+  (ws/register-ws-dispatch :throw-it throw-it)    ; Diag
+  (reset! assistant-memo {})
+  (reset! thread-memo {})
   [:llm-fns-registered-for-ws-dispatch])
 
 (defn llm-stop []

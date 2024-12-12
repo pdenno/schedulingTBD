@@ -2,25 +2,24 @@
   (:require
    [applied-science.js-interop :as j]
    [helix.core :as helix :refer [defnc $ <>]]
+   [helix.experimental.refresh :as refresh]
    [helix.hooks :as hooks]
-   ["@codemirror/view" :as view]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/colors" :as colors]
    ["@mui/material/CssBaseline$default" :as CssBaseline]
-   ["@mui/material/Stack$default" :as Stack]
-   ["@mui/material/styles" :as styles] ; See it used here: https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
+   ["@mui/material/Stack$default"      :as Stack]
+   ;; Example: https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
+   ["@mui/material/styles" :as styles]
    ["@mui/material/Typography$default" :as Typography]
-   [promesa.core :as p]
    ["react-dom/client"          :as react-dom]
    [scheduling-tbd.util         :refer [config-log!]]
    [stbd-app.components.chat    :as chat]
    [stbd-app.components.editor  :as editor :refer [Editor]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
-   [stbd-app.components.share   :as share :refer [ShareUpDown ShareLeftRight]]
-   [stbd-app.db-access :as dba]
-   [stbd-app.util      :as util :refer [register-fn lookup-fn update-common-info!]]
+   [stbd-app.components.share   :as share :refer [ShareLeftRight]]
+   [stbd-app.util      :as util :refer [register-fn]]
    [stbd-app.ws        :as ws]
-   [taoensso.telemere.timbre  :as log :refer-macros [info debug log]]))
+   [taoensso.telemere  :refer [log!]]))
 
 (def ^:diag diag (atom {}))
 
@@ -59,11 +58,9 @@
   "ev/processRM the source, returning a string that is either the result of processing
    or the error string that processing produced."
   [source]
-  (log/info "run-code: running some code")
+  (log! :info "run-code: running some code")
   (when-some [code (not-empty (str/trim source))]
     (let [user-data (get-editor-text "data-editor")
-          ;_zippy (log/info "******* For RM eval: CODE = \n" code)
-          ;_zippy (log/info "******* For RM eval: DATA = \n" user-data)
           result (try (ev/processRM :ptag/exp code  {:pprint? true :execute? true :sci? true :user-data user-data})
                       (catch js/Error e {:failure (str "Error: " (.-message e))}))]
       result)))
@@ -91,22 +88,15 @@
 
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
-        [proj-infos set-proj-infos]           (hooks/use-state nil) ; Has keys :project/id and :project/name
         [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
         [code set-code]                       (hooks/use-state "")
         useful-height (int (- height banner-height))
         chat-side-height useful-height
         code-side-height useful-height]
     (hooks/use-effect :once
-      (log/info "ONCE")
+      (log! :debug "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
-      (register-fn :set-code set-code)
-    (-> (dba/get-project-list) ;  Resolves to map with client's :current-project :others, and cid the first two are maps of :projec/id :project/name.
-        (p/then (fn [{:keys [current-project others cid] :as _resp}]
-                  (set-proj-infos (conj others current-project))
-                  (set-proj current-project)
-                  (update-common-info! {:project/id (:project/id current-project)})
-                  ((lookup-fn :get-conversation) (:project/id current-project) cid)))))
+      (register-fn :set-code set-code))
     ;; ------- component (end of use-effect :once)
     ($ Stack {:direction "column" :height useful-height}
        ($ Typography
@@ -119,7 +109,7 @@
           ($ Stack {:direction "row"}
              "schedulingTBD"
              ($ Box
-                ($ SelectProject {:current-proj proj :proj-infos proj-infos}))))
+                ($ SelectProject))))
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
                      ($ chat/Chat {:chat-height chat-side-height :proj-info proj}))
@@ -161,13 +151,20 @@
           ($ Top {:width  (:width  @carry-dims-atm)
                   :height (:height @carry-dims-atm)})))))) ; ToDo: Work required here to check whether it is called with an example UUID.
 
-(defonce root (react-dom/createRoot (js/document.getElementById "app")))
+(defonce root nil)
 
 ;;; --------------- https://code.thheller.com/blog/shadow-cljs/2019/08/25/hot-reload-in-clojurescript.html ----------------------
+(defn ^dev/after-load reload
+  []
+  (refresh/refresh!))
+
 (defn ^{:after-load true, :dev/after-load true} start []
+  (refresh/inject-hook!)
+  (set! root (react-dom/createRoot (js/document.getElementById "app")))
+  (.render root ($ app))
   (config-log!)
-  (ws/connect!)
-  (.render root ($ app)))
+  (ws/connect!))
+
 
 (defn ^:export init []
   (start))
@@ -177,11 +174,11 @@
 ;;; For a possible solution See "performance.getEntriesByType("navigation")" at
 ;;; https://stackoverflow.com/questions/5004978/check-if-page-gets-reloaded-or-refreshed-in-javascript
 (defn ^{:before-load true, :dev/before-load true #_#_:dev/before-load-async true} stop []
-  (log/info "STOP")
+  (log! :info "STOP")
   (when-let [proc @ws/ping-process]  (js/window.clearInterval proc)) ; clear old ping-process, if any.
   (when-let [proc @ws/check-process] (js/window.clearInterval proc))
   (when-let [proc @chat/update-msg-dates-process] (js/window.clearInterval proc))
   (when (ws/channel-ready?)
-    (log/info "Telling server to close channel for client-id = " @ws/client-id)
+    (log! :info (str "Telling server to close channel for client-id = " ws/client-id))
     (ws/send-msg {:dispatch-key :close-channel}) ; The client-id is appended by send-message!.
-    (log/info "Message sent for client-id = " @ws/client-id)))
+    (log! :info (str "Message sent for client-id = " ws/client-id))))
