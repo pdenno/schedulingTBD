@@ -54,7 +54,6 @@
 (defn analyze-response--dispatch
   "Parameters to analyze-response is a object with at least a :plan-step in it and a response from operator-meth (user response)."
   [{:keys [question-type cid] :as args}]
-  (reset! diag args)
   (s/assert ::dispatch-args args)
   (if (and question-type cid)
     (keyword (name cid) (name question-type))

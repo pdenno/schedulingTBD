@@ -33,7 +33,6 @@
 
    The whole quantity map could be #:box{:string-val 'variable'}, in which case duration is set to -1."
   [target-units {:quantity/keys [units value-string] :as _qty-map}]
-  (reset! diag {:target-units target-units :qty-map _qty-map})
   (s/assert ::uom units)
   (assert (#{:minutes :hours :days :8-hour-shifts} target-units))
   (let [src-val (edn/read-string value-string)]

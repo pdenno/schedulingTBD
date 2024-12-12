@@ -443,7 +443,6 @@
 (defn ctx-surrogate
   "Return context updated with surrogate info."
   [{:keys [pid cid] :as ctx}]
-  (reset! diag ctx)
   (let [interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
                                                  (assoc :pid pid)))
         surrogate-agent   (adb/ensure-agent! (-> (get @adb/agent-infos pid)
@@ -456,7 +455,6 @@
     (if (s/valid? ::surrogate-ctx ctx)
       ctx
       (do
-        (reset! diag ctx)
         (throw (ex-info "Invalid surrogate context:" {:ctx ctx}))))))
 
 (defn ctx-human

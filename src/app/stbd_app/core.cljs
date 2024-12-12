@@ -11,15 +11,13 @@
    ;; Example: https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
    ["@mui/material/styles" :as styles]
    ["@mui/material/Typography$default" :as Typography]
-   [promesa.core :as p]
    ["react-dom/client"          :as react-dom]
    [scheduling-tbd.util         :refer [config-log!]]
    [stbd-app.components.chat    :as chat]
    [stbd-app.components.editor  :as editor :refer [Editor]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareLeftRight]]
-   [stbd-app.db-access :as dba]
-   [stbd-app.util      :as util :refer [register-fn lookup-fn update-common-info!]]
+   [stbd-app.util      :as util :refer [register-fn]]
    [stbd-app.ws        :as ws]
    [taoensso.telemere  :refer [log!]]))
 
@@ -163,9 +161,10 @@
 (defn ^{:after-load true, :dev/after-load true} start []
   (refresh/inject-hook!)
   (set! root (react-dom/createRoot (js/document.getElementById "app")))
+  (.render root ($ app))
   (config-log!)
-  (ws/connect!)
-  (.render root ($ app)))
+  (ws/connect!))
+
 
 (defn ^:export init []
   (start))

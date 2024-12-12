@@ -1,6 +1,5 @@
 (ns stbd-app.components.editor
   (:require
-   [ajax.core        :refer [POST]]
    ["@codemirror/language" :refer [foldGutter syntaxHighlighting defaultHighlightStyle]]
    ["@codemirror/commands" :refer [history #_historyKeymap emacsStyleKeymap]]
    ["@codemirror/view" :as view :refer [EditorView  #_lineNumbers]]

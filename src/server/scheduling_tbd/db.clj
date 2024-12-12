@@ -763,7 +763,6 @@
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
   [id project-name dir]
-  (reset! diag [id project-name dir])
   (let [conn-atm (connect-atm :system)
         eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn-atm)]
     (d/transact conn-atm {:tx-data [{:db/id eid

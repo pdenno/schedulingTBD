@@ -389,15 +389,11 @@
   (let [{:keys [force-new?] :as info} (enrich-agent-info agent-info)
         {:keys [make-agent? make-thread? substitute-aid] :as _status} (agent-status info)
         agent (if (or force-new? make-agent?)
-                (if (= :process-interview-agent (:base-type agent-info))
-                  (do (reset! diag {:info info :status _status})
-                      (throw (ex-info "NO!" {:info info :status _status})))
-                  (-> info make-agent-assistant (put-agent! info)))
+                (-> info make-agent-assistant (put-agent! info))
                 (get-agent info))
         agent  (cond-> agent
                  substitute-aid   (assoc :agent/assistant-id substitute-aid)
                  make-thread?     (add-thread! info))]
-    (reset! diag {:status _status :info info})
     (-> agent (dissoc :db/id) agent-db2proj)))
 
 ;;; ----------------------------------- Higher-level usages ------------------------------------------

@@ -71,7 +71,6 @@
 
 (defn run-minizinc
   [request]
-  (reset! diag request)
   (log! :info "Call to run-minizinc")
   (http/ok {:mzn-output "Success!"}))
 

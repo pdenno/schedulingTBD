@@ -4,9 +4,7 @@
    ["@mui/material/Divider$default" :as Divider]
    [applied-science.js-interop :as j]
    [helix.core :refer [defnc $]]
-   [helix.hooks :as hooks]
-   #_[stbd-app.util     :as util]
-   #_[taoensso.telemere.timbre :as log :refer-macros [info debug log]]))
+   [helix.hooks :as hooks]))
 
 ;;; ToDo:
 ;;;   (1) The on-resize-x methods should not be necessary. It should be the case that resizing the parent

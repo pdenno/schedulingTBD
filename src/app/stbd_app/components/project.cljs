@@ -14,8 +14,8 @@
    [helix.core         :as helix :refer [defnc $]]
    [promesa.core       :as p]
    [stbd-app.db-access :as dba]
-   [stbd-app.ws        :as ws    :refer [send-msg]]
-   [stbd-app.util      :as util  :refer [common-info lookup-fn register-fn update-common-info!]]
+   [stbd-app.ws        :as ws]
+   [stbd-app.util      :as util  :refer [lookup-fn register-fn update-common-info!]]
    [taoensso.telemere  :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -37,7 +37,6 @@
    current is first, 'new-project' is second and the remainder are all other
    known projects sorted alphabetically."
   [current proj-infos]
-  (reset! diag {:current current :proj-infos proj-infos})
   (let [current (cond (nil? current)     #:project{:name "New Project" :id :new-project}
                       (map? current)     (assoc current :menu-text (menu-text current)) ; Awkward assoc. Necessary!
                       (string? current)  (-> {:project/name current}
@@ -57,6 +56,12 @@
       (into [current] others))))
 
 ;;; current-project and content of the others vector are keywords.
+
+;;; ToDo: This is currently causing a warning:
+;;; A component is changing an uncontrolled input to be controlled.
+;;; This is likely caused by the value changing from undefined to a defined value, which should not happen.
+;;; Decide between using a controlled or uncontrolled input element for the lifetime of the component.
+;;; More info: https://reactjs.org/link/controlled-components
 (defnc SelectProject
   "This calls chat's :get-conversation, which calls server to the the project, learn the active conversation, and resume the planner.
       - current-proj    : a map containing :project/id and :project/name.
@@ -89,7 +94,7 @@
          ($ FormControl {:size "small"} ; small makes a tiny difference, :sx's :margin and :height do not.
             ($ Select {:variant "filled"
                        :sx {:height "3vh"}
-                       :value (-> @menu-infos first :menu-text)
+                       :value (or (-> @menu-infos first :menu-text) "")
                        ;; onChange: communicates up to parent to change the conversation too.
                        :onChange (fn [_e v]
                                    (let [proj-str (j/get-in v [:props :value])

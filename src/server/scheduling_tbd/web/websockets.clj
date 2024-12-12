@@ -150,9 +150,7 @@
             (when-not (#{:ping :alive-confirm} (:dispatch-key msg)) (log! :debug (str "Received message: "  msg)))
             (if (= :stop (:dispatch-key msg))
               (swap! socket-channels #(assoc-in % [client-id :exit?] true))
-              (let [prom (px/submit! (fn []
-                                       (reset! diag (str "In the px/submit! msg = " msg))
-                                       (dispatch msg)))]
+              (let [prom (px/submit! (fn [] (dispatch msg)))]
                 (-> prom
                     (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation don't return anything themselves.
                     (p/catch (fn [err]

@@ -48,7 +48,6 @@
         (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
                           :new-proj-map {:project/name pname :project/id pid}}))
       (catch Exception e
-        (reset! diag e)
         (log! :error (str "Error starting surrogate:\n" e))))))
 
 (defn surrogate-follow-up
