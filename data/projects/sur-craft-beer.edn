@@ -180,7 +180,23 @@
                                      :id 24,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T13:32:53.320-00:00"}]}
+                                     #inst "2024-11-20T13:32:53.320-00:00"}
+                           #:message{:content
+                                     "Let's talk about the data you use to do your work. Typically, and especially in small businesses, information about customer orders, resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you use and how you maintain and store it.",
+                                     :from :system,
+                                     :id 27,
+                                     :question-type :warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-11-20T21:24:10.760-00:00"}
+                           #:message{:content
+                                     "We primarily utilize spreadsheets to track customer orders, inventory levels, production schedules, and raw materials. Each sheet contains information like order volumes, dispatch dates, and allocated resources for inventory management. Additionally, we maintain spreadsheets for tracking suppliers, delivery schedules, and ingredient costs, which help in managing our supply chain efficiently. For more integrated management, some data are also managed through inventory management and production planning software that syncs regularly with our spreadsheet records to ensure cohesive data management.",
+                                     :from :surrogate,
+                                     :id 28,
+                                     :question-type :warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-11-20T21:24:10.786-00:00"}]}
            #:conversation{:id :resources,
                           :messages
                           [#:message{:content
@@ -218,10 +234,29 @@
           :agents
           [#:agent{:assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_S6odTkFTcgXrV1nwxy2iNPpw"}],
+                   :thread-id "thread_S6odTkFTcgXrV1nwxy2iNPpw"}
+           #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
+                   :base-type :data-interview-agent,
+                   :agent-type :shared-assistant
+                   :id :data-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_cGmzuhNrzz9rXDGHpyTQlhzi"}
+           #:agent{:base-type :sur-craft-beer,
+                   :agent-type :project
+                   :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes craft beer.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",
+                   :id :sur-craft-beer-openai,
+                   :expertise "craft beer",
+                   :timestamp #inst "2024-12-08T16:12:48.520-00:00"}],
           :processes
           [#:process{:id :sur-craft-beer,
                      :interview-class :initial-unordered,
@@ -393,12 +428,5 @@
            #:claim{:conversation-id :process,
                    :string "(project-id :sur-craft-beer)"}],
           :name "SUR Craft Beer",
-          :surrogate
-          #:surrogate{:assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",
-                      :id :sur-craft-beer,
-                      :subject-of-expertise "craft beer",
-                      :system-instruction
-                      "You manage a company that makes craft beer.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av"},
           :id :sur-craft-beer}
 ]

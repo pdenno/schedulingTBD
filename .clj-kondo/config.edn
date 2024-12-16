@@ -10,7 +10,18 @@
            ;; New versions of datahike don't actually have forms for these functions and macros.
            ;; But there is lots of clojure.spec in DH, so many things will be caught at runtime.
            ;; ajax.core has similar problems.
-           :unresolved-var      {:exclude [datahike.api ajax.core]}
+           :unresolved-var      {:exclude [datahike.api ajax.core
+                                           taoensso.telemere/with-kind-filter
+                                           taoensso.telemere/signal!
+
+                                           taoensso.telemere/*ctx*
+                                           taoensso.telemere/add-handler!
+                                           taoensso.telemere/handler:console
+                                           taoensso.telemere/handler:file
+                                           taoensso.telemere/pr-signal-fn
+                                           taoensso.telemere/set-ctx!
+                                           taoensso.telemere/set-middleware!
+                                           taoensso.telemere/stop-handlers!]}
            :unused-pubic-var    {:exclude-when-contains-meta #{:diag}}
 
            ;; :exclude-patterns is for bindings, not vars. See https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md

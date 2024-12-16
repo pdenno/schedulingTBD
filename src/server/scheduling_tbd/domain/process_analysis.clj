@@ -1,21 +1,24 @@
 (ns scheduling-tbd.domain.process-analysis
   "Analysis of the process interview"
   (:require
-   [clojure.edn                               :as edn]
-   [clojure.pprint                            :refer [pprint]]
-   [clojure.spec.alpha                        :as s]
-   [clojure.string                            :as str]
-   [jsonista.core                             :as json]
-   [scheduling-tbd.db                         :as db]
-   [scheduling-tbd.llm                        :as llm :refer [query-llm]]
-   [scheduling-tbd.minizinc                   :as mzn]
-   [scheduling-tbd.response-utils             :as ru :refer [defanalyze find-claim make-human-project]]
-   [scheduling-tbd.sutil                      :as sutil :refer [elide starting-new-project?]]
-   [scheduling-tbd.web.websockets             :as ws]
-   [taoensso.telemere                         :as tel :refer [log!]]))
+   [clojure.core.unify                 :as uni]
+   [clojure.edn                        :as edn]
+   [clojure.pprint                     :refer [pprint]]
+   [clojure.spec.alpha                 :as s]
+   [clojure.string                     :as str]
+   [jsonista.core                      :as json]
+   [scheduling-tbd.agent-db            :as adb]
+   [scheduling-tbd.db                  :as db]
+   [scheduling-tbd.llm                 :as llm]
+   [scheduling-tbd.minizinc            :as mzn]
+   [scheduling-tbd.response-utils      :as ru :refer [defanalyze]]
+   [scheduling-tbd.sutil               :as sutil]
+   [scheduling-tbd.web.websockets      :as ws]
+   [taoensso.telemere                  :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
-(declare analyze-intro-response analyze-process-steps-response analyze-process-durs-response analyze-batch-size-response analyze-process-ordering-response)
+(declare analyze-warm-up-response analyze-process-steps-response analyze-process-durs-response
+         analyze-batch-size-response analyze-process-ordering-response)
 
 (def the-warm-up-type-question
   (str "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."))
@@ -28,38 +31,28 @@
 ;;; ensuring we have enough skilled workers available when needed, adds another layer of complexity to our operations.",
 ;;; This might get into skills classification, delivery schedules, downtime, machine utilization.
 
-;;; Note that pid here can be :START-A-NEW-PROJECT. In that case, we don't have a DB for the project yet. We make it here.
-(defanalyze :process/warm-up [{:keys [response client-id pid] :as _ctx}]
-  (log! :debug (str "*******analysis :process/warm-up, response = " response))
-  (let [init-state (db/get-claims pid)
-        new-claims (analyze-intro-response response init-state)
-        all-claims (into init-state new-claims)
-        surrogate? (find-claim '(surrogate ?x) init-state)] ; return state props project-id and project-name if human, otherwise argument state.
-    (when-not surrogate? (make-human-project (into init-state new-claims)))
-    ;;--------  Now human/surrogate can be treated nearly identically ---------
-    (let [[_ pid]     (find-claim '(project-id ?pid) all-claims)
-          [_ _ pname] (find-claim '(project-name ?pid ?pname) all-claims)]
-      (doseq [claim new-claims]
-        (db/add-claim! pid {:string (str claim) :cid :process :q-type :warm-up}))
-      (db/add-msg {:pid pid
-                   :cid :process
-                   :from :system
-                   :text (format "Great, we'll call your project %s." pname)
-                   :tags [:!describe-challenge :informative]})
-      (ws/refresh-client client-id pid :process)
-      pid))) ; Need this when you made a new project.
+;;; start-conversation doesn't call this. It calls analyze-warm-up-response directly. This is only used by surrogates, so far.
+(defanalyze :process/warm-up [{:keys [response pid] :as _ctx}]
+  (assert (db/project-exists? pid)) ; This is only called where the project already exists.
+  (let [warm-up-claims (analyze-warm-up-response response)
+        needed-claims (remove #('#{temp-project-id temp-project-name} (first %)) warm-up-claims)
+        bindings {'?pid pid}]
+      (doseq [claim needed-claims]
+        (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
+                            :q-type :process/warm-up
+                            :cid :process}))))
 
 (defanalyze :process/work-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)PRODUCT.*" response) (list 'provides-product pid)
                        (re-matches #".*(?i)SERVICE.*" response) (list 'provides-service pid)
                        :else                                    (list 'fails-query 'work-type pid))]
-    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :work-type})))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :process/work-type})))
 
 (defanalyze :process/production-location [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)OUR-FACILITY.*" response)  (list 'production-location pid 'factory)
                        (re-matches #".*(?i)CUSTOMER-SITE.*" response) (list 'production-location pid 'customer-site)
                        :else                                    (list 'fails-query 'production-location pid))]
-    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-location})))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :process/production-location})))
 
 
 (defanalyze :process/production-motivation [{:keys [pid response] :as _ctx}]
@@ -67,19 +60,19 @@
                        (re-matches #".*(?i)MAKE-TO-ORDER.*" response)        (list 'production-mode pid 'make-to-order)
                        (re-matches #".*(?i)ENGINEER-TO-ORDER.*" response)    (list 'production-mode pid 'engineer-to-order)
                        :else                                                 (list 'fails-query 'production-mode pid))]
-    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-motivation})))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :process/production-motivation})))
 
 (defanalyze :process/production-system-type [{:keys [pid response] :as _ctx}]
   (let [new-fact (cond (re-matches #".*(?i)FLOW-SHOP.*" response)  (list 'flow-shop pid)
                        (re-matches #".*(?i)JOB-SHOP.*"  response)  (list 'job-shop pid)
                        :else                                       (list 'fails-query 'flow-vs-job pid))]
-    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :production-system-type})))
+    (db/add-claim! pid {:string (str new-fact) :cid :process :q-type :process/production-system-type})))
 
 (defanalyze :process/process-steps [{:keys [pid] :as obj}]
   (let [new-claims (analyze-process-steps-response obj)]
     (log! :debug (str "---------------------- !query-process-steps: new-claims = " new-claims))
     (doseq [claim new-claims]
-      (db/add-claim! pid {:string (str claim) :cid :process :q-type :process-steps}))))
+      (db/add-claim! pid {:string (str claim) :cid :process :q-type :process/process-steps}))))
 
 (defanalyze :process/process-durations [{:keys [client-id response pid] :as obj}]
   (log! :info (str "process-durations (action): response =\n" response))
@@ -99,9 +92,8 @@
                      :from :system
                      :text see-code-msg
                      :tags [:info-to-user :minizinc]})
-        (ws/refresh-client client-id pid :process)
         (doseq [claim new-claims]
-          (db/add-claim! pid {:string (str claim) :cid :process :q-type :process-durations})))
+          (db/add-claim! pid {:string (str claim) :cid :process :q-type :process/process-durations})))
       (ws/send-to-chat
        {:client-id client-id
         :dispatch-key :tbd-says
@@ -117,78 +109,57 @@
   (log! :info (str "process-ordering: response = " response))
   (analyze-process-ordering-response response))
 
-;;; ================================ Supporting functions ===========================================
-;;; ------------------------------- project name --------------------------------------
-;;; The user would be prompted: "Tell us what business you are in and what your scheduling problem is."
-;;; Also might want a prompt for what business they are in.
-(def project-name-partial
-  "This is used to name the project.  Wrap the user's paragraph in square brackets."
-  [{:role "system"    :content "You are a helpful assistant."}
-   {:role "user"      :content "Produce a Clojure map containing 1 key, :project-name, the value of which is a string of 3 words or less describing the scheduling project being discussed in the text in square brackets.
-                                If the text says something like 'We make <x>', <x> ought to be part of your answer."}
+(s/def ::scheduling-challenges-response (s/keys :req-un [::product-or-service-name, ::challenges ::one-more-thing]))
+(s/def ::product-or-service-name string?)
+(s/def ::challenges (s/coll-of keyword? :kind vector?))
+(s/def ::one-more-thing string?)
 
-   {:role "user"      :content "[We produce clothes for firefighting (PPE). Our most significant scheduling problem is about deciding how many workers to assign to each product.]"}
-   {:role "assistant" :content "{:project-name \"PPE production scheduling\"}"}
-
-   {:role "user"      :content "[We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.]"}
-   {:role "assistant" :content "{:project-name \"road construction and repaving scheduling\"}"}
-   {:role "user"      :content "WRONG. That is more than 3 words."} ; This doesn't help, except with GPT-4!
-
-   {:role "user"      :content "[We do road construction and repaving. We find coping with our limited resources (trucks, workers etc) a challenge.]"}
-   {:role "assistant" :content "{:project-name \"supply chain scheduling\"}"}
-   {:role "user"      :content "WRONG. Be more specific!"} ; This doesn't help, except with GPT-4!
-
-   {:role "user"      :content "[Acme Machining is a job shop producing mostly injection molds. We want to keep our most important customers happy, but we also want to be responsive to new customers.]"}
-   {:role "assistant" :content "{:project-name \"job shop scheduling\"}"}])
-
-(defn project-name-llm-query
-  "Wrap the user-text in square brackets and send it to an LLM to suggest a project name.
-   Returns a string consisting of just a few words."
-  [user-text]
-  (as-> (conj project-name-partial
-              {:role "user" :content (str "[ " user-text " ]")}) ?r
-    (query-llm ?r {:model-class :gpt :raw-text? false}) ; 2024-03-23 I was getting bad results with :gpt-3.5. This is too important!
-    (:project-name ?r)
-    (if (string? ?r) ?r (throw (ex-info "Could not obtain a project name suggestion from and LLM." {:user-text user-text})))))
-
-(defn scheduling-challenges-claims
-  "Analyze the response for a fixed set of 'scheduling challenges' and add claims to the DB
-   for the ones that are evident in the response. This is particularly useful for planning detailed conversation.
-   Returns a map {:challenge <keywords naming challenges> :one-more-thing <a string>}."
+(defn run-scheduling-challenges-agent
+  "Analyze the response for project name,a fixed set of 'scheduling challenges' and 'one-more-thing', an observation.
+   Returns a map {:project-or-service-name, :challenge <keywords naming challenges> :one-more-thing <a string>}."
   [response]
-  (let [{:keys [aid tid]} (db/get-agent :base-type :scheduling-challenges-agent)
-        res (llm/query-on-thread {:aid aid :tid tid :query-text response :tries 2})
-        {:keys [one-more-thing] :as result} (-> res
-                                                json/read-value
-                                                (update-keys keyword)
-                                                (update :challenges #(mapv keyword %)))]
+  (let [{:keys [one-more-thing] :as res}  (-> (adb/query-agent :scheduling-challenges-agent response {:tries 2})
+                                              json/read-value
+                                              (update-keys str/lower-case)
+                                              (update-keys keyword)
+                                              (update :challenges #(mapv keyword %)))]
     (when (not-empty one-more-thing)
       (log! :info (str "one-more-thing: " one-more-thing))) ; This just to see whether another claim should be added to the agent.
-    result))
+    (when-not (s/valid? ::scheduling-challenges-response res)
+      (log! :error (str "Invalid scheduling-challenges-response: " (with-out-str (pprint res)))))
+    res))
 
-(defn analyze-intro-response
+;;; (pan/analyze-warm-up-response pant/ice-cream-answer-warm-up)
+(defn analyze-warm-up-response
   "Analyze the response to the initial question.
-   If init-state argument is just #{(project-id :START-A-NEW-PROJECT)}, we are talking to humans and there is not yet a project.
-   Returns a map containing (possibly new) pid, and claims."
-  [response init-state]
-  (log! :info (-> (str "analyze-intro-response: init-state = " init-state " response = " response) (elide 150)))
-  (let [[_ pid] (find-claim '(project-id ?x) init-state)
-        new-claims (atom #{})]
-    (when (starting-new-project? pid)
-      (let [project-name (as-> (project-name-llm-query response) ?s
-                           (str/trim ?s)
-                           (str/split ?s #"\s+")
-                           (map str/capitalize ?s)
-                           (interpose " " ?s)
-                           (apply str ?s))
-            pid (as-> project-name ?s (str/lower-case ?s) (str/replace ?s #"\s+" "-") (keyword ?s))]
-        (reset! new-claims (into (filterv #(not= % '(project-id :START-A-NEW-PROJECT)) init-state)
-                                 `[(~'project-id ~pid)
-                                   (~'project-name ~project-name)]))))
-    (let [{:keys [challenges]} (scheduling-challenges-claims response) ; ToDo keep one-more-thing?
-          more-claims (for [claim challenges]
-                        (list 'scheduling-challenge pid claim))]
-        (into @new-claims more-claims))))
+   Returns a collection of new NON-GROUND claims, including scheduling-challenges and project-id and project-name predicates.
+   Not everything here will be asserted as claims:
+     1) Actual project-name and project-id are calculated by db/create-proj-db, which already happened for surrogate.
+
+   If this is called by a human project the project-id and project-name can be retracted later.
+   If this is called by a surrogate project, the project-id and project-name are already known."
+  [response]
+  (let [{:keys [product-or-service-name challenges]}  (run-scheduling-challenges-agent response)
+        project-name (as-> product-or-service-name ?s
+                       (str/trim ?s)
+                       (str/split ?s #"\s+")
+                       (map str/capitalize ?s)
+                       (interpose " " ?s)
+                       (apply str ?s))
+        pid (as-> product-or-service-name ?s
+              (str/trim ?s)
+              (str/lower-case ?s)
+              (str/split ?s #"\s+")
+              (interpose "-" ?s)
+              (apply str ?s)
+              (keyword ?s))]
+    ;; We will unify on DB's ?pid later.
+    (-> #{}
+        (conj (list 'temp-project-id pid))                 ; Used to create project database if human.
+        (conj (list 'temp-project-name '?pid project-name))   ; Used to create project database if human.
+        (conj (list 'principal-expertise '?pid project-name))
+        (into (for [claim challenges]
+                (list 'scheduling-challenge '?pid claim))))))
 
 ;;; ToDo: I can't decide whether or not I want these process-steps in claims. I suppose it can't hurt.
 (defn analyze-process-steps-response
@@ -314,16 +285,16 @@
 (defn run-process-dur-agent-steps
   "Run the steps of the process agent, checking work after each step."
   [response]
-  (let [{:keys [aid tid]} (db/get-agent :base-type :process-dur-agent)
-        past-rev (atom response)]
+  (let [past-rev (atom response)]
     (doseq [rev [::rev-1 ::rev-2 ::rev-3 ::rev-4 ::rev-5]] ; These are also spec defs, thus ns-qualified.
       (log! :info (str "process-dur-agent, rev " (name rev)))
       (when @past-rev
-        (let [result (llm/query-on-thread
-                      {:aid aid :tid tid :role "user"
-                       :tries 3 :test-fn (fn [resp] (s/valid? rev resp))
-                       :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))
-                       :query-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)})]
+        (let [action-text (str "Perform " (-> rev name str/upper-case) " on the following:\n\n" @past-rev)
+              result (adb/query-agent :process-dur-agent
+                                      action-text
+                                      {:tries 3
+                                       :test-fn (fn [resp] (s/valid? rev resp))
+                                       :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))})]
           (reset! past-rev result)
           (log! :debug (str "process-dur-agent " (name rev) " =\n" (with-out-str (pprint @past-rev)))))))
     @past-rev))
@@ -367,16 +338,16 @@
 (defn analyze-process-ordering-response
   "Return structured object for process ordering question."
   [{:keys [response] :as _ctx}]
-    (let [{:keys [aid tid]} (db/get-agent :base-type :process-ordering-agent)
-        past-step (atom response)]
+    (let [past-step (atom response)]
     (doseq [step [::step-1 ::step-2]]
       (log! :info (str "Starting step " (name step)))
       (when @past-step
-        (let [result (llm/query-on-thread
-                      {:aid aid :tid tid :role "user"
-                       :tries 3 :test-fn (fn [_resp] true #_(s/valid? step resp)) ; ToDo: check s/valid?
-                       :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))
-                       :query-text (str "Perform " (-> step name str/upper-case) " on the following:\n\n" @past-step)})]
+        (let [action-text (str "Perform " (-> step name str/upper-case) " on the following:\n\n" @past-step)
+              result (adb/query-agent :process-ordering-agent
+                                      action-text
+                                      {:tries 3
+                                       :test-fn (fn [_resp] true #_(s/valid? step resp)) ; ToDo: check s/valid?
+                                       :preprocess-fn (fn [resp] (-> resp sutil/remove-preamble edn/read-string))})]
           (reset! past-step result)
           (log! :debug (str "process-ordering-agent " (name step) " :\n" (with-out-str (pprint @past-step)))))))
     @past-step))

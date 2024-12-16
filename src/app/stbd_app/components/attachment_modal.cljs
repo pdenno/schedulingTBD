@@ -1,14 +1,14 @@
 (ns stbd-app.components.attachment-modal
   "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
-   [ajax.core :refer [GET POST #_raw-response-format]]
+   [ajax.core :refer [POST #_raw-response-format]]
    [promesa.core :as p]
    [applied-science.js-interop :as j]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Buttons$default" :refer [AttachmentButton]]
    [helix.core :refer [defnc $]]
    [helix.dom :as dom]
    [helix.hooks :as hooks]
-   ;["react-dropzone/dist/index$useDropzone" :as useDropzone]
+   ["react-dropzone/dist/index$useDropzone" :as useDropzone] ; This worked with 4.2.3, and not some versions afterwards.
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/Button$default" :as Button]
    ["@mui/material/Card$default" :as Card]
@@ -19,7 +19,7 @@
    ["@mui/material/Dialog$default" :as Dialog]
    [stbd-app.util     :refer [common-info]]
    [stbd-app.ws       :as ws]
-   [taoensso.telemere.timbre :as log :refer-macros [info debug log]]))
+   [taoensso.telemere :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -38,23 +38,23 @@
   (let [[open, set-open] (hooks/use-state false)
         [state-text set-state-text]  (hooks/use-state drag-text) ; mystery why this doesn't work.
         modal           (hooks/use-ref nil)
-        ;dz-hook         (useDropzone)
-        root-props      nil #_((j/get dz-hook :getRootProps) #js {:className "dropzone"})
-        input-props     nil #_((j/get dz-hook :getInputProps))
-        accepted-files  nil #_(j/get dz-hook :acceptedFiles)]
+        dz-hook         (useDropzone)
+        root-props      ((j/get dz-hook :getRootProps) #js {:className "dropzone"})
+        input-props     ((j/get dz-hook :getInputProps))
+        accepted-files  (j/get dz-hook :acceptedFiles)]
     (letfn [(save-success [_] (when (j/get modal :current)
                                 ;;(set-open false)
                                 (set-state-text "Saving to server succeeded.")))
             (save-failure [status status-text]
               (when (j/get modal :current)
-                (log/info "Saving example failed: status = " status " status text = " status-text)
+                (log! :info (str "Saving example failed: status = " status " status text = " status-text))
                 (set-state-text "Communication with the server failed.")
                 (set-open true)))
             (handle-attach []
               (when (j/get modal :current) (set-open true) (set-state-text drag-text)))
             (upload-files []
               (doseq [f (js->clj accepted-files)] ; Copy because I do .shift on it below.
-                (log/info "upload file:" (j/get f :name))
+                (log! :info (str "upload file: " (j/get f :name)))
                 (let [fr (js/FileReader.)]
                   (.addEventListener fr "loadend"
                                      (fn [_event]
@@ -78,7 +78,7 @@
               (when post-attach-fn (post-attach-fn accepted-files)))
             (handle-close [] (set-open false))]
       (dom/div {:ref modal}
-        ($ AttachmentButton {:onClick handle-attach})
+               ($ AttachmentButton {:onClick handle-attach})
         ($ Dialog  {:open open :onClose handle-close}
            ($ Stack {:direction "row"
                      :divider ($ Divider {:variant "activeVert" :color "black"})} ; ToDo: only "activeVert" works.

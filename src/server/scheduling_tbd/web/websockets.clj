@@ -5,14 +5,13 @@
    [clojure.core.async       :as async :refer [<! >! go]]
    [clojure.edn              :as edn]
    [clojure.spec.alpha       :as s]
-   [clojure.walk             :as walk  :refer [keywordize-keys]]
    [mount.core               :as mount :refer [defstate]]
    [promesa.core             :as p]
    [promesa.exec             :as px]
    [ring.websocket.async     :as wsa]
    [scheduling-tbd.specs     :as spec]
    [scheduling-tbd.sutil     :as sutil :refer [elide]]
-   [scheduling-tbd.util      :refer [now]]
+   [scheduling-tbd.util      :refer [now util-state]] ; util-state for mount
    [taoensso.telemere        :refer [log! event!]]))
 
 (def ^:diag diag (atom {}))
@@ -148,12 +147,12 @@
       (loop []
         (when-let [msg (<! in)] ; Listen for messages.
           (let [msg (edn/read-string msg)]
-            (when-not (#{:ping :alive-confirm} (:dispatch-key msg)) (log! :info (str "Received message: "  msg)))
+            (when-not (#{:ping :alive-confirm} (:dispatch-key msg)) (log! :debug (str "Received message: "  msg)))
             (if (= :stop (:dispatch-key msg))
               (swap! socket-channels #(assoc-in % [client-id :exit?] true))
               (let [prom (px/submit! (fn [] (dispatch msg)))]
                 (-> prom
-                    (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation-plan don't return anything themselves.
+                    (p/then (fn [r] (when r (go (>! out (str r)))))) ; Some, like-resume-conversation don't return anything themselves.
                     (p/catch (fn [err]
                                (let [trace (->> (.getStackTrace err) (map str) (interpose "\n") (apply str))]
                                  (log! :error (str "Error dispatching: msg = " msg " err = " err "\ntrace:\n" trace))))))))
@@ -173,9 +172,9 @@
    In that case, the old channel will eventually get destroyed by close-inactive-channels.
    Returns a map with value for key :ring.websocket/listener."
   [request]
-  (log! :debug (str "Establishing ws handler for " (-> request :query-params keywordize-keys :client-id)))
+  (log! :debug (str "Establishing ws handler for " (-> request :query-params (update-keys keyword) :client-id)))
   (when-not @inactive-channels-process (reset! inactive-channels-process (future (close-inactive-channels))))
-  (if-let [client-id (-> request :query-params keywordize-keys :client-id)]
+  (if-let [client-id (-> request :query-params (update-keys keyword) :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]
       (swap! ping-dates #(assoc % client-id (now)))
       (error-listener client-id)   ; This and next are go loops,
@@ -209,8 +208,10 @@
   ([] (reset! promise-stack '()))
   ([client-id]
    (doseq [p (filter #(= client-id (:client-id %)) @promise-stack)]
-     (log! :info (str "Clearing (rejecting) promise " p))
-     (p/reject! (:prom p) (ex-info "client forgotten" {})))
+     (log! :debug (str "Clearing (rejecting) promise " p))
+     (when-let [prom (:prom p)]
+       (when (p/promise? prom)
+         (p/reject! (:prom p) (ex-info "client forgotten" {})))))
    (swap! promise-stack #(remove (fn [p] (= (:client-id p) client-id)) %))))
 
 (defn remove-promise!
@@ -218,7 +219,7 @@
   [p-key]
   (swap! promise-stack (fn [stack] (remove #(= p-key (:p-key %)) stack))))
 
-(defn new-promise
+(defn new-promise!
   "Return a vector of [key, promise] to a new promise.
    We use this key to match returning responses from ws-send :domain-expert-says, to know
    what is being responded to." ; ToDo: This is not fool-proof.
@@ -226,6 +227,7 @@
   (let [k (-> (gensym "promise-") keyword)
         p (p/deferred)
         obj {:prom p :p-key k :client-id client-id :timestamp (java.util.Date.)}]
+    (log! :debug (str "New promise: " obj))
     (swap! promise-stack #(conj % obj))
     ;; Because I saw it messed up once...
     (when-not (every? #(s/valid? ::promise %) @promise-stack)
@@ -257,10 +259,9 @@
    Note that we call it 'domain-expert' rather than 'user' because the role is just that, and it can be
    filled by a human or surrogate expert."
   [{:keys [msg-text client-id promise-keys] :as msg}]
-  (log! :info (str "domain-expert-says: " msg))
+  (log! :debug (str "domain-expert-says: " msg))
   (if-let [prom-obj (select-promise promise-keys)]
-    (do (log! :info (str "Before resolve!: prom-obj = " prom-obj))
-        (reset! diag prom-obj)
+    (do (log! :debug (str "Before resolve!: prom-obj = " prom-obj))
         (p/resolve! (:prom prom-obj) msg-text)
         (clear-keys client-id [(:p-key prom-obj)]))
     (log! :error "domain-expert-says: no p-key (e.g. no question in play)")))
@@ -275,12 +276,12 @@
   (s/assert ::spec/chat-msg-obj content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if-let [out (->> client-id (get @socket-channels) :out)]
-    (let [{:keys [prom p-key]} (when promise? (new-promise client-id))
+    (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))
           msg-obj (cond-> content
                     p-key               (assoc :p-key p-key)
                     true                (assoc :timestamp (now)))]
       (when-not (= :alive? dispatch-key)
-        (event! ::send-to-client {:level :debug :msg (elide (str "send-to-chat: msg-obj =" msg-obj) 80)}))
+        (log! :debug (elide (str "send-to-chat: msg-obj =" msg-obj) 130)))
       (go (>! out (str msg-obj)))
       prom)
     (log! :error (str "Could not find out async channel for client " client-id))))
@@ -290,12 +291,13 @@
 ;;; Other namespaces update it (with register-ws-dispatch).
 (defonce dispatch-table (atom nil))
 
-(defn register-ws-dispatch
+(defmacro register-ws-dispatch
   "Add a function to the websocket dispatch table."
   [k func]
-  (assert (fn? func))
-  (swap! dispatch-table #(assoc % k func))
-  (event! ::register-ws-fn {:level :report :msg (str "Registered function for websocket: " k)}))
+  `(do
+     (assert (fn? ~func))
+     (swap! dispatch-table #(assoc % ~k ~func))
+     (log! :info (str "Registered function for websocket: " ~k))))
 
 (defn client-confirms-alive
   "Because the ws go loop can drop, we use this as part of reconnecting."
@@ -307,7 +309,7 @@
 (defn init-dispatch-table!
   "A map from keyword keys (typically values of :dispatch-key) to functions for websockets.
    Other entries in this table include (they are added by register-ws-dispatch):
-       :resume-conversation-plan plan/resume-conversation
+       :resume-conversation      interviewers/resume-conversation
        :surrogate-call           sur/start-surrogate
        :ask-llm                  llm/llm-directly."
   []
@@ -316,11 +318,10 @@
                           :alive-confirm        client-confirms-alive
                           :close-channel        close-channel}))
 
-;;; surrogate.clj interviewers.clj llm.clj
+;;; When you recompile this, recompile surrogate.clj, interviewers.clj and llm.clj.
 (defn dispatch [{:keys [dispatch-key] :as msg}]
   (when-not (#{:ping :alive-confirm} dispatch-key)
-    (event! ::dispatch {:level :report :msg (str "dispatch: Received msg: " msg)}))
-
+    (log! :info (elide (str "Received msg: " msg) 130)))
   (let [res (cond (= dispatch-key :stop)                        nil ; What needs to be done has already been done.
                   (contains? @dispatch-table dispatch-key)      ((get @dispatch-table dispatch-key) msg)
                   :else                                         (log! :error (str "No dispatch function for " msg "."
@@ -328,31 +329,32 @@
                                                                                   " Search for 'register-ws-dispatch' and recompile.")))]
     (when (map? res)
       (when-not (= (:dispatch-key res) :ping-confirm)
-        (event! ::response-from-dispatch {:level :report :msg (str "dispatch: Sending response: " res)}))
+        (event! ::response-from-dispatch {:level :debug :msg (str "dispatch: Sending response: " res)}))
       res)))
 
-;;; ToDo: Should this and a few others have promises? And should :promise? be called :round-trip?
-(defn refresh-client
-  "Send a message to the client to reload the conversation. Typically done with surrogate."
-  [client-id pid cid]
-  (assert (string? client-id))
-  (send-to-chat {:promise? false
-                 :client-id client-id
-                 :dispatch-key :update-conversation-text
-                 :pid pid
-                 :cid cid}))
-
 ;;;------------------- Starting and stopping ---------------
+;;; ToDo: Not clear why the the starts referenced here run twice on start and restart.
+;;;       They run once on compile.
 (defn wsock-start []
   (clear-promises!)
   (reset! ping-dates {})
-  (init-dispatch-table!))
+  (init-dispatch-table!)
+  ;; The following have ws/register-ws-dispatch, which need to be re-established.
+  (mount/start (find-var 'scheduling-tbd.llm/llm-tools))
+  (mount/start (find-var 'scheduling-tbd.surrogate/surrogates))
+  (mount/start (find-var 'scheduling-tbd.interviewers/iviewers))
+  [:socket-started])
 
 (defn wsock-stop []
   (doseq [id (keys @socket-channels)]
     (forget-client id))
   (doseq [prom-obj @promise-stack]
-    (p/reject! (:prom prom-obj) :restarting))
+    (p/reject! (:prom prom-obj) (ex-info (str "restarting: Rejecting promise: " prom-obj)
+                                         {:prom-obj prom-obj})))
+  ;; The following have ws/register-ws-dispatch, which need to be re-established.
+  (mount/stop (find-var 'scheduling-tbd.llm/llm-tools))
+  (mount/stop (find-var 'scheduling-tbd.surrogate/surrogates))
+  (mount/stop (find-var 'scheduling-tbd.interviewers/iviewers))
   (reset! promise-stack '())
   [:closed-sockets])
 

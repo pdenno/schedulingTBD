@@ -41,7 +41,7 @@
               (set-open true)
               (log/info "before http call.")
               (let [prom (p/deferred)]
-                (POST (str "/api/run-minizinc?project-id=" (:project/id @common-info) "&client-id=" ws/client-id)
+                (POST (str "/api/run-minizinc?project-id=" (:pid @common-info) "&client-id=" ws/client-id)
                       {:timeout 30000
                        :body {:code example-code}
                        :handler (fn [resp]

@@ -2,10 +2,22 @@
 #:project{:agents
           [#:agent{:assistant-id "asst_EwzLHKlxoSdkUMzjxDHlrtap",
                    :base-type :process-interview-agent,
+                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
-                   :thread-id "thread_ItPZGtTOqmuSILHetgbxfSfg"}],
+                   :thread-id "thread_ItPZGtTOqmuSILHetgbxfSfg"}
+           #:agent{:base-type :sur-remanufactured-alternators,
+                   :agent-type :project
+                   :thread-id "thread_8uvGjgLQPTxcQgPz33XL9tU9",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes remanufactured alternators.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_xEU23bgeSGtQGmA1Zw8AisOE",
+                   :id :sur-remanufactured-alternators-openai,
+                   :expertise "remanufactured alternators",
+                   :timestamp #inst "2024-12-08T16:12:48.662-00:00"}],
           :code
           "enum Task = {disassembly, cleaning, inspection, component, reassembly, testing, packaging};",
           :conversations
@@ -188,13 +200,5 @@
                                      #inst "2024-11-20T13:32:54.465-00:00"}]}],
           :current-conversation :process,
           :id :sur-remanufactured-alternators,
-          :name "SUR Remanufactured Alternators",
-          :surrogate
-          #:surrogate{:assistant-id "asst_xEU23bgeSGtQGmA1Zw8AisOE",
-                      :id :sur-remanufactured-alternators,
-                      :subject-of-expertise
-                      "remanufactured alternators",
-                      :system-instruction
-                      "You manage a company that makes remanufactured alternators.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                      :thread-id "thread_8uvGjgLQPTxcQgPz33XL9tU9"}}
+          :name "SUR Remanufactured Alternators"}
 ]

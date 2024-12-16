@@ -1,0 +1,56 @@
+;;; This is used by agent-db.clj to create agents.
+;;; "The actual agent :base-type is the one provided here with -<llm-provider> added."
+[
+ ;; ---------- project-specific interview agents -------------------------
+ {:base-type :process-interview-agent
+  :agent-type :shared-assistant
+  :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
+  :tools [{:type "file_search"}]
+  :vector-store-paths ["agents/interviewers/process-interview-flowchart.pdf"]
+  :instruction-path "agents/interviewers/process.txt"
+  ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
+  #_#_:response-format-path "agents/interviewers/response-format-path.edn"}
+
+ {:base-type :data-interview-agent
+  :agent-type :shared-assistant
+  :model-class :gpt
+  :tools [{:type "file_search"}]
+  #_#_:vector-store-paths ["agents/interviewers/data-interview-flowchart.pdf"]
+  :instruction-path "agents/interviewers/data.txt"}
+
+ {:base-type :resources-interview-agent
+  :agent-type :shared-assistant
+  :model-class :gpt
+  :tools [{:type "file_search"}]
+  #_#_:vector-store-paths ["agents/interviewers/resources-interview-flowchart.pdf"]
+  :instruction-path "agents/interviewers/resources.txt"}
+
+ {:base-type :optimality-interview-agent
+  :agent-type :shared-assistant
+  :model-class :gpt
+  :tools [{:type "file_search"}]
+  #_#_:vector-store-paths ["agents/interviewers/optimality-interview-flowchart.pdf"]
+  :instruction-path "agents/interviewers/optimality.txt"}
+
+ ;; ----------------- more generic system agents ---------------------------------
+ {:base-type :response-analysis-agent
+  :agent-type :system
+  :instruction-path "agents/response-analysis-agent.txt"
+  :response-format-path "agents/response-analysis-format.edn"}
+
+ {:base-type :scheduling-challenges-agent
+  :agent-type :system
+  :instruction-path "agents/scheduling-challenges.txt"
+    :response-format-path "agents/scheduling-challenges-response-format.edn"}
+
+ {:base-type :process-dur-agent
+  :agent-type :system
+  :instruction-path "agents/process-dur-agent.txt"}
+
+ {:base-type :process-ordering-agent
+  :agent-type :system
+  :instruction-path "agents/process-ordering-agent.txt"}
+
+ {:base-type :text-function-agent
+  :agent-type :system
+  :instruction-path "agents/text-function-agent.txt"}]
