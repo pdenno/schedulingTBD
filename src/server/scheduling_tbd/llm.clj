@@ -170,8 +170,10 @@
 
 ;;; I don't use clojure.core/memoize here because I want to clear the atom on mount/start.
 ;;; We could populate this at startup, see list-assistants below, but it might mean keeping objects for lots of unused assistants.
-;;; BTW, this is not case with get-thread-memo; there is no way to list all the threads.
-(def assistant-memo "A map of aid to assistant object, for memoization" (atom {}))
+;;; BTW, this is not case with get-thread-memo; currently there is no way to list all the threads.
+
+;;; A map of aid to assistant object, for memoization
+(defonce assistant-memo (atom {}))
 (defn get-assistant
   "Return a assistant object if the assistant exists, or nil otherwise."
   [aid & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
@@ -180,14 +182,19 @@
                   (openai/retrieve-assistant {:assistant_id aid}
                                              (api-credentials llm-provider))
                   (catch Exception _e nil)))]
-    (swap! assistant-memo #(assoc % aid (if (map? res) (dissoc res :instructions) :missing)))
+    (swap! assistant-memo
+           #(assoc % aid
+                   (if (map? res)
+                     (dissoc res :instructions)
+                     :missing)))
     (if (= res :missing) nil res)))
 
 (defn ^:diag get-thread-force
   [tid]
   (openai/retrieve-thread {:thread_id tid} (api-credentials @default-llm-provider)))
 
-(def thread-memo "A map of tid to thread object, for memoization" (atom {}))
+;;; A map of tid to thread object, for memoization
+(defonce thread-memo  (atom {}))
 (defn get-thread
   "Return a thread object if the thread exists, or nil otherwise."
   [tid & {:keys [llm-provider] :or {llm-provider @default-llm-provider}}]
@@ -196,7 +203,8 @@
                   (openai/retrieve-thread {:thread_id tid}
                                           (api-credentials llm-provider))
                   (catch Exception _e nil)))]
-    (swap! thread-memo #(assoc % tid (or res :missing)))
+    (swap! thread-memo
+           #(assoc % tid (or res :missing)))
     (if (= res :missing) nil res)))
 
 (defn ^:diag list-thread-messages

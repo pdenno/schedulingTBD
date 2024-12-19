@@ -3,7 +3,7 @@
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
            com.cemerick/url                    {:mvn/version "0.1.1"}
            com.github.pdenno/mznp              {:mvn/version "1.0.89"}
-           com.taoensso/timbre                 {:mvn/version "6.6.1"} ; Kee
+           com.taoensso/timbre                 {:mvn/version "6.6.1"} ; Keep
            com.taoensso/telemere               {:mvn/version "1.0.0-RC1"}
            com.taoensso/telemere-slf4j         {:mvn/version "1.0.0-RC1"} ; Just adding it here initializes it; try (tel/check-interop).
            com.taoensso/truss                  {:mvn/version "1.12.0"}

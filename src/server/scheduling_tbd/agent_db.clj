@@ -479,13 +479,13 @@
     (assert (< (:tries obj) 10))
     (if (> (:tries obj) 0)
       (try
-        (do (tel/with-kind-filter {:allow :agents}
-              (tel/signal! {:kind :agents :level :info :msg (str "\n\n" (name base-type) " ===> " query-text)}))
-            (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
-                  res (preprocess-fn raw)]
-              (tel/with-kind-filter {:allow :agents}
-                (tel/signal! {:kind :agents :level :info :msg (str "\n" (name base-type) " <=== " raw)}))
-              (if (test-fn res) res (throw (ex-info "Try again" {:res res})))))
+        (tel/with-kind-filter {:allow :agents}
+          (tel/signal! {:kind :agents :level :info :msg (str "\n\n" (name base-type) " ===> " query-text)}))
+        (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
+              res (preprocess-fn raw)]
+          (tel/with-kind-filter {:allow :agents}
+            (tel/signal! {:kind :agents :level :info :msg (str "\n" (name base-type) " <=== " raw)}))
+          (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
         (catch Exception e
           (let [d-e (datafy e)]
             (log! :warn (str "query-on-thread failed (tries = " (:tries obj) "):\n "
