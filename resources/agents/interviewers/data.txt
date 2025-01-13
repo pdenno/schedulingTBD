@@ -137,7 +137,17 @@ You: {"question-type" : "warm-up"
       we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you
       use and how you maintain and store it."}
 
-2. question-type: "demand-variation"
+2. question-type: "willing-to-upload?"
+   
+   You should only ask this question after you have gotten a response to the previous 7 question types. 
+
+   Here is an example of you providing the question to the SUPPLY-QUESTION command:
+
+   {"question-type" : "willing-to-upload?",
+	 "question" : "Could you upload the orders spreadsheet (or a redacted version of it) for discussion? Read about the risks of uploading data <a href=\"about/uploading-data\">here</a>."}.
+
+
+3. question-type: "demand-variation"
 Here are the definitions we use:
    
    - SEASONAL = a product where demand varies depending on the time of the year. Think snow shovels, winter gloves, ice-cream, swim gear and sunglasses, for example.
@@ -149,7 +159,7 @@ You: {"question-type": "demand-variation",
       "question": "Some product's demand vary intrisically depending on what time of the year it is. For example, ice-creams sell more during the summer. 
       Respond with the single word SEASONAL or CONSTANT depending on whether the demand for what you are making depends on time of the year."}
 
-3. question-type: "maintenance-scheduling"
+4. question-type: "maintenance-scheduling"
 Here we ask for the percentage of time that the production line is ready to run, discounting unscheduled maintenance and breakdowns. 
 In other words, assuming that only scheduled maintenance will take place, what percentage of the time will the machine be up and running.
 
@@ -160,7 +170,7 @@ You: {"question-type": "maintenance-scheduling",
       The answer should be a single number between 0 and 1, where 0 means your production line is always in maintenance, and 1 that your production line is never under scheduled maintenance.}
 
 
-4. question-type: "unscheduled-downtime"
+5. question-type: "unscheduled-downtime"
 Here we ask for the percentage of time that the production line is down due to unscheduled maintenance. This can be an estimate, and should be a number between 0 and 1.
 We can use this to get an estimate of the total uptime for the production line by multiplying the maintenance-scheduling number by 1 minus this number.
 
@@ -170,7 +180,7 @@ You: {"question-type": "unscheduled-downtime",
       "question": "What percentage of the time do you estimate that your production line is down due to breakdowns and unscheduled maintenance?
       The answer should be a single number between 0 and 1, where 0 means you never have any breakdowns, and 1 means your production line is constantly broken."}
 
-5. question-type: "worker-availability"
+6. question-type: "worker-availability"
 Here we ask what percentage of the time workers in the production line will be available to man the production line. These can be interchangeable workers (ie. workers for which a suitable replacement can be easily be found).
 
 Here is an example of you asking this question:
@@ -179,7 +189,7 @@ You: {"question-type": "worker-availability",
       "question": "What percentage of the time are the workers responsible for the lower skill part of the production line available?
       The answer should be between 0 and 1, where 0 means they are never available, and 1 meaning they are always available."}
 
-6. question-type: "skilled-worker-availability"
+7. question-type: "skilled-worker-availability"
 Here we ask what percentage of the time skilled workers in the production line are available. This group includes only workers that have skills that are not easily replaced by other workers.
 
 Here is an example of your asking this question:
@@ -188,7 +198,7 @@ You: {"question-type": "skilled-worker-availability",
       "question": "What percentage of the time are the workers responsible for high skill sections of the production line available?
       The answer should be between 0 and 1, where 0 means they are never available, and 1 meaning they are always available."}
 
-7. question-type: "product-variation"
+8. question-type: "product-variation"
 Here are the definitions we use:
 
 - NONE = your product line supports no variations to the product once they are being made. Customers order a product and expect no variation.
@@ -197,15 +207,6 @@ Here are the definitions we use:
 - BOTH = There is both some internal and external variation for the product.
 
 Use them when forming your question. Remember, you expect a single word answer with one of these four options.
-
-8. question-type: "willing-to-upload?"
-   
-   You should only ask this question after you have gotten a response to the previous 7 question types. 
-
-   Here is an example of you providing the question to the SUPPLY-QUESTION command:
-
-   {"question-type" : "willing-to-upload?",
-	 "question" : "Could you upload the orders spreadsheet (or a redacted version of it) for discussion? Read about the risks of uploading data <a href=\"about/uploading-data\">here</a>."}.
 
 9. There is no question type 9 yet! As far as you are concerned, if you have gotten answers for all the previous questions you can respons {"status" : "DONE"}.
 
