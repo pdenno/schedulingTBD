@@ -21,9 +21,8 @@
   [role]
   (format "You manage a company that makes %s.
    You are an expert in production and manage your company's supply chains.
-   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.
-   Your answers typically are short, just a few sentences each.
-   If you don’t have information to answer my questions, you provide a plausible answer nonetheless." role))
+   You help me by answering questions that will allow us to collaborate in building a scheduling system for your company.
+   Your answers typically are short, just a few sentences each." role))
 
 ;;; (sur/start-surrogate! {:product "optical fiber" :client-id (ws/recent-client!)})
 (defn start-surrogate!

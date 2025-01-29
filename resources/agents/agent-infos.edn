@@ -15,21 +15,18 @@
   :agent-type :shared-assistant
   :model-class :gpt
   :tools [{:type "file_search"}]
-  #_#_:vector-store-paths ["agents/interviewers/data-interview-flowchart.pdf"]
   :instruction-path "agents/interviewers/data.txt"}
 
  {:base-type :resources-interview-agent
   :agent-type :shared-assistant
   :model-class :gpt
   :tools [{:type "file_search"}]
-  #_#_:vector-store-paths ["agents/interviewers/resources-interview-flowchart.pdf"]
   :instruction-path "agents/interviewers/resources.txt"}
 
  {:base-type :optimality-interview-agent
   :agent-type :shared-assistant
   :model-class :gpt
   :tools [{:type "file_search"}]
-  #_#_:vector-store-paths ["agents/interviewers/optimality-interview-flowchart.pdf"]
   :instruction-path "agents/interviewers/optimality.txt"}
 
  ;; ----------------- more generic system agents ---------------------------------
