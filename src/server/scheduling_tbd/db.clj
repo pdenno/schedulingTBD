@@ -13,8 +13,7 @@
    [datahike.api                 :as d]
    [datahike.pull-api            :as dp]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.agent-db :as adb]
-   [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema db-cfg-map default-llm-provider register-db resolve-db-id]]
+   [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
    [scheduling-tbd.util     :as util :refer [now]]
    [taoensso.telemere       :refer [log!]]))
 
@@ -161,6 +160,9 @@
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
+   :conversation/interviewer-budget
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
+        :doc "the budget a number (0 <= budget <= 1) indicating how much more resources the interviewer is allowed to expend."}
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages of the conversation."}
@@ -502,7 +504,7 @@
          vec))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/id :conversation/messages :message/id :message/from :message/content :message/time :message/tags :message/question-type})
+  #{:conversation/id :conversation/interviewer-budget :conversation/messages :message/id :message/from :message/content :message/time :message/tags :message/question-type})
 
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
@@ -760,6 +762,17 @@
                                                             question-type    (assoc :message/question-type question-type))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
+(defn interviewer-budget
+  "Return the interviewer budget, or 1.0 if it was not found." ; ToDo: Not found is a schema migration issue.
+  [pid cid]
+  (or (d/q '[:find ?budget
+             :in $ ?cid
+             :where
+             [:conversation/id ?cid]
+             [:conversation/interviewer-budget ?budget]]
+           @(connect-atm pid) cid)
+      1.0))
+
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
   [id project-name dir]
@@ -838,10 +851,10 @@
                                               :project/current-conversation :process
                                               :project/claims [{:claim/string (str `(~'project-id ~id))}
                                                                {:claim/string (str `(~'project-name ~id ~pname))}]
-                                              :project/conversations [{:conversation/id :process}
-                                                                      {:conversation/id :data}
-                                                                      {:conversation/id :resources}
-                                                                      {:conversation/id :optimality}]}]})
+                                              :project/conversations [{:conversation/id :process :conversation/interviewer-budget 1.0}
+                                                                      {:conversation/id :data :conversation/interviewer-budget 1.0}
+                                                                      {:conversation/id :resources :conversation/interviewer-budget 1.0}
+                                                                      {:conversation/id :optimality :conversation/interviewer-budget 1.0}]}]})
      (add-conversation-intros id)
      (when (not-empty additional-info)
        (d/transact (connect-atm id) additional-info))

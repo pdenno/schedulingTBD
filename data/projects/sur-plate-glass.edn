@@ -1,14 +1,16 @@
 [
 #:project{:conversations
-          [#:conversation{:id :process,
+          [#:conversation{:done? true,
+                          :id :process,
+                          :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
-                                     "This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
                                      :from :system,
                                      :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-12-03T21:10:55.311-00:00"}
+                                     #inst "2025-01-30T17:38:23.283-00:00"}
                            #:message{:content
                                      "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
                                      :from :system,
@@ -16,30 +18,30 @@
                                      :question-type :process/warm-up,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-03T21:11:11.077-00:00"}
+                                     #inst "2025-01-30T17:38:38.877-00:00"}
                            #:message{:content
-                                     "We produce a variety of plate glass products, including tempered glass, laminated glass, and low-emissivity glass for architectural and automotive applications. Our scheduling challenge involves coordinating production sequences to optimize furnace capacity, minimize changeovers between different glass types, and manage lead times effectively. We also need to align production with supply chain logistics to ensure timely delivery of raw materials and finished products.",
+                                     "We produce a variety of plate glass products, including standard clear glass, tinted glass, tempered glass, and laminated glass used in construction, automotive, and specialty applications. The main scheduling challenge is coordinating production cycles with supply chain logistics and customer demand. We must optimally allocate resources to minimize machine downtime and ensure timely delivery while managing raw material availability and varying lead times for customized orders.",
                                      :from :surrogate,
                                      :id 6,
                                      :question-type :process/warm-up,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-03T21:11:11.100-00:00"}
+                                     #inst "2025-01-30T17:38:38.906-00:00"}
                            #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
+                                     "Would you characterize your company's work as primarily providing a product, a service or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
                                      :from :system,
                                      :id 7,
                                      :question-type :process/work-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-03T21:11:28.160-00:00"}
+                                     #inst "2025-01-30T17:38:57.831-00:00"}
                            #:message{:content "PRODUCT",
                                      :from :surrogate,
                                      :id 8,
                                      :question-type :process/work-type,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-03T21:11:28.196-00:00"}
+                                     #inst "2025-01-30T17:38:57.852-00:00"}
                            #:message{:content
                                      "Some work is performed in your own facility, some, like cutting down trees, has to be performed at the customer's site. Which is most common in your work? Respond with the single word OUR-FACILITY, CUSTOMER-SITE, or if it isn't straightforward, an explanation.",
                                      :from :system,
@@ -48,7 +50,7 @@
                                      :process/production-location,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-03T21:11:38.104-00:00"}
+                                     #inst "2025-01-30T17:39:11.831-00:00"}
                            #:message{:content "OUR-FACILITY",
                                      :from :surrogate,
                                      :id 10,
@@ -56,16 +58,16 @@
                                      :process/production-location,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-03T21:11:38.127-00:00"}
+                                     #inst "2025-01-30T17:39:11.865-00:00"}
                            #:message{:content
-                                     "There are three common motivations for making a product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product is configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER, or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
+                                     "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER, or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
                                      :from :system,
                                      :id 11,
                                      :question-type
                                      :process/production-motivation,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-03T21:11:52.271-00:00"}
+                                     #inst "2025-01-30T17:39:37.145-00:00"}
                            #:message{:content "MAKE-TO-ORDER",
                                      :from :surrogate,
                                      :id 12,
@@ -73,16 +75,16 @@
                                      :process/production-motivation,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-03T21:11:52.293-00:00"}
+                                     #inst "2025-01-30T17:39:37.177-00:00"}
                            #:message{:content
-                                     "There are a few common patterns or system designs by which products are made. In a FLOW-SHOP all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
+                                     "There are a few common patterns or system designs by which product is made. In a FLOW-SHOP, all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
                                      :from :system,
                                      :id 13,
                                      :question-type
                                      :process/production-system-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-03T21:12:02.745-00:00"}
+                                     #inst "2025-01-30T17:40:00.163-00:00"}
                            #:message{:content "FLOW-SHOP",
                                      :from :surrogate,
                                      :id 14,
@@ -90,7 +92,7 @@
                                      :process/production-system-type,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-03T21:12:02.766-00:00"}
+                                     #inst "2025-01-30T17:40:00.209-00:00"}
                            #:message{:content
                                      "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
                                      :from :system,
@@ -99,16 +101,16 @@
                                      :process/process-steps,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-03T21:12:19.858-00:00"}
+                                     #inst "2025-01-30T17:40:17.414-00:00"}
                            #:message{:content
-                                     "1. Cut Glass Sheets\n2. Edge Finishing\n3. Tempering\n4. Laminating\n5. Coating (e.g. Low-Emissivity)\n6. Quality Inspection\n7. Packaging",
+                                     "1. Prepare Raw Materials\n2. Melt and Form Glass\n3. Anneal Glass\n4. Cut Glass to Size\n5. Temper or Laminate (if required)\n6. Inspect and Quality Check\n7. Package and Label",
                                      :from :surrogate,
                                      :id 16,
                                      :question-type
                                      :process/process-steps,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-03T21:12:19.883-00:00"}
+                                     #inst "2025-01-30T17:40:17.442-00:00"}
                            #:message{:content
                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
                                      :from :system,
@@ -117,42 +119,61 @@
                                      :process/process-durations,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-03T21:12:31.748-00:00"}
+                                     #inst "2025-01-30T17:40:32.366-00:00"}
                            #:message{:content
-                                     "1. Cut Glass Sheets (30-60 minutes)\n2. Edge Finishing (20-40 minutes)\n3. Tempering (1-2 hours)\n4. Laminating (2-3 hours)\n5. Coating (e.g. Low-Emissivity) (1-2 hours)\n6. Quality Inspection (30-45 minutes)\n7. Packaging (20-30 minutes)",
+                                     "1. Prepare Raw Materials (2-3 hours)\n2. Melt and Form Glass (8-12 hours)\n3. Anneal Glass (4-6 hours)\n4. Cut Glass to Size (1-2 hours)\n5. Temper or Laminate (if required) (4-5 hours)\n6. Inspect and Quality Check (1-2 hours)\n7. Package and Label (1-2 hours)",
                                      :from :surrogate,
                                      :id 18,
                                      :question-type
                                      :process/process-durations,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-03T21:12:31.789-00:00"}
+                                     #inst "2025-01-30T17:40:32.397-00:00"}
                            #:message{:content
                                      "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
                                      :from :system,
                                      :id 19,
                                      :tags [:info-to-user :minizinc],
                                      :time
-                                     #inst "2024-12-03T21:13:26.869-00:00"}
+                                     #inst "2025-01-30T17:41:38.900-00:00"}
                            #:message{:content
-                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just '1000 packages'. If, however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n1. Make Cookie Dough (1000 packages)\n2. Make Filling      (2000 packages)\n3. Bake Wafers       (1000 packages)\n4. Assemble Cookies  (1000 packages)\n5. Package           (1000 packages)",
+                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just \"1000 packages.\" If, however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling      (2000 packages)\n 3. Bake Wafers       (1000 packages)\n 4. Assemble Cookies  (1000 packages)\n 5. Package           (1000 packages)",
                                      :from :system,
                                      :id 20,
                                      :question-type
                                      :process/batch-size,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-03T21:13:42.039-00:00"}
+                                     #inst "2025-01-30T17:41:57.755-00:00"}
                            #:message{:content
-                                     "1. Cut Glass Sheets (200 sheets)\n2. Edge Finishing (200 sheets)\n3. Tempering (200 sheets)\n4. Laminating (100 sheets)\n5. Coating (e.g. Low-Emissivity) (100 sheets)\n6. Quality Inspection (200 sheets)\n7. Packaging (200 sheets)",
+                                     "1. Prepare Raw Materials (varies based on product size)\n2. Melt and Form Glass (1000-2000 square meters)\n3. Anneal Glass (1000-2000 square meters)\n4. Cut Glass to Size (200-500 pieces)\n5. Temper or Laminate (if required) (200-500 pieces)\n6. Inspect and Quality Check (200-500 pieces)\n7. Package and Label (200-500 pieces)",
                                      :from :surrogate,
                                      :id 21,
                                      :question-type
                                      :process/batch-size,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-03T21:13:42.056-00:00"}]}
+                                     #inst "2025-01-30T17:41:57.784-00:00"}
+                           #:message{:content
+                                     "Earlier, you listed the process steps typically used in making product (e.g. 1. Prepare Raw Materials, 2. Melt and Form Glass, etc.) and for each you specified typical durations. Now we'd like you to tell us what raw materials and intermediate products go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n 1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n 2. Make Filling (sugar, water vanilla flavoring)\n 3. Bake Wafers (use dough from Make Cookie Dough)\n 4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n 5. Package (use cookies from Assemble Cookies)",
+                                     :from :system,
+                                     :id 22,
+                                     :question-type
+                                     :process/process-ordering,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-01-30T17:42:17.423-00:00"}
+                           #:message{:content
+                                     "1. Prepare Raw Materials (silica sand, soda ash, limestone, dolomite)\n2. Melt and Form Glass (use raw materials from Prepare Raw Materials)\n3. Anneal Glass (use glass from Melt and Form Glass)\n4. Cut Glass to Size (use glass from Anneal Glass)\n5. Temper or Laminate (if required) (use glass from Cut Glass to Size, additional interlayers for lamination)\n6. Inspect and Quality Check (use glass from Temper or Laminate)\n7. Package and Label (use glass from Inspect and Quality Check)",
+                                     :from :surrogate,
+                                     :id 23,
+                                     :question-type
+                                     :process/process-ordering,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-01-30T17:42:17.446-00:00"}]}
            #:conversation{:id :data,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -160,17 +181,19 @@
                                      :id 2,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-12-03T21:10:55.338-00:00"}]}
+                                     #inst "2025-01-30T17:38:23.303-00:00"}]}
            #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
                                      :from :system,
                                      :id 3,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-12-03T21:10:55.366-00:00"}]}
+                                     #inst "2025-01-30T17:38:23.332-00:00"}]}
            #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
@@ -178,82 +201,33 @@
                                      :id 4,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-12-03T21:10:55.388-00:00"}]}],
+                                     #inst "2025-01-30T17:38:23.352-00:00"}]}],
           :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {cutGlass, edgeFinish, tempering, laminating, applyCoating, inspectQuality};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|0.750, 0.500, 1.500, 2.500, 1.500, 0.625|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, cutGlass] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, cutGlass] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, cutGlass] == taskStarts[p, edgeFinish]);\nconstraint forall (p in Product) (taskEnds[p, edgeFinish] == taskStarts[p, tempering]);\nconstraint forall (p in Product) (taskEnds[p, tempering] == taskStarts[p, laminating]);\nconstraint forall (p in Product) (taskEnds[p, laminating] == taskStarts[p, applyCoating]);\nconstraint forall (p in Product) (taskEnds[p, applyCoating] == taskStarts[p, inspectQuality]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, inspectQuality]);",
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {prepareMaterials, meltFormGlass, annealGlass, cutGlass, laminateGlass, inspectQuality};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.500, 10.000, 5.000, 1.500, 4.500, 1.500|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, prepareMaterials] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, prepareMaterials] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, prepareMaterials] == taskStarts[p, meltFormGlass]);\nconstraint forall (p in Product) (taskEnds[p, meltFormGlass] == taskStarts[p, annealGlass]);\nconstraint forall (p in Product) (taskEnds[p, annealGlass] == taskStarts[p, cutGlass]);\nconstraint forall (p in Product) (taskEnds[p, cutGlass] == taskStarts[p, laminateGlass]);\nconstraint forall (p in Product) (taskEnds[p, laminateGlass] == taskStarts[p, inspectQuality]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, inspectQuality]);",
           :agents
-          [#:agent{:assistant-id "asst_Zz3XcnFcPnVJ622Z0RU5zCYJ",
-                   :base-type :process-interview-agent,
-                   :agent-type :shared-assistant
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_d0r3wv6Aaii508rLRxXZ61hL",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
                    :id :process-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_xQMNIKeErwYN0iZih3B9S6mu"}
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
            #:agent{:base-type :sur-plate-glass,
-                   :agent-type :project
-                   :thread-id "thread_9Dpq47AFeA1unQqSefW1A7lI",
+                   :agent-type :project,
+                   :thread-id "thread_D8ZQtTXZs7wme2dezsMrfKb9",
                    :model-class :gpt,
                    :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes plate glass.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
                    :surrogate? true,
-                   :assistant-id "asst_SQxwuqUG0wdwicY7CqlE9hdR",
+                   :assistant-id "asst_vS3Ssk1th8eSa6d5WJn0OEmd",
                    :id :sur-plate-glass-openai,
                    :expertise "plate glass",
-                   :timestamp #inst "2024-12-09T19:14:16.275-00:00"}],
+                   :timestamp #inst "2025-01-30T17:38:24.945-00:00"}],
           :processes
           [#:process{:id :sur-plate-glass,
                      :interview-class :initial-unordered,
                      :sub-processes
                      [#:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :minutes,
-                                                            :value-string
-                                                            "60"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :minutes,
-                                                            :value-string
-                                                            "30"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--cutGlass,
-                                :name "Cut Glass Sheets",
-                                :step-number 1,
-                                :var-name "cutGlass"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :minutes,
-                                                            :value-string
-                                                            "40"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :minutes,
-                                                            :value-string
-                                                            "20"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--edgeFinish,
-                                :name "Edge Finishing",
-                                :step-number 2,
-                                :var-name "edgeFinish"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--tempering,
-                                :name "Tempering",
-                                :step-number 3,
-                                :var-name "tempering"}
-                      #:process{:duration
                                 #:quantity-range{:high
                                                  #:quantity{:units
                                                             :hours,
@@ -265,10 +239,42 @@
                                                             :value-string
                                                             "2"}},
                                 :id
-                                :sur-plate-glass--initial-unordered--laminating,
-                                :name "Laminating",
-                                :step-number 4,
-                                :var-name "laminating"}
+                                :sur-plate-glass--initial-unordered--prepareMaterials,
+                                :name "Prepare Raw Materials",
+                                :step-number 1,
+                                :var-name "prepareMaterials"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "12"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "8"}},
+                                :id
+                                :sur-plate-glass--initial-unordered--meltFormGlass,
+                                :name "Melt and Form Glass",
+                                :step-number 2,
+                                :var-name "meltFormGlass"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "6"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "4"}},
+                                :id
+                                :sur-plate-glass--initial-unordered--annealGlass,
+                                :name "Anneal Glass",
+                                :step-number 3,
+                                :var-name "annealGlass"}
                       #:process{:duration
                                 #:quantity-range{:high
                                                  #:quantity{:units
@@ -280,46 +286,61 @@
                                                             :hours,
                                                             :value-string
                                                             "1"}},
-                                :duration-comment
-                                "(e.g. Low-Emissivity)",
                                 :id
-                                :sur-plate-glass--initial-unordered--applyCoating,
-                                :name "Coating",
-                                :step-number 5,
-                                :var-name "applyCoating"}
+                                :sur-plate-glass--initial-unordered--cutGlass,
+                                :name "Cut Glass to Size",
+                                :step-number 4,
+                                :var-name "cutGlass"}
                       #:process{:duration
                                 #:quantity-range{:high
                                                  #:quantity{:units
-                                                            :minutes,
+                                                            :hours,
                                                             :value-string
-                                                            "45"},
+                                                            "5"},
                                                  :low
                                                  #:quantity{:units
-                                                            :minutes,
+                                                            :hours,
                                                             :value-string
-                                                            "30"}},
+                                                            "4"}},
+                                :duration-comment "(if required)",
+                                :id
+                                :sur-plate-glass--initial-unordered--laminateGlass,
+                                :name "Tempor or Laminate",
+                                :step-number 5,
+                                :var-name "laminateGlass"}
+                      #:process{:duration
+                                #:quantity-range{:high
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "2"},
+                                                 :low
+                                                 #:quantity{:units
+                                                            :hours,
+                                                            :value-string
+                                                            "1"}},
                                 :id
                                 :sur-plate-glass--initial-unordered--inspectQuality,
-                                :name "Quality Inspection",
+                                :name "Inspect and Quality Check",
                                 :step-number 6,
                                 :var-name "inspectQuality"}
                       #:process{:duration
                                 #:quantity-range{:high
                                                  #:quantity{:units
-                                                            :minutes,
+                                                            :hours,
                                                             :value-string
-                                                            "30"},
+                                                            "2"},
                                                  :low
                                                  #:quantity{:units
-                                                            :minutes,
+                                                            :hours,
                                                             :value-string
-                                                            "20"}},
+                                                            "1"}},
                                 :id
-                                :sur-plate-glass--initial-unordered--packaging,
-                                :name "Packaging",
+                                :sur-plate-glass--initial-unordered--packageLabel,
+                                :name "Package and Label",
                                 :step-number 7,
                                 :supply-chain? true,
-                                :var-name "packaging"}]}],
+                                :var-name "packageLabel"}]}],
           :current-conversation :process,
           :claims
           [#:claim{:string "(project-id :sur-plate-glass)"}
@@ -330,15 +351,7 @@
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-plate-glass :lead-times)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-plate-glass :equipment-changeover)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-plate-glass :delivery-schedules)"}
+                   "(scheduling-challenge :sur-plate-glass :product-variation)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
@@ -351,6 +364,14 @@
                    :question-type :process/warm-up,
                    :string
                    "(scheduling-challenge :sur-plate-glass :equipment-utilization)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :process-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :demand-uncertainty)"}
            #:claim{:conversation-id :process,
                    :question-type :process/work-type,
                    :string "(provides-product :sur-plate-glass)"}
@@ -368,31 +389,31 @@
            #:claim{:conversation-id :process,
                    :question-type :process/process-steps,
                    :string
-                   "(process-step :sur-plate-glass 1 \"Cut Glass Sheets\")"}
+                   "(process-step :sur-plate-glass 1 \"Prepare Raw Materials\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/process-steps,
                    :string
-                   "(process-step :sur-plate-glass 2 \"Edge Finishing\")"}
+                   "(process-step :sur-plate-glass 2 \"Melt and Form Glass\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/process-steps,
                    :string
-                   "(process-step :sur-plate-glass 3 \"Tempering\")"}
+                   "(process-step :sur-plate-glass 3 \"Anneal Glass\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/process-steps,
                    :string
-                   "(process-step :sur-plate-glass 4 \"Laminating\")"}
+                   "(process-step :sur-plate-glass 4 \"Cut Glass to Size\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/process-steps,
                    :string
-                   "(process-step :sur-plate-glass 5 \"Coating\")"}
+                   "(process-step :sur-plate-glass 5 \"Temper or Laminate\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/process-steps,
                    :string
-                   "(process-step :sur-plate-glass 6 \"Quality Inspection\")"}
+                   "(process-step :sur-plate-glass 6 \"Inspect and Quality Check\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/process-steps,
                    :string
-                   "(process-step :sur-plate-glass 7 \"Packaging\")"}],
+                   "(process-step :sur-plate-glass 7 \"Package and Label\")"}],
           :name "SUR Plate Glass",
           :id :sur-plate-glass}
 ]

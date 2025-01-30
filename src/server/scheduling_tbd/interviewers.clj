@@ -23,21 +23,6 @@
      [taoensso.telemere             :as tel :refer [log!]]
      [taoensso.truss                 :as truss :refer [have]]))
 
-;;; This is typical of what is in contex (ctx) when a conversation is running:
-#_{:command "INTERVIEWEES-RESPOND",
-   :question-type :process/warm-up
-   :answers :warm-up,
-   :response "We primarily produce various types of plate glass,..."
-   :iview-aid "asst_ToYvIv293mV7wQck8tUjidUY",
-   :iview-tid "thread_Vws6JuTf64GwpgI0qU7m8itJ",
-   :sur-aid "asst_qfiFxk5VrS0oO3B3mOHd9cOO",
-   :sur-tid "thread_jsMawPCXoz3ivkJU0yxnBgIt",
-   :client-id "455c85e2-0e01-4580-9d4a-219fcabd6828",
-   :pid :sur-plate-glass,
-   :cid :process,
-   :dispatch-key :resume-conversation,
-   :responder-type :surrogate}
-
 (def diag (atom nil))
 (s/def ::pid keyword?)
 (s/def ::cid keyword?)
@@ -139,30 +124,34 @@
                     @interview-agent-atm)
          (s/assert ::interview-agent))))
 
-;;; To check the structure of commands to the interviewer:
-(s/def ::interviewer-cmd (s/and (s/keys :req-un [::command])
-                                #(let [{:keys [advice already-answered answers claims command conclusions response responses told-what]} %]
-                                   (case command
-                                     "SUPPLY-QUESTION"         (and (s/valid? ::already-answered already-answered) (s/valid? ::claims claims))
-                                     "INTERVIEWEES-RESPOND"    (and (s/valid? ::response response) (s/valid? ::answers answers))
-                                     "ANALYSIS-CONCLUDES"      (s/valid? ::conclusions conclusions)
-                                     "INTERVIEWEES-TOLD"       (s/valid? ::told-what told-what)
+;;; To check the structure of messages to and from the interviewer:
+(s/def ::interviewer-msg (s/and (s/keys :req-un [::message-type])
+                                #(let [{:keys [advice budget answers claims commit-notes conclusion convey-to-interviewees
+                                               data-structure message-type question Q-A-pairs response responses status]} %]
+                                   (case message-type
+                                     "SUPPLY-QUESTION"           (and (s/valid? ::budget budget) #_(s/valid? ::claims claims))
+                                     "QUESTION-TO-ASK"           (and (s/valid? ::question question))
+                                     "INTERVIEWEES-RESPOND"      (and (s/valid? ::response response))
+                                     "DATA-STRUCTURE-REFINEMENT" (and (s/valid? ::commit-notes commit-notes)
+                                                                      (s/valid? ::data-structure data-structure)
+                                                                      (s/valid? ::convey-to-interviewees convey-to-interviewees))
+                                     "PHASE-1-CONCLUSION"        (s/valid? ::phase-1-conclusion conclusion)
+                                     #_#_"ANALYSIS-CONCLUDES"      (s/valid? ::conclusions conclusions)
                                      "COURSE-CORRECTION"       (s/valid? ::advice advice)
-                                     "CONVERSATION-HISTORY"    (and (s/valid? ::already-answered already-answered)
-                                                                    (s/valid? ::claims claims)
-                                                                    (s/valid? ::responses responses))
+                                     "CONVERSATION-HISTORY"    (and (s/valid? ::budget buget)
+                                                                    (s/valid? ::q-a-pairs Q-A-pairs))
+                                     "STATUS"                  (s/valid? ::status status)   
                                    nil))))
 
 (s/def ::advice string?)
-(s/def ::already-answered (s/coll-of keyword?))
+(s/def ::budget number?)
 (s/def ::answer string?)
 (s/def ::answers string?)
 (s/def ::claims string?)
 (s/def ::conclusions string?)
-(s/def ::command string?)
 (s/def ::response string?)
 (s/def ::responses (s/coll-of (s/keys :req-un [::question-type ::answer])))
-(s/def ::told-what string?)
+(s/def ::status string?)  
 
 (def course-correction-count (atom 0))
 
@@ -177,34 +166,18 @@
 (defn tell-interviewer
   "Send a command to an interviewer agent and wait for response; translate it.
    :aid and :tid in the ctx should be for the interviewer agent."
-  [cmd {:keys [interviewer-agent cid] :as _ctx}]
-  (too-many-course-corrections! cmd)
-  (when-not (s/valid? ::interviewer-cmd cmd) ; We don't s/assert here because old project might not be up-to-date.
-    (log! :warn (str "Invalid interviewer-cmd: " (with-out-str (pprint cmd)))))
-  (log! :info (-> (str "Interviewer told: " cmd) (elide 150)))
-  (let [cmd-string (json/write-value-as-string cmd)
-        res (-> (adb/query-agent interviewer-agent cmd-string) output-struct2clj)
+  [msg {:keys [interviewer-agent cid] :as _ctx}]
+  (too-many-course-corrections! msg)
+  (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
+    (log! :warn (str "Invalid interviewer-msg: " (with-out-str (pprint msg)))))
+  (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
+  (let [msg-string (json/write-value-as-string msg)
+        res (-> (adb/query-agent interviewer-agent msg-string) output-struct2clj)
         res (if (contains? res :question-type)
               (update res :question-type #(keyword (name cid) %))
               res)]
     (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
     res))
-
-;;; ToDo: Would be different for different interviews. For example, the resource interview would want to see the process interview.
-(defn initial-advice
-  "Return in an :ANALYSIS-CONCLUDES command map a list of conclusions used to set the context of the conversation just before
-   the interviewer agent starts interviewing. This might, for example, tell the interviewer what the interviewee manufactures
-   and whether the interviewee is an actual human or a surrogate."
-  [pid]
-  (let [claims (db/get-claims pid)
-        surrogate?       (ru/find-claim '(surrogate ?pid) claims)
-        [_ _ expertise]  (ru/find-claim '(principal-expertise ?pid ?makes) claims)
-        conclusions (cond-> ""
-                      expertise  (str " Their expertise: " expertise ". ")
-                      surrogate? (str " You are talking to to a surrogate (machine agent). "))]
-
-    {:command "ANALYSIS-CONCLUDES",
-     :conclusions conclusions}))
 
 (defn response-analysis
   "Return a map of booleans including
@@ -276,34 +249,33 @@
       set))
 
 ;;; ToDo: It isn't obvious that the interview agent needs to see all this. Only useful when the thread was destroyed?
-;;;       It might be sufficient to explain the claims.
+;;;       It might be sufficient to explain the claims. ToDo: V4 doesn't have claims, but this still holds
 (defn conversation-history
   "Construct a conversation-history command structure for the argument project.
    This tells the interview agent what has already been asked. If the thread hasn't been deleted
    (i.e. by OpenAI, because it is more than 30 days old) then the agent knows what has already been
-   asked. Thus, this covers that possibility. We also start fresh interviews with this information,
-   just to make sure."
+   asked EXCEPT for the warm-up question (if any)."
   [pid cid]
-  (let [msgs (->> (db/get-conversation pid cid)
-                  (filter #(= :surrogate (:message/from %)))
-                  (mapv #(reduce-kv (fn [m k v] (cond (= k :message/content)         (assoc m :answer v)
-                                                      (= k :message/question-type)   (assoc m :question-type v)
-                                                      :else m))
-                                    {} %)))]
-    {:command "CONVERSATION-HISTORY"
-     :claims (->> (db/get-claims pid :objects? true)
-                  (filter #(= cid (:conversation-id %)))
-                  (map :claim)
-                  (map str)
-                  (interpose " ")
-                  (apply str))
-     :already-answered (vec (already-answered? pid cid))
-     :responses msgs}))
+  (let [msgs (db/get-conversation pid cid)
+        questions (filter #(= :system (:message/from %)) msgs)] ; Some aren't questions; we deal with it.
+    {:message-type "CONVERSATION-HISTORY"
+     :budget 1.0 (db/interviewer-budget pid cid)
+     :Q-A-pairs (->> questions
+                     (map (fn [q]
+                            (let [next-id (inc (:message/id q))]
+                              (as-> {} ?pair
+                                (assoc ?pair :question (:message/content q))
+                                (if-let [response (when-let [resp (some #(when (= next-id (:message/id %)) %) msgs)]
+                                                    (when (#{:human :surrogate} (:message/from resp)) resp))]
+                                  (assoc ?pair :answer (:message/content response))
+                                  ?pair)))))
+                     (filter #(contains? % :answer))
+                     vec)}))
 
 (defn supply-question
   "Create a supply question command for the conversation."
   [{:keys [pid cid] :as _ctx}]
-    {:command "SUPPLY-QUESTION"
+    {:message-type "SUPPLY-QUESTION"
      :already-answered (already-answered? pid cid)
      :claims (->> (db/get-claims pid) (interpose " ") vec (apply str))})
 
@@ -315,7 +287,7 @@
    The returns the warm-up question."
   [ctx]
   (log! :warn "off-course: Didn't ask a warm-up type question!")
-  (tell-interviewer {:command "COURSE-CORRECTION"
+  (tell-interviewer {:message-type "COURSE-CORRECTION"
                      :advice (str "There are no questions in already-answered of the CONVERSATION-HISTORY command we are sent. "
                                   "You should have responded with the question-type = \"warm-up\" (and a warm-up question, etc.). "
                                   "Next time we send you a SUPPLY-QUESTION command, provide a warm-up type question. "
@@ -341,7 +313,7 @@
   (log! :warn "off-course: Returning 'DONE' when there is more to be done.")
   (let [answered? (already-answered? pid cid)
         ask-next (have keyword? (some #(when (not (answered? %)) %) process-flow-shop-questions))]
-    (tell-interviewer {:command "COURSE-CORRECTION"
+    (tell-interviewer {:message-type "COURSE-CORRECTION"
                        :advice (str "You are not done. "
                                     "Next time we send you a SUPPLY-QUESTION command "
                                     (name ask-next) ".")}
@@ -365,7 +337,7 @@
 (defn off-course--invalid-response
   [candidate-q ctx]
   (log! :warn (str "Not a valid response to SUPPLY-QUESTION: " candidate-q))
-  (tell-interviewer {:command "COURSE-CORRECTION"
+  (tell-interviewer {:message-type "COURSE-CORRECTION"
                      :advice (str "Responses to SUPPLY-QUESTION should be either "
                                   "1) an object have attributes 'question' and 'question-type', or "
                                   "2) an object with just the attribute 'status' with value 'DONE'.\n"
@@ -402,7 +374,7 @@
 
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
 ;;; over and over and the interview will advance each time until you get back DONE.
-;;; ToDo: This goes somewhere when you are done: {:command 'INTERVIEWEES-RESPOND' :response <some-text> :question-type <a keyword>}." <===========================================
+;;; ToDo: This goes somewhere when you are done: {:message-type 'INTERVIEWEES-RESPOND' :response <some-text> :question-type <a keyword>}." <===========================================
 (defn q-and-a
   "Call interviewer to supply a question; call  get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
    Returns a vector of message objects suitable for db/add-msg."
@@ -500,9 +472,7 @@
       (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
         (when-not (db/conversation-done? pid cid)
           (if @active?
-            (do (when (== 0 (-> (db/get-conversation-eids pid cid) count))
-                  (-> ctx :pid initial-advice (tell-interviewer ctx)))
-                (-> (conversation-history pid cid) (tell-interviewer ctx))
+            (do (-> (conversation-history pid cid) (tell-interviewer ctx))
                 (loop [cnt 0
                        conversation (q-and-a ctx)] ; Returns a vec of msg objects suitable for db/add-msg.
                   (if @active?
@@ -518,7 +488,7 @@
                           (ru/analyze-response-meth (merge ctx
                                                            {:response (:text response)
                                                             :question-type (:question-type response)}))
-                          (tell-interviewer {:command "INTERVIEWEES-RESPOND"
+                          (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
                                              :response (:text response)
                                              :answers (-> response :question-type name)}
                                             ctx)

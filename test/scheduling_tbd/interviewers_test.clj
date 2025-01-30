@@ -148,7 +148,7 @@
                           :responder-role :surrogate
                           :pid :sur-ice-cream})
 
-(defn ask-one-question
+#_(defn ask-one-question
   "Use inv/chat-pair to get back an answer"
   [{:keys [question question-type pid responder-role client-id]
     :or {client-id (ws/recent-client!)}
@@ -321,3 +321,32 @@
       (is (string? answers-the-question?))
       (is (false? raises-a-question?))
       (is (false? wants-a-break?)))))
+
+(defn  ^:diag migrate-project!
+  "Add a :conversation/interviewer-budget value to every conversation; 0.5 for :process 1.0 for others."
+  [pid]
+  (letfn [(update-proj [obj]
+            (cond (and (map? obj) (= :process    (:conversation/id obj)))  (assoc obj :conversation/interviewer-budget 0.5)
+                  (and (map? obj) (= :data       (:conversation/id obj)))  (assoc obj :conversation/interviewer-budget 1.0)
+                  (and (map? obj) (= :resources  (:conversation/id obj)))  (assoc obj :conversation/interviewer-budget 1.0)
+                  (and (map? obj) (= :optimality (:conversation/id obj)))  (assoc obj :conversation/interviewer-budget 1.0)
+                  (map? obj)      (reduce-kv (fn [m k v] (assoc m k (update-proj v))) {} obj)
+                  (vector? obj)   (mapv update-proj obj)
+                  :else           obj))]
+    (let [new-proj (-> (db/get-project pid) update-proj db/clean-project-for-schema)
+          proj-string (with-out-str (pprint new-proj))]
+      (spit (str "data/projects/" (name pid) ".edn") (format "[\n%s\n]" proj-string)))))
+
+(defn  ^:diag migrate-projects!
+  []
+  (doseq [pid (db/list-projects)]
+    (log! :info (str "Doing project " pid))
+    (migrate-project! pid)
+    (db/recreate-project-db! pid)))
+
+
+(defn  ^:diag new-backup-files!
+    []
+  (doseq [pid (db/list-projects)]
+    (log! :info (str "Doing project " pid))
+    (db/backup-proj-db pid)))

@@ -1,7 +1,7 @@
 [
 #:project{:agents
           [#:agent{:base-type :sur-optical-fiber,
-                   :agent-type :project
+                   :agent-type :project,
                    :thread-id "thread_YBUMi1ALt2Bak4PZ3z8Bpn5t",
                    :model-class :gpt,
                    :llm-provider :openai,
@@ -10,13 +10,13 @@
                    :id :sur-optical-fiber-openai,
                    :expertise "optical fiber",
                    :timestamp #inst "2024-12-11T16:32:31.018-00:00"}
-           #:agent{:assistant-id "asst_rfGIKnBEJ8vP7y6nAGlBxTLV",
-                   :base-type :process-interview-agent,
-                   :agent-type :shared-assistant
-                   :id :process-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
+           #:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
                    :thread-id "thread_xsW5fNHuQLFRE48mCs9NeS84",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_rfGIKnBEJ8vP7y6nAGlBxTLV",
+                   :id :process-interview-agent-openai,
                    :timestamp #inst "2024-12-10T16:14:54.156-00:00"}],
           :claims
           [#:claim{:string "(project-id :sur-optical-fiber)"}
@@ -92,6 +92,7 @@
                    "(process-step :sur-optical-fiber 7 \"Packaging\")"}],
           :conversations
           [#:conversation{:id :process,
+                          :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
                                      "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
@@ -219,6 +220,7 @@
                                      :time
                                      #inst "2024-12-11T16:34:43.690-00:00"}]}
            #:conversation{:id :data,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -228,6 +230,7 @@
                                      :time
                                      #inst "2024-12-11T16:32:29.729-00:00"}]}
            #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
@@ -237,6 +240,7 @@
                                      :time
                                      #inst "2024-12-11T16:32:29.741-00:00"}]}
            #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",

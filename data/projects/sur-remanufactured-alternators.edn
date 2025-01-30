@@ -1,204 +1,358 @@
 [
-#:project{:agents
-          [#:agent{:assistant-id "asst_EwzLHKlxoSdkUMzjxDHlrtap",
-                   :base-type :process-interview-agent,
-                   :agent-type :shared-assistant
-                   :id :process-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_ItPZGtTOqmuSILHetgbxfSfg"}
-           #:agent{:base-type :sur-remanufactured-alternators,
-                   :agent-type :project
-                   :thread-id "thread_8uvGjgLQPTxcQgPz33XL9tU9",
-                   :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes remanufactured alternators.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                   :surrogate? true,
-                   :assistant-id "asst_xEU23bgeSGtQGmA1Zw8AisOE",
-                   :id :sur-remanufactured-alternators-openai,
-                   :expertise "remanufactured alternators",
-                   :timestamp #inst "2024-12-08T16:12:48.662-00:00"}],
-          :code
-          "enum Task = {disassembly, cleaning, inspection, component, reassembly, testing, packaging};",
-          :conversations
+#:project{:conversations
           [#:conversation{:done? true,
                           :id :process,
+                          :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
-                                     "Describe your most significant scheduling problem in a few sentences.",
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
                                      :from :system,
                                      :id 1,
-                                     :tags [:initial-question :query],
+                                     :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-05-31T02:33:07.837-00:00"}
+                                     #inst "2025-01-16T18:54:32.164-00:00"}
                            #:message{:content
-                                     "Our most significant scheduling problem is balancing production capacity with fluctuating supply chain availability. We face frequent delays in receiving key components such as bearings and voltage regulators, which disrupts our assembly line schedules. Additionally, we have to accommodate last-minute orders and changes in customer demand, making it challenging to optimize production efficiency and lead times. The variance in component arrival and the need for adaptive scheduling often result in either underutilization of our workforce or bottlenecks that delay shipments.",
-                                     :from :surrogate,
-                                     :id 2,
-                                     :tags
-                                     [:initial-question :response],
-                                     :time
-                                     #inst "2024-05-31T02:33:07.852-00:00"}
-                           #:message{:content
-                                     "Great, we'll call your project SUR Remanufactured Alternators.",
-                                     :from :system,
-                                     :id 3,
-                                     :tags [:informative],
-                                     :time
-                                     #inst "2024-05-31T02:33:08.547-00:00"}
-                           #:message{:content
-                                     "Though you've cited a challenge with inputs (raw material, workers, or other resources), we'd like to put that aside for a minute and talk about the processes that make product.",
-                                     :from :system,
-                                     :id 4,
-                                     :time
-                                     #inst "2024-05-31T02:33:08.569-00:00"}
-                           #:message{:content
-                                     "Please briefly describe your production processes.",
+                                     "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
                                      :from :system,
                                      :id 5,
-                                     :time
-                                     #inst "2024-05-31T02:33:17.266-00:00"}
-                           #:message{:content
-                                     "Our production process for remanufacturing alternators involves several key steps:\n\n1. <b>Disassembly:</b> Used alternators are disassembled into component parts.\n2. <b>Cleaning:</b> Parts are cleaned to remove dirt, oil, and other contaminants.\n3. <b>Inspection and Testing:</b> Each component is inspected and tested to determine if it can be reused or needs to be replaced.\n4. <b>Component Replacement:</b> Worn or defective parts are replaced with new or refurbished parts.\n5. <b>Reassembly:</b> Components are reassembled into a fully functioning alternator.\n6. <b>Testing:</b> The remanufactured alternators are tested to ensure they meet specific performance criteria.\n7. <b>Packaging and Shipping:</b> Once verified for quality, the alternators are packaged and sent out to customers.\n\nEach stage has its own set timelines and resource requirements, and disruptions in any stage can affect the subsequent processes.",
-                                     :from :surrogate,
-                                     :id 6,
-                                     :tags [:process-description],
-                                     :time
-                                     #inst "2024-05-31T02:33:17.286-00:00"}
-                           #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product or a service? Respond respectively with either the single word PRODUCT or SERVICE.",
-                                     :from :system,
-                                     :id 7,
+                                     :question-type :process/warm-up,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-05-31T02:33:20.280-00:00"}
+                                     #inst "2025-01-16T18:54:57.803-00:00"}
+                           #:message{:content
+                                     "We specialize in remanufacturing alternators, taking old or defective units and restoring them to like-new condition. The primary scheduling challenge involves coordinating the timing of incoming used units, the availability of parts and materials for refurbishment, and aligning these with skilled labor availability to meet customer demand efficiently. Balancing these elements to minimize downtime and ensure timely delivery is key to our operations.",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :question-type :process/warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-01-16T18:54:57.833-00:00"}
+                           #:message{:content
+                                     "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
+                                     :from :system,
+                                     :id 7,
+                                     :question-type :process/work-type,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-01-16T18:55:22.553-00:00"}
                            #:message{:content "PRODUCT",
                                      :from :surrogate,
                                      :id 8,
+                                     :question-type :process/work-type,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-05-31T02:33:20.319-00:00"}
+                                     #inst "2025-01-16T18:55:22.579-00:00"}
                            #:message{:content
-                                     "Three commonly recognized ways of production are termed MAKE-TO-STOCK, MAKE-TO-ORDER, and ENGINEER-TO-ORDER. In MAKE-TO-STOCK you make product to replenish inventory based on forecasted demand. In MAKE-TO-ORDER you make product because a customer has specifically asked you to, and the customer has described characteristics of the product in your own terminology, perhaps using your catalog of offerings. ENGINEER-TO-ORDER is something like MAKE-TO-ORDER but here the customer also expects you to do some creative problem solving to meet their need. For example, a commercial aircraft might be ENGINEER-TO-ORDER because though the customer may have specified the engine type and seating capacity it wants, it is relying on you to determine how to best accommodate the engine and arrange the seats. Other examples of ENGINEER-TO-ORDER include general contracting for building construction, film production, event planning, and 3rd party logisistics. Respond with just one of the terms MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER according to which most accurately describes your mode of production. ",
+                                     "Some work, for example, cutting down trees, has to be done at your customer's site, other work is done at your facility. Respond with the single word CUSTOMER-SITE or OUR-FACILITY depending on where you perform the work.",
                                      :from :system,
                                      :id 9,
+                                     :question-type
+                                     :process/production-location,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-05-31T02:33:23.306-00:00"}
-                           #:message{:content "MAKE-TO-ORDER",
-                                     :from :surrogate,
-                                     :id 10,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-05-31T02:33:23.331-00:00"}
-                           #:message{:content
-                                     "Some work, for example factory work, must be performed in a specially designed facility. Other work, like cutting down a tree, can only be performed at a location designated by the customer. Are the processes you describe things that must be performed at your facility, or are they things that must be done at the customer's site? Respond respectively with either the single term OUR-FACILITY or CUSTOMER-SITE.",
-                                     :from :system,
-                                     :id 11,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-05-31T02:33:27.649-00:00"}
+                                     #inst "2025-01-16T18:55:41.202-00:00"}
                            #:message{:content "OUR-FACILITY",
                                      :from :surrogate,
-                                     :id 12,
+                                     :id 10,
+                                     :question-type
+                                     :process/production-location,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-05-31T02:33:27.663-00:00"}
+                                     #inst "2025-01-16T18:55:41.267-00:00"}
                            #:message{:content
-                                     "A FLOW-SHOP is a production system designed so that all jobs follows the same sequence of steps through production resources. A JOB-SHOP is a production system where each job might follow its own route, depending on its unique requirements. Is the process you described more like a flow-shop or a job-shop? Respond respectively with either the single term FLOW-SHOP or JOB-SHOP.",
+                                     "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product is configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER, or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
+                                     :from :system,
+                                     :id 11,
+                                     :question-type
+                                     :process/production-motivation,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-01-16T18:56:03.969-00:00"}
+                           #:message{:content "MAKE-TO-ORDER",
+                                     :from :surrogate,
+                                     :id 12,
+                                     :question-type
+                                     :process/production-motivation,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-01-16T18:56:04.001-00:00"}
+                           #:message{:content
+                                     "There are a few common patterns or system designs by which product is made. In a FLOW-SHOP all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
                                      :from :system,
                                      :id 13,
+                                     :question-type
+                                     :process/production-system-type,
+                                     :tags [:query],
                                      :time
-                                     #inst "2024-05-31T02:33:31.163-00:00"}
-                           #:message{:content "FLOW-SHOP",
+                                     #inst "2025-01-16T18:56:25.542-00:00"}
+                           #:message{:content "JOB-SHOP",
                                      :from :surrogate,
                                      :id 14,
+                                     :question-type
+                                     :process/production-system-type,
+                                     :tags [:response],
                                      :time
-                                     #inst "2024-05-31T02:33:31.213-00:00"}
+                                     #inst "2025-01-16T18:56:25.572-00:00"}
                            #:message{:content
-                                     "Please list the steps of your process, one per line in the order they are executed to produce a product, so it looks like this:\n1. (the first step)\n2. (the second step)...\n",
+                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
                                      :from :system,
                                      :id 15,
-                                     :tags [:process-steps :query],
+                                     :question-type
+                                     :process/process-steps,
+                                     :tags [:query],
                                      :time
-                                     #inst "2024-05-31T02:33:35.759-00:00"}
+                                     #inst "2025-01-16T18:56:46.693-00:00"}
                            #:message{:content
-                                     "1. Disassembly\n2. Cleaning\n3. Inspection and Testing\n4. Component Replacement\n5. Reassembly\n6. Testing\n7. Packaging and Shipping",
+                                     "1. Receive Used Alternators\n2. Disassemble Alternators\n3. Clean and Inspect Components\n4. Replace Worn or Damaged Parts\n5. Reassemble Alternators\n6. Test Alternators for Performance\n7. Paint and Finish\n8. Package for Shipping",
                                      :from :surrogate,
                                      :id 16,
-                                     :tags [:process-steps :response],
+                                     :question-type
+                                     :process/process-steps,
+                                     :tags [:response],
                                      :time
-                                     #inst "2024-05-31T02:33:35.796-00:00"}
+                                     #inst "2025-01-16T18:56:46.723-00:00"}
                            #:message{:content
-                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we added a <a href=\"http://localhost:3300/mzn-enum\">MiniZinc enum</a>. The 'enum values' name the steps of your process in the order they are executed for each product.",
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
                                      :from :system,
                                      :id 17,
+                                     :question-type
+                                     :process/process-durations,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-01-16T18:57:08.630-00:00"}
+                           #:message{:content
+                                     "1. Receive Used Alternators (1 hour)\n2. Disassemble Alternators (2 hours)\n3. Clean and Inspect Components (3 hours)\n4. Replace Worn or Damaged Parts (2 hours)\n5. Reassemble Alternators (2 hours)\n6. Test Alternators for Performance (1 hour)\n7. Paint and Finish (1 hour)\n8. Package for Shipping (1 hour)",
+                                     :from :surrogate,
+                                     :id 18,
+                                     :question-type
+                                     :process/process-durations,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-01-16T18:57:08.656-00:00"}
+                           #:message{:content
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
+                                     :from :system,
+                                     :id 19,
                                      :tags [:info-to-user :minizinc],
                                      :time
-                                     #inst "2024-05-31T02:33:35.838-00:00"}
+                                     #inst "2025-01-16T18:58:02.606-00:00"}
                            #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but add to it the typical processing time so it looks like this:\n1. disassembly (some amount of time)\n2. cleaning (some amount of time)...",
-                                     :from :system,
-                                     :id 18,
-                                     :tags [:process-durs :query],
-                                     :time
-                                     #inst "2024-05-31T02:33:39.078-00:00"}
-                           #:message{:content
-                                     "1. Disassembly (30 minutes)\n2. Cleaning (20 minutes)\n3. Inspection and Testing (45 minutes)\n4. Component Replacement (60 minutes)\n5. Reassembly (50 minutes)\n6. Testing (30 minutes)\n7. Packaging and Shipping (20 minutes)",
-                                     :from :surrogate,
-                                     :id 19,
-                                     :tags [:process-durs :response],
-                                     :time
-                                     #inst "2024-05-31T02:33:39.124-00:00"}]}
-           #:conversation{:id :data,
-                          :messages
-                          [#:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just '1000 package'. If however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling (2000 packages)\n 3. Bake Wafers (1000 packages)\n 4. Assemble Cookies (1000 packages)\n 5. Package (1000 packages)",
                                      :from :system,
                                      :id 20,
-                                     :tags [:conversation-intro],
+                                     :question-type
+                                     :process/batch-size,
+                                     :tags [:query],
                                      :time
-                                     #inst "2024-11-20T12:53:12.386-00:00"}
+                                     #inst "2025-01-16T18:58:27.769-00:00"}
                            #:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
-                                     :from :system,
-                                     :id 23,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-11-20T13:32:54.426-00:00"}]}
-           #:conversation{:id :resources,
-                          :messages
-                          [#:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
-                                     :from :system,
+                                     "1. Receive Used Alternators (50 units)\n2. Disassemble Alternators (50 units)\n3. Clean and Inspect Components (50 units)\n4. Replace Worn or Damaged Parts (50 units)\n5. Reassemble Alternators (50 units)\n6. Test Alternators for Performance (50 units)\n7. Paint and Finish (50 units)\n8. Package for Shipping (50 units)",
+                                     :from :surrogate,
                                      :id 21,
-                                     :tags [:conversation-intro],
+                                     :question-type
+                                     :process/batch-size,
+                                     :tags [:response],
                                      :time
-                                     #inst "2024-11-20T12:53:12.410-00:00"}
-                           #:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
-                                     :from :system,
-                                     :id 24,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-11-20T13:32:54.446-00:00"}]}
-           #:conversation{:id :optimality,
+                                     #inst "2025-01-16T18:58:27.800-00:00"}]}
+           #:conversation{:id :data,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
                                      :from :system,
-                                     :id 22,
+                                     :id 2,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T12:53:12.430-00:00"}
-                           #:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     #inst "2025-01-16T18:54:32.195-00:00"}]}
+           #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
                                      :from :system,
-                                     :id 25,
+                                     :id 3,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T13:32:54.465-00:00"}]}],
+                                     #inst "2025-01-16T18:54:32.231-00:00"}]}
+           #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-01-16T18:54:32.256-00:00"}]}],
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {disassembleAlt, cleanInspect, replaceParts, reassembleAlt, testPerformance, paintFinish};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of int: taskDuration = [|2, 3, 2, 2, 1, 1|];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, disassembleAlt] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, disassembleAlt] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, disassembleAlt] == taskStarts[p, cleanInspect]);\nconstraint forall (p in Product) (taskEnds[p, cleanInspect] == taskStarts[p, replaceParts]);\nconstraint forall (p in Product) (taskEnds[p, replaceParts] == taskStarts[p, reassembleAlt]);\nconstraint forall (p in Product) (taskEnds[p, reassembleAlt] == taskStarts[p, testPerformance]);\nconstraint forall (p in Product) (taskEnds[p, testPerformance] == taskStarts[p, paintFinish]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, paintFinish]);",
+          :agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_ehfr6tj7LRYBk1TuvcpRoeJw",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
+           #:agent{:base-type :sur-remanufactured-alternators,
+                   :agent-type :project,
+                   :thread-id "thread_WJapV6DHuLUkjAcCi4ibEbch",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_ECJuwZ4HlCTGwevMex85UjvV",
+                   :id :sur-remanufactured-alternators-openai,
+                   :expertise "remanufactured alternators",
+                   :timestamp #inst "2025-01-16T18:54:33.443-00:00"}],
+          :processes
+          [#:process{:id :sur-remanufactured-alternators,
+                     :interview-class :initial-unordered,
+                     :sub-processes
+                     [#:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-remanufactured-alternators--initial-unordered--receiveAlternators,
+                                :name "Receive Used Alternators",
+                                :step-number 1,
+                                :supply-chain? true,
+                                :var-name "receiveAlternators"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "2"},
+                                :id
+                                :sur-remanufactured-alternators--initial-unordered--disassembleAlt,
+                                :name "Disassemble Alternators",
+                                :step-number 2,
+                                :var-name "disassembleAlt"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "3"},
+                                :id
+                                :sur-remanufactured-alternators--initial-unordered--cleanInspect,
+                                :name "Clean and Inspect Components",
+                                :step-number 3,
+                                :var-name "cleanInspect"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "2"},
+                                :id
+                                :sur-remanufactured-alternators--initial-unordered--replaceParts,
+                                :name "Replace Worn or Damaged Parts",
+                                :step-number 4,
+                                :var-name "replaceParts"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "2"},
+                                :id
+                                :sur-remanufactured-alternators--initial-unordered--reassembleAlt,
+                                :name "Reassemble Alternators",
+                                :step-number 5,
+                                :var-name "reassembleAlt"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-remanufactured-alternators--initial-unordered--testPerformance,
+                                :name
+                                "Test Alternators for Performance",
+                                :step-number 6,
+                                :var-name "testPerformance"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-remanufactured-alternators--initial-unordered--paintFinish,
+                                :name "Paint and Finish",
+                                :step-number 7,
+                                :var-name "paintFinish"}
+                      #:process{:duration
+                                #:quantity{:units :hours,
+                                           :value-string "1"},
+                                :id
+                                :sur-remanufactured-alternators--initial-unordered--packageShipping,
+                                :name "Package for Shipping",
+                                :step-number 8,
+                                :supply-chain? true,
+                                :var-name "packageShipping"}]}],
           :current-conversation :process,
-          :id :sur-remanufactured-alternators,
-          :name "SUR Remanufactured Alternators"}
+          :claims
+          [#:claim{:string
+                   "(project-id :sur-remanufactured-alternators)"}
+           #:claim{:string
+                   "(project-name :sur-remanufactured-alternators \"SUR Remanufactured Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :string
+                   "(surrogate :sur-remanufactured-alternators)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-remanufactured-alternators :skilled-worker-availability)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-remanufactured-alternators :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-remanufactured-alternators :equipment-utilization)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-remanufactured-alternators \"Remanufactured Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-remanufactured-alternators :demand-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/work-type,
+                   :string
+                   "(provides-product :sur-remanufactured-alternators)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-location,
+                   :string
+                   "(production-location :sur-remanufactured-alternators factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-motivation,
+                   :string
+                   "(production-mode :sur-remanufactured-alternators make-to-order)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-system-type,
+                   :string
+                   "(job-shop :sur-remanufactured-alternators)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 1 \"Receive Used Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 2 \"Disassemble Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 3 \"Clean and Inspect Components\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 4 \"Replace Worn or Damaged Parts\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 5 \"Reassemble Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 6 \"Test Alternators for Performance\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 7 \"Paint and Finish\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 8 \"Package for Shipping\")"}],
+          :name "SUR Remanufactured Alternators",
+          :id :sur-remanufactured-alternators}
 ]
