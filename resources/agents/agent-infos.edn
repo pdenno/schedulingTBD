@@ -53,4 +53,8 @@
 
  {:base-type :text-function-agent
   :agent-type :system
-  :instruction-path "agents/text-function-agent.txt"}]
+  :instruction-path "agents/text-function-agent.txt"}
+
+ {:base-type :table-analysis-agent
+  :agent-type :system
+  :instruction-path "agents/table-analysis-agent.txt"}]

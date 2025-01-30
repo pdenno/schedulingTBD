@@ -72,8 +72,9 @@
    Does not check that it is viable (does not check that the assistant and thread are still
    maintained by llm provider). Thus, it is lazy, with updating done by adb/ensure-agent! as needed."
   []
-  (log! :info "Adding surrogates from all project so adb/agent-infos.")
+  (log! :info "Adding surrogates from all project to adb/agent-infos.")
   (doseq [pid (db/list-projects)]
+    (log! :info (str "pid: " pid))
     (let [conn @(connect-atm pid)]
       (when-let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] conn)]
         (let [{:agent/keys [system-instruction expertise]} (dp/pull conn '[*] eid)

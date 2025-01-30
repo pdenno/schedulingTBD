@@ -1,5 +1,5 @@
 (ns scheduling-tbd.interviewers
-    "Runs an interview uing an interview agent."
+    "Runs an interview using an interview agent."
     (:require
      [clojure.core.unify          :as uni]
      [clojure.pprint                :refer [pprint]]
@@ -23,7 +23,7 @@
      [taoensso.telemere             :as tel :refer [log!]]
      [taoensso.truss                 :as truss :refer [have]]))
 
-;;; This is typical of what is in contex (ctx) when a conversation is running:
+;;; This is typical of what is in context (ctx) when a conversation is running:
 #_{:command "INTERVIEWEES-RESPOND",
    :question-type :process/warm-up
    :answers :warm-up,
