@@ -23,7 +23,7 @@
 
 (def preferred-llms
   "These names (keywords) are the models we use, and the models we've been using lately."
-  {:openai {:gpt         "gpt-4o-2024-08-06"
+  {:openai {:gpt         "gpt-4o-2024-11-20" ; "gpt-4o-2024-08-06"
             :analysis    "o1-preview"
             :mini        "gpt-4o-mini"}
    :azure  {:gpt         "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"

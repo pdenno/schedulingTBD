@@ -762,16 +762,25 @@
                                                             question-type    (assoc :message/question-type question-type))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
-(defn interviewer-budget
-  "Return the interviewer budget, or 1.0 if it was not found." ; ToDo: Not found is a schema migration issue.
+(defn get-interviewer-budget
+  "Return the :converation/interviewer-budget."
   [pid cid]
-  (or (d/q '[:find ?budget
-             :in $ ?cid
-             :where
-             [:conversation/id ?cid]
-             [:conversation/interviewer-budget ?budget]]
-           @(connect-atm pid) cid)
-      1.0))
+   (d/q '[:find ?budget .
+          :in $ ?cid
+          :where
+          [?e :conversation/id ?cid]
+          [?e :conversation/interviewer-budget ?budget]]
+        @(connect-atm pid) cid))
+
+(defn put-interviewer-budget!
+  [pid cid val]
+  (let [conn-atm (connect-atm pid)
+        eid (d/q '[:find ?eid .
+                   :in $ ?cid
+                   :where [?eid :conversation/id ?cid]] @conn-atm cid)]
+    (if eid
+      (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
+      (log! :error (str "No such conversation: " cid)))))
 
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."

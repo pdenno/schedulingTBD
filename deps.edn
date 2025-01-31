@@ -4,26 +4,25 @@
            com.cemerick/url                    {:mvn/version "0.1.1"}
            com.github.pdenno/mznp              {:mvn/version "1.0.89"}
            com.taoensso/timbre                 {:mvn/version "6.6.1"} ; Keep
-           com.taoensso/telemere               {:mvn/version "1.0.0-RC1"}
-           com.taoensso/telemere-slf4j         {:mvn/version "1.0.0-RC1"} ; Just adding it here initializes it; try (tel/check-interop).
-           com.taoensso/truss                  {:mvn/version "1.12.0"}
-           com.wsscode/pathom3                 {:mvn/version "2023.08.22-alpha"}
-           dk.ative/docjure                    {:mvn/version "1.19.0"}   ; spreadsheets
+           com.taoensso/telemere               {:mvn/version "1.0.0-RC2"}
+           com.taoensso/telemere-slf4j         {:mvn/version "1.0.0-RC2"} ; Just adding it here initializes it; try (tel/check-interop).
+           com.wsscode/pathom3                 {:mvn/version "2025.01.16-alpha"}
+           dk.ative/docjure                    {:mvn/version "1.21.0"}   ; spreadsheets
            io.github.paintparty/bling          {:mvn/version "0.4.2"}
            funcool/promesa                     {:mvn/version "11.0.678"}
            io.replikativ/datahike              {:mvn/version "0.6.1592"}
-           metosin/jsonista                    {:mvn/version "0.3.12"}
-           metosin/muuntaja                    {:mvn/version "0.6.10"}
+           metosin/jsonista                    {:mvn/version "0.3.13"}
+           metosin/muuntaja                    {:mvn/version "0.6.11"}
            metosin/reitit                      {:mvn/version "0.7.2"}
-           metosin/ring-http-response          {:mvn/version "0.9.4"}
+           metosin/ring-http-response          {:mvn/version "0.9.5"}
            mount/mount                         {:mvn/version "0.1.20"}
            net.clojars.wkok/openai-clojure     {:mvn/version "0.22.0"}   ; 0.21.3 is a guess about version with my PR.
-           org.apache.logging.log4j/log4j-core {:mvn/version "2.24.1"}   ; Used by jetty
+           org.apache.logging.log4j/log4j-core {:mvn/version "2.24.3"}   ; Used by jetty
            org.clj-commons/hickory             {:mvn/version "0.7.5"}
            org.clojure/clojure                 {:mvn/version "1.12.0"}
            org.clojure/core.unify              {:mvn/version "0.7.0"}
            org.ring-clojure/ring-websocket-async {:mvn/version "0.1.0-beta2"} ;  "0.1.19" Does not exist.
-           ring/ring-defaults                  {:mvn/version "0.5.0"}
+           ring/ring-defaults                  {:mvn/version "0.6.0"}
            ring/ring-jetty-adapter             {:mvn/version "1.13.0"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
            ring/ring-core                      {:mvn/version "1.13.0"}  ;; I switched to try org.ring-clojure/ring-websocket-async
            ring/ring-devel                     {:mvn/version "1.13.0"}  ;; Of course, both could have been accommodated.
@@ -38,19 +37,19 @@
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
                                            ;binaryage/devtools              {:mvn/version "1.0.7"} ; ToDo: would use with telemere handler:console-raw.
                                            ;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
-                                           cider/cider-nrepl               {:mvn/version "0.50.2"}
-                                           com.lambdaisland/classpath      {:mvn/version "0.5.48"}
+                                           cider/cider-nrepl               {:mvn/version "0.52.0"}
+                                           com.lambdaisland/classpath      {:mvn/version "0.6.58"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
                                            lilactown/helix                 {:mvn/version "0.2.1"}
                                            org.clojure/java.classpath      {:mvn/version "1.1.0"}
-                                           nrepl/nrepl                     {:mvn/version "1.3.0"}
+                                           nrepl/nrepl                     {:mvn/version "1.3.1"}
                                            org.clojure/tools.namespace     {:mvn/version "1.5.0"}}}
 
            :test       {:extra-paths    ["src/server" "test" "env/dev"]
                         :main-opts      ["-m" "kaocha.runner"]
                         :extra-deps     {lambdaisland/kaocha          {:mvn/version "1.91.1392"}
                                          ;; Since I'm running from the command line, bin/koacha, need to repeat these.
-                                         com.lambdaisland/classpath   {:mvn/version "0.5.48"}
+                                         com.lambdaisland/classpath   {:mvn/version "0.6.58"}
                                          org.clojure/tools.namespace  {:mvn/version "1.5.0"}}}
 
            :app       {:extra-paths ["src/app" "src/server" "test"] ; src/server has shared util.cljc
@@ -68,7 +67,7 @@
                                          nrepl/nrepl                  {:mvn/version "1.3.0"}
                                          cider/cider-nrepl            {:mvn/version "0.50.2"}}}
 
-           :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+           :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.10.6"}}
                       :ns-default build}
 
            ;; clj -M:morpheus -d graphs -f svg -e 'clojure.core/.*|:clj-kondo/unknown-namespace/.*|:cljs.core/.*' src
@@ -83,3 +82,23 @@
 ;;;  |          |    org.apache.logging.log4j/log4j-api |      2.24.1 |   2.24.2 | ; ERROR Log4j API could not find a logging provider. Problem with both versions.
 ;;;  |          | org.ring-clojure/ring-websocket-async | 0.1.0-beta2 |    0.2.0 | ; Keep beta2
 ;;;  |          |                  thheller/shadow-cljs |     2.28.19 |  2.28.20 |
+
+
+;;;   |    :file |                                 :name |         :current |          :latest |
+;;;   |----------+---------------------------------------+------------------+------------------|
+;;;   | deps.edn |                     cider/cider-nrepl |           0.50.2 |           0.52.0 |
+;;;   |          |                 com.lambdaisland/chui |          1.2.205 |  Failed to fetch |
+;;;   |          |            com.lambdaisland/classpath |           0.5.48 |           0.6.58 |
+;;;   |          |                 com.taoensso/telemere |        1.0.0-RC1 |        1.0.0-RC2 |
+;;;   |          |           com.taoensso/telemere-slf4j |        1.0.0-RC1 |        1.0.0-RC2 |
+;;;   |          |                   com.wsscode/pathom3 | 2023.08.22-alpha | 2025.01.16-alpha |
+;;;   |          |                      dk.ative/docjure |           1.19.0 |           1.21.0 |
+;;;   |          |         io.github.clojure/tools.build |           0.10.5 |           0.10.6 |
+;;;   |          |                io.replikativ/datahike |         0.6.1592 |         0.6.1594 |
+;;;   |          |                      metosin/jsonista |           0.3.12 |           0.3.13 |
+;;;   |          |                      metosin/muuntaja |           0.6.10 |           0.6.11 |
+;;;   |          |            metosin/ring-http-response |            0.9.4 |            0.9.5 |
+;;;   |          |                           nrepl/nrepl |            1.3.0 |            1.3.1 |
+;;;   |          |   org.apache.logging.log4j/log4j-core |           2.24.1 |           2.24.3 |
+;;;   |          | org.ring-clojure/ring-websocket-async |      0.1.0-beta2 |            0.2.0 |
+;;;   |          |                    ring/ring-defaults |            0.5.0 |            0.6.0 |

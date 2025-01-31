@@ -271,7 +271,7 @@
         files-modify-date (newest-file-modification-date agent-info)
         outdated? (and files-modify-date (== 1 (compare files-modify-date (-> db-info :system :agent/timestamp))))
         system-aid  (-> db-info :system :agent/assistant-id)
-        system-tid (-> db-info :project :agent/thread-id)
+        ;; system-tid (-> db-info :system :agent/thread-id)
         project-aid (-> db-info :project :agent/assistant-id)
         project-tid (-> db-info :project :agent/thread-id)
         same-assistant? (= system-aid project-aid)
@@ -283,7 +283,7 @@
         project-provider-aid? (llm/get-assistant project-aid)
         system-provider-aid?  (llm/get-assistant system-aid)
         substitute-aid        (when (and system-provider-aid? (not project-provider-aid?)) system-aid)
-        provider-tid? (when system-tid  (llm/get-thread project-tid))
+        provider-tid?  (llm/get-thread project-tid) ;(when system-tid  (llm/get-thread project-tid))
         missing-provider (cond-> #{}
                            (and (not system-provider-aid?)
                                 (not project-provider-aid?)) (conj :assistant)
