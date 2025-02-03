@@ -321,6 +321,17 @@
   (openai/modify-vector-store {:vector_store_id vector-store-id :name name}
                               (api-credentials llm-provider)))
 
+;;; The assistant aid you are providing must be linked to an assistant that has the file_search tool activated in order for this to work.
+;;; NB: there is a 1 vector store per assistant limit at the moment
+(defn add-vector-store-to-assistant
+  [& {:keys [vector-store-id aid llm-provider] :or {llm-provider @default-llm-provider}}]
+  (openai/modify-assistant {:assistant-id aid
+                            :tool-resources
+                            {:file_search 
+                             {:vector-store-ids [vector-store-id]}}} 
+                           (api-credentials llm-provider))
+  )
+
 ;;; Calls to openai/retieve-vector-store raises an error "Could not find route :retrieve-vector-store"openai/retrieve-vector-store
 ;;; Instead of calling openai/retieve-vector-store, I think you can call modify-vector-store with params specifying just :vector_store_id.
 (defn retrieve-vector-store
