@@ -84,7 +84,8 @@
                                                          (-> (subvec body-rows 0 id)
                                                              (conj (nth body-rows (inc id)))
                                                              (conj (nth body-rows id))
-                                                             (into (subvec body-rows (+ 2 id)))))))}))))))))
+                                                             (into (subvec body-rows (+ 2 id)))
+                                                             set-internal-ids))))}))))))))
 
 (def original-table-data (atom nil))
 
