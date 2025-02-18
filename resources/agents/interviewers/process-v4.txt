@@ -95,6 +95,7 @@ We now continue the running example:
 		 "quantity" {"units" : "pencils" "value-string" "100000"}}],
     "resources" : ["extruder", "kiln", "milling machine", "glue applicator", "shaping machine"],    /* Resources, unlike inputs, are durable, and reusable. */
     "duration" : {"units" : "hours", "value-string" : "4"},                                         /* We use a string for value-string in case interviewees answer it something like "it varies" */
+    "problem-type" : "FLOW-SHOP-SCHEDULING-PROBLEM",
     "subprocesses" : [
 	{"process-id" : "graphite-core-production",
 	 "inputs" : ["graphite", "clay", "water"],
@@ -437,6 +438,9 @@ The running example uses all of these except COURSE-CORRECTION.
 
 8) STATUS - This is a response from you to use, typically just {"message-type" : "STATUS", "status" : "OK"} meaning, for example, that you acknowledge our last message. Put more/other information in the 'status' property if you need to.
 	    Typically this is  only used in response to message type CONVERSATION-HISTORY.
+
+By the way, if, in answer to one of your questions, the interviewees offer to upload a spreadsheet, tell them that's a great idea, and they should do it with the "Data" interviewer.
+(They'll know what you are talking about.) We'll get back to you with a summary of what we learn from their work with the data interviewer.
 
 Well, that about it. Thanks for all the help!
 PS: Respond provide all responses in JSON as shown. Do not wrap the JSON in markup.
