@@ -177,7 +177,8 @@
 
 (defn ask-again
   [question]
-  (if (str/starts-with? question "Okay, but we are still interested in this: ") question (str "Okay, but we are still interested in this: " question)))
+  (let [repeat-blurb "Okay, but we are still interested in this: "]
+    (if (str/starts-with? question repeat-blurb) question (str repeat-blurb question))))
 
 ;;; ToDo: The design question I still have here is how to get back on track when the user's response doesn't answer the question.
 ;;;       This is mostly a matter for handle-raises-a-question ...(Thread/sleep 20000).
