@@ -23,7 +23,7 @@
 
 (def ^:diag diag (atom nil))
 (s/def ::pid keyword?)
-(s/def ::cid keyword?)
+(s/def ::cid #(#{:process :data :resources :optimality} %))
 
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
 ;;; (like when it is burning OpenAI asking the same question over and over ;^)).
@@ -76,7 +76,6 @@
 
 ;;; Optional
 (s/def ::tags (s/coll-of keyword?))
-(s/def ::topic #(#{:process :data :resources :optimality} %))
 
 ;;; ToDo: Maybe return a string ===immoderate=== and end the conversation if needed.
 (defn chat-pair
@@ -108,7 +107,9 @@
                                      "CONVERSATION-HISTORY"    (and (s/valid? ::budget budget)
                                                                     (s/valid? ::q-a-pairs Q-A-pairs))
                                      "STATUS"                  (s/valid? ::status status)
-                                   nil))))
+                                     "TABLE_LIST"              (s/valid? ::table-list table-list)
+                                     "DATA-STEP-2-CONCLUSION"       (s/valid? ::data-step-2-conclusion data-step-2-conclusion)
+                                     nil))))
 
 (s/def ::advice string?)
 (s/def ::budget number?)
@@ -174,6 +175,10 @@
   (log! :warn (str "handle-other-non-responsive not yet implemented: response = " response))
   [])
 
+(defn ask-again
+  [question]
+  (if (str/starts-with? question "Okay, but we are still interested in this: ") question (str "Okay, but we are still interested in this: " question)))
+
 ;;; ToDo: The design question I still have here is how to get back on track when the user's response doesn't answer the question.
 ;;;       This is mostly a matter for handle-raises-a-question ...(Thread/sleep 20000).
 (defn get-an-answer
@@ -188,7 +193,7 @@
         {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when-not answered? (response-analysis question response))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
-      (let [same-question (str "Okay, but we are still interested in this: " question)]
+      (let [same-question (ask-again question)]
         (into conversation (get-an-answer (-> ctx (assoc :question same-question)))))
       (cond-> conversation
         answered?                  (conj {:text response :from responder-type :tags [:response]})
@@ -275,7 +280,7 @@
     ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
     (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :text text})))
 
-(defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
+(defn surrogate? [pid] (find-claim '(surrogate ?x) (db/get-claims pid)))
 
 (defn ctx-surrogate
   "Return context updated with surrogate info."
@@ -309,8 +314,8 @@
    Return pid of new project."
   [response]
   (let [warm-up-claims (pan/analyze-warm-up-response response)
-        [_ pid] (ru/find-claim '(temp-project-id ?pid) warm-up-claims)
-        [_ _ pname] (ru/find-claim '(temp-project-name ?pid ?pname) warm-up-claims)
+        [_ pid] (find-claim '(temp-project-id ?pid) warm-up-claims)
+        [_ _ pname] (find-claim '(temp-project-name ?pid ?pname) warm-up-claims)
         pid (db/create-proj-db! {:project/id pid :project/name pname})
         bindings {'?pid pid}
         needed-claims (remove #('#{temp-project-id temp-project-name} (first %)) warm-up-claims)]
@@ -325,12 +330,12 @@
 (defn resume-conversation
   "Resume the interview loop for an established project and given cid."
   [{:keys [client-id pid cid] :as ctx}]
-  (assert (string? client-id))
-  (assert (#{:process :data :resources :optimality} cid))
+  (assert (s/valid? ::client-id client-id))
+  (assert (s/valid? ::cid cid))
   (log! :debug (str "--------- Resume conversation: ctx: " ctx))
   (reset! course-correction-count 0)
   (try
-    (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
+    (if (not (ready-for-discussion? pid cid))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
       (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
