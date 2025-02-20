@@ -59,6 +59,10 @@
                                       ((lookup-fn :set-current-project) new-proj-map)
                                       ((lookup-fn :get-conversation) (:project/id new-proj-map))))
 
+(register-fn :send-table (fn [table]
+                           (send-msg {:dispatch-key :user-returns-table
+                                      :table-string (str table)})))
+
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
   [{:keys [dispatch-key] :as msg}]
@@ -138,6 +142,7 @@
     :domain-expert-says        ; Human user wrote at the chat prompt (typically answering a question).
     :interviewer-busy?         ; Enable/disable various UI features depending on whether interviewer is busy.
     :run-long                  ; diagnostic
+    :user-returns-table        ; User submitted table data
     :throw-it})                ; diagnostic
 
 (defn send-msg

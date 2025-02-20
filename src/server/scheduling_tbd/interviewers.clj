@@ -1,7 +1,8 @@
 (ns scheduling-tbd.interviewers
     "Runs an interview uing an interview agent."
     (:require
-     [clojure.core.unify          :as uni]
+     [clojure.core.unify            :as uni]
+     [clojure.data.xml              :as xml]
      [clojure.pprint                :refer [pprint]]
      [clojure.spec.alpha            :as s]
      [clojure.string                :as str]
@@ -390,9 +391,63 @@
     (finally
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
+;;; --------------- Handle tables from users --------------------------------------
+(defn separate-table
+  "Look through the response for '#+begin_src HTML ... #+end_src'; what is between those markers should be a table.
+   Return an object where :sans-table is the argument string minus the table, and :table is the substring between the markers."
+  [response-string]
+  (let [in-table? (atom false)]
+    (loop [lines (str/split-lines response-string)
+           res {:sans-table "" :table ""}]
+      (let [l (first lines)]
+        (when (and l @in-table? (re-matches #"(?i)^\s*\#\+end_src\s*" l))  (reset! in-table? false))
+        (when (and l (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l))    (reset! in-table? true))
+        (if (empty? lines)
+          res
+          (recur (rest lines)
+                 (cond (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l) res
+                       (re-matches #"(?i)^\s*\#\+end_src\s*"          l) res
+                       (not @in-table?) (update res :sans-table #(str % "\n" l))
+                       @in-table?       (update res :table      #(str % "\n" l)))))))))
+
+(defn structure-response
+  "Return the response with XHTML tables separated from text and converted to a clojure object."
+  [response-string]
+  (let [{:keys [table] :as res} (separate-table response-string)]
+    (as-> res ?r
+      (assoc ?r :status :ok)       ;; ToDo: Throwable isn't catching errors here! HUH???
+      (if (not-empty table)        (try (assoc ?r :table (-> table java.io.StringReader. xml/parse))
+                                        (catch Throwable _e (assoc ?r :status :invalid-table)))
+          ?r))))
+
+(defn xml2clj [x]
+  (cond (seq? x) (mapv xml2clj x)
+        (map? x) (reduce-kv (fn [m k v]
+                              (cond (= k :content)           (assoc m k (->> v (remove #(and (string? %) (re-matches #"^\s+" %))) vec xml2clj))
+                                    (= k :attrs)              m ; There aren't any values here in our application.
+                                    :else                    (assoc m k (xml2clj v))))
+                            {}
+                            x)
+        (vector? x) (mapv xml2clj x)
+        :else x))
+
+(defn table2obj
+  "Convert the ugly XML-like object (as :tr :th :td) to an object with :headings and table-data, where
+  (1) :headings is a vector of maps with :title and :key and,
+  (2) :table-data is a vector of maps with keys that are the :key values of (1)
+  These :key values are :title as a... "
+  [])
+
+(defn handle-table
+  "Turn the table returned by user (a string) into something you can communicate back to the interviewer agent.
+   This is the function registered to handle :user-returns-table."
+  [{:keys [table-string]}]
+  (log! :info (str "Received table: " table-string)))
+
 ;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-iviewers!
   []
+  (ws/register-ws-dispatch :user-returns-table handle-table)
   (ws/register-ws-dispatch :start-conversation start-conversation)
   (ws/register-ws-dispatch :resume-conversation resume-conversation))
 

@@ -9,7 +9,6 @@
    [scheduling-tbd.interviewers   :as inv]
    [scheduling-tbd.llm            :as llm]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm]]
-   [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -44,6 +43,7 @@
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
+  (safe-alias 'inv    'scheduling-tbd.interviewers)
   (safe-alias 'mzn    'scheduling-tbd.minizinc)
   (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
   (safe-alias 'ou     'scheduling-tbd.op-utils)
