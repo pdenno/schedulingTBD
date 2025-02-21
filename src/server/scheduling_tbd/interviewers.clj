@@ -13,7 +13,7 @@
      [scheduling-tbd.agent-db       :as adb]
      [scheduling-tbd.db             :as db]
      [scheduling-tbd.domain.data-analysis]
-     [scheduling-tbd.domain.process-analysis  :as pan :refer [the-warm-up-type-question]]
+     [scheduling-tbd.domain.process-analysis  :as pan :refer [the-warm-up-type-question text-to-var]]
      [scheduling-tbd.domain.optimality-analysis]
      [scheduling-tbd.domain.resources-analysis]
      [scheduling-tbd.llm            :as llm]
@@ -37,7 +37,7 @@
    Returns promise which will resolve to the original obj argument except:
      1) :agent-query is adapted from the input argument value for the agent type (human or surrogate)
      2) :response is added. Typically its value is a string."
-  [{:keys [question surrogate-agent responder-type preprocess-fn tries client-id] :as ctx
+  [{:keys [question table table-text surrogate-agent responder-type preprocess-fn tries client-id] :as ctx
     :or {tries 1 preprocess-fn identity}}]
   (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
   (let [prom (if (= :human responder-type)
@@ -45,12 +45,13 @@
                  (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
                  (ws/send-to-chat (-> ctx                        ; This cannot timeout.
                                       (assoc :text question)
+                                      (assoc :table table)
                                       (assoc :promise? true)
                                       (assoc :dispatch-key :tbd-says))))
                (px/submit! (fn [] ; surrogate responder...
                              (try
                                (adb/query-agent surrogate-agent  ; This can timeout.
-                                                question
+                                                (str question "\n\n" table-text)
                                                 {:tries tries
                                                  :preprocess-fn preprocess-fn})
                                (catch Exception e {:error e})))))]
@@ -184,7 +185,7 @@
   [{:keys [question responder-type human-starting?] :as ctx}]
   (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
   (let [conversation [{:text question :from :system :tags [:query]}]
-        response  (chat-pair ctx) ; response here is just text.
+        response  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
         answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
         {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when-not answered? (response-analysis question response))
         answered? (or answered? answers-the-question?)]
@@ -224,20 +225,92 @@
                      (filter #(contains? % :answer))
                      vec)}))
 
-(defn supply-question
+(defn make-supply-question-msg
   "Create a supply question command for the conversation."
   [{:keys [pid cid] :as _ctx}]
   {:message-type "SUPPLY-QUESTION" :budget (db/get-interviewer-budget pid cid)})
 
 (defn fix-off-course [q ctx] q) ; ToDo: NYI
 
-;;; ToDo: If done? had access to the example annotated-datastructure, it could use that to determine whether or not it's done.
-;;;       In V4, whenever done? returns false, interviewer monitor sends another SUPPLY-QUESTION message.
-;;;       In V4, the monitor decides, not the interviewer.
-(defn done?
-  "A conversation-specific boolean function that determines whether everything that needs to be asked has been asked."
-  [pid cid]
-  false)
+;;; --------------- Handle tables from interviewer --------------------------------------
+(defn table-xml2clj
+  "Remove some useless aspects of the parsed XHTML, including string content and attrs."
+  [table-xml]
+  (letfn [(x2c [x]
+            (cond (seq? x) (mapv x2c x)
+                  (map? x) (reduce-kv (fn [m k v]
+                                        (cond (= k :content)           (assoc m k (->> v (remove #(and (string? %) (re-matches #"^\s+" %))) vec x2c))
+                                              (= k :attrs)              m ; There aren't any values here in our application.
+                                              :else                    (assoc m k (x2c v))))
+                                      {}
+                                      x)
+                  (vector? x) (mapv x2c x)
+                  :else x))]
+    (x2c table-xml)))
+
+(defn table2obj
+  "Convert the ugly XML-like object (as :tr :th :td) to an object with :headings and :table-data, where
+  (1) :headings is a vector of maps with :title and :key and,
+  (2) :table-data is a vector of maps with keys that are the :key values of (1)
+  These :key values are :title as a keyword. For example:
+
+   ugly-table:
+
+  {:tag :table,
+   :content [{:tag :tr, :content [{:tag :th, :content ['Dessert (100g serving)']} {:tag :th, :content ['Carbs (g)']} {:tag :th, :content ['Protein (g)']}]}
+             {:tag :tr, :content [{:tag :td, :content ['frozen yogurt']} {:tag :td, :content [24]}  {:tag :td, :content [4.0]}]}
+             {:tag :tr, :content [{:tag :td, :content ['ice cream']}     {:tag :td, :content [37]}  {:tag :td, :content [4.3]}]}]}
+
+  Would result in:
+  {:headings [{:title 'Dessert (100g serving)', :key :dessert}
+              {:title 'Carbs (g)',              :key :carbs}
+              {:title 'Protein (g)',            :key :protein}]
+   :table-data [{:dessert 'frozen yogurt', :carbs 24 :protein 4.0}
+                {:dessert 'ice cream',     :carbs 37 :protein 4.3}]}."
+  [ugly-table]
+  (let [heading (-> ugly-table :content first :content)
+        titles (if (every? #(= (:tag %) :th) heading)
+                 (->> heading
+                      (mapv #(-> % :content first))
+                      (mapv #(-> {} (assoc :title %) (assoc :key (-> % ru/text-to-var keyword)))))
+                 (log! :warn "No titles in ugly table."))
+        title-keys (map :key titles)
+        data-rows  (->> ugly-table
+                        :content                                 ; table content
+                        rest                                     ; everything but header
+                        (mapv (fn [row]
+                                (mapv #(or (-> % :content first) "") (:content row)))))]
+    {:headings  titles
+     :table-data (mapv (fn [row] (zipmap title-keys row)) data-rows)}))
+
+(defn separate-table-aux
+  "Look through the text (typically an interviewer question) for '#+begin_src HTML ... #+end_src'; what is between those markers should be a table.
+   Return an object where :question is the argument string minus the table, and :table is the substring between the markers."
+  [text]
+  (let [in-table? (atom false)]
+    (loop [lines (str/split-lines text)
+           res {:question "" :table-text ""}]
+      (let [l (first lines)]
+        (when (and l @in-table? (re-matches #"(?i)^\s*\#\+end_src\s*" l))  (reset! in-table? false))
+        (when (and l (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l))    (reset! in-table? true))
+        (if (empty? lines)
+          res
+          (recur (rest lines)
+                 (cond (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l) res
+                       (re-matches #"(?i)^\s*\#\+end_src\s*"          l) res
+                       (not @in-table?) (update res :question   #(str % "\n" l))
+                       @in-table?       (update res :table-text #(str % "\n" l)))))))))
+
+(defn separate-table
+  "Return the response with XHTML tables separated from text and converted to a clojure object."
+  [interviewer-question]
+  (let [{:keys [table-text] :as res} (separate-table-aux interviewer-question)]
+        (if (not-empty table-text)
+          (try (as-> res ?r
+                 (assoc ?r :table (-> ?r :table-text java.io.StringReader. xml/parse table-xml2clj table2obj))
+                 (assoc ?r :status :ok))
+               (catch Throwable _e (assoc res :status :invalid-table)))
+          res)))
 
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
 ;;; over and over and the interview will advance each time until you get back DONE.
@@ -246,14 +319,12 @@
    Returns a vector of message objects suitable for db/add-msg."
   [{:keys [client-id] :as ctx}]
   (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-  (try (let [supplied-question
-             (-> (supply-question ctx)   ; This just makes the question map.
-                 (tell-interviewer ctx)  ; This translates it to JSON and tells it to the agent.
-                 (fix-off-course ctx))]  ; This will return the argument if it is okay, otherwise has a conversation with the interviewer to fix things.
-         (if (= (:status supplied-question) "DONE")
-           (-> (assoc ctx :status "DONE") vector) ; This in lieu of a vector of messages.
-           (do (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
-               (get-an-answer (merge ctx (dissoc supplied-question :status))))))
+  (try (let [interviewer-q (-> (make-supply-question-msg ctx)   ; This just makes the question map.
+                               (tell-interviewer ctx)  ; This translates it to JSON and tells it to the agent.
+                               (separate-table)
+                               (fix-off-course ctx))]  ; This will return the argument if it is okay, otherwise has a conversation with the interviewer to fix things.
+         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
+         (get-an-answer (merge ctx interviewer-q)))
        (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn ready-for-discussion?
@@ -391,53 +462,7 @@
     (finally
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
-;;; --------------- Handle tables from users --------------------------------------
-(defn separate-table
-  "Look through the response for '#+begin_src HTML ... #+end_src'; what is between those markers should be a table.
-   Return an object where :sans-table is the argument string minus the table, and :table is the substring between the markers."
-  [response-string]
-  (let [in-table? (atom false)]
-    (loop [lines (str/split-lines response-string)
-           res {:sans-table "" :table ""}]
-      (let [l (first lines)]
-        (when (and l @in-table? (re-matches #"(?i)^\s*\#\+end_src\s*" l))  (reset! in-table? false))
-        (when (and l (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l))    (reset! in-table? true))
-        (if (empty? lines)
-          res
-          (recur (rest lines)
-                 (cond (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l) res
-                       (re-matches #"(?i)^\s*\#\+end_src\s*"          l) res
-                       (not @in-table?) (update res :sans-table #(str % "\n" l))
-                       @in-table?       (update res :table      #(str % "\n" l)))))))))
-
-(defn structure-response
-  "Return the response with XHTML tables separated from text and converted to a clojure object."
-  [response-string]
-  (let [{:keys [table] :as res} (separate-table response-string)]
-    (as-> res ?r
-      (assoc ?r :status :ok)       ;; ToDo: Throwable isn't catching errors here! HUH???
-      (if (not-empty table)        (try (assoc ?r :table (-> table java.io.StringReader. xml/parse))
-                                        (catch Throwable _e (assoc ?r :status :invalid-table)))
-          ?r))))
-
-(defn xml2clj [x]
-  (cond (seq? x) (mapv xml2clj x)
-        (map? x) (reduce-kv (fn [m k v]
-                              (cond (= k :content)           (assoc m k (->> v (remove #(and (string? %) (re-matches #"^\s+" %))) vec xml2clj))
-                                    (= k :attrs)              m ; There aren't any values here in our application.
-                                    :else                    (assoc m k (xml2clj v))))
-                            {}
-                            x)
-        (vector? x) (mapv xml2clj x)
-        :else x))
-
-(defn table2obj
-  "Convert the ugly XML-like object (as :tr :th :td) to an object with :headings and table-data, where
-  (1) :headings is a vector of maps with :title and :key and,
-  (2) :table-data is a vector of maps with keys that are the :key values of (1)
-  These :key values are :title as a... "
-  [])
-
+;;; --------------- Handle tables user (Table HTML from interviewer is handled earlier in this file.)  -----------
 (defn handle-table
   "Turn the table returned by user (a string) into something you can communicate back to the interviewer agent.
    This is the function registered to handle :user-returns-table."

@@ -3,8 +3,12 @@
   (:refer-clojure :exclude [send])
   (:require
    [clojure.spec.alpha            :as s]
+   [clojure.datafy                :refer [datafy]]
    [clojure.core.unify            :as uni]
-   [clojure.pprint                :refer [cl-format]]
+   [clojure.pprint                :refer [cl-format pprint]]
+   [clojure.string                :as str]
+   [jsonista.core                 :as json]
+   [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere             :refer [log!]]))
@@ -79,3 +83,41 @@
                     :pname (db/get-project-name pid)
                     :pid pid
                     :cid cid}))
+
+(s/def ::text-to-var (s/keys :req-un [::INPUT-TEXT ::CORRESPONDING-VAR]))
+(s/def ::INPUT-TEXT string?)
+(s/def ::CORRESPONDING-VAR string?)
+
+(defn good-for-var?
+  "Returns true if the argument text has any hope of making a good variable name."
+  [text]
+  (and (< (count text) 25)
+       (not-any? #{\. \, \{ \} \( \) \* \[ \] \@ \# \% \^} (set text))))
+
+(defn make-var-from-string
+  [text]
+  (-> text
+      str/trim
+      (str/replace #"\s+" "-")
+      str/lower-case))
+
+(defn text-to-var
+  "Convert some text to variable name, return as a string.
+   This uses a agent only in the case that the text is long or has some characters in it that wouldn't look good in a variable
+   (regarding this, see function good-for-var?)
+   Call the text-to-var agent on the argument text, returning a map containing keys:
+   :INPUT-TEXT and :CORRESPONDING-VAR."
+  [text]
+  (if (good-for-var? text)
+    (make-var-from-string text)
+    (let [res (try (-> (adb/query-agent :text-to-var (format "{\"INPUT-TEXT\" : \"%s\"}" text))
+                       json/read-value
+                       (update-keys keyword))
+                   (catch Exception e
+                     (let [d-e (datafy e)]
+                       (log! :warn (str "text-to-var failed\n "
+                                        "\nmessage: " (-> d-e :via first :message)
+                                        "\ncause: " (-> d-e :data :body)
+                                        "\ntrace: " (with-out-str (pprint (:trace d-e))))))))]
+      (s/assert ::text-to-var res)
+      (:CORRESPONDING-VAR res))))

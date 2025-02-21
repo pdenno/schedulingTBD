@@ -48,13 +48,19 @@
   :instruction-path "agents/scheduling-challenges.txt"
   :response-format-path "agents/scheduling-challenges-response-format.edn"}
 
- {:base-type :process-dur-agent
+#_ {:base-type :process-dur-agent
   :agent-type :system
   :instruction-path "agents/process-dur-agent.txt"}
 
- {:base-type :process-ordering-agent
+#_ {:base-type :process-ordering-agent
   :agent-type :system
-  :instruction-path "agents/process-ordering-agent.txt"}
+    :instruction-path "agents/process-ordering-agent.txt"}
+
+ {:base-type :text-to-var
+  :agent-type :system
+  :model-class :mini
+  :response-format-path "agents/text-to-var-response-format.edn"
+  :instruction-path "agents/text-to-var.txt"}
 
  {:base-type :text-function-agent
   :agent-type :system

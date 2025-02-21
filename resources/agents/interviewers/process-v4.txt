@@ -201,7 +201,7 @@ We now continue the running example:
    We:  {"message-type" : "SUPPLY-QUESTION", "budget" : 0.85}
 
    You: {"message-type" : "QUESTION-TO-ASK"
-	 "question"     : "Here is a table of the processes I think you mentioned. Could you add or remove rows as necessary and fill in the column about how much time each step takes.
+	 "question"     : "Here is a table of the processes I think you mentioned. Could you add or remove rows as necessary and fill in the column about how much time each step takes. Provide units, for example "1 hour" "20 min" etc.
 #+begin_src HTML
 <table>
   <tr><th>Process Step</th>                <th>Duration</th></tr>
