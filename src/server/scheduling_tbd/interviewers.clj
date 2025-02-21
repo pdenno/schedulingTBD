@@ -380,7 +380,7 @@
           response (-> conversation last :text) ; ToDo: Could be more to it...wants-a-break?.
           _effect! (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
           pid (start-human-project! response)
-          [_ _ pname] (ru/find-claim '(project-name ?pid ?pname) (db/get-claims pid))]
+          [_ _ pname] (find-claim '(project-name ?pid ?pname) (db/get-claims pid))]
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
       (doseq [m conversation]
         (let [{:keys [from text tags]} m]
