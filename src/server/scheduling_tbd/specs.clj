@@ -35,13 +35,13 @@
                                     :ping-confirm              ; Server confirms your ping.
                                     :interviewer-busy?         ; Tells client to prevent changing the conversation/planning domain.
                                     :sur-says
-                                    :tbd-says
+                                    :iviewr-says
                                     :update-code} x))
 
 (s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
 (s/def ::dispatch-key outbound-dispatch-key?)
 (s/def ::text (s/and string? #(not-empty %)))
 (s/def ::chat-msg-obj (s/and (s/keys :req-un [::client-id ::dispatch-key])
-                             #(if (#{:sur-says :tbd-says :update-code} (:dispatch-key %))
+                             #(if (#{:sur-says :iviewr-says :update-code} (:dispatch-key %))
                                 (s/valid? ::text (:text %))
                                 true)))

@@ -1,5 +1,6 @@
 (ns stbd-app.util
   (:require
+   [helix.core :as helix :refer [$]]
    [taoensso.telemere :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -29,17 +30,18 @@
   (swap! dispatch-table #(assoc % k func))
   (log! :debug (str "Registered function for websocket: " k)))
 
-(def common-info "Map tracking current project/id and :conversation/id." (atom {:cid :process}))
+(def common-info "Map tracking current project/id and :conversation/id."
+  (atom {:cid :process
+         :table :removed}))
 
 (defn update-common-info!
   "Update the common-info atom from an app action or server response.
    Returns the value of the common-info atom."
-  [resp]
+  [{:keys [current-project project-id cid] :as resp}]
   (log! :info (str "update-common-info: resp = " resp))
   (swap! common-info
          (fn [info]
-           (let [{:keys [current-project project-id cid]} resp
-                 pid (or (:project/id resp) (:pid resp))]
+           (let [pid (or (:project/id resp) (:pid resp))]
              (cond-> info
                (not (contains? resp :cid))     (assoc :cid :process)
                current-project   (assoc :pid current-project)

@@ -19,24 +19,25 @@
 
 ;;; ToDo: Is this table stuff really what I want? I could use a strict response format, but
 (def how-to-handle-tables
-  (str "Typically you answer in plain text. However, the interviewer may ask you to complete an HTML table.\n"
+  (str "Typically you answer in sentences. However, the interviewers may ask you to complete an HTML table.\n"
        "In that case, they will provide the HTML table partially filled in (based on your earlier answers) and will ask you to complete it, best you can.\n"
        "For example they might say:\n\n"
-       "'Here is a list of the processes you mentioned. Could you please review and adjust the table below, filling in the approximate duration of each step in the 'Duration' column:'\n "
+       "'Here is a list of the processes you mentioned. Could you please review and adjust the table below, filling in the approximate duration of each step in the 'Duration' column:'\n"
        "<table>\n"
-       "<tr><th>Process Step</th>                <th>Duration</th></tr>\n"
-       "<tr><td>--Some step--</td>               <td></td></tr>\n"
-       "<tr><td>--Some other step--</td>         <td></td></tr>\n"
+       "  <tr><th>Process Step</th>                <th>Duration</th></tr>\n"
+       "  <tr><td>--Some step--</td>               <td></td></tr>\n"
+       "  <tr><td>--Some other step--</td>         <td></td></tr>\n"
        "</table>\n\n"
        "Your response in this case can be text plus the provided table modified to answer the question.\n"
        "However, it is important that you wrap the table part of your answer in #+begin_src HTML ... #+end_src\n"
-       "So, if for example --Some step-- takes 2 hours, and --Some other step-- takes 3 days, you could respond with:\n\n"
-       "Here are my estimates of the step durations:\n\n"
+       "So, if for example --Some step-- takes 2 hours, and --Some other step-- takes 3 days, and you think there is some other step they should have asked about, you could respond with:\n\n"
+       "Here are my estimates of the step durations. Note that I added --Yet another step-- which I think should be included in this context:\n\n"
        "#+begin_src HTML\n"
        "<table>\n"
        "  <tr><th>Process Step</th>                <th>Duration</th></tr>\n"
        "  <tr><td>--Some step--</td>               <td>2 hours</td></tr>\n"
        "  <tr><td>--Some other step--</td>         <td>3 days</td></tr>\n"
+       "  <tr><td>--Yet anoter step--</td>         <td>1 days</td></tr>\n"
        "</table>\n"
        "#+end_src"))
 
@@ -49,7 +50,6 @@
    "You help me by answering an interviewer's questions that will allow us to collaborate in building a scheduling system for your company.\n"
    "Your answers typically are short, just a few sentences each.\n\n"
    how-to-handle-tables))
-
 
 ;;; (sur/start-surrogate! {:product "optical fiber" :client-id (ws/recent-client!)})
 (defn start-surrogate!

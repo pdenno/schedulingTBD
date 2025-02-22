@@ -47,7 +47,7 @@
                                       (assoc :text question)
                                       (assoc :table table)
                                       (assoc :promise? true)
-                                      (assoc :dispatch-key :tbd-says))))
+                                      (assoc :dispatch-key :iviewr-says))))
                (px/submit! (fn [] ; surrogate responder...
                              (try
                                (adb/query-agent surrogate-agent  ; This can timeout.
@@ -88,7 +88,7 @@
   (let [response-text (chat-pair-aux ctx)]
     (if (string? response-text)
       (if (and (= :human responder-type) (llm/immoderate? response-text))
-        (do (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :text "This is not helpful."})
+        (do (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :text "This is not helpful."})
             "===IMMODERATE===") ; ToDo: Continue with this to stop interactions.
         response-text)
     (throw (ex-info "Unknown response from operator" {:response response-text})))))
@@ -212,7 +212,7 @@
   (let [msgs (db/get-conversation pid cid)
         questions (filter #(= :system (:message/from %)) msgs)] ; Some aren't questions; we deal with it.
     {:message-type "CONVERSATION-HISTORY"
-     :budget (db/get-interviewer-budget pid cid)
+     :budget (db/get-budget pid cid)
      :Q-A-pairs (->> questions
                      (map (fn [q]
                             (let [next-id (inc (:message/id q))]
@@ -228,7 +228,7 @@
 (defn make-supply-question-msg
   "Create a supply question command for the conversation."
   [{:keys [pid cid] :as _ctx}]
-  {:message-type "SUPPLY-QUESTION" :budget (db/get-interviewer-budget pid cid)})
+  {:message-type "SUPPLY-QUESTION" :budget (db/get-budget pid cid)})
 
 (defn fix-off-course [q ctx] q) ; ToDo: NYI
 
@@ -239,9 +239,9 @@
   (letfn [(x2c [x]
             (cond (seq? x) (mapv x2c x)
                   (map? x) (reduce-kv (fn [m k v]
-                                        (cond (= k :content)           (assoc m k (->> v (remove #(and (string? %) (re-matches #"^\s+" %))) vec x2c))
-                                              (= k :attrs)              m ; There aren't any values here in our application.
-                                              :else                    (assoc m k (x2c v))))
+                                        (cond (= k :content)        (assoc m k (->> v (remove #(and (string? %) (re-matches #"^\s+" %))) vec x2c))
+                                              (= k :attrs)          m ; There aren't any values here in our application.
+                                              :else                 (assoc m k (x2c v))))
                                       {}
                                       x)
                   (vector? x) (mapv x2c x)
@@ -249,8 +249,8 @@
     (x2c table-xml)))
 
 (defn table2obj
-  "Convert the ugly XML-like object (as :tr :th :td) to an object with :headings and :table-data, where
-  (1) :headings is a vector of maps with :title and :key and,
+  "Convert the ugly XML-like object (has :tr :th :td) to an object with :table-headings and :table-data, where
+  (1) :table-headings is a vector of maps with :title and :key and,
   (2) :table-data is a vector of maps with keys that are the :key values of (1)
   These :key values are :title as a keyword. For example:
 
@@ -262,9 +262,9 @@
              {:tag :tr, :content [{:tag :td, :content ['ice cream']}     {:tag :td, :content [37]}  {:tag :td, :content [4.3]}]}]}
 
   Would result in:
-  {:headings [{:title 'Dessert (100g serving)', :key :dessert}
-              {:title 'Carbs (g)',              :key :carbs}
-              {:title 'Protein (g)',            :key :protein}]
+  {:table-headings [{:title 'Dessert (100g serving)', :key :dessert}
+                    {:title 'Carbs (g)',              :key :carbs}
+                    {:title 'Protein (g)',            :key :protein}]
    :table-data [{:dessert 'frozen yogurt', :carbs 24 :protein 4.0}
                 {:dessert 'ice cream',     :carbs 37 :protein 4.3}]}."
   [ugly-table]
@@ -280,12 +280,12 @@
                         rest                                     ; everything but header
                         (mapv (fn [row]
                                 (mapv #(or (-> % :content first) "") (:content row)))))]
-    {:headings  titles
+    {:table-headings  titles
      :table-data (mapv (fn [row] (zipmap title-keys row)) data-rows)}))
 
 (defn separate-table-aux
   "Look through the text (typically an interviewer question) for '#+begin_src HTML ... #+end_src'; what is between those markers should be a table.
-   Return an object where :question is the argument string minus the table, and :table is the substring between the markers."
+   Return an object where :question is the argument string minus the table, and :table-text is the substring between the markers."
   [text]
   (let [in-table? (atom false)]
     (loop [lines (str/split-lines text)
@@ -303,27 +303,29 @@
 
 (defn separate-table
   "Return the response with XHTML tables separated from text and converted to a clojure object."
-  [interviewer-question]
-  (let [{:keys [table-text] :as res} (separate-table-aux interviewer-question)]
+  [{:keys [question]}]
+  (let [{:keys [table-text] :as res} (separate-table-aux question)]
         (if (not-empty table-text)
           (try (as-> res ?r
                  (assoc ?r :table (-> ?r :table-text java.io.StringReader. xml/parse table-xml2clj table2obj))
                  (assoc ?r :status :ok))
+               ;; ToDo:  This catch is not catching!?!
                (catch Throwable _e (assoc res :status :invalid-table)))
           res)))
 
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
-;;; over and over and the interview will advance each time until you get back DONE.
+;;; over and over and the interview will advance each time.
 (defn q-and-a
   "Call interviewer to supply a question; call get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
    Returns a vector of message objects suitable for db/add-msg."
   [{:keys [client-id] :as ctx}]
   (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-  (try (let [interviewer-q (-> (make-supply-question-msg ctx)   ; This just makes the question map.
-                               (tell-interviewer ctx)  ; This translates it to JSON and tells it to the agent.
-                               (separate-table)
-                               (fix-off-course ctx))]  ; This will return the argument if it is okay, otherwise has a conversation with the interviewer to fix things.
+  (try (let [interviewer-q (-> (make-supply-question-msg ctx) ; This just makes the question map.
+                               (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type "QUESTION-TO-ASK", :question "...'}
+                               (separate-table)               ; Returns a {:question "..." :table-text "..." :table {:table-headings ... :tabel-data ...}}
+                               (fix-off-course ctx))]  ; Currently a no-op. Returns argument.
          (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
+         (reset! diag interviewer-q)
          (get-an-answer (merge ctx interviewer-q)))
        (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
@@ -345,7 +347,7 @@
               (format "Could you pop over to the %s discussion (menu on left, 'Process', 'Data' etc.) and chat more with that agent?"
                       (name recommended-chat)))]
     ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
-    (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :text text})))
+    (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :text text})))
 
 (defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
 
@@ -414,11 +416,12 @@
                   (if @active?
                     (let [response (-> conversation last)]
                       (doseq [msg conversation]
-                        (when-not (= (:status msg) "DONE")
-                          (db/add-msg (merge {:pid pid :cid cid} msg))))
+                        (db/add-msg (merge {:pid pid :cid cid} msg)))
+                      (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
                       (cond
-                        (> cnt 15)                                  :exceeded-questions-safety-stop
-                        (= "DONE" (-> conversation last :status))   (db/assert-conversation-done! pid cid)
+                        (> cnt 20)                                  :exceeded-questions-safety-stop
+                        ;; ToDo: Write some utility to "re-fund and re-open" conversations.
+                        (<= 0 (db/get-budget pid cid)) (db/assert-conversation-done! pid cid)
                         :else
                         (do
                           (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
@@ -435,7 +438,7 @@
   "Ask a human the first question, create a project and call resume-conversation.
    :start-conversation is a dispatch-key from the client, providing, perhaps only the client-id."
   [{:keys [client-id] :as ctx}]
-  (ws/send-to-chat {:dispatch-key :tbd-says :client-id client-id :promise? true
+  (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :promise? true
                     :text (str "You want to start a new project? This is the right place! "
                                (db/conversation-intros :process))})
   (try
@@ -462,17 +465,9 @@
     (finally
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
-;;; --------------- Handle tables user (Table HTML from interviewer is handled earlier in this file.)  -----------
-(defn handle-table
-  "Turn the table returned by user (a string) into something you can communicate back to the interviewer agent.
-   This is the function registered to handle :user-returns-table."
-  [{:keys [table-string]}]
-  (log! :info (str "Received table: " table-string)))
-
 ;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-iviewers!
   []
-  (ws/register-ws-dispatch :user-returns-table handle-table)
   (ws/register-ws-dispatch :start-conversation start-conversation)
   (ws/register-ws-dispatch :resume-conversation resume-conversation))
 

@@ -17,7 +17,7 @@
    [stbd-app.components.editor  :as editor :refer [Editor]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareLeftRight ShareUpDown]]
-   [stbd-app.components.tables  :as tables :refer [BasicTable]]
+   [stbd-app.components.tables  :as tables :refer [DataArea]]
    [stbd-app.util      :as util :refer [register-fn]]
    [stbd-app.ws        :as ws]
    [taoensso.telemere  :refer [log!]]))
@@ -87,9 +87,10 @@
   {:right-share  {:on-resize-up    (partial editor/resize "code-editor")
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")}})
 
+
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
-        [proj set-proj]                       (hooks/use-state nil) ; Same structure as a proj-info element.
+        [proj _set-proj]                      (hooks/use-state nil) ; Same structure as a proj-info element.
         [code set-code]                       (hooks/use-state "")
         useful-height (int (- height banner-height))
         chat-side-height useful-height
@@ -119,7 +120,7 @@
                       :up ($ Editor {:text code
                                      :name "code-editor"
                                      :height code-side-height})
-                      :dn ($ BasicTable #_Box)
+                      :dn ($ DataArea)
                       :share-fns (:right-share top-share-fns)})
            :lf-pct 0.50
            :init-width width}))))

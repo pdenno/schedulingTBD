@@ -68,7 +68,7 @@
   (assert (string? client-id))
   (assert (string? question))
   (log! :info (str "llm-directly: " question))
-  (let [chat-args {:client-id client-id :dispatch-key :tbd-says :promise? false}]
+  (let [chat-args {:client-id client-id :dispatch-key :iviewr-says :promise? false}]
     (try
       (let [res (-> (query-llm [{:role "system"    :content "You are a helpful assistant."}
                                 {:role "user"      :content question}])
