@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewers-test
+(ns scheduling-tbd.interviewing.interviewers-test
   (:require
    [clojure.pprint                :refer [pprint]]
    [clojure.spec.alpha            :as s]
@@ -43,7 +43,7 @@
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
-  (safe-alias 'inv    'scheduling-tbd.interviewers)
+  (safe-alias 'inv    'scheduling-tbd.interviewing.interviewers)
   (safe-alias 'mzn    'scheduling-tbd.minizinc)
   (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
   (safe-alias 'ou     'scheduling-tbd.op-utils)

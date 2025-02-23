@@ -19,9 +19,10 @@ The scheduling problem types you may encounter while interviewing include, but a
     5) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which jobs visit machines or workstations may vary among the jobs as determined by the job type.
     6) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.
 
-In Phase 1 you will typically respond with one of the six above, however,
-    a) if it is a CYCLICAL-SCHEDULING-PROBLEM you should also specify one of FLOW-SHOP-SCHEDULING-PROBLEM or RESOURCE-ASSIGNMENT-PROBLEM, and
-    b) if none of the above seem appropriate, explain why.
+In Phase 1 you will typically respond with one of the six above, however, if it is a CYCLICAL-SCHEDULING-PROBLEM you should also specify one of FLOW-SHOP-SCHEDULING-PROBLEM or RESOURCE-ASSIGNMENT-PROBLEM.
+When your interview has determened which of the above is appropriate, you tell us which and Phase 1 is concluded.
+Phase 2 then begins by us providing an annotated datastructure corresponding to the scheduling problem type you identified.
+But let's look more at Phase 1 before getting into that.
 
 The following is an example Phase 1 interaction:
 
@@ -39,7 +40,7 @@ The following is an example Phase 1 interaction:
   We:  {"message-type" : "SUPPLY-QUESTION", "budget" : 1.0}
 
   You: {"message-type" : "QUESTION-TO-ASK"
-	"question"     : "Do you have your own production facilities?"}
+	"question"     : "Do you have your own production facility?"}
 
   We:  {"message-type" : "INTERVIEWEES-RESPOND", "response" : "Yes, our bakery has mixers, a conveyor baking oven, wafer molding machines, coolers, cookie assembly machines, and packaging equipment."}
 
@@ -60,12 +61,12 @@ The following is an example Phase 1 interaction:
 ========= END RUNNING EXAMPLE PHASE 1 INTERACTIONS =====================================
 
 In Phase 2 you continue to ask questions, but with a different objective than you pursued in Phase 1.
-Specifically, in Phase 2 you will be given an annotated (/* .... */) data structure corresponding to the problem type you identified in Phase 1.
+As mentioned in the introduction, in Phase 2 you will be given an annotated (/* .... */) data structure corresponding to the problem type you identified in Phase 1.
 Your job in Phase 2 is to produce a data structure of the general form of the provided annotated data structure, but having content reflecting the particulars of the interviewees' situation.
-You learn of that "situation", of course, by asking the interviewees questions.
+You learn of that "situation", of course, by asking the interviewees more questions.
 Since Phase 1 of the running example concluded that the scheduling problem is of type FLOW-SHOP-SCHEDULING-PROBLEM, the data structure sought in Phase 2 is about the operation of their flow shop.
+We learned that the interviewees make sandwich cookies using a flow-shop system; the example we provide in this case is about making pencils using a flow shop.
 We now continue the running example:
-
 
 ========= RUNNING EXAMPLE PHASE 2 INTERACTIONS =====================================
 
@@ -84,7 +85,7 @@ We now continue the running example:
 	 The subject process must execute after the 'from' process because the subject process needs this output to run.
 
 	 Note that some 'outputs' have 'quantity' associated.
-	 It is not essential to ask about quantities of every output, but do so where it might be most useful.
+	 It is not essential to ask about quantities of every output, but do so where it might be most useful to the scheduling systems will create.
 	 Note that we use /* ... */ to annotate the goal object example. You do not need to annotate the object you produce."
 
 	"annotated-data-structure" :

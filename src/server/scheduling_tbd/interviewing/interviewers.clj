@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewers
+(ns scheduling-tbd.interviewing.interviewers
     "Runs an interview uing an interview agent."
     (:require
      [clojure.core.unify            :as uni]
