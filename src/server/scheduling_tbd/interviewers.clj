@@ -108,7 +108,8 @@
                                      "CONVERSATION-HISTORY"    (and (s/valid? ::budget budget)
                                                                     (s/valid? ::q-a-pairs Q-A-pairs))
                                      "STATUS"                  (s/valid? ::status status)
-                                     "TABLE_LIST"              (s/valid? dan/::table-list table-list)
+                                     "TABLE_LIST"              (s/valid? dan/::table-list table-list table-list)
+                                     "DATA_PATH"               (s/valid? dan/::data-path data-path)
                                      "DATA-STEP-2-CONCLUSION"       (s/valid? dan/::data-step-2-conclusion data-step-2-conclusion)
                                      nil))))
 

@@ -313,9 +313,11 @@ Here is an example of what a TABLE-LIST response could look like: {"message-type
 6) STEP-2-CONCLUSION - This is the most important response you will give us. This summarizes the information that you find in the data that you believe will be relevant to scheduling the production of our user.
                        These will basically be a series of key-value pairs, where the key is a value of you believe to be of importance, and the value of that key.
 
-7) COURSE-CORRECTION - There were none of these in the running example, but we would use it to influence how you are running the interview. The message provides advice in its 'advice' property.
+7) DATA-PATH - This is a simple command from us to you. It gives you the name of the file that was uploaded if it was, and an empty string if nothing was uploaded. This does spend some budget to make sure the conversation doesn't go on too long.
 
-8) STATUS - This is a response from you to use, typically just {"message-type" : "STATUS", "status" : "OK"} meaning, for example, that you acknowledge our last message. Put more/other information in the 'status' property if you need to.
+8) COURSE-CORRECTION - There were none of these in the running example, but we would use it to influence how you are running the interview. The message provides advice in its 'advice' property.
+
+9) STATUS - This is a response from you to use, typically just {"message-type" : "STATUS", "status" : "OK"} meaning, for example, that you acknowledge our last message. Put more/other information in the 'status' property if you need to.
 	    Notably, add a "table_list" and a "confidence" property to that message type until the end of step 1.
 
 Well, that about it. Thanks for all the help!
