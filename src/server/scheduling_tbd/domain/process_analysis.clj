@@ -91,7 +91,7 @@
                             :q-type :process/warm-up
                             :cid :process}))))
 (defn extreme-dur-span?
-  "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more.
+  "Return the vector of units used in the process if :qty/units span from :minutes to :days or more or :hours to :weeks or more.
    This always looks at :process/inverview-class = :initial-unordered."
   [pid]
   (let [units (atom #{})]

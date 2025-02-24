@@ -124,7 +124,7 @@ Update your conclusions depending on those answers. Try to find a value for thes
 1. property-name: "demand-variation"
 Here are the definitions we use:
    
-   - SEASONAL = a product where demand varies depending on the time of the year. Think snow shovels, winter gloves, ice-cream, swim gear and sunglasses, for example.
+   - SEASONAL = a product where demand varies depending on the time of the year. Think snow shovels, winter gloves, ice-cream, or swim gear and sunglasses, for example.
    - CONSTANT = a product where demand doesn't correlate to a specific time of the year. Think electronics, household appliances, every-day items.
 
 Based on the product that is referenced, and the data contained inside of the table, decide whether the product has a seasonal aspect to its demand.
@@ -259,7 +259,7 @@ We:  {"message-type" : "SUPPLY-QUESTION",
     "budget" : 0.40}
 
 You : {"message-type" : "STEP-2-CONCLUSION", 
-"data-properties" : {"production-bottleneck": ["MANPOWER","SUPPLY-CHAIN"],
+"data-properties" : {"production-bottlenecks": ["MANPOWER","SUPPLY-CHAIN"],
                      "maintenance-scheduling": 0.90,
                      "unscheduled-downtime": 0.10,
                      "worker-availability": 0.80,
