@@ -271,7 +271,7 @@
   "Send the argument structure to the client.
    If :promise?=true, return a promise that is resolved when the domain-expert responds to the message.
    The only keys of the argument map that are required are :client-id. and :dispatch-key.
-   :promise? defaults to true only when the dispatch key is :tbd-says."
+   :promise? defaults to true only when the dispatch key is :iviewr-says."
   [{:keys [client-id promise? dispatch-key] :as content}]
   (s/assert ::spec/chat-msg-obj content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))

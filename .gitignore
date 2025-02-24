@@ -6,6 +6,7 @@ pom.xml.asc
 *.jar
 *.class
 /lib/
+/logs/
 /classes/
 /target/
 /checkouts/

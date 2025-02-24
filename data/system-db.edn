@@ -169,10 +169,6 @@
                     :id :sur-cheesecake,
                     :name "SUR Cheesecake"}
           #:project{:dir
-                    "/opt/scheduling/projects/sur-athletic-shoes/db/",
-                    :id :sur-athletic-shoes,
-                    :name "SUR Athletic Shoes"}
-          #:project{:dir
                     "/opt/scheduling/projects/sur-fuel-and-radiator-hose/db/",
                     :id :sur-fuel-and-radiator-hose,
                     :name "SUR Fuel And Radiator Hose"}

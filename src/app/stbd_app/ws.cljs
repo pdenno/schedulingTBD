@@ -34,7 +34,7 @@
 (defn remember-promise
   "When the server sends a message that is part of a conversation and requires a response, it adds a keyword
    that associates to a promise on the server side and allows the server to continue the conversation,
-   interpreting the :domain-expert-says response which repeat this promise-key as answer to the :tbd-says ws message.
+   interpreting the :domain-expert-says response which repeat this promise-key as answer to the :iviewr-says ws message.
    This function just adds to the list, which in most cases will be empty when the argument key is added here."
   [k]  (when k (swap! pending-promise-keys conj k)))
 
@@ -58,6 +58,10 @@
                                       (update-common-info! (assoc new-proj-map :cid :process))
                                       ((lookup-fn :set-current-project) new-proj-map)
                                       ((lookup-fn :get-conversation) (:project/id new-proj-map))))
+
+(register-fn :domain-expert-submits-table (fn [table]
+                                            (send-msg {:dispatch-key :domain-expert-says
+                                                       :table-string (str table)})))
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."
@@ -138,6 +142,7 @@
     :domain-expert-says        ; Human user wrote at the chat prompt (typically answering a question).
     :interviewer-busy?         ; Enable/disable various UI features depending on whether interviewer is busy.
     :run-long                  ; diagnostic
+    :user-returns-table        ; User submitted table data
     :throw-it})                ; diagnostic
 
 (defn send-msg

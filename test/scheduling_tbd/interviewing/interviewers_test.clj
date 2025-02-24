@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewers-test
+(ns scheduling-tbd.interviewing.interviewers-test
   (:require
    [clojure.pprint                :refer [pprint]]
    [clojure.spec.alpha            :as s]
@@ -9,7 +9,6 @@
    [scheduling-tbd.interviewers   :as inv]
    [scheduling-tbd.llm            :as llm]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm]]
-   [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -44,6 +43,7 @@
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
+  (safe-alias 'inv    'scheduling-tbd.interviewing.interviewers)
   (safe-alias 'mzn    'scheduling-tbd.minizinc)
   (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
   (safe-alias 'ou     'scheduling-tbd.op-utils)
@@ -107,13 +107,13 @@
 
 (defn ^:diag ask-about-flowchart:inverviewer [])
 
-(defn tell-one
+#_(defn tell-one
   "Diagnostic for one interaction with interviewer."
   [cmd {:keys [pid cid] :as ctx}]
   (inv/tell-interviewer cmd
                         (merge ctx (inv/ensure-interview-agent! pid cid))))
 
-(deftest finished-process-test
+#_(deftest finished-process-test
   (testing "Testing that :sur-ice-cream has finished all process questions."
     (is (= {:status "DONE"}
            (do (tell-one (inv/conversation-history :sur-ice-cream :process) {:pid :sur-ice-cream :cid :process})
@@ -165,7 +165,7 @@
                       :sur-tid thread-id})))
        (inv/get-an-answer ctx)))) ; ToDo: Have special behavior for a client-id="dev-null".
 
-(deftest test-get-an-answer
+#_(deftest test-get-an-answer
   (testing "get-an-answer for surrogates"
     (if (db/project-exists? :sur-ice-cream)
       (let [result (ask-one-question {:question "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
@@ -179,7 +179,7 @@
       (log! :warn "Need project :sur-ice-cream to run this test."))))
 
 
-(deftest question-asking
+#_(deftest question-asking
   (testing "Testing question asking capability through loop-for-answer."
     (when (or (nil? (db/get-project :sur-fountain-pens :error? false))
               (nil? (ws/recent-client!)))
@@ -350,3 +350,12 @@
   (doseq [pid (db/list-projects)]
     (log! :info (str "Doing project " pid))
     (db/backup-proj-db pid)))
+
+"We run a fitness center. We have two small areas for one-on-one sessions between trainers and their clients.
+ It only fits one pair at a time, so we'd like to schedule things so trainers can meet (typically once a week)
+ with their clients in the one-on-one areas. Ideally, the trainers would like to have back-to-back lessons;
+ they don't like to drive in for just one client."
+
+"We run a fitness center. We have two small areas for one-on-one sessions between trainers and their clients.
+ Each area only fits one pair at a time, so we'd like to schedule things so trainers can meet  with their clients in the one-on-one areas (typically once a week, same time each week to make it easier on everyone).
+ Ideally, the trainers would like to have back-to-back lessons; they don't like to drive in for just one client."

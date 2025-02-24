@@ -762,7 +762,7 @@
                                                             question-type    (assoc :message/question-type question-type))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
-(defn get-interviewer-budget
+(defn get-budget
   "Return the :converation/interviewer-budget."
   [pid cid]
    (d/q '[:find ?budget .
@@ -772,7 +772,7 @@
           [?e :conversation/interviewer-budget ?budget]]
         @(connect-atm pid) cid))
 
-(defn put-interviewer-budget!
+(defn put-budget!
   [pid cid val]
   (let [conn-atm (connect-atm pid)
         eid (d/q '[:find ?eid .

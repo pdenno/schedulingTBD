@@ -25,7 +25,7 @@
   "These names (keywords) are the models we use, and the models we've been using lately."
   {:openai {:gpt         "gpt-4o-2024-11-20" ; "gpt-4o-2024-08-06"
             :analysis    "o1-preview"
-            :mini        "gpt-4o-mini"}
+            :mini        "o3-mini-2025-01-31"}
    :azure  {:gpt         "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
 
 (defn pick-llm
@@ -68,7 +68,7 @@
   (assert (string? client-id))
   (assert (string? question))
   (log! :info (str "llm-directly: " question))
-  (let [chat-args {:client-id client-id :dispatch-key :tbd-says :promise? false}]
+  (let [chat-args {:client-id client-id :dispatch-key :iviewr-says :promise? false}]
     (try
       (let [res (-> (query-llm [{:role "system"    :content "You are a helpful assistant."}
                                 {:role "user"      :content question}])
