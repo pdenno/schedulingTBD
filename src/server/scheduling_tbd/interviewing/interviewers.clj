@@ -12,19 +12,17 @@
      [promesa.exec                  :as px]
      [scheduling-tbd.agent-db       :as adb]
      [scheduling-tbd.db             :as db]
-     [scheduling-tbd.domain.data-analysis]
-     [scheduling-tbd.domain.process-analysis  :as pan :refer [the-warm-up-type-question text-to-var]]
-     [scheduling-tbd.domain.optimality-analysis]
-     [scheduling-tbd.domain.resources-analysis]
+     [scheduling-tbd.interviewing.domain.data-analysis]
+     [scheduling-tbd.interviewing.domain.process-analysis :as pan :refer [the-warm-up-type-question]]
+     [scheduling-tbd.interviewing.domain.optimality-analysis]
+     [scheduling-tbd.interviewing.domain.resources-analysis]
+     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim]]
      [scheduling-tbd.llm            :as llm]
-     [scheduling-tbd.response-utils :as ru :refer [find-claim]]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets :as ws]
      [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
-(s/def ::pid keyword?)
-(s/def ::cid keyword?)
 
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
 ;;; (like when it is burning OpenAI asking the same question over and over ;^)).
@@ -230,7 +228,7 @@
   [{:keys [pid cid] :as _ctx}]
   {:message-type "SUPPLY-QUESTION" :budget (db/get-budget pid cid)})
 
-(defn fix-off-course [q ctx] q) ; ToDo: NYI
+(defn fix-off-course [q _ctx] q) ; ToDo: NYI
 
 ;;; --------------- Handle tables from interviewer --------------------------------------
 (defn table-xml2clj

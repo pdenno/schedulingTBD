@@ -342,7 +342,7 @@
   ;; The following have ws/register-ws-dispatch, which need to be re-established.
   (mount/start (find-var 'scheduling-tbd.llm/llm-tools))
   (mount/start (find-var 'scheduling-tbd.surrogate/surrogates))
-  (mount/start (find-var 'scheduling-tbd.interviewers/iviewers))
+  (mount/start (find-var 'scheduling-tbd.interviewing.interviewers/iviewers))
   [:socket-started])
 
 (defn wsock-stop []
@@ -354,7 +354,7 @@
   ;; The following have ws/register-ws-dispatch, which need to be re-established.
   (mount/stop (find-var 'scheduling-tbd.llm/llm-tools))
   (mount/stop (find-var 'scheduling-tbd.surrogate/surrogates))
-  (mount/stop (find-var 'scheduling-tbd.interviewers/iviewers))
+  (mount/stop (find-var 'scheduling-tbd.interviewing.interviewers/iviewers))
   (reset! promise-stack '())
   [:closed-sockets])
 

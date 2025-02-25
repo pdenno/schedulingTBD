@@ -1,4 +1,4 @@
-(ns scheduling-tbd.domain.process-analysis
+(ns scheduling-tbd.interviewing.domain.process-analysis
   "Analysis of the process interview"
   (:require
    [clojure.core.unify                 :as uni]
@@ -9,7 +9,7 @@
    [scheduling-tbd.agent-db            :as adb]
    [scheduling-tbd.db                  :as db]
    [scheduling-tbd.minizinc            :as mzn]
-   [scheduling-tbd.response-utils      :as ru :refer [defanalyze]]
+   [scheduling-tbd.interviewing.response-utils :as ru :refer [defanalyze]]
    [taoensso.telemere                  :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
