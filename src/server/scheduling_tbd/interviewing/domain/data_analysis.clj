@@ -50,4 +50,3 @@
 
 (defanalyze :data/warm-up [{:keys [response _client-id _pid] :as _ctx}]
   (log! :debug (str "*******analysis :data/warm-up, response = " response)))
-
