@@ -12,12 +12,12 @@
      [promesa.exec                  :as px]
      [scheduling-tbd.agent-db       :as adb]
      [scheduling-tbd.db             :as db]
-     [scheduling-tbd.domain.data-analysis]
-     [scheduling-tbd.domain.process-analysis  :as pan :refer [the-warm-up-type-question text-to-var]]
-     [scheduling-tbd.domain.optimality-analysis]
-     [scheduling-tbd.domain.resources-analysis]
+     [scheduling-tbd.interviewing.domain.data-analysis :as dan]
+     [scheduling-tbd.interviewing.domain.process-analysis  :as pan :refer [the-warm-up-type-question]]
+     [scheduling-tbd.interviewing.domain.optimality-analysis]
+     [scheduling-tbd.interviewing.domain.resources-analysis]
      [scheduling-tbd.llm            :as llm]
-     [scheduling-tbd.response-utils :as ru :refer [find-claim]]
+     [scheduling-tbd.response-utils :as ru :refer [find-claim  text-to-var]]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets :as ws]
      [taoensso.telemere             :as tel :refer [log!]]))
@@ -96,7 +96,7 @@
 (s/def ::interviewer-msg (s/and (s/keys :req-un [::message-type])
                                 #(let [{:keys [advice budget commit-notes conclusion convey-to-interviewees
                                                data-structure message-type question Q-A-pairs response status
-                                               table-list data-step-2-conclusion]} %]
+                                               table-list data-path data-step-2-conclusion]} %]
                                    (case message-type
                                      "SUPPLY-QUESTION"           (s/valid? ::budget budget) ; _(s/valid? ::claims claims)
                                      "QUESTION-TO-ASK"           (s/valid? ::question question)
@@ -110,9 +110,9 @@
                                      "CONVERSATION-HISTORY"    (and (s/valid? ::budget budget)
                                                                     (s/valid? ::q-a-pairs Q-A-pairs))
                                      "STATUS"                  (s/valid? ::status status)
-                                     "TABLE_LIST"              (s/valid? dan/::table-list table-list table-list)
-                                     "DATA_PATH"               (s/valid? dan/::data-path data-path)
-                                     "DATA-STEP-2-CONCLUSION"       (s/valid? dan/::data-step-2-conclusion data-step-2-conclusion)
+                                     "TABLE_LIST"              (s/valid? ::dan/table-list table-list)
+                                     "DATA_PATH"               (s/valid? ::dan/data-path data-path)
+                                     "DATA-STEP-2-CONCLUSION"       (s/valid? ::dan/data-step-2-conclusion data-step-2-conclusion)
                                      nil))))
 
 (s/def ::advice string?)

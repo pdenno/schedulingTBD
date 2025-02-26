@@ -1,4 +1,4 @@
-(ns scheduling-tbd.domain.process-analysis
+(ns scheduling-tbd.interviewing.domain.process-analysis
   "Analysis of the process interview"
   (:require
    [clojure.core.unify                 :as uni]

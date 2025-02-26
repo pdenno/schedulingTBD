@@ -6,7 +6,7 @@
    [datahike.api                  :as d]
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
-   [scheduling-tbd.interviewers   :as inv]
+   [scheduling-tbd.interviewing.interviewers   :as inv]
    [scheduling-tbd.llm            :as llm]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm]]
    [taoensso.telemere             :as tel :refer [log!]]))
@@ -38,7 +38,7 @@
   (safe-alias 'p      'promesa.core)
   (safe-alias 'px     'promesa.exec)
   (safe-alias 'core   'scheduling-tbd.core)
-  (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
+  (safe-alias 'pan    'scheduling-tbd.interviewing.domain.process-analysis)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'how    'scheduling-tbd.how-made)
   (safe-alias 'llm    'scheduling-tbd.llm)

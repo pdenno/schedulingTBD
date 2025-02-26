@@ -133,9 +133,6 @@
           #:project{:dir "/opt/scheduling/projects/sur-stoneware/db/",
                     :id :sur-stoneware,
                     :name "SUR Stoneware"}
-          #:project{:dir "/opt/scheduling/projects/sur-ice-cream/db/",
-                    :id :sur-ice-cream,
-                    :name "SUR Ice Cream"}
           #:project{:dir
                     "/opt/scheduling/projects/sur-inline-skates/db/",
                     :id :sur-inline-skates,
@@ -164,25 +161,6 @@
           #:project{:dir
                     "/opt/scheduling/projects/sur-optical-fiber/db/",
                     :id :sur-optical-fiber,
-                    :name "SUR Optical Fiber"}
-          #:project{:dir "/opt/scheduling/projects/sur-cheesecake/db/",
-                    :id :sur-cheesecake,
-                    :name "SUR Cheesecake"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-fuel-and-radiator-hose/db/",
-                    :id :sur-fuel-and-radiator-hose,
-                    :name "SUR Fuel And Radiator Hose"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-ball-point-pens/db/",
-                    :id :sur-ball-point-pens,
-                    :name "SUR Ball Point Pens"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-office-chairs/db/",
-                    :id :sur-office-chairs,
-                    :name "SUR Office Chairs"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-sandwich-cookies/db/",
-                    :id :sur-sandwich-cookies,
-                    :name "SUR Sandwich Cookies"}]}
+                    :name "SUR Optical Fiber"}]}
 
 ]
