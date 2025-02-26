@@ -9,12 +9,12 @@
    [ring.adapter.jetty :as jetty]
    [scheduling-tbd.db   :refer [sys&proj-database-cfgs]]              ; for mount
    [scheduling-tbd.how-made :refer [him-cfg]]                         ; for mount
-   [scheduling-tbd.interviewing.interviewers :refer [iviewers]]       ; for mount
+   [scheduling-tbd.interviewing.interviewers]                         ; for mount
    [scheduling-tbd.surrogate :refer [surrogates]]                     ; for mount
    [scheduling-tbd.web.handler :refer [app]]                          ; for mount
    [scheduling-tbd.web.websockets :refer [wsock]]                     ; for mount
    [taoensso.telemere  :refer [log!]])
-  (:gen-class))
+  #_(:gen-class))
 
 ;;; Here are some naming conventions we try to use throughout the server and app code.
 ;;;   pid - a project id (keyword)
@@ -63,7 +63,7 @@
   [:http-server])
 
 ;;; ToDo: Do something to stop telemere console handlers. https://github.com/taoensso/telemere/blob/master/examples.cljc
-(defn -main [& _]
+#_(defn -main [& _]
   (let [res (mount/start)
         info (str "   " (clojure.string/join ",\n    " (:started res)))]
     (log! :info (str "started:\n" info))))
@@ -72,3 +72,13 @@
 (defstate server
   :start (start-server)
   :stop (stop-server))
+
+;;;==================================== Uncomment this if, at startup, the program stops without a stack trace. =============================
+#_(import '(java.util Arrays))
+
+#_(let [shutdown-hook (Thread.
+                       #(do
+                          (println "Shutdown hook called")
+                          (doseq [[thread stack-trace] (.entrySet (Thread/getAllStackTraces))]
+                            (println thread ":" (java.util.Arrays/toString stack-trace)))))]
+    (.addShutdownHook (Runtime/getRuntime) shutdown-hook))

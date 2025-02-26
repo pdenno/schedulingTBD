@@ -21,7 +21,7 @@
 (def how-to-handle-tables
   (str "Typically you answer in sentences. However, the interviewers may ask you to complete an HTML table.\n"
        "In that case, they will provide the HTML table partially filled in (based on your earlier answers) and will ask you to complete it, best you can.\n"
-       "For example they might say:\n\n"
+       "For example, they might say:\n\n"
        "'Here is a list of the processes you mentioned. Could you please review and adjust the table below, filling in the approximate duration of each step in the 'Duration' column:'\n"
        "<table>\n"
        "  <tr><th>Process Step</th>                <th>Duration</th></tr>\n"
@@ -42,7 +42,7 @@
        "#+end_src"))
 
 (defn system-instruction
-  "This is the instruction that configures the role of the OpenAI assistant."
+  "This is the instruction that configures the role of the OpenAI assistant for a surrogate domain expert."
   [role]
   (str
    (format "You manage a company that makes %s.\n" role)

@@ -76,6 +76,7 @@
 (s/def ::units string?)
 (s/def ::value-string string?)
 
+;;; (s/valid? ::fshop/EADS (:annotated-data-structure fshop/flow-eads))
 (def flow-eads
   "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of Phase 2 of a flow-shop problem."
   {:notes-on-data-structure

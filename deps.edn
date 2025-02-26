@@ -1,4 +1,4 @@
-{:paths   ["src/lib"]
+{:paths   ["src/server"]
  :deps    {camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
            cljs-ajax/cljs-ajax                 {:mvn/version "0.8.4"}
            com.cemerick/url                    {:mvn/version "0.1.1"}
@@ -21,6 +21,8 @@
            org.clj-commons/hickory             {:mvn/version "0.7.5"}
            org.clojure/clojure                 {:mvn/version "1.12.0"}
            org.clojure/core.unify              {:mvn/version "0.7.0"}
+           org.clojure/data.xml                {:mvn/version "0.0.8"}
+           org.clojure/tools.logging           {:mvn/version "1.3.0"}
            org.ring-clojure/ring-websocket-async {:mvn/version "0.2.0"} ;  "0.1.19" Does not exist.
            ring/ring-defaults                  {:mvn/version "0.6.0"}
            ring/ring-jetty-adapter             {:mvn/version "1.13.0"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
@@ -31,13 +33,13 @@
 
  ;; See .dir-locals.el for some defaults on CIDER C-c M-j
  :aliases {:dev          {:extra-paths    ["src/server" "test" "env/dev" "resources"]
-                          :jvm-opts       ["-XX:-OmitStackTraceInFastThrow" ; https://www.metosin.fi/blog/missing-stacktraces/
+                          #_#_:jvm-opts   ["-XX:-OmitStackTraceInFastThrow" ; https://www.metosin.fi/blog/missing-stacktraces/
                                            #_"-Djdk.attach.allowAttachSelf"]  ; https://github.com/clojure-goes-fast/clj-async-profiler
                           ;; :dev includes src/server (for use with exerciser) thus much of this stuff.
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
                                            ;binaryage/devtools              {:mvn/version "1.0.7"} ; ToDo: would use with telemere handler:console-raw.
                                            ;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
-                                           cider/cider-nrepl               {:mvn/version "0.52.0"}
+                                           cider/cider-nrepl               {:mvn/version "0.52.1"}
                                            com.lambdaisland/classpath      {:mvn/version "0.6.58"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
                                            lilactown/helix                 {:mvn/version "0.2.1"}
@@ -53,19 +55,19 @@
                                          org.clojure/tools.namespace  {:mvn/version "1.5.0"}}}
 
            :app       {:extra-paths ["src/app" "src/server" "test"] ; src/server has shared util.cljc
-                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.28.20"}
+                       :extra-deps  {thheller/shadow-cljs           {:mvn/version "2.28.21"}
                                      lilactown/helix                {:mvn/version "0.2.1"}
                                      cljs-ajax/cljs-ajax            {:mvn/version "0.8.4"}
                                      applied-science/js-interop     {:mvn/version "0.4.2"}}}
 
            :kaochaSTBD {:extra-paths    ["test" "env/dev"]
-                        :extra-deps     {thheller/shadow-cljs         {:mvn/version "2.28.20"}
+                        :extra-deps     {thheller/shadow-cljs         {:mvn/version "2.28.21"}
                                          lambdaisland/kaocha          {:mvn/version "1.91.1392"}
                                          lambdaisland/kaocha-cljs2    {:mvn/version "0.2.72"}
                                          com.lambdaisland/glogi       {:mvn/version "1.3.169"}
                                          ;com.lambdaisland/chui        {:mvn/version "1.2.205"} ; Still can't find lambdaisland.chui.remote. (start funnel?)
                                          nrepl/nrepl                  {:mvn/version "1.3.1"}
-                                         cider/cider-nrepl            {:mvn/version "0.52.0"}}}
+                                         cider/cider-nrepl            {:mvn/version "0.52.1"}}}
 
            :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.10.7"}}
                       :ns-default build}

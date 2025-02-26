@@ -432,8 +432,9 @@
             (log! :warn "Exiting because active? atom is false.")))))
     (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
+;;; The equivalent for surrogates is start-surrogate. It also asks the first question.
 (defn start-conversation
-  "Ask a human the first question, create a project and call resume-conversation.
+  "Ask a human the first question (a warm-up question), create a project and call resume-conversation.
    :start-conversation is a dispatch-key from the client, providing, perhaps only the client-id."
   [{:keys [client-id] :as ctx}]
   (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :promise? true
