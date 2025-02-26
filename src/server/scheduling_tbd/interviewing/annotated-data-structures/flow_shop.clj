@@ -1,5 +1,5 @@
 (ns scheduling-tbd.interviewing.annotated-data-structures.flow-shop
-  "(1) Define the an example annotated data structure to provide to the interviewer for a flow-shop scheduling problem.
+  "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a flow-shop scheduling problem.
        As the case is with flow-shop problems, this structure defines the flow of work through resources.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
@@ -20,8 +20,9 @@
 (s/def ::annotated-process-id (s/keys :req-un [:process-id/val ::comment]))
 (s/def :process-id/val string?)
 
-(s/def ::thing (s/or :normal :thing/val :quantified ::quantified-thing))
-(s/def ::quantified-thing (s/keys :req-un [::item-id ::quantity]))
+(s/def ::thing (s/or :normal :thing/val :quantified ::thing-with-quantity :originated ::thing-with-origin))
+(s/def ::thing-with-quantity (s/keys :req-un [::item-id ::quantity]))
+(s/def ::thing-with-origin (s/keys :req-un [::item-id ::from]))
 (s/def :thing/val string?)
 
 (s/def ::item-id (s/or :normal :item-id/val :annotated ::annotated-item-id))
@@ -75,7 +76,7 @@
 (s/def ::units string?)
 (s/def ::value-string string?)
 
-(def flow-ds
+(def flow-eads
   "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of Phase 2 of a flow-shop problem."
   {:notes-on-data-structure
    (str "Below is an annotated data structure that provides an example of what we'd like you to produce.\n"
@@ -164,11 +165,11 @@
                                     :subprocesses []}]},
 
                    {:process-id "assembly",
-                    :inputs [{:val {:item-id "graphite core", :from "graphite-core-production"},
+                    :inputs  {:val [{:item-id "graphite core", :from "graphite-core-production"},
+                                    {:item-id "wood slats with grooves", :from "wood-casing-production"}
+                                    "metal", "erasers", "paint"]
                               :comment (str "The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\n"
                                             "The 'from' property is essential to understanding process ordering and potential for concurrency.")}
-                             {:item-id "wood slats with grooves", :from "wood-casing-production"}
-                             "metal", "erasers", "paint"],
                     :outputs ["finished pencil"],
                     :resources ["glue applicator", "shaping machine"],
                     :subprocesses [{:process-id "insert-core-into-slats",
