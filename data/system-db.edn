@@ -1,166 +1,158 @@
-[
-#:system{:agents
-         [#:agent{:base-type :process-dur-agent,
-                  :agent-type :system,
-                  :thread-id "thread_gD1kN7QoWVMkLG0mvV62vMWx",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_WDjZC9jQ8tYarHuzKHLMfHvK",
-                  :id :process-dur-agent-openai,
-                  :timestamp #inst "2024-12-18T01:39:12.245-00:00"}
-          #:agent{:base-type :text-function-agent,
-                  :agent-type :system,
-                  :thread-id "thread_sLkB7PdJlAgKzcD1keSEY7rB",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_goTNbqcqjK78EPbRMtNwL50S",
-                  :id :text-function-agent-openai,
-                  :timestamp #inst "2024-12-05T21:39:38.200-00:00"}
-          #:agent{:base-type :process-ordering-agent,
-                  :agent-type :system,
-                  :thread-id "thread_1kgHH7xN613JxIvT4BZm4Hj8",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_5eDrNKn7FlQpaGfWGrZYl6EV",
-                  :id :process-ordering-agent-openai,
-                  :timestamp #inst "2024-12-05T21:39:37.396-00:00"}
-          #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_eJ7AxECsRib6jGssqREMahgx",
-                  :base-type :process-interview-agent,
-                  :id :process-interview-agent-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2025-01-31T17:13:05.127-00:00"}
-          #:agent{:agent-type :system,
-                  :assistant-id "asst_eaxRDWsEwmdWHObw5MjTiPQP",
-                  :base-type :answers-the-question?,
-                  :id :answers-the-question?-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :thread-id "thread_2vhjT8fIazLPDOmTqD2Qc4Dj"}
-          #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_wQtaRFA9jHBBxfRZHbca1mqN",
-                  :base-type :data-interview-agent,
-                  :id :data-interview-agent-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2024-12-05T21:39:34.070-00:00"}
-          #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_aaDLAj0gxcfigOPWPrO5dUrE",
-                  :base-type :resources-interview-agent,
-                  :id :resources-interview-agent-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2024-12-05T21:39:34.439-00:00"}
-          #:agent{:base-type :scheduling-challenges-agent,
-                  :agent-type :system,
-                  :thread-id "thread_tWC6VKRPtItcb8UQ7WQ7HJux",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_i8PVzL4NAelr1TYKalh0J49C",
-                  :id :scheduling-challenges-agent-openai,
-                  :timestamp #inst "2024-12-13T18:59:16.559-00:00"}
-          #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_Rx6NcEXEVGZi5WtBffD7umSF",
-                  :base-type :optimality-interview-agent,
-                  :id :optimality-interview-agent-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2024-12-05T21:39:34.846-00:00"}
-          #:agent{:base-type :response-analysis-agent,
-                  :agent-type :system,
-                  :thread-id "thread_wDcvDiGb8ZbRrVANUuTLLCmk",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_VaeePwn9LHgSwQsh1gDgoNB4",
-                  :id :response-analysis-agent-openai,
-                  :timestamp #inst "2024-12-13T21:09:08.701-00:00"}
-          #:agent{:agent-type :system,
-                  :assistant-id "asst_a0lK1BYchdZUN7oza6sU68AP",
-                  :base-type :helpful,
-                  :id :helpful-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2024-12-12T12:46:06.528-00:00"}
-          #:agent{:base-type :helpful-1,
-                  :agent-type :system,
-                  :thread-id "thread_xOlazp212KfATPwJZ2LAc7tM",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_WlPVzM82mT0IgMATtsnWHnx4",
-                  :id :helpful-1-openai,
-                  :timestamp #inst "2024-12-12T13:23:51.572-00:00"}],
-         :default-project-id :sur-ice-cream,
-         :name "SYSTEM",
-         :projects
-         [#:project{:dir
-                    "/opt/scheduling/projects/craft-beer-brewery-scheduling",
-                    :id :craft-beer-brewery-scheduling,
-                    :name "Craft Beer Brewery Scheduling"}
-          #:project{:dir
-                    "/opt/scheduling/projects/snowboards-production-scheduling",
-                    :id :snowboards-production-scheduling,
-                    :name "Snowboards Production Scheduling"}
-          #:project{:dir
-                    "/opt/scheduling/projects/aluminium-foil-production-scheduling",
-                    :id :aluminium-foil-production-scheduling,
-                    :name "Aluminium Foil Production Scheduling"}
-          #:project{:dir "/opt/scheduling/projects/sur-canned-corn",
-                    :id :sur-canned-corn,
-                    :name "Sur Canned Corn"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-canned-vegetables",
-                    :id :sur-canned-vegetables,
-                    :name "Sur Canned Vegetables"}
-          #:project{:dir "/opt/scheduling/projects/sur-aluminum-cans",
-                    :id :sur-aluminum-cans,
-                    :name "Sur Aluminum Cans"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-remanufactured-alternators/db/",
-                    :id :sur-remanufactured-alternators,
-                    :name "SUR Remanufactured Alternators"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-ice-hockey-sticks/db/",
-                    :id :sur-ice-hockey-sticks,
-                    :name "SUR Ice Hockey Sticks"}
-          #:project{:dir "/opt/scheduling/projects/sur-craft-beer",
-                    :id :sur-craft-beer,
-                    :name "Sur Craft Beer"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-injection-molds",
-                    :id :sur-injection-molds,
-                    :name "Sur Injection Molds"}
-          #:project{:dir "/opt/scheduling/projects/sur-stoneware/db/",
-                    :id :sur-stoneware,
-                    :name "SUR Stoneware"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-inline-skates/db/",
-                    :id :sur-inline-skates,
-                    :name "SUR Inline Skates"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-fountain-pens/db/",
-                    :id :sur-fountain-pens,
-                    :name "SUR Fountain Pens"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-garage-doors/db/",
-                    :id :sur-garage-doors,
-                    :name "SUR Garage Doors"}
-          #:project{:dir "/opt/scheduling/projects/sur-carpet/db/",
-                    :id :sur-carpet,
-                    :name "SUR Carpet"}
-          #:project{:dir "/opt/scheduling/projects/ice-cream/db/",
-                    :id :ice-cream,
-                    :name "Ice Cream"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-plate-glass/db/",
-                    :id :sur-plate-glass,
-                    :name "SUR Plate Glass"}
-          #:project{:dir "/opt/scheduling/projects/sur-key-blanks/db/",
-                    :id :sur-key-blanks,
-                    :name "SUR Key Blanks"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-optical-fiber/db/",
-                    :id :sur-optical-fiber,
-                    :name "SUR Optical Fiber"}]}
-
-]
+[#:system{:agents
+          [#:agent{:base-type :process-dur-agent,
+                   :agent-type :system,
+                   :thread-id "thread_p4kt0o1EzAeaYf2SWAEuvVpp",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_UqSUIn2hPTykDGOKBcBLtybw",
+                   :id :process-dur-agent-openai,
+                   :timestamp #inst "2024-12-12T11:58:52.848-00:00"}
+           #:agent{:base-type :text-function-agent,
+                   :agent-type :system,
+                   :thread-id "thread_sLkB7PdJlAgKzcD1keSEY7rB",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_goTNbqcqjK78EPbRMtNwL50S",
+                   :id :text-function-agent-openai,
+                   :timestamp #inst "2024-12-05T21:39:38.200-00:00"}
+           #:agent{:base-type :process-ordering-agent,
+                   :agent-type :system,
+                   :thread-id "thread_1kgHH7xN613JxIvT4BZm4Hj8",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_5eDrNKn7FlQpaGfWGrZYl6EV",
+                   :id :process-ordering-agent-openai,
+                   :timestamp #inst "2024-12-05T21:39:37.396-00:00"}
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_rfGIKnBEJ8vP7y6nAGlBxTLV",
+                   :base-type :process-interview-agent,
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :timestamp #inst "2024-12-10T16:14:54.156-00:00"}
+           #:agent{:agent-type :system,
+                   :assistant-id "asst_eaxRDWsEwmdWHObw5MjTiPQP",
+                   :base-type :answers-the-question?,
+                   :id :answers-the-question?-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_2vhjT8fIazLPDOmTqD2Qc4Dj"}
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_wQtaRFA9jHBBxfRZHbca1mqN",
+                   :base-type :data-interview-agent,
+                   :id :data-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :timestamp #inst "2024-12-05T21:39:34.070-00:00"}
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_aaDLAj0gxcfigOPWPrO5dUrE",
+                   :base-type :resources-interview-agent,
+                   :id :resources-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :timestamp #inst "2024-12-05T21:39:34.439-00:00"}
+           #:agent{:base-type :scheduling-challenges-agent,
+                   :agent-type :system,
+                   :thread-id "thread_a3nSM1zg3MB0V8pucd1SuqGd",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_WHTICk0i2iLZzk9KBrLyElVV",
+                   :id :scheduling-challenges-agent-openai,
+                   :timestamp #inst "2024-12-05T21:39:36.347-00:00"}
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_Rx6NcEXEVGZi5WtBffD7umSF",
+                   :base-type :optimality-interview-agent,
+                   :id :optimality-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :timestamp #inst "2024-12-05T21:39:34.846-00:00"}
+           #:agent{:base-type :response-analysis-agent,
+                   :agent-type :system,
+                   :thread-id "thread_k4t294r5MZJh4GVnL45d7gKo",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_0SZIeyRobSR17lkk68MmsCzD",
+                   :id :response-analysis-agent-openai,
+                   :timestamp #inst "2024-12-11T16:00:07.420-00:00"}
+           #:agent{:agent-type :system,
+                   :assistant-id "asst_a0lK1BYchdZUN7oza6sU68AP",
+                   :base-type :helpful,
+                   :id :helpful-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :timestamp #inst "2024-12-12T12:46:06.528-00:00"}],
+          :default-project-id :sur-ice-cream,
+          :name "SYSTEM",
+          :projects
+          [#:project{:dir
+                     "/opt/scheduling/projects/craft-beer-brewery-scheduling",
+                     :id :craft-beer-brewery-scheduling,
+                     :name "Craft Beer Brewery Scheduling"}
+           #:project{:dir
+                     "/opt/scheduling/projects/snowboards-production-scheduling",
+                     :id :snowboards-production-scheduling,
+                     :name "Snowboards Production Scheduling"}
+           #:project{:dir
+                     "/opt/scheduling/projects/aluminium-foil-production-scheduling",
+                     :id :aluminium-foil-production-scheduling,
+                     :name "Aluminium Foil Production Scheduling"}
+           #:project{:dir "/opt/scheduling/projects/sur-canned-corn",
+                     :id :sur-canned-corn,
+                     :name "Sur Canned Corn"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-canned-vegetables",
+                     :id :sur-canned-vegetables,
+                     :name "Sur Canned Vegetables"}
+           #:project{:dir "/opt/scheduling/projects/sur-aluminum-cans",
+                     :id :sur-aluminum-cans,
+                     :name "Sur Aluminum Cans"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-remanufactured-alternators",
+                     :id :sur-remanufactured-alternators,
+                     :name "Sur Remanufactured Alternators"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-ice-hockey-sticks/db/",
+                     :id :sur-ice-hockey-sticks,
+                     :name "SUR Ice Hockey Sticks"}
+           #:project{:dir "/opt/scheduling/projects/sur-craft-beer",
+                     :id :sur-craft-beer,
+                     :name "Sur Craft Beer"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-injection-molds",
+                     :id :sur-injection-molds,
+                     :name "Sur Injection Molds"}
+           #:project{:dir "/opt/scheduling/projects/sur-stoneware/db/",
+                     :id :sur-stoneware,
+                     :name "SUR Stoneware"}
+           #:project{:dir "/opt/scheduling/projects/sur-ice-cream/db/",
+                     :id :sur-ice-cream,
+                     :name "SUR Ice Cream"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-inline-skates/db/",
+                     :id :sur-inline-skates,
+                     :name "SUR Inline Skates"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-fountain-pens/db/",
+                     :id :sur-fountain-pens,
+                     :name "SUR Fountain Pens"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-garage-doors/db/",
+                     :id :sur-garage-doors,
+                     :name "SUR Garage Doors"}
+           #:project{:dir "/opt/scheduling/projects/sur-carpet/db/",
+                     :id :sur-carpet,
+                     :name "SUR Carpet"}
+           #:project{:dir "/opt/scheduling/projects/ice-cream/db/",
+                     :id :ice-cream,
+                     :name "Ice Cream"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-plate-glass/db/",
+                     :id :sur-plate-glass,
+                     :name "SUR Plate Glass"}
+           #:project{:dir "/opt/scheduling/projects/sur-key-blanks/db/",
+                     :id :sur-key-blanks,
+                     :name "SUR Key Blanks"}
+           #:project{:dir
+                     "/opt/scheduling/projects/sur-optical-fiber/db/",
+                     :id :sur-optical-fiber,
+                     :name "SUR Optical Fiber"}]}]

@@ -48,5 +48,23 @@
 (s/def ::budget number?) ;this is duplicated from interviewers.clj, not great
 (s/def ::path string?) ;there's probably a way better way to check that this is a valid path
 
-(defanalyze :data/warm-up [{:keys [response _client-id _pid] :as _ctx}]
-  (log! :debug (str "*******analysis :data/warm-up, response = " response)))
+(defn upload-first-vector-store-to-agent 
+  [file-id pid]
+  (log! :info "Unimplemented")
+  )
+
+(defn add-additional-vector-store-to-agent
+  [vector-store-id pid]
+  (let [interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos :data-interviewer-agent) (assoc :pid pid)))]
+    (llm/add-vector-store-to-assistant vector-store-id pid)
+    )
+)
+
+(defn add-spreadsheet-to-agent
+  [pid data-path]
+  (log! :info "Unimplemented")
+  )
+
+(defn analyze-response
+  [pid response]
+  (log! :info "Unimplemented"))

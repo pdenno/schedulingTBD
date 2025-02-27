@@ -337,6 +337,18 @@
          (get-an-answer (merge ctx interviewer-q)))
        (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
+;TODO: add for other interviews
+(defn analyze-response
+  "Analyze the response from the expert (human or surrogate)."
+  [pid cid response]
+  (assert (s/valid? ::cid cid))
+  (cond 
+    (= :process cid) (log! :info (str "process analysis " pid ": " response))
+    (= :data cid) (dan/analyze-response pid response)
+    (= :resources cid) (log! :info (str "resources analysis " pid ": " response))
+    (= :optimality cid) (log! :info (str "optimality analysis" pid ": " response)))
+  )
+
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
    discussion on the given topic."
@@ -426,6 +438,7 @@
                       (doseq [msg conversation]
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
+                      (analyze-response pid cid response)
                       (cond
                         (> cnt 20)                                  :exceeded-questions-safety-stop
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.
