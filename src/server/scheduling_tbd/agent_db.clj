@@ -76,7 +76,8 @@
 (defonce agent-infos
   (atom (reduce (fn [res info] (assoc res (:base-type info) info))
                 {}
-                (-> (io/resource "agents/agent-infos.edn")
+                (-> "agents/agent-infos.edn"
+                    io/resource
                     slurp
                     edn/read-string))))
 

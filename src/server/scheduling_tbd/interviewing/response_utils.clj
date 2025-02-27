@@ -1,4 +1,4 @@
-(ns scheduling-tbd.response-utils
+(ns scheduling-tbd.interviewing.response-utils
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:refer-clojure :exclude [send])
   (:require

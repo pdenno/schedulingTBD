@@ -1,5 +1,4 @@
-(ns scheduling-tbd.domain.process-analysis-test
-  "Currently these are more about exploring prompts than they are about test the code."
+(ns scheduling-tbd.domain.data-analysis-test
   (:require
    [clojure.core.unify                     :as uni]
    [clojure.test                           :refer [deftest is testing]]

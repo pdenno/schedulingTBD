@@ -8,7 +8,7 @@
    [scheduling-tbd.db                         :as db]
    [scheduling-tbd.llm                        :as llm]
    [scheduling-tbd.minizinc                   :as mzn]
-   [scheduling-tbd.response-utils             :as ru :refer [defanalyze]]
+   [scheduling-tbd.interviewing.response-utils             :as ru :refer [defanalyze]]
    [scheduling-tbd.sutil                      :as sutil]
    [scheduling-tbd.web.websockets             :as ws]
    [taoensso.telemere                         :as tel :refer [log!]]

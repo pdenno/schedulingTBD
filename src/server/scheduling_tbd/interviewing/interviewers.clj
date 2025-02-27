@@ -17,7 +17,7 @@
      [scheduling-tbd.interviewing.domain.optimality-analysis]
      [scheduling-tbd.interviewing.domain.resources-analysis]
      [scheduling-tbd.llm            :as llm]
-     [scheduling-tbd.response-utils :as ru :refer [find-claim  text-to-var]]
+     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim  text-to-var]]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets :as ws]
      [taoensso.telemere             :as tel :refer [log!]]))
@@ -425,7 +425,7 @@
   (reset! course-correction-count 0)
   (try
     (if (not (ready-for-discussion? pid cid))
-      (redirect-user-to-discussion client-id cid :process)
+      (redirect-user-to-discussion client-id cid :process) 
       ;; The conversation loop.
       (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
         (when-not (db/conversation-done? pid cid)
