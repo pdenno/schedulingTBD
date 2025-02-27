@@ -78,18 +78,25 @@
 (s/def ::tags (s/coll-of keyword?))
 (s/def ::topic #(#{:process :data :resources :optimality} %))
 
+(s/def ::expert-response (s/keys :req-un [:expert/msg-type] :opt-un [:expert/msg-text :expert/table]))
+(s/def :expert/msg-type #(= % :expert-response))
+(s/def :expert/table map?)
+(s/def :expert/msg-text string?)
+
 ;;; ToDo: Maybe return a string ===immoderate=== and end the conversation if needed.
 (defn chat-pair
   "Call to run ask and wait for an answer, returns the response, a string.
    If response is immoderate return '===IMMODERATE==='."
   [{:keys [responder-type client-id] :as ctx}]
-  (let [response-text (chat-pair-aux ctx)]
-    (if (string? response-text)
-      (if (and (= :human responder-type) (llm/immoderate? response-text))
-        (do (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :text "This is not helpful."})
-            "===IMMODERATE===") ; ToDo: Continue with this to stop interactions.
-        response-text)
-    (throw (ex-info "Unknown response from operator" {:response response-text})))))
+  (let [{:keys [msg-text] :as response} (chat-pair-aux ctx)]
+    (if (s/valid? ::expert-response response)
+      (if (string? msg-text)
+        (if (and (= :human responder-type) (llm/immoderate? msg-text))
+          (do (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :text "This is not helpful."})
+              "===IMMODERATE===") ; ToDo: Continue with this to stop interactions.
+          response)
+        response)
+      (throw (ex-info "Unknown response from operator" {:response response})))))
 
 ;;; To check the structure of messages to and from the interviewer:
 (s/def ::interviewer-msg (s/and (s/keys :req-un [::message-type])
@@ -132,7 +139,7 @@
 (defn tell-interviewer
   "Send a command to an interviewer agent and wait for response; translate it.
    :aid and :tid in the ctx should be for the interviewer agent."
-  [msg {:keys [interviewer-agent cid] :as _ctx}]
+  [msg {:keys [interviewer-agent] :as _ctx}]
   (too-many-course-corrections! msg)
   (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid interviewer-msg: " (with-out-str (pprint msg)))))
@@ -183,15 +190,16 @@
   [{:keys [question responder-type human-starting?] :as ctx}]
   (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
   (let [conversation [{:text question :from :system :tags [:query]}]
-        response  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
+        {:keys [msg-text] :as response}  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
         answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
-        {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when-not answered? (response-analysis question response))
+        {:keys [answers-the-question? raises-a-question? wants-a-break?]}  (when (and (not answered?) (string? msg-text))
+                                                                             (response-analysis question msg-text))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
       (let [same-question (str "Okay, but we are still interested in this: " question)]
         (into conversation (get-an-answer (-> ctx (assoc :question same-question)))))
       (cond-> conversation
-        answered?                  (conj {:text response :from responder-type :tags [:response]})
+        answered?                  (conj {:response response :from responder-type :tags [:response]})
         wants-a-break?             (into (handle-wants-a-break question response ctx))
         raises-a-question?         (into (handle-raises-a-question question response ctx))
         (not
@@ -323,7 +331,6 @@
                                (separate-table)               ; Returns a {:question "..." :table-text "..." :table {:table-headings ... :tabel-data ...}}
                                (fix-off-course ctx))]  ; Currently a no-op. Returns argument.
          (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
-         (reset! diag interviewer-q)
          (get-an-answer (merge ctx interviewer-q)))
        (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
@@ -351,13 +358,14 @@
 
 (defn ctx-surrogate
   "Return context updated with surrogate info."
-  [{:keys [pid cid] :as ctx}]
+  [{:keys [pid cid force-new?] :as ctx}]
   (let [interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
                                                  (assoc :pid pid)))
         surrogate-agent   (adb/ensure-agent! (-> (get @adb/agent-infos pid)
-                                                 (assoc :base-type pid)))
+                                                 (assoc :base-type pid)
+                                                 (assoc :force-new? force-new?)))
         ctx (-> ctx
-                (dissoc :client-id :dispatch-key)
+                #_(dissoc :client-id :dispatch-key) ; 2025-02-27 I'm not sure doing this was necessary.
                 (assoc :responder-type :surrogate)
                 (assoc :interviewer-agent interviewer-agent)
                 (assoc :surrogate-agent surrogate-agent))]
@@ -421,11 +429,13 @@
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.
                         (<= 0 (db/get-budget pid cid)) (db/assert-conversation-done! pid cid)
                         :else
-                        (do
-                          (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
-                                             :response (:text response)}
-                                            ctx)
+                        (let [response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
+                                                          :response (:text response)}
+                                                         ctx)]
+                          (log! :info (str "Response in resume-conversation-loop: " response))
                           (when (surrogate? pid) (ru/refresh-client client-id pid cid))
+                          (when (= (:message-type response) "PHASE-1-CONCLUSION")
+                            (-> response :conclusion str/lower-case keyword ru/respond-with-EADS))
                           (recur (inc cnt)
                                  (q-and-a ctx)))))
                     (log! :warn "Exiting because active? atom is false."))))
@@ -444,15 +454,14 @@
     (let [ctx (merge ctx {:responder-type :human
                           :human-starting? true
                           :question the-warm-up-type-question})
+          _effect! (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
           conversation (get-an-answer ctx)
           response (-> conversation last :text) ; ToDo: Could be more to it...wants-a-break?.
-          _effect! (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
           pid (start-human-project! response)
           [_ _ pname] (ru/find-claim '(project-name ?pid ?pname) (db/get-claims pid))]
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-      (doseq [m conversation]
-        (let [{:keys [from text tags]} m]
-          (db/add-msg {:pid pid :cid :process :from from :tags tags :text text})))
+      (doseq [{:keys [from msg-text table tags]} conversation]
+        (db/add-msg {:pid pid :cid :process :from from :tags tags :text msg-text :table table}))
       (db/add-msg {:pid pid
                    :cid :process
                    :from :system

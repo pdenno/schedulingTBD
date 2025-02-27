@@ -1,23 +1,23 @@
 [
 #:project{:agents
-          [#:agent{:base-type :sur-optical-fiber,
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_aCtrRngOtjpXgKh9VOUzXRJu",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_eJ7AxECsRib6jGssqREMahgx",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2025-01-31T17:13:05.127-00:00"}
+           #:agent{:base-type :sur-optical-fiber,
                    :agent-type :project,
-                   :thread-id "thread_YBUMi1ALt2Bak4PZ3z8Bpn5t",
+                   :thread-id "thread_6ScOjaWzQnyIIhVcHRcMZOmN",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :surrogate? true,
-                   :assistant-id "asst_xuZoXrvHHdanwqM3VDEFEklJ",
+                   :assistant-id "asst_AJjO3967dnJC9VeRzasXpRG8",
                    :id :sur-optical-fiber-openai,
                    :expertise "optical fiber",
-                   :timestamp #inst "2024-12-11T16:32:31.018-00:00"}
-           #:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_xsW5fNHuQLFRE48mCs9NeS84",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_rfGIKnBEJ8vP7y6nAGlBxTLV",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-10T16:14:54.156-00:00"}],
+                   :timestamp #inst "2025-02-27T13:55:45.609-00:00"}],
           :claims
           [#:claim{:string "(project-id :sur-optical-fiber)"}
            #:claim{:string
@@ -26,12 +26,11 @@
                    :string "(surrogate :sur-optical-fiber)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-optical-fiber :planned-maintenance)"}
+                   :string "(temp-project-id :optical-fiber-products)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-optical-fiber :delivery-schedules)"}
+                   "(scheduling-challenge :sur-optical-fiber :product-variation)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
@@ -39,7 +38,11 @@
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(principal-expertise :sur-optical-fiber \"Optical Fibers\")"}
+                   "(temp-project-name :sur-optical-fiber \"Optical Fiber Products\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-optical-fiber \"Optical Fiber Products\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
@@ -47,52 +50,15 @@
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-optical-fiber :demand-uncertainty)"}
+                   "(scheduling-challenge :sur-optical-fiber :process-variation)"}
            #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string "(provides-product :sur-optical-fiber)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
+                   :question-type :process/warm-up,
                    :string
-                   "(production-location :sur-optical-fiber factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-optical-fiber make-to-order)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string "(flow-shop :sur-optical-fiber)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-optical-fiber 1 \"Preform Manufacturing\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-optical-fiber 2 \"Fiber Drawing\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-optical-fiber 3 \"Coating Application\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-optical-fiber 4 \"Curing of Coating\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-optical-fiber 5 \"Testing and Quality Control\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-optical-fiber 6 \"Spooling\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-optical-fiber 7 \"Packaging\")"}],
+                   "(scheduling-challenge :sur-optical-fiber :demand-uncertainty)"}],
           :conversations
-          [#:conversation{:id :process,
-                          :interviewer-budget 0.5,
+          [#:conversation{:done? true,
+                          :id :process,
+                          :interviewer-budget 0.95,
                           :messages
                           [#:message{:content
                                      "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
@@ -100,125 +66,35 @@
                                      :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-12-11T16:32:29.715-00:00"}
+                                     #inst "2025-02-27T13:55:44.310-00:00"}
                            #:message{:content
-                                     "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
                                      :from :system,
                                      :id 5,
-                                     :question-type :process/warm-up,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-11T16:32:55.138-00:00"}
+                                     #inst "2025-02-27T13:56:05.313-00:00"}
                            #:message{:content
-                                     "We manufacture various types of optical fibers, including single-mode, multi-mode, and specialty fibers for telecommunications and data transmission. The scheduling challenge involves coordinating production runs with fluctuating demand, ensuring on-time delivery while optimizing use of raw materials and production capacity. Delays in acquiring raw materials or equipment maintenance can disrupt schedules, making predictive scheduling and flexibility critical to operations.",
+                                     "We manufacture optical fiber products, including standard telecom-grade fibers, specialty fibers for medical or industrial applications, and custom-designed fiber solutions. The scheduling challenge lies in coordinating production stages such as preform fabrication, fiber drawing, coating, testing, and packaging. Each step has strict quality requirements and varying durations, and we must balance customer demand with equipment constraints and raw material availability.",
                                      :from :surrogate,
                                      :id 6,
-                                     :question-type :process/warm-up,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-11T16:32:55.156-00:00"}
+                                     #inst "2025-02-27T13:56:05.347-00:00"}
                            #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product, a service or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
+                                     "\nDoes the production of all your optical fiber products follow the same sequence of processes or do different products require different process flows?",
                                      :from :system,
                                      :id 7,
-                                     :question-type :process/work-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-12-11T16:33:23.450-00:00"}
-                           #:message{:content "PRODUCT",
+                                     #inst "2025-02-27T13:56:27.591-00:00"}
+                           #:message{:content
+                                     "Most optical fiber products follow a similar sequence of processes: preform fabrication, fiber drawing, coating, testing, and packaging. However, specialty fibers or custom designs may require additional steps, like splicing, polishing, or advanced testing, which can alter the process flow.",
                                      :from :surrogate,
                                      :id 8,
-                                     :question-type :process/work-type,
                                      :tags [:response],
                                      :time
-                                     #inst "2024-12-11T16:33:23.487-00:00"}
-                           #:message{:content
-                                     "Some work, for example, cutting down trees, has to be done at your customer's site, other work is done at your facility. Respond with the single word CUSTOMER-SITE or OUR-FACILITY depending on where you perform the work.",
-                                     :from :system,
-                                     :id 9,
-                                     :question-type
-                                     :process/production-location,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-11T16:33:37.692-00:00"}
-                           #:message{:content "OUR-FACILITY",
-                                     :from :surrogate,
-                                     :id 10,
-                                     :question-type
-                                     :process/production-location,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-11T16:33:37.707-00:00"}
-                           #:message{:content
-                                     "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
-                                     :from :system,
-                                     :id 11,
-                                     :question-type
-                                     :process/production-motivation,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-11T16:33:49.876-00:00"}
-                           #:message{:content "MAKE-TO-ORDER",
-                                     :from :surrogate,
-                                     :id 12,
-                                     :question-type
-                                     :process/production-motivation,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-11T16:33:49.913-00:00"}
-                           #:message{:content
-                                     "There are a few common patterns or system design by which product is made. In a FLOW-SHOP all jobs follows the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
-                                     :from :system,
-                                     :id 13,
-                                     :question-type
-                                     :process/production-system-type,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-11T16:34:13.525-00:00"}
-                           #:message{:content "FLOW-SHOP",
-                                     :from :surrogate,
-                                     :id 14,
-                                     :question-type
-                                     :process/production-system-type,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-11T16:34:13.544-00:00"}
-                           #:message{:content
-                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
-                                     :from :system,
-                                     :id 15,
-                                     :question-type
-                                     :process/process-steps,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-11T16:34:27.656-00:00"}
-                           #:message{:content
-                                     "1. Preform Manufacturing\n2. Fiber Drawing\n3. Coating Application\n4. Curing of Coating\n5. Testing and Quality Control\n6. Spooling\n7. Packaging",
-                                     :from :surrogate,
-                                     :id 16,
-                                     :question-type
-                                     :process/process-steps,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-11T16:34:27.671-00:00"}
-                           #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
-                                     :from :system,
-                                     :id 17,
-                                     :question-type
-                                     :process/process-durations,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-11T16:34:43.675-00:00"}
-                           #:message{:content
-                                     "1. Preform Manufacturing (several days to a week)\n2. Fiber Drawing (1 to 2 hours)\n3. Coating Application (instantaneous, integrated with fiber drawing)\n4. Curing of Coating (minutes, integrated with fiber drawing)\n5. Testing and Quality Control (2 to 3 hours)\n6. Spooling (1 to 2 hours)\n7. Packaging (1 to 2 hours)",
-                                     :from :surrogate,
-                                     :id 18,
-                                     :question-type
-                                     :process/process-durations,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-11T16:34:43.690-00:00"}]}
+                                     #inst "2025-02-27T13:56:27.616-00:00"}]}
            #:conversation{:id :data,
                           :interviewer-budget 1.0,
                           :messages
@@ -228,7 +104,7 @@
                                      :id 2,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-12-11T16:32:29.729-00:00"}]}
+                                     #inst "2025-02-27T13:55:44.354-00:00"}]}
            #:conversation{:id :resources,
                           :interviewer-budget 1.0,
                           :messages
@@ -238,7 +114,7 @@
                                      :id 3,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-12-11T16:32:29.741-00:00"}]}
+                                     #inst "2025-02-27T13:55:44.409-00:00"}]}
            #:conversation{:id :optimality,
                           :interviewer-budget 1.0,
                           :messages
@@ -248,109 +124,8 @@
                                      :id 4,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-12-11T16:32:29.754-00:00"}]}],
+                                     #inst "2025-02-27T13:55:44.443-00:00"}]}],
           :current-conversation :process,
           :id :sur-optical-fiber,
-          :name "SUR Optical Fiber",
-          :processes
-          [#:process{:id :sur-optical-fiber,
-                     :interview-class :initial-unordered,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :weeks,
-                                                            :value-string
-                                                            "1"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :days,
-                                                            :value-string
-                                                            "several"}},
-                                :id
-                                :sur-optical-fiber--initial-unordered--preformMfg,
-                                :name "Preform Manufacturing",
-                                :step-number 1,
-                                :var-name "preformMfg"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-optical-fiber--initial-unordered--fiberDraw,
-                                :name "Fiber Drawing",
-                                :step-number 2,
-                                :var-name "fiberDraw"}
-                      #:process{:duration
-                                #:box{:string-val "instantaneous"},
-                                :duration-comment
-                                "integrated with fiber drawing",
-                                :id
-                                :sur-optical-fiber--initial-unordered--coatApply,
-                                :name "Coating Application",
-                                :step-number 3,
-                                :var-name "coatApply"}
-                      #:process{:duration #:box{:string-val "minutes"},
-                                :duration-comment
-                                "integrated with fiber drawing",
-                                :id
-                                :sur-optical-fiber--initial-unordered--curingCoat,
-                                :name "Curing of Coating",
-                                :step-number 4,
-                                :var-name "curingCoat"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "3"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"}},
-                                :id
-                                :sur-optical-fiber--initial-unordered--testingQC,
-                                :name "Testing and Quality Control",
-                                :step-number 5,
-                                :var-name "testingQC"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-optical-fiber--initial-unordered--spooling,
-                                :name "Spooling",
-                                :step-number 6,
-                                :var-name "spooling"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-optical-fiber--initial-unordered--packaging,
-                                :name "Packaging",
-                                :step-number 7,
-                                :var-name "packaging"}]}]}
+          :name "SUR Optical Fiber"}
 ]

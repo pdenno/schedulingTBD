@@ -121,3 +121,21 @@
                                         "\ntrace: " (with-out-str (pprint (:trace d-e))))))))]
       (s/assert ::text-to-var res)
       (:CORRESPONDING-VAR res))))
+
+(def general-notes-on-EADS
+  (str "Below is an Example Annotated Data Structure (EADS) that defines the structure and intent of what we'd like you to produce.\n"
+       "By 'annotated' we mean that in some places, rather than just providing the kind of thing you should produce, we provide that kind of thing AND an associated comment.\n"
+       "For example, instead of providing the 'process-id' of some process as a string, we present it as\n"
+       "{\"val\" : \"pencil-manufacturing\", \"comment\" : \"This is the top-level process. You can name it as you see fit; don't ask the interviewees.\"}.\n"
+       "Such comments are there to help you understand the intent of the example. You do not have to put comments in what you produce, but you could if you'd like.\n"
+       "You can use annotations on any property. Where you choose to use them should be entirely independent of where we used them.\n"
+       "Where you do use annotations, the 'comment' text should flag something about how you arrived at the 'val', for example, how it is unclear from the interviewees' answer what belongs in the value.\n"
+       "For example, if you were asking the interviewees how long shipping takes, they might answer 'it depends'.\n"
+       "You could flag this difficulty with an annotation: {\"val\" : \"it depends\", \"comment\" : \"The interviewees did not elaborate.\"}.\n"
+       "By using an annotation here, you've flagged something that we can pursue with another agent and the interviewees."))
+
+
+
+(defn get-EADS [&_])
+
+(defn respond-with-EADS [&_])

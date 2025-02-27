@@ -189,6 +189,9 @@
    :message/tags
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "Optional keywords used to classify the message."}
+   :message/table
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An optional table that that is the response, or part of the response of a user."}
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
@@ -749,7 +752,7 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to current conversation of the database with :project/id = id."
-  [{:keys [pid cid from text tags question-type]}]
+  [{:keys [pid cid from text table tags question-type]}]
   (assert (keyword? cid))
   (assert (#{:system :human :surrogate :developer-injected} from))
   (assert (string? text))
@@ -758,6 +761,7 @@
     (let [msg-id (inc (max-msg-id pid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
+                                                            table            (assoc :message/table table)
                                                             (not-empty tags) (assoc :message/tags tags)
                                                             question-type    (assoc :message/question-type question-type))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
