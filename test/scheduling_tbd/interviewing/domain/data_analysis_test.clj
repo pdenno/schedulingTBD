@@ -53,3 +53,18 @@
       (inv/tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
                              :response (:text response)} ctx)
       (ru/refresh-client client-id pid cid))))
+
+;; (defn testing-loop-sur
+;;   [pid cid]
+;;   (let [client-id (ws/recent-client!)
+;;         ctx (merge (ctx-surrogate {:pid pid :cid cid}) {:client-id client-id})
+;;         conversation (q-and-a ctx)
+;;         response (-> conversation last)]
+
+;;     (doseq [msg conversation]
+;;       (db/add-msg (merge {:pid pid :cid cid} msg)))
+;;     (analyze-response pid cid response)
+;;     (do
+;;       (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
+;;                              :response (:text response)} ctx)
+;;       (ru/refresh-client client-id pid cid))))

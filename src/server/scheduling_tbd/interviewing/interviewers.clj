@@ -355,8 +355,8 @@
   [pid cid]
   (case cid
     ;; ToDo: Someday we will be able to do better than this!
-    (:data :resources :optimality) (find-claim '(flow-shop ?x) (db/get-claims pid))
-    :process true))
+    (:resources :optimality) (find-claim '(flow-shop ?x) (db/get-claims pid))
+    (:process :data) true))
 
 (defn redirect-user-to-discussion
   "Put a message in the current chat to go to the recommended chat."

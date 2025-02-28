@@ -68,7 +68,6 @@ Here is an example of the first step running through in its entirety:
 
    You: {"message-type" : "QUESTION-TO-ASK"
 	 "question"     : "Here is a table of the data I think you mentioned. Could you add or remove rows as necessary and fill in the column with a quick description of the tables.
-        #+begin_src HTML
             <table>
                 <tr><th>Data table</th>                <th>Duration</th></tr>
                 <tr><td>Production schedule</td> <td>Displays the timeline for each production batch, including start time, end time, and shift details.</td></tr>
@@ -76,13 +75,11 @@ Here is an example of the first step running through in its entirety:
                 <tr><td>Orders</td>     <td>Lists customer orders with details like product type, quantity, delivery date, and order status.</td></tr>
                 <tr><td>Supplier deliveries</td>     <td>Tracks incoming shipments of raw materials, including expected delivery dates, actual arrival times, and any discrepancies.</td></tr>
                 <tr><td>Personnel schedule</td>     <td>Organizes employee shifts and assignments, ensuring adequate staffing for each production phase.</td></tr>
-            </table>
-        #+end_src"}
+            </table>"}
 
    We: {"message-type" : "INTERVIEWEES-RESPOND",
        "response" :
-       "#+begin_src HTML
-            <table>
+       "        <table>
                 <tr><th>Data table</th>                <th>Duration</th></tr>
                 <tr><td>Production schedule</td> <td>Displays the timeline for each production batch, including start time, end time, and shift details including any issues that may have come up during production.</td></tr>
                 <tr><td>Inventory</td>     <td>Catalogs raw materials, packaging, and finished goods, showing quantities on hand and reorder levels.</td></tr>
@@ -91,12 +88,8 @@ Here is an example of the first step running through in its entirety:
                 <tr><td>Personnel schedule</td>     <td>Organizes employee shifts and assignments, ensuring adequate staffing for each production phase.</td></tr>
                 <tr><td>Maintenance scheduling</td>   <td>Outlines planned maintenance activities for machinery, minimizing downtime and preventing unexpected breakdowns.</td></tr>
        </table>
-       #+end_src
-
-       #+begin_src comment
        I added a little bit of detail to the production schedule and orders tables that I thought may be important to scheduling issues. 
-       I also added a maintenance scheduling table as it is a piece of data we use often, and is very relevant to scheduling.
-       #+end_src"}
+       I also added a maintenance scheduling table as it is a piece of data we use often, and is very relevant to scheduling."}
 
     You: {"message-type" : "TABLE_LIST",
         "table-list" : ["PRODUCTION-SCHEDULE","INVENTORY","ORDERS", "SUPPLIER-DELIVERIES", "PERSONNEL-SCHEDULE", "MAINTENANCE-SCHEDULING]}
@@ -283,9 +276,7 @@ In future implementations there will be other things you can spend budget on bey
 so we expect that you can complete your work in 20 questions per table. Note also that QUESTION-TO-ASK questions that asks the interviewees to fill out a (partially completed)
 table kill a lot of birds with one 0.05 stone.
 
-More generally, regarding questions with tables, notice that we delimit the table with '#+begin_src HTML' and '#+end_src'.
-You can also attach directions about filling in the table to convey to the interviewees using '#+begin_src comment' and '#+end_src'
-inside the 'question' property of the QUESTION-TO-ASK object.
+More generally, regarding questions with tables, notice that we use HTML syntax for table. Make sure to do the same. You can also add comments BEFORE the table if you need the user to check something in there.
 
 Note that we encourage an occassional open-ended question such as in the running example where you ask "I think we now have a reasonable understanding of your processes, but maybe you disagree. Is this really what you do?"
 These help us stay on the right path.
