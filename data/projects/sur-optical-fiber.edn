@@ -2,22 +2,22 @@
 #:project{:agents
           [#:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
-                   :thread-id "thread_aCtrRngOtjpXgKh9VOUzXRJu",
+                   :thread-id "thread_FV620PRt5dOxjlbwUcZ1Pf5e",
                    :model-class :gpt,
                    :llm-provider :openai,
-                   :assistant-id "asst_eJ7AxECsRib6jGssqREMahgx",
+                   :assistant-id "asst_2r78YATlSKvD4qj99GltLPGz",
                    :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-01-31T17:13:05.127-00:00"}
+                   :timestamp #inst "2025-03-03T20:48:13.043-00:00"}
            #:agent{:base-type :sur-optical-fiber,
                    :agent-type :project,
-                   :thread-id "thread_6ScOjaWzQnyIIhVcHRcMZOmN",
+                   :thread-id "thread_GNwNxZet4NosT9p12bDqhGlR",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :surrogate? true,
-                   :assistant-id "asst_AJjO3967dnJC9VeRzasXpRG8",
+                   :assistant-id "asst_xRj0Y3WdhQL2EHJcjAhQch3B",
                    :id :sur-optical-fiber-openai,
                    :expertise "optical fiber",
-                   :timestamp #inst "2025-02-27T13:55:45.609-00:00"}],
+                   :timestamp #inst "2025-03-03T21:00:45.896-00:00"}],
           :claims
           [#:claim{:string "(project-id :sur-optical-fiber)"}
            #:claim{:string
@@ -26,23 +26,12 @@
                    :string "(surrogate :sur-optical-fiber)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string "(temp-project-id :optical-fiber-products)"}
+                   :string
+                   "(scheduling-challenge :sur-optical-fiber :resource-assignment)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-optical-fiber :product-variation)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-optical-fiber :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(temp-project-name :sur-optical-fiber \"Optical Fiber Products\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(principal-expertise :sur-optical-fiber \"Optical Fiber Products\")"}
+                   "(scheduling-challenge :sur-optical-fiber :bottleneck-processes)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
@@ -54,11 +43,14 @@
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-optical-fiber :demand-uncertainty)"}],
+                   "(scheduling-challenge :sur-optical-fiber :demand-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-optical-fiber \"Optical Fiber\")"}],
           :conversations
-          [#:conversation{:done? true,
-                          :id :process,
-                          :interviewer-budget 0.95,
+          [#:conversation{:id :process,
+                          :interviewer-budget 0.8999999999999999,
                           :messages
                           [#:message{:content
                                      "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
@@ -66,35 +58,49 @@
                                      :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-02-27T13:55:44.310-00:00"}
+                                     #inst "2025-03-03T21:00:45.076-00:00"}
                            #:message{:content
                                      "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
                                      :from :system,
                                      :id 5,
                                      :tags [:query],
                                      :time
-                                     #inst "2025-02-27T13:56:05.313-00:00"}
+                                     #inst "2025-03-03T21:01:06.142-00:00"}
                            #:message{:content
-                                     "We manufacture optical fiber products, including standard telecom-grade fibers, specialty fibers for medical or industrial applications, and custom-designed fiber solutions. The scheduling challenge lies in coordinating production stages such as preform fabrication, fiber drawing, coating, testing, and packaging. Each step has strict quality requirements and varying durations, and we must balance customer demand with equipment constraints and raw material availability.",
+                                     "\nWe manufacture optical fiber, primarily for telecommunications, data centers, and specialized applications like medical or industrial use. Our scheduling challenge lies in coordinating the lengthy and precise production processes, which include preform manufacturing, fiber drawing, coating, testing, and packaging. Each step has strict timing, equipment, and resource constraints, making it critical to optimize flow and minimize downtime in the supply chain.",
                                      :from :surrogate,
                                      :id 6,
                                      :tags [:response],
                                      :time
-                                     #inst "2025-02-27T13:56:05.347-00:00"}
+                                     #inst "2025-03-03T21:01:06.163-00:00"}
                            #:message{:content
-                                     "\nDoes the production of all your optical fiber products follow the same sequence of processes or do different products require different process flows?",
+                                     "\nDo all the optical fiber products you make follow the same sequence of production steps, or do different products require different sequences?",
                                      :from :system,
                                      :id 7,
                                      :tags [:query],
                                      :time
-                                     #inst "2025-02-27T13:56:27.591-00:00"}
+                                     #inst "2025-03-03T21:01:28.340-00:00"}
                            #:message{:content
-                                     "Most optical fiber products follow a similar sequence of processes: preform fabrication, fiber drawing, coating, testing, and packaging. However, specialty fibers or custom designs may require additional steps, like splicing, polishing, or advanced testing, which can alter the process flow.",
+                                     "\nMost optical fiber products follow a similar sequence of production steps: preform preparation, fiber drawing, coating, curing, testing, and packaging. However, specialized fibers, such as medical or high-strength fibers, may require additional or modified steps, like enhanced coating or specific material treatments, which alter the sequence slightly.",
                                      :from :surrogate,
                                      :id 8,
                                      :tags [:response],
                                      :time
-                                     #inst "2025-02-27T13:56:27.616-00:00"}]}
+                                     #inst "2025-03-03T21:01:28.369-00:00"}
+                           #:message{:content
+                                     "\nCan you describe, in detail, the complete process flow for your standard optical fiber manufacturing, from preform preparation to packaging? Additionally, mention any variations you consider significant for specialized fibers.",
+                                     :from :system,
+                                     :id 9,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-03T21:02:04.519-00:00"}
+                           #:message{:content
+                                     "\nOf course! Here's the complete process flow for standard optical fiber manufacturing:\n\n1. <b>Preform Preparation</b>: Large glass rods (preforms) are created through chemical vapor deposition, laying the foundation for the fiber's core and cladding structure.\n2. <b>Fiber Drawing</b>: The preform is heated in a drawing tower, where it is stretched into a thin fiber at high temperatures.\n3. <b>Coating Application</b>: Protective layers (e.g., UV-curable coatings) are immediately applied to the drawn fiber to shield it from physical damage and maintain optical quality.\n4. <b>Curing</b>: The coating is cured using ultraviolet light for durability.\n5. <b>Testing</b>: Fibers are subjected to testing for attenuation, strength, and other quality metrics.\n6. <b>Spooling and Packaging</b>: The fibers are wound onto spools for delivery and further packaging as necessary.\n\n### Variations for specialized fibers:\n- <b>High-strength fibers</b>: May require additional protective coatings or heat treatments during or after drawing.\n- <b>Medical and industrial fibers</b>: Might involve non-standard core diameters or materials, leading to adjustments in the preform preparation or fiber drawing stages.\n- <b>Custom-coated fibers</b>: Require specialized coating equipment or curing methods to meet unique specifications.",
+                                     :from :surrogate,
+                                     :id 10,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-03T21:02:04.550-00:00"}]}
            #:conversation{:id :data,
                           :interviewer-budget 1.0,
                           :messages
@@ -104,7 +110,7 @@
                                      :id 2,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-02-27T13:55:44.354-00:00"}]}
+                                     #inst "2025-03-03T21:00:45.093-00:00"}]}
            #:conversation{:id :resources,
                           :interviewer-budget 1.0,
                           :messages
@@ -114,7 +120,7 @@
                                      :id 3,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-02-27T13:55:44.409-00:00"}]}
+                                     #inst "2025-03-03T21:00:45.115-00:00"}]}
            #:conversation{:id :optimality,
                           :interviewer-budget 1.0,
                           :messages
@@ -124,7 +130,7 @@
                                      :id 4,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-02-27T13:55:44.443-00:00"}]}],
+                                     #inst "2025-03-03T21:00:45.142-00:00"}]}],
           :current-conversation :process,
           :id :sur-optical-fiber,
           :name "SUR Optical Fiber"}

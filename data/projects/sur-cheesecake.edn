@@ -1,0 +1,358 @@
+[
+#:project{:conversations
+          [#:conversation{:done? true,
+                          :id :process,
+                          :interviewer-budget 0.5,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-12-18T01:37:23.992-00:00"}
+                           #:message{:content
+                                     "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 5,
+                                     :question-type :process/warm-up,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:37:45.619-00:00"}
+                           #:message{:content
+                                     "Our company specializes in producing a variety of cheesecakes, including classic flavors like New York-style, chocolate, and strawberry, as well as seasonal and custom cheesecake options. The primary scheduling challenge involves coordinating the supply of perishable ingredients with production schedules, ensuring that all products are made fresh and delivered on time. We also have to balance production capacity with fluctuating demand, particularly during peak seasons and holidays.",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :question-type :process/warm-up,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:37:45.651-00:00"}
+                           #:message{:content
+                                     "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
+                                     :from :system,
+                                     :id 7,
+                                     :question-type :process/work-type,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:38:02.521-00:00"}
+                           #:message{:content "PRODUCT",
+                                     :from :surrogate,
+                                     :id 8,
+                                     :question-type :process/work-type,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:38:02.591-00:00"}
+                           #:message{:content
+                                     "Some work is performed in your own facility, some, like cutting down trees, has to be performed at the customer's site. Which is most common in your work? Respond with the single word OUR-FACILITY, CUSTOMER-SITE, or if it isn't straightforward, an explanation.",
+                                     :from :system,
+                                     :id 9,
+                                     :question-type
+                                     :process/production-location,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:38:14.975-00:00"}
+                           #:message{:content "OUR-FACILITY",
+                                     :from :surrogate,
+                                     :id 10,
+                                     :question-type
+                                     :process/production-location,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:38:15.052-00:00"}
+                           #:message{:content
+                                     "There are three common motivations for making a product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, products are configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
+                                     :from :system,
+                                     :id 11,
+                                     :question-type
+                                     :process/production-motivation,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:38:26.598-00:00"}
+                           #:message{:content "MAKE-TO-STOCK",
+                                     :from :surrogate,
+                                     :id 12,
+                                     :question-type
+                                     :process/production-motivation,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:38:26.668-00:00"}
+                           #:message{:content
+                                     "There are a few common patterns or system designs by which products are made. In a FLOW-SHOP, all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
+                                     :from :system,
+                                     :id 13,
+                                     :question-type
+                                     :process/production-system-type,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:38:39.424-00:00"}
+                           #:message{:content "FLOW-SHOP",
+                                     :from :surrogate,
+                                     :id 14,
+                                     :question-type
+                                     :process/production-system-type,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:38:39.478-00:00"}
+                           #:message{:content
+                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
+                                     :from :system,
+                                     :id 15,
+                                     :question-type
+                                     :process/process-steps,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:38:52.840-00:00"}
+                           #:message{:content
+                                     "1. Prepare Cheesecake Crust\n2. Mix Cheesecake Filling\n3. Pour Filling into Crust\n4. Bake Cheesecake\n5. Cool Cheesecake\n6. Apply Toppings\n7. Package Cheesecake",
+                                     :from :surrogate,
+                                     :id 16,
+                                     :question-type
+                                     :process/process-steps,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:38:52.893-00:00"}
+                           #:message{:content
+                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
+                                     :from :system,
+                                     :id 17,
+                                     :question-type
+                                     :process/process-durations,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:39:10.378-00:00"}
+                           #:message{:content
+                                     "1. Prepare Cheesecake Crust (15 minutes)\n2. Mix Cheesecake Filling (20 minutes)\n3. Pour Filling into Crust (10 minutes)\n4. Bake Cheesecake (60 minutes)\n5. Cool Cheesecake (120 minutes)\n6. Apply Toppings (15 minutes)\n7. Package Cheesecake (10 minutes)",
+                                     :from :surrogate,
+                                     :id 18,
+                                     :question-type
+                                     :process/process-durations,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:39:10.447-00:00"}
+                           #:message{:content
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
+                                     :from :system,
+                                     :id 19,
+                                     :tags [:info-to-user :minizinc],
+                                     :time
+                                     #inst "2024-12-18T01:39:41.869-00:00"}
+                           #:message{:content
+                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just \"1000 package\". If, however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling      (2000 packages)\n 3. Bake Wafers       (1000 packages)\n 4. Assemble Cookies  (1000 packages)\n 5. Package          (1000 packages)",
+                                     :from :system,
+                                     :id 20,
+                                     :question-type
+                                     :process/batch-size,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:39:57.271-00:00"}
+                           #:message{:content
+                                     "1. Prepare Cheesecake Crust (50 cheesecakes)\n2. Mix Cheesecake Filling (50 cheesecakes)\n3. Pour Filling into Crust (50 cheesecakes)\n4. Bake Cheesecake (50 cheesecakes)\n5. Cool Cheesecake (50 cheesecakes)\n6. Apply Toppings (50 cheesecakes)\n7. Package Cheesecake (50 cheesecakes)",
+                                     :from :surrogate,
+                                     :id 21,
+                                     :question-type
+                                     :process/batch-size,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:39:57.328-00:00"}
+                           #:message{:content
+                                     "Earlier, you listed the process steps typically used in making your cheesecake products and for each you specified typical durations. Now we'd like you to tell us what raw materials and intermediate products go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list, it would look like this:\n\n 1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n 2. Make Filling (sugar, water, vanilla flavoring)\n 3. Bake Wafers (use dough from Make Cookie Dough)\n 4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n 5. Package (use cookies from Assemble Cookies)\n\nPlease provide a similar breakdown for your cheesecake production process.",
+                                     :from :system,
+                                     :id 22,
+                                     :question-type
+                                     :process/process-ordering,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2024-12-18T01:40:17.429-00:00"}
+                           #:message{:content
+                                     "1. Prepare Cheesecake Crust (graham crackers, butter, sugar)\n2. Mix Cheesecake Filling (cream cheese, sugar, eggs, vanilla extract, sour cream)\n3. Pour Filling into Crust (use crust from Prepare Cheesecake Crust, use filling from Mix Cheesecake Filling)\n4. Bake Cheesecake (use assembled cheesecake from Pour Filling into Crust)\n5. Cool Cheesecake (use baked cheesecake from Bake Cheesecake)\n6. Apply Toppings (use cooled cheesecake from Cool Cheesecake, toppings like fruit, chocolate syrup, or nuts)\n7. Package Cheesecake (use finished cheesecake from Apply Toppings)",
+                                     :from :surrogate,
+                                     :id 23,
+                                     :question-type
+                                     :process/process-ordering,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2024-12-18T01:40:17.510-00:00"}]}
+           #:conversation{:id :data,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-12-18T01:37:24.093-00:00"}]}
+           #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-12-18T01:37:24.190-00:00"}]}
+           #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2024-12-18T01:37:24.291-00:00"}]}],
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {prepCrust, mixFilling, pourFilling, bakeCheesecake, coolCheesecake, applyToppings};\n% Durations are in units of minutes and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of int: taskDuration = [|15, 20, 10, 60, 120, 15|];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, prepCrust] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, prepCrust] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, prepCrust] == taskStarts[p, mixFilling]);\nconstraint forall (p in Product) (taskEnds[p, mixFilling] == taskStarts[p, pourFilling]);\nconstraint forall (p in Product) (taskEnds[p, pourFilling] == taskStarts[p, bakeCheesecake]);\nconstraint forall (p in Product) (taskEnds[p, bakeCheesecake] == taskStarts[p, coolCheesecake]);\nconstraint forall (p in Product) (taskEnds[p, coolCheesecake] == taskStarts[p, applyToppings]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, applyToppings]);",
+          :agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_gPVcR57QU0Oym8fxyrlIczVn",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
+           #:agent{:base-type :sur-cheesecake,
+                   :agent-type :project,
+                   :thread-id "thread_rGwjpLSYtE4fSpF7Wg0dSH6q",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_gNwmZND3QjA8wHDlO3pnup1L",
+                   :id :sur-cheesecake-openai,
+                   :expertise "cheesecake",
+                   :timestamp #inst "2024-12-18T01:37:25.209-00:00"}],
+          :processes
+          [#:process{:id :sur-cheesecake,
+                     :interview-class :initial-unordered,
+                     :sub-processes
+                     [#:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "15"},
+                                :id
+                                :sur-cheesecake--initial-unordered--prepCrust,
+                                :name "Prepare Cheesecake Crust",
+                                :step-number 1,
+                                :var-name "prepCrust"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "20"},
+                                :id
+                                :sur-cheesecake--initial-unordered--mixFilling,
+                                :name "Mix Cheesecake Filling",
+                                :step-number 2,
+                                :var-name "mixFilling"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "10"},
+                                :id
+                                :sur-cheesecake--initial-unordered--pourFilling,
+                                :name "Pour Filling into Crust",
+                                :step-number 3,
+                                :var-name "pourFilling"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "60"},
+                                :id
+                                :sur-cheesecake--initial-unordered--bakeCheesecake,
+                                :name "Bake Cheesecake",
+                                :step-number 4,
+                                :var-name "bakeCheesecake"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "120"},
+                                :id
+                                :sur-cheesecake--initial-unordered--coolCheesecake,
+                                :name "Cool Cheesecake",
+                                :step-number 5,
+                                :var-name "coolCheesecake"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "15"},
+                                :id
+                                :sur-cheesecake--initial-unordered--applyToppings,
+                                :name "Apply Toppings",
+                                :step-number 6,
+                                :var-name "applyToppings"}
+                      #:process{:duration
+                                #:quantity{:units :minutes,
+                                           :value-string "10"},
+                                :id
+                                :sur-cheesecake--initial-unordered--packageCheese,
+                                :name "Package Cheesecake",
+                                :step-number 7,
+                                :supply-chain? true,
+                                :var-name "packageCheese"}]}],
+          :current-conversation :process,
+          :claims
+          [#:claim{:string "(project-id :sur-cheesecake)"}
+           #:claim{:string
+                   "(project-name :sur-cheesecake \"SUR Cheesecake\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-cheesecake)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-cheesecake :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-cheesecake :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-cheesecake :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-cheesecake :variation-in-demand)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-cheesecake \"Cheesecakes\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/work-type,
+                   :string "(provides-product :sur-cheesecake)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-location,
+                   :string
+                   "(production-location :sur-cheesecake factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-motivation,
+                   :string
+                   "(production-mode :sur-cheesecake make-to-stock)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-system-type,
+                   :string "(flow-shop :sur-cheesecake)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-cheesecake 1 \"Prepare Cheesecake Crust\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-cheesecake 2 \"Mix Cheesecake Filling\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-cheesecake 3 \"Pour Filling into Crust\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-cheesecake 4 \"Bake Cheesecake\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-cheesecake 5 \"Cool Cheesecake\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-cheesecake 6 \"Apply Toppings\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-cheesecake 7 \"Package Cheesecake\")"}],
+          :name "SUR Cheesecake",
+          :id :sur-cheesecake}
+]

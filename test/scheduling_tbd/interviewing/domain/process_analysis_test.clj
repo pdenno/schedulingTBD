@@ -468,7 +468,7 @@
     (d/transact (sutil/connect-atm pid) {:tx-data [{:project/id pid
                                                     :project/conversations [{:conversation/id :optimality}]}]})
     (doseq [cid [:data :resources :optimality]]
-      (when (empty? (db/get-conversation pid cid))
+      (when (empty? (-> (db/get-conversation-msgs pid cid) :conversation/messages))
         (db/add-msg {:pid pid :cid cid :from :system :text (get db/conversation-intros cid) :tags [:conversation-intro]})))
     (db/backup-proj-db pid)
     (db/recreate-project-db! pid)))

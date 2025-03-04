@@ -263,7 +263,7 @@
   (if-let [prom-obj (select-promise promise-keys)]
     (do (log! :debug (str "Before resolve!: prom-obj = " prom-obj))
         (p/resolve! (:prom prom-obj) (cond-> {:msg-type :expert-response}
-                                       msg-text (assoc :msg-text msg-text)
+                                       msg-text (assoc :text msg-text)
                                        table    (assoc :table table)))
         (clear-keys client-id [(:p-key prom-obj)]))
     (log! :error "domain-expert-says: no p-key (e.g. no question in play)")))

@@ -2,6 +2,9 @@
   "Analysis of the process interview"
   (:require
    [clojure.core.unify                 :as uni]
+   [clojure.data.json]
+   [clojure.edn                        :as edn]
+   [clojure.java.io                    :as io]
    [clojure.pprint                     :refer [pprint]]
    [clojure.spec.alpha                 :as s]
    [clojure.string                     :as str]
@@ -9,7 +12,7 @@
    [scheduling-tbd.agent-db            :as adb]
    [scheduling-tbd.db                  :as db]
    [scheduling-tbd.minizinc            :as mzn]
-   [scheduling-tbd.interviewing.response-utils :as ru :refer [defanalyze]]
+   [scheduling-tbd.interviewing.response-utils :as ru :refer [eads-response! analyze-warm-up]]
    [taoensso.telemere                  :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -26,7 +29,7 @@
   "Analyze the response for project name,a fixed set of 'scheduling challenges' and 'one-more-thing', an observation.
    Returns a map {:project-or-service-name, :challenge <keywords naming challenges> :one-more-thing <a string>}."
   [response]
-  (let [{:keys [one-more-thing] :as res}  (-> (adb/query-agent :scheduling-challenges-agent response {:tries 2})
+  (let [{:keys [one-more-thing] :as res}  (-> (adb/query-agent :scheduling-challenges-agent response {:tries 2 :asking-role :process-analysis})
                                               json/read-value
                                               (update-keys str/lower-case)
                                               (update-keys keyword)
@@ -37,16 +40,15 @@
       (log! :error (str "Invalid scheduling-challenges-response: " (with-out-str (pprint res)))))
     res))
 
-;;; (pan/analyze-warm-up-response pant/ice-cream-answer-warm-up)
-(defn analyze-warm-up-response
-  "Analyze the response to the initial question.
-   Returns a collection of new NON-GROUND claims, including scheduling-challenges and project-id and project-name predicates.
-   Not everything here will be asserted as claims:
-     1) Actual project-name and project-id are calculated by db/create-proj-db, which already happened for surrogate.
-
-   If this is called by a human project the project-id and project-name can be retracted later.
-   If this is called by a surrogate project, the project-id and project-name are already known."
-  [response]
+;;;  "Analyze the response to the initial question.
+;;;   Returns a collection of new NON-GROUND claims, including scheduling-challenges and project-id and project-name predicates.
+;;;   Not everything here will be asserted as claims:
+;;;     1) Actual project-name and project-id are calculated by db/create-proj-db, which already happened for surrogate.
+;;;
+;;;   If this is called by a human project the project-id and project-name can be retracted later.
+;;;   If this is called by a surrogate project, the project-id and project-name are already known."
+;;; (ru/analyze-warm-up :process pant/ice-cream-answer-warm-up)
+(defn analyze-warm-up-with-agent [response]
   (let [{:keys [product-or-service-name challenges]}  (run-scheduling-challenges-agent response)
         project-name (as-> product-or-service-name ?s
                        (str/trim ?s)
@@ -77,17 +79,10 @@
 ;;; ensuring we have enough skilled workers available when needed, adds another layer of complexity to our operations.",
 ;;; This might get into skills classification, delivery schedules, downtime, machine utilization.
 
-;;; start-conversation doesn't call this. It calls analyze-warm-up-response directly. This is only used by surrogates, so far.
-(defanalyze :process/warm-up [{:keys [response pid] :as _ctx}]
-  (assert (db/project-exists? pid)) ; This is only called where the project already exists.
-  (let [warm-up-claims (analyze-warm-up-response response)
-        needed-claims (remove #('#{temp-project-id temp-project-name} (first %)) warm-up-claims)
-        bindings {'?pid pid}]
-      (doseq [claim needed-claims]
-        (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
-                            :q-type :process/warm-up
-                            :cid :process}))))
-(defn extreme-dur-span?
+(defmethod analyze-warm-up :process [_tag response]
+  (analyze-warm-up-with-agent response))
+
+(defn ^:diag extreme-dur-span?
   "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more.
    This always looks at :process/inverview-class = :initial-unordered."
   [pid]
@@ -101,3 +96,34 @@
       (let [units @units]
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
+
+;;; ToDo: I'm currently not handling anything by flow-shop
+(def process-eads2file
+  {:FLOW-SHOP-SCHEDULING-PROBLEM      "EADS/flow-shop.edn"
+   :RESOURCE-ASSIGNMENT-PROBLEM       nil
+   :CYCLICAL-SCHEDULING-PROBLEM       nil
+   :PROJECT-SCHEDULING-PROBLEM        nil
+   :JOB-SHOP-SCHEDULING-PROBLEM       "EADS/flow-shop.edn"
+   :SINGLE-MACHINE-SCHEDULING-PROBLEM nil})
+
+
+(s/def :process/EADS-keyword (fn [key] (#{:FLOW-SHOP-SCHEDULING-PROBLEM
+                                          :RESOURCE-ASSIGNMENT-PROBLEM
+                                          :CYCLICAL-SCHEDULING-PROBLEM
+                                          :PROJECT-SCHEDULING-PROBLEM
+                                          :JOB-SHOP-SCHEDULING-PROBLEM
+                                          :SINGLE-MACHINE-SCHEDULING-PROBLEM}
+                                        key)))
+
+;;; ToDo: I'm currently ignore :cyclical?
+;;;  "Create a message of type PHASE-2-EADS for the given PHASE-1-CONCLUSION"
+(defmethod eads-response!
+  :process [_tag pid cid {:keys [problem-type _cyclical?] :as _iviewr-response}]
+  (let [k (-> problem-type str/upper-case keyword)]
+    (s/assert :process/EADS-keyword k)
+    (if-let [resource (get process-eads2file k)]
+      (let [eads (-> resource io/resource slurp edn/read-string)]
+        (db/put-eads! pid cid (str eads))
+        {:message-type "PHASE-2-EADS"
+         :EADS (with-out-str (clojure.data.json/pprint eads))})
+      (log! :error (str "No EADS for problem type " k)))))

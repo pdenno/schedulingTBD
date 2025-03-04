@@ -1,10 +1,11 @@
-(ns scheduling-tbd.interviewing.EADS.flow-shop
+(ns scheduling-tbd.interviewing.EADS.job-shop
   "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a flow-shop scheduling problem.
-       As the case is with flow-shop problems, this structure defines the flow of work through resources.
+       As the case is with job-shop problems, this structure defines work to be performed in typical job.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer.
 
    Note: We don't load this code at system startup. When you compile it, it writes the EADS to resources/EADS/flow-shop.txt"
   (:require
+   [clojure.data.json]
    [clojure.pprint             :refer [pprint]]
    [clojure.spec.alpha         :as s]
    [taoensso.telemere          :as tel :refer [log!]]))
@@ -78,10 +79,9 @@
 (s/def ::value-string string?)
 
 ;;; (s/valid? ::fshop/EADS (:EADS fshop/flow-shop))
-(def flow-shop
+(def job-shop
   "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of Phase 2 of a flow-shop problem."
-  {:interview-objective "Produce a data structure similar in form to the EADS in this object, but describing the interviewees' production processes."
-   :EADS
+  {:EADS
    {:process-id {:val "pencil-manufacturing",
                  :comment "This is the top-level process. You can name it as you see fit; don't ask the interviewees."}
 
@@ -188,11 +188,14 @@
                                     :resources ["crimping tool"],
                                     :subprocesses []}]}]}})
 
-(if (s/valid? ::EADS (:EADS flow-shop))
+(def interview-objective
+
+(if (s/valid? ::EADS (:EADS job-shop))
   (spit "resources/EADS/flow-shop.edn"
         (with-out-str
           (pprint
            {:message-type :PHASE-2-EADS
-            :EADS flow-shop #_(with-out-str (clojure.data.json/pprint (:EADS flow-shop)))})))
-  (do (log! :error "flow-shop EADS does not pass specs.")
-      {:invalid-EADS-spec :flow-shop}))
+            :interview-objective "Produce a data structure similar in form to the EADS in this object, but describing the interviewees' production processes."
+            :EADS (with-out-str (clojure.data.json/pprint (:EADS job-shop)))})))
+  (do (log! :error "job-shop EADS does not pass specs.")
+      {:invalid-EADS-spec :job-shop}))

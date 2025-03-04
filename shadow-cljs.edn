@@ -9,7 +9,7 @@
    :asset-path       "/js"
    :compiler-options {:externs ["datascript/externs.js"]}
    :modules          {:app {:entries [stbd-app.core] ; creates app.js owing to key :app.
-                            :init-fn stbd-app.core/start}}
+                              :init-fn stbd-app.core/start}}
    :devtools         {:after-load stbd-app.core/start
                       :before-load stbd-app.core/stop}}
 

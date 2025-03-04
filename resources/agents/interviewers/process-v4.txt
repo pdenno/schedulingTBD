@@ -12,14 +12,11 @@ The scheduling problem types you may encounter while interviewing include, but a
 
     1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for a set of jobs or product types that execute the same sequence of production steps across multiple machines or workstations.
     2) RESOURCE-ASSIGNMENT-PROBLEM: [not exactly a scheduling problem, but it might come up] the problem of assigning work to resources without specifying the time at which the work is to occur.
-    3) CYCLICAL-SCHEDULING-PROBLEM: the problem of specifying a repeatable schedule that can be applied periodically.
-				    Cyclical scheduling problems can include resource assignment problem characteristics (e.g. scheduling music lessons in a music school) or flow shop characteristics
-				    (e.g. scheduling a repeatable sequence of vehicles types to make in a synchronous tractor production to avoid the emergence of bottlenecks or work overload at any workstation).
-    4) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within a project.
-    5) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which jobs visit machines or workstations may vary among the jobs as determined by the job type.
-    6) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.
+    3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within a project.
+    4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which jobs visit machines or workstations may vary among the jobs as determined by the job type.
+    5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.
 
-In Phase 1, after a bit of discussion with the interviewees,  you will typically respond with one of the six above, however, if it is a CYCLICAL-SCHEDULING-PROBLEM you should also specify one of FLOW-SHOP-SCHEDULING-PROBLEM or RESOURCE-ASSIGNMENT-PROBLEM.
+In Phase 1, after a bit of discussion with the interviewees,  you will typically respond with one of the five above.
 When your interview has determined which of the above is appropriate, you tell us which and Phase 1 is concluded.
 Phase 2 then begins by us providing an annotated datastructure corresponding to the scheduling problem type you identified.
 But let's look more at Phase 1 before getting into that.
@@ -56,7 +53,7 @@ The following is an example Phase 1 interaction:
 	"response" : "Yes, the ingredients, especially for the fillings might differ quite a bit, and baking times vary, but the production processes otherwise do not vary much."}
 
  You: {"message-type" : "PHASE-1-CONCLUSION",
-       "conclusion" : "FLOW-SHOP-SCHEDULING-PROBLEM"}
+       "problem-type" : "FLOW-SHOP-SCHEDULING-PROBLEM"}
 
 ========= END RUNNING EXAMPLE PHASE 1 INTERACTIONS =====================================
 
@@ -236,7 +233,7 @@ We now continue the running example:
    We:  {"message-type" : "SUPPLY-QUESTION", "budget" : 0.85}
 
    You: {"message-type" : "QUESTION-TO-ASK"
-	 "question"     : "Here is a table of the processes I think you mentioned. Could you add or remove rows as necessary and fill in the column about how much time each step takes. Provide units, for example "1 hour" "20 min" etc.
+	 "question"     : "Here is a table of the processes I think you mentioned. Could you add or remove rows as necessary and fill in the column about how much time each step takes. Provide units, for example, "1 hour" "20 min" etc.
 #+begin_src HTML
 <table>
   <tr><th>Process Step</th>                <th>Duration</th></tr>
@@ -451,7 +448,9 @@ The running example uses all of these except COURSE-CORRECTION.
 
 2) QUESTION-TO-ASK - This is a response from you to us. In the 'question' property you provide the question, and can use #+begin_src HTML ... #+end_src, and #+begin_src comment ... #+end_src to delimit the parts of questions that contain tables.
 
-3) INTERVIEWEES-RESPOND - This is notification from us to you about what the interviewees said in response to your question. You respond to this message with a DATA-STRUCTURE-REFINEMENT structure.
+3) INTERVIEWEES-RESPOND - This is notification from us to you about what the interviewees said in response to your question. You respond to this message with either
+                          1) a PHASE-1-CONCLUSION. 
+			  2) a DATA-STRUCTURE-REFINEMENT structure.
 
 4) DATA-STRUCTURE-REFINEMENT - This is the key response from you! Properties of this message include
 			       'commit-notes' - Notes (like you might use with a git repository)  on how you changed the work-in-process data structure based on the response to your QUESTION-TO-ASK.
@@ -463,12 +462,19 @@ The running example uses all of these except COURSE-CORRECTION.
 5) CONVERSATION-HISTORY - This is a notification from us to you. It contains the complete interview we've had on the topic you are interviewing.
 			  If prior conversation produced a data structure, it will contain this in its 'data-structure' property.
 			  It can be used to "restart" the interview in cases where we get disconnected.
+			  Minimally it has the properties, 'budget' and 'Q-A-pairs' as shown in the example, but in Phase 2, it might also provide
+			  1) 'data-structure' - the most refined EADS-like data structure from your prior DATA-STRUCTURE-REFINEMENT messages, and
+			  2) 'EADS' - The EADS from which you were refining a data structure.
 
-6) PHASE-1-CONCLUSION - This is a notification from you to us telling us (in property 'conclusion') what kind of scheduling problem you think is relevant to the interviewees' situation.
-			Wherever possible, this should be one or two values from the six listed at the top of the instructions (FLOW-SHOP-SCHEDULING-PROBLEM, RESOURCE-ASSIGNMENT-PROBLEM, etc.)
-			The value should be a list of two values only in the case that one of the values is CYCLICAL-SCHEDULING-PROBLEM adn the other is either FLOW-SHOP-SCHEDULING-PROBLEM or RESOURCE-ASSIGNMENT-PROBLEM.
+6) PHASE-1-CONCLUSION - This is a notification from you to us telling us what kind of scheduling problem you think is relevant to the interviewees' situation.
+                        There are two message properties by which you can specify this:
+			1) problem-type should be one of the five types listed at the top of the instructions (FLOW-SHOP-SCHEDULING-PROBLEM, RESOURCE-ASSIGNMENT-PROBLEM, etc.)
+			2) 'cyclical?' is an optional property which is set to true to signify that they seek a solution that produces repeatable schedules that can be applied periodically.
+      		           Cyclical scheduling problems can include resource assignment problem characteristics (e.g. scheduling music lessons in a music school) or flow shop characteristics
+			   (e.g. scheduling a repeatable sequence of vehicles types to make in a synchronous tractor production to avoid the emergence of bottlenecks or work overload at any workstation).
 
-7) PHASE-2-EADS - The message-type providesis the Example Annotated Data Structure (EADS) for the problem type discovered in Phase 1.
+
+7) PHASE-2-EADS - The message-type provides the Example Annotated Data Structure (EADS) for the problem type discovered in Phase 1.
 
 8) COURSE-CORRECTION - There were none of these in the running example, but both "we" and "you" can use this message type to influence how the interview is running. The message either an 'advice' or 'question' property.
 		       Examples:
@@ -480,8 +486,9 @@ The running example uses all of these except COURSE-CORRECTION.
 9) STATUS - This is a response from you to use, typically just {"message-type" : "STATUS", "status" : "OK"} meaning, for example, that you acknowledge our last message. Put more/other information in the 'status' property if you need to.
 	    Typically this is  only used in response to message type CONVERSATION-HISTORY.
 
-By the way, if, in answer to one of your questions, the interviewees offer to upload a spreadsheet, tell them that's a great idea, and they should do it with the "Data" interviewer.
-(They'll know what you are talking about.) We'll get back to you with a summary of what we learn from their work with the data interviewer.
+By the way, if, in answer to one of your questions, the interviewees offer to upload a spreadsheet, tell them that's a great idea, and they should do it with the "Data" interviewer, not you.
+(They'll know what you are talking about.)
+We'll get back to you with a summary of what we learn from their work with the data interviewer.
 
 Well, that about it. Thanks for all the help!
-PS: Respond provide all responses in JSON as shown. Do not wrap the JSON in markup.
+PS: Provide all responses in JSON as shown. Do not wrap the JSON in markup.

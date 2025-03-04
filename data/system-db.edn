@@ -25,12 +25,12 @@
                   :id :process-ordering-agent-openai,
                   :timestamp #inst "2024-12-05T21:39:37.396-00:00"}
           #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_eJ7AxECsRib6jGssqREMahgx",
+                  :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
                   :base-type :process-interview-agent,
                   :id :process-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2025-01-31T17:13:05.127-00:00"}
+                  :timestamp #inst "2025-03-03T12:35:41.989-00:00"}
           #:agent{:agent-type :system,
                   :assistant-id "asst_eaxRDWsEwmdWHObw5MjTiPQP",
                   :base-type :answers-the-question?,
@@ -89,11 +89,23 @@
                   :llm-provider :openai,
                   :assistant-id "asst_WlPVzM82mT0IgMATtsnWHnx4",
                   :id :helpful-1-openai,
-                  :timestamp #inst "2024-12-12T13:23:51.572-00:00"}],
-         :default-project-id :sur-ice-cream,
+                  :timestamp #inst "2024-12-12T13:23:51.572-00:00"}
+          #:agent{:base-type :text-to-var,
+                  :agent-type :system,
+                  :thread-id "thread_GngjkcPOZH4prj4I08VyaBqF",
+                  :model-class :mini,
+                  :llm-provider :openai,
+                  :assistant-id "asst_jD6xz9YjfzqeDWnZAKTJgZvX",
+                  :id :text-to-var-openai,
+                  :timestamp #inst "2025-02-21T13:19:00.143-00:00"}],
+         :default-project-id :blank-project,
          :name "SYSTEM",
          :projects
          [#:project{:dir
+                    "/opt/scheduling/projects/blank-project",
+                    :id :blank-project,
+                    :name "Blank Project"}
+          #:project{:dir
                     "/opt/scheduling/projects/craft-beer-brewery-scheduling",
                     :id :craft-beer-brewery-scheduling,
                     :name "Craft Beer Brewery Scheduling"}
@@ -161,10 +173,6 @@
           #:project{:dir "/opt/scheduling/projects/sur-key-blanks/db/",
                     :id :sur-key-blanks,
                     :name "SUR Key Blanks"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-optical-fiber/db/",
-                    :id :sur-optical-fiber,
-                    :name "SUR Optical Fiber"}
           #:project{:dir "/opt/scheduling/projects/sur-cheesecake/db/",
                     :id :sur-cheesecake,
                     :name "SUR Cheesecake"}
@@ -183,6 +191,13 @@
           #:project{:dir
                     "/opt/scheduling/projects/sur-sandwich-cookies/db/",
                     :id :sur-sandwich-cookies,
-                    :name "SUR Sandwich Cookies"}]}
+                    :name "SUR Sandwich Cookies"}
+          #:project{:dir
+                    "/opt/scheduling/projects/sur-mechanical-pencils/db/",
+                    :id :sur-mechanical-pencils,
+                    :name "SUR Mechanical Pencils"}
+          #:project{:dir "/opt/scheduling/projects/sur-brake-pads/db/",
+                    :id :sur-brake-pads,
+                    :name "SUR Brake Pads"}]}
 
 ]

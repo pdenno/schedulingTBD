@@ -31,7 +31,7 @@
            heading (-> (str "\n" (name kind) "/" (name level) " ") str/upper-case)]
        (cond (= :error level)      (pr-bling (bling [:bold.red.white-bg heading] " " [:red    (str file ":" line " - " msg)]))
              (= :warn  level)      (pr-bling (bling [:bold.blue heading]         " " [:yellow (str file ":" line " - " msg)]))
-             :else                 (pr-bling (bling [:bold.blue heading]         " "  (str file ":" line " - " msg))))))))
+             :else                 (pr-bling (bling [:bold.blue heading]         " " [:olive  (str file ":" line " - " msg)])))))))
 
 (defn agents-log-output-fn
   "Output verbatim agent interactions to a log file."

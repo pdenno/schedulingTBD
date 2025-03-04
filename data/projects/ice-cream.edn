@@ -2,10 +2,10 @@
 #:project{:agents
           [#:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
-                   :thread-id "thread_yi2ucfQDCRJqhsrLgghNCFNn",
+                   :thread-id "thread_i3NxKAbu8ogyJZCdNH7JYDnh",
                    :model-class :gpt,
                    :llm-provider :openai,
-                   :assistant-id "asst_eJ7AxECsRib6jGssqREMahgx",
+                   :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
                    :id :process-interview-agent-openai,
                    :timestamp #inst "2025-01-31T17:13:05.127-00:00"}],
           :claims

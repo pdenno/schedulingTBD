@@ -132,9 +132,9 @@
 (defn ^:diag check-instructions
   "It might be the case that the system instructions were too long. This asks what it knows about."
   []
-  (let [{:keys [aid tid]} (-> (adb/ensure-agent! :base-type :process-dur-agent) adb/agent-db2proj)]
+  (let [{:keys [aid tid base-type]} (-> (adb/ensure-agent! :base-type :process-dur-agent) adb/agent-db2proj)]
     (adb/query-on-thread
-     {:aid aid :tid tid :role "user"
+     {:aid aid :tid tid :role "user" :base-type base-type
       :query-text (str "I provided instructions to perform a number of transformation we call 'REVs', "
                        "REV-1, REV-2, etc. What are the REVs that you know about, and what do they do?")})))
 

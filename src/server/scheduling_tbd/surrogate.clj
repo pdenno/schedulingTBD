@@ -10,6 +10,7 @@
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.interviewing.domain.process-analysis :as pan]
    [scheduling-tbd.interviewing.interviewers :as inv]
+   [scheduling-tbd.interviewing.response-utils :as ru]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere        :refer [log!]]))
@@ -62,15 +63,14 @@
               Any of the :segment/name from the 'How it's Made' DB would work here.
     force? - This is about naming of the DB. Any old DB having this pid is deleted."
   [{:keys [product client-id]} & {:keys [force?] :or {force? true}}]
-  (log! :info (str "======= Starting a surrogate: product = " product " ======================="))
+  ;(log! :info (str "======= Starting a surrogate: product = " product " ======================="))
   (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
         pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
         [_ _ expertise] (re-matches #"(SUR )?(.*)" pname)
         expertise (str/lower-case expertise)
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
-        instructions (system-instruction expertise)
-        agent-info {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise}]
-    (adb/put-agent-info! pid agent-info)
+        instructions (system-instruction expertise)]
+    (adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
     (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
     (try ;; Now do the warm-up question.
@@ -81,11 +81,12 @@
                                     :force-new? true}) ; This is about the agent; make a new project agent.
             conversation (inv/get-an-answer ctx)
             response (-> conversation last :text)
-            warm-up-claims (pan/analyze-warm-up-response response)
+            warm-up-claims (ru/analyze-warm-up :process response)
+            needed-claims (remove #('#{temp-project-id temp-project-name} (first %)) warm-up-claims)
             bindings {'?pid pid}]
         (doseq [{:keys [from text tags]} conversation]
           (db/add-msg {:pid pid :cid :process :from from :tags tags :text text}))
-        (doseq [claim warm-up-claims]
+        (doseq [claim needed-claims]
           (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
                               :q-type :process/warm-up
                               :cid :process}))
@@ -103,7 +104,7 @@
   (log! :info (str "SUR follow-up:" obj))
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
         cid (db/get-current-cid pid)]
-    (try (when-let [answer (adb/query-agent pid question)]
+    (try (when-let [answer (adb/query-agent pid question {:asking-role :surrogate-follow-up})]
            (log! :info (str "SUR's answer:" answer))
            (when (string? answer)
              (ws/send-to-chat (assoc chat-args :text answer))
