@@ -2,7 +2,7 @@
 #:project{:agents
           [#:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
-                   :thread-id "thread_FV620PRt5dOxjlbwUcZ1Pf5e",
+                   :thread-id "thread_uunCnQFDMRA7077G4aofxhiH",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :assistant-id "asst_2r78YATlSKvD4qj99GltLPGz",
@@ -10,14 +10,14 @@
                    :timestamp #inst "2025-03-03T20:48:13.043-00:00"}
            #:agent{:base-type :sur-optical-fiber,
                    :agent-type :project,
-                   :thread-id "thread_GNwNxZet4NosT9p12bDqhGlR",
+                   :thread-id "thread_wIhEGcR5LMgGTh1P8426Q2bl",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :surrogate? true,
-                   :assistant-id "asst_xRj0Y3WdhQL2EHJcjAhQch3B",
+                   :assistant-id "asst_mDsQyli5U5M47VQRvqDuamM6",
                    :id :sur-optical-fiber-openai,
                    :expertise "optical fiber",
-                   :timestamp #inst "2025-03-03T21:00:45.896-00:00"}],
+                   :timestamp #inst "2025-03-04T12:05:06.789-00:00"}],
           :claims
           [#:claim{:string "(project-id :sur-optical-fiber)"}
            #:claim{:string
@@ -35,7 +35,7 @@
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-optical-fiber :equipment-utilization)"}
+                   "(scheduling-challenge :sur-optical-fiber :product-variation)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
@@ -43,94 +43,126 @@
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-optical-fiber :demand-uncertainty)"}
+                   "(principal-expertise :sur-optical-fiber \"High-quality Optical Fiber\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(principal-expertise :sur-optical-fiber \"Optical Fiber\")"}],
+                   "(scheduling-challenge :sur-optical-fiber :demand-uncertainty)"}],
           :conversations
           [#:conversation{:id :process,
-                          :interviewer-budget 0.8999999999999999,
+                          :interviewer-budget 0.7999999999999998,
                           :messages
                           [#:message{:content
-                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
                                      :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-03T21:00:45.076-00:00"}
+                                     #inst "2025-03-04T12:05:05.597-00:00"}
                            #:message{:content
                                      "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
                                      :from :system,
+                                     :id 2,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-04T12:05:22.266-00:00"}
+                           #:message{:content
+                                     "\nWe produce high-quality optical fiber used in telecommunications, medical devices, and industrial applications. Our scheduling challenge lies in optimizing production due to the complexity of the processes involved, which include drawing the fiber, coating, curing, testing, and spooling. These processes require precise timing, alignment of resources, and managing dependencies, especially for custom orders with specific requirements.",
+                                     :from :surrogate,
+                                     :id 3,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-04T12:05:22.288-00:00"}
+                           #:message{:content
+                                     "\nDo all the optical fiber products follow the same sequence of production steps, or does the sequence vary depending on the product or the customer requirements?",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-04T12:05:50.425-00:00"}
+                           #:message{:content
+                                     "\nThe sequence of production steps is generally the same—drawing, coating, curing, testing, and spooling—but certain variations occur depending on the product specifications or customer requirements. For example, custom coatings or additional testing may be required for specialized fibers, adding steps or altering the timing.",
+                                     :from :surrogate,
                                      :id 5,
-                                     :tags [:query],
+                                     :tags [:response],
                                      :time
-                                     #inst "2025-03-03T21:01:06.142-00:00"}
+                                     #inst "2025-03-04T12:05:50.449-00:00"}
                            #:message{:content
-                                     "\nWe manufacture optical fiber, primarily for telecommunications, data centers, and specialized applications like medical or industrial use. Our scheduling challenge lies in coordinating the lengthy and precise production processes, which include preform manufacturing, fiber drawing, coating, testing, and packaging. Each step has strict timing, equipment, and resource constraints, making it critical to optimize flow and minimize downtime in the supply chain.",
-                                     :from :surrogate,
+                                     "\nCould you provide a high-level overview of your production process, including how custom coatings or additional testing might fit into the standard steps of drawing, coating, curing, testing, and spooling?",
+                                     :from :system,
                                      :id 6,
-                                     :tags [:response],
+                                     :tags [:query],
                                      :time
-                                     #inst "2025-03-03T21:01:06.163-00:00"}
+                                     #inst "2025-03-04T12:08:00.583-00:00"}
                            #:message{:content
-                                     "\nDo all the optical fiber products you make follow the same sequence of production steps, or do different products require different sequences?",
-                                     :from :system,
+                                     "\nThe high-level production process begins with **fiber drawing**, where glass is heated and stretched into a thin fiber. Next is **coating and curing**, which involves applying protective layers and hardening them with UV or heat. Standard **testing** follows, checking optical and mechanical properties. Finally, the fiber undergoes <b>spooling</b> for storage and shipping.\n\nFor custom products, **specialized coatings** may be added as an extended coating step, and <b>additional testing</b> for specific parameters might follow the standard testing stage. These adjustments ensure that the fiber meets unique customer or application requirements.",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"fiber-drawing\"} {\"process-id\" \"coating-and-curing\"} {\"process-id\" \"standard-testing\"} {\"process-id\" \"spooling\"} {\"process-id\" \"custom-coating\", \"optional?\" {\"comment\" \"This step is optional and only applies to custom orders requiring specialized coatings.\", \"val\" true}} {\"process-id\" \"additional-testing\", \"optional?\" {\"comment\" \"This step involves specific checks and is optional depending on the product requirements.\", \"val\" true}}], \"process-id\" \"optical-fiber-production\"}, :commit-notes \"Added a high-level structure of the production process with room for custom steps and additional testing.\"}",
+                                     :from :surrogate,
                                      :id 7,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-03T21:01:28.340-00:00"}
-                           #:message{:content
-                                     "\nMost optical fiber products follow a similar sequence of production steps: preform preparation, fiber drawing, coating, curing, testing, and packaging. However, specialized fibers, such as medical or high-strength fibers, may require additional or modified steps, like enhanced coating or specific material treatments, which alter the sequence slightly.",
-                                     :from :surrogate,
-                                     :id 8,
                                      :tags [:response],
                                      :time
-                                     #inst "2025-03-03T21:01:28.369-00:00"}
+                                     #inst "2025-03-04T12:08:00.611-00:00"}
                            #:message{:content
-                                     "\nCan you describe, in detail, the complete process flow for your standard optical fiber manufacturing, from preform preparation to packaging? Additionally, mention any variations you consider significant for specialized fibers.",
+                                     "\nLet's gather some more details about your production steps. Can you describe the approximate duration of each step in your standard process (drawing, coating and curing, standard testing, and spooling)? For custom coatings and additional testing, could you provide an estimate if applicable?\n\nHere's a table to fill:",
                                      :from :system,
-                                     :id 9,
+                                     :id 8,
                                      :tags [:query],
                                      :time
-                                     #inst "2025-03-03T21:02:04.519-00:00"}
+                                     #inst "2025-03-04T12:08:28.326-00:00"}
                            #:message{:content
-                                     "\nOf course! Here's the complete process flow for standard optical fiber manufacturing:\n\n1. <b>Preform Preparation</b>: Large glass rods (preforms) are created through chemical vapor deposition, laying the foundation for the fiber's core and cladding structure.\n2. <b>Fiber Drawing</b>: The preform is heated in a drawing tower, where it is stretched into a thin fiber at high temperatures.\n3. <b>Coating Application</b>: Protective layers (e.g., UV-curable coatings) are immediately applied to the drawn fiber to shield it from physical damage and maintain optical quality.\n4. <b>Curing</b>: The coating is cured using ultraviolet light for durability.\n5. <b>Testing</b>: Fibers are subjected to testing for attenuation, strength, and other quality metrics.\n6. <b>Spooling and Packaging</b>: The fibers are wound onto spools for delivery and further packaging as necessary.\n\n### Variations for specialized fibers:\n- <b>High-strength fibers</b>: May require additional protective coatings or heat treatments during or after drawing.\n- <b>Medical and industrial fibers</b>: Might involve non-standard core diameters or materials, leading to adjustments in the preform preparation or fiber drawing stages.\n- <b>Custom-coated fibers</b>: Require specialized coating equipment or curing methods to meet unique specifications.",
+                                     "\nHere are my estimates of the step durations, including standard and custom processes:\n",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"fiber-drawing\", \"duration\" {\"comment\" \"No specific duration provided yet.\", \"val\" \"unknown\"}} {\"process-id\" \"coating-and-curing\", \"duration\" {\"comment\" \"No specific duration provided yet.\", \"val\" \"unknown\"}} {\"process-id\" \"standard-testing\", \"duration\" {\"comment\" \"No specific duration provided yet.\", \"val\" \"unknown\"}} {\"process-id\" \"spooling\", \"duration\" {\"comment\" \"No specific duration provided yet.\", \"val\" \"unknown\"}} {\"process-id\" \"custom-coating\", \"duration\" {\"comment\" \"No specific duration provided yet.\", \"val\" \"unknown\"}, \"optional?\" {\"val\" true}} {\"process-id\" \"additional-testing\", \"duration\" {\"comment\" \"No specific duration provided yet.\", \"val\" \"unknown\"}, \"optional?\" {\"val\" true}}], \"process-id\" \"optical-fiber-production\"}, :commit-notes \"Obtained initial duration estimates for steps, though no specifics were provided. Will need to follow up for values.\"}",
                                      :from :surrogate,
-                                     :id 10,
+                                     :id 9,
                                      :tags [:response],
                                      :time
-                                     #inst "2025-03-03T21:02:04.550-00:00"}]}
+                                     #inst "2025-03-04T12:08:28.344-00:00"}
+                           #:message{:content
+                                     "\nIt seems the duration estimates for each process step weren't included. Could you please provide approximate times for the following steps? If the durations vary, feel free to provide a range or an average estimate.\n\nHere's the table again for your convenience:",
+                                     :from :system,
+                                     :id 10,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-04T12:09:01.715-00:00"}
+                           #:message{:content
+                                     "\nHere is the completed table with approximate duration estimates for each step. Variations are noted where applicable:\n",
+                                     :from :surrogate,
+                                     :id 11,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-04T12:09:01.780-00:00"}]}
            #:conversation{:id :data,
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
-                                     :id 2,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-03T21:00:45.093-00:00"}]}
+                                     #inst "2025-03-04T12:05:05.597-00:00"}]}
            #:conversation{:id :resources,
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
-                                     :id 3,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-03T21:00:45.115-00:00"}]}
+                                     #inst "2025-03-04T12:05:05.597-00:00"}]}
            #:conversation{:id :optimality,
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
-                                     :id 4,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-03T21:00:45.142-00:00"}]}],
+                                     #inst "2025-03-04T12:05:05.597-00:00"}]}],
           :current-conversation :process,
           :id :sur-optical-fiber,
           :name "SUR Optical Fiber"}

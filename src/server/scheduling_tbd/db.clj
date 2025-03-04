@@ -796,29 +796,34 @@
       (d/transact conn-atm {:tx-data [{:db/id eid :conversation/EADS (str eads)}]})
       (log! :error (str "No such conversation: " cid)))))
 
-(defn get-ds ;<============================================================================================= NEEDS WORK. Get the latest? Which?
-  "Return the conversation's most recent EADS."
+(defn get-ds
+  "Return a vector of maps of data structures where :message/id is where the :message/data-structure was created."
   [pid cid]
-  (when-let [s (d/q '[:find ?ds .
-                      :in $ ?cid
-                      :where
-                      [?e :conversation/id ?cid]
-                      [?e :conversation/data-structure ?ds]]
-                    @(connect-atm pid) cid)]
-    (edn/read-string s)))
+  (->> (d/q '[:find ?id ?ds
+              :keys message/id message/data-structure
+              :in $ ?cid
+              :where
+              [?e :conversation/id ?cid]
+              [?conv :conversation/messages ?m]
+              [?m :message/data-structure ?ds]
+              [?m :message/id ?id]]
+            @(connect-atm pid) cid)
+       (mapv #(update % :message/data-structure edn/read-string))
+       not-empty))
 
-;;; < ===================================================================================================== NEEDS WORK
+;;; ToDo: latest :human/surrogate message might be better?
 ;;; (db/backup-proj-db :sur-optical-fiber)
 (defn put-ds!
-  "Attach a stringified representation of the data structure (edn) the interviewer is building to some message."
+  "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message."
   [pid cid ds]
   (let [max-id (max-msg-id pid cid)
         conn-atm (connect-atm pid)
         eid (d/q '[:find ?eid .
                    :in $ ?cid ?max-id
-                   :where [?conv :conversation/id ?cid
-                           ?conv :conversation/messages ?eid
-                           ?eid :message/id ?max-id]] @conn-atm cid max-id)]
+                   :where
+                   [?conv :conversation/id ?cid]
+                   [?conv :conversation/messages ?eid]
+                   [?eid :message/id ?max-id]] @conn-atm cid max-id)]
     (if eid
       (d/transact conn-atm {:tx-data [{:db/id eid :message/data-structure (str ds)}]})
       (log! :error (str "No such conversation: " cid)))))

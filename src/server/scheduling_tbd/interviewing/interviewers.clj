@@ -10,7 +10,7 @@
      [mount.core                    :as mount :refer [defstate]]
      [promesa.core                  :as p]
      [promesa.exec                  :as px]
-     [scheduling-tbd.agent-db       :as adb]
+     [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
      [scheduling-tbd.db             :as db]
      [scheduling-tbd.interviewing.domain.data-analysis]
      [scheduling-tbd.interviewing.domain.process-analysis :as pan :refer [the-warm-up-type-question]]
@@ -60,9 +60,6 @@
 
 (defn chat-pair-aux
   "Run one query/response pair of chat elements with a human or a surrogate. This executes blocking.
-   It returns a map {:msg-type :expert-response :text <text> :table <table>} where
-     :text is text in response to the query (:question ctx), and
-     :table is a table completed by the expert.
    For human interactions, the response is based on :dispatch-key :domain-experts-says (See websockets/domain-expert-says)."
   [{:keys [question table table-text surrogate-agent responder-type preprocess-fn tries asking-role pid cid] :as ctx
     :or {tries 1  preprocess-fn identity}}]
@@ -88,7 +85,12 @@
 (declare separate-table)
 
 (defn chat-pair
-  "Call to run ask and wait for an answer, returns the response, a string.
+  "Call to run ask and wait for an answer.
+   It returns a map {:msg-type :expert-response :full-text <string> :text <string> :table <table-map>} where
+        :msg-type is either :expert-response or :immoderate.
+        :full-text is text in response to the query (:question ctx), especially useful for use with surrogates.
+        :text is text in response to the query with surrogate tables removed.
+        :table is a table map completed by the expert.
    If response is immoderate returns {:msg-type :immoderate}"
   [{:keys [responder-type client-id] :as ctx}]
   (let [response (chat-pair-aux ctx)]
@@ -97,8 +99,8 @@
       :human (if (-> response :text llm/immoderate?)
                {:msg-type :immoderate}
                response)
-      :surrogate (let [{:keys [text table-html table]} (separate-table response)]
-                   (cond-> {:msg-type :expert-response}
+      :surrogate (let [{:keys [full-text text table-html table]} (separate-table response)]
+                   (cond-> {:msg-type :expert-response :full-text full-text}
                      text  (assoc :text text)
                      table (assoc :table table)
                      table (assoc :table-html table-html))))))
@@ -224,10 +226,10 @@
   [{:keys [question responder-type human-starting?] :as ctx}]
   (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
   (let [conversation [{:text question :from :system :tags [:query]}]
-        {:keys [text] :as response}  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
+        {:keys [full-text] :as response}  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
         answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
-        {:keys [answers-the-question? raises-a-question? wants-a-break?]}  (when (and (not answered?) (string? text))
-                                                                             (response-analysis question text ctx))
+        {:keys [answers-the-question? raises-a-question? wants-a-break?]}  (when (and (not answered?) (string? full-text))
+                                                                             (response-analysis question full-text ctx))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
       (let [same-question (str "Okay, but we are still interested in this: " question)]
@@ -327,11 +329,14 @@
 
 (defn separate-table-aux
   "Look through the text (typically an interviewer question) for '#+begin_src HTML ... #+end_src'; what is between those markers should be a table.
-   Return an object where :text is the argument string minus the table, and :table-html is the substring between the markers."
+   Return a map where
+      :full-text is the argument text,
+      :text is the argument string minus the table, and
+      :table-html is the substring between the markers."
   [text]
   (let [in-table? (atom false)]
     (loop [lines (str/split-lines text)
-           res {:text "" :table-html ""}]
+           res {:full-text text :text "" :table-html ""}]
       (let [l (first lines)]
         (when (and l @in-table? (re-matches #"(?i)^\s*\#\+end_src\s*" l))  (reset! in-table? false))
         (when (and l (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l))    (reset! in-table? true))
@@ -345,7 +350,8 @@
 
 (defn separate-table
   "Arg may be (1) a string that might contain an embedded table, or (2) a context map that contains :question.
-   Return a map containing :text (a string) :table-html (a string)  and :table (a map)."
+   Return a map containing :full-text (a string) :text (a string) :table-html (a string)  and :table (a map).
+   Where :text is a substring of :full-text (argument text)."
   [arg]
   (let [text (if (string? arg) arg (:question arg))
         {:keys [table-text] :as res} (separate-table-aux text)]
@@ -368,10 +374,9 @@
   [{:keys [client-id responder-type] :as ctx}]
   (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
   (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
-                               (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type "QUESTION-TO-ASK", :question "...'}
-                               (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
-                               (fix-off-course ctx))]  ; Currently a no-op. Returns argument.
-         (reset! diag {:iviewr-q iviewr-q :ctx ctx})
+                          (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type "QUESTION-TO-ASK", :question "...'}
+                          (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
+                          (fix-off-course ctx))]  ; Currently a no-op. Returns argument.
          (when (= :human responder-type) (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
          ;; This returns a VECTOR of statements from the interviewees and interviewer.
          (get-an-answer (cond-> ctx
@@ -468,15 +473,18 @@
     (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
-      (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
+      (let [asking-role (-> (str cid "-interviewer") keyword)
+            ctx (-> (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))
+                    (assoc :asking-role asking-role))]
         (when-not (db/conversation-done? pid cid)
           (if @active?
-            (do (-> (conversation-history pid cid) (tell-interviewer ctx))
+            (do (agent-log "resume " pid  " " cid)
+                (-> (conversation-history pid cid) (tell-interviewer ctx))
                 (loop [cnt 0]
                   (if @active?
                     ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                     (let [conversation (q-and-a ctx)
-                          expert-response (-> conversation last :text)]
+                          expert-response (-> conversation last :full-text)] ; ToDo: This assumes the last is meaningful.
                       (log! :info (str "Expert in resume-conversation-loop: " expert-response))
                       (doseq [msg conversation]
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
@@ -488,12 +496,12 @@
                         :else
                         ;; Interviewer respond to INTERVIEWEES-RESPOND with either OK, PHASE-1-CONCLUSION, or DATA-STRUCTURE-REFINEMENT.
                         (let [iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
-                                                                 :response expert-response} ; ToDo: This assumes the last is meaningful.
+                                                                 :response expert-response}
                                                                 ctx)]
                           (log! :info (str "Interviewer in resume-conversation-loop: " iviewr-response))
                           (when (surrogate? pid) (ru/refresh-client client-id pid cid))
                           (case (:message-type iviewr-response)
-                            "PHASE-1-CONCLUSION"          (tell-interviewer (ru/eads-response! pid cid iviewr-response) ctx)
+                            "PHASE-1-CONCLUSION"          (tell-interviewer (ru/eads-response! :process pid cid iviewr-response) ctx)
                             "DATA-STRUCTURE-REFINEMENT"   (db/put-ds! pid cid iviewr-response)
                             nil)
                           (recur (inc cnt)))))

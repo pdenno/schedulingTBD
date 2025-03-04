@@ -6,7 +6,7 @@
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
    [mount.core               :as mount :refer [defstate]]
-   [scheduling-tbd.agent-db  :as adb]
+   [scheduling-tbd.agent-db  :as adb :refer [agent-log]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.interviewing.domain.process-analysis :as pan]
    [scheduling-tbd.interviewing.interviewers :as inv]
@@ -70,6 +70,7 @@
         expertise (str/lower-case expertise)
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
         instructions (system-instruction expertise)]
+    (agent-log "============= Start surrogate " pid " :process  =========================")
     (adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
     (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})

@@ -523,6 +523,15 @@
      (catch Exception e
        (log! :error (str "query-agent failed: " e))))))
 
+(defn agent-log
+  "Log info-string to agent log"
+  [& args]
+  (let [date (str (java.util.Date.))]
+    (tel/with-kind-filter {:allow :agents}
+      (tel/signal!
+       {:kind :agents :level :info
+        :msg (str "===== " date " " (apply str args))}))))
+
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-agents!
   "Things done on start and restart."

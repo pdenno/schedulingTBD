@@ -38,9 +38,9 @@
   ([] :can-be-a-no-op)
   ([signal]
    (when (= (:kind signal) :agents)
-     (let [{:keys [inst msg_]} signal
+     (let [{:keys [msg_]} signal
            msg (if-let [s (not-empty (force msg_))] s "\"\"")]
-       (str inst ": " msg "\n")))))
+       (str msg "\n")))))
 
 (defn config-log!
   "Configure Telemere: set reporting levels and specify a custom :output-fn."
