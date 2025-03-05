@@ -443,7 +443,7 @@
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
   [pid cid]
-  (assert (#{:process :data :resource :resources :optimality} cid))
+  (assert (#{:process :data :resources :optimality} cid))
   (d/q '[:find ?eid .
          :in $ ?cid
          :where [?eid :conversation/id ?cid]]
