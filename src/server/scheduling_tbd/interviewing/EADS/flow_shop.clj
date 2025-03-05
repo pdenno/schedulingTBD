@@ -11,9 +11,9 @@
 
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
 (s/def ::data-structure (s/keys :req-un [::notes-on-data-structure ::annotated-data-structure]))
-(s/def ::EADS (s/keys :req-un [::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::process-var ::duration]))
+(s/def ::EADS (s/keys :req-un [::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
 (s/def ::notes-on-data-structure string?)
-(s/def ::process (s/keys :req-un [::process-id ::subprocesses] :opt-un [::process-var ::duration ::inputs ::outputs ::resources]))
+(s/def ::process (s/keys :req-un [::process-id ::subprocesses] :opt-un [::duration ::inputs ::outputs ::resources]))
 (s/def ::annotated-data-structure ::process) ; Interesting that forward reference of ::process does not work.
 (s/def ::comment string?)
 
@@ -65,12 +65,6 @@
 (s/def :subprocesses/val (s/coll-of ::process :kind vector?))
 (s/def ::annotated-subprocesses (s/keys :req-un [:subprocesses/val ::comment]))
 
-(s/def ::process-var (s/or :normal :process-var/val :annotated ::annotated-process-var))
-(s/def ::annotated-process-var (s/keys :req-un [:process-var/val ::comment]))
-(s/def :process-var/val string?)
-
-;;; <=============================== Start here. outputs, resources, duration, subprocesses, subprocess-flow, process-var
-
 (s/def ::quantified-thing (s/keys :req-un [::item-id ::quantity]))
 (s/def ::item-id string?)
 (s/def ::quantity (s/keys :req-un [::units ::value-string]))
@@ -105,8 +99,6 @@
                                :quantity {:units "graphite cores" :value-string "100000"}}],
                     :resources ["mixer", "extruder", "kiln"],
                     :subprocesses [{:process-id "mix-graphite-and-clay",
-                                    :process-var {:val "mix"
-                                                  :comment "Include a camelCase variable of less than 25 characters that describes the process. We'll use these in the translation to MiniZinc."}
                                     :inputs ["graphite", "clay", "water"],
                                     :outputs [{:item-id "graphite-clay paste",
                                                :quantity {:units "liters", :value-string "100"}}],
@@ -115,7 +107,6 @@
                                     :subprocesses []},
 
                                    {:process-id "extrude-core",
-                                    :process-var "extrude"
                                     :inputs ["graphite-clay paste"],
                                     :outputs [{:item-id "extruded graphite rods",
                                                :quantity {:units "extruded graphite core", :value-string "100000"}}],
@@ -124,7 +115,6 @@
                                     :subprocesses []},
 
                                    {:process-id "dry-and-bake-core",
-                                    :process-var "dryAndBakeCores"
                                     :inputs ["extruded graphite rods"],
                                     :outputs [{:item-id "extruded graphite rods",
                                                :quantity {:units "extruded graphite core", :value-string "100000"}}],
@@ -142,7 +132,6 @@
                     :duration  {:val  {:units "hours", :value-string "2"} ; ToDo: Review this comment. Improve it.
                                 :comment "Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses."}
                     :subprocesses [{:process-id "mill-wood-slats",
-                                    :process-var "millSlats",
                                     :inputs ["cedar wood"],
                                     :outputs ["milled wood slats"],
                                     :resources ["milling machine"],
@@ -150,7 +139,6 @@
                                     :subprocesses []},
 
                                    {:process-id "cut-grooves-in-slats",
-                                    :process-var "cutGrooves",
                                     :inputs ["milled wood slats"],
                                     :outputs ["wood slats with grooves"],
                                     :resources ["groove cutter"],
@@ -166,21 +154,18 @@
                     :outputs ["finished pencil"],
                     :resources ["glue applicator", "shaping machine"],
                     :subprocesses [{:process-id "insert-core-into-slats",
-                                    :process-var "insert-cores"
                                     :inputs ["graphite core", "wood slats with grooves"],
                                     :outputs ["pencil blanks"],
                                     :resources ["glue applicator"],
                                     :subprocesses []},
 
                                    {:process-id "shape-and-paint-pencil",
-                                    :process-var "shapeAndPaint",
                                     :inputs ["pencil blanks", "paint"],
                                     :outputs ["shaped and painted pencils"],
                                     :resources ["shaping machine", "painting station"],
                                     :subprocesses []},
 
                                    {:process-id "attach-eraser",
-                                    :process-var "attachErasers",
                                     :optional?  {:val true,
                                                  :comment "'optional?' means that the process does not occur for every product. Not every pencil has an eraser."}
                                     :inputs ["shaped and painted pencils", "metal", "erasers"],

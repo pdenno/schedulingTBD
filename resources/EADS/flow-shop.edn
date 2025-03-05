@@ -46,10 +46,6 @@
      :resources ["mixer" "extruder" "kiln"],
      :subprocesses
      [{:process-id "mix-graphite-and-clay",
-       :process-var
-       {:val "mix",
-        :comment
-        "Include a camelCase variable of less than 25 characters that describes the process. We'll use these in the translation to MiniZinc."},
        :inputs ["graphite" "clay" "water"],
        :outputs
        [{:item-id "graphite-clay paste",
@@ -58,7 +54,6 @@
        :duration {:units "hours", :value-string "1"},
        :subprocesses []}
       {:process-id "extrude-core",
-       :process-var "extrude",
        :inputs ["graphite-clay paste"],
        :outputs
        [{:item-id "extruded graphite rods",
@@ -68,7 +63,6 @@
        :duration {:units "minutes", :value-string "20"},
        :subprocesses []}
       {:process-id "dry-and-bake-core",
-       :process-var "dryAndBakeCores",
        :inputs ["extruded graphite rods"],
        :outputs
        [{:item-id "extruded graphite rods",
@@ -91,14 +85,12 @@
       "Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses."},
      :subprocesses
      [{:process-id "mill-wood-slats",
-       :process-var "millSlats",
        :inputs ["cedar wood"],
        :outputs ["milled wood slats"],
        :resources ["milling machine"],
        :duration {:units "hours", :value-string "2"},
        :subprocesses []}
       {:process-id "cut-grooves-in-slats",
-       :process-var "cutGrooves",
        :inputs ["milled wood slats"],
        :outputs ["wood slats with grooves"],
        :resources ["groove cutter"],
@@ -119,19 +111,16 @@
      :resources ["glue applicator" "shaping machine"],
      :subprocesses
      [{:process-id "insert-core-into-slats",
-       :process-var "insert-cores",
        :inputs ["graphite core" "wood slats with grooves"],
        :outputs ["pencil blanks"],
        :resources ["glue applicator"],
        :subprocesses []}
       {:process-id "shape-and-paint-pencil",
-       :process-var "shapeAndPaint",
        :inputs ["pencil blanks" "paint"],
        :outputs ["shaped and painted pencils"],
        :resources ["shaping machine" "painting station"],
        :subprocesses []}
       {:process-id "attach-eraser",
-       :process-var "attachErasers",
        :optional?
        {:val true,
         :comment
