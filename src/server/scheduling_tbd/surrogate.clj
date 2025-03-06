@@ -46,18 +46,117 @@
        "#+end_src"))
 
 (def how-to-provide-tables
- (str "Additionally, if you are asked to provide a table, please do you best to provide a reasonable example for what that table could look like in HTML." 
+ (str "Additionally, if you are asked to upload a table, please do you best to provide a reasonable example for what that table could look like, in HTML." 
       "Here is an example of something that you could be asked, and how you would be expected to answer.
        They: "
       "Could you upload the orders spreadsheet (or a redacted version of it) for discussion? Please note the risks of uploading sensitive data, which you can read about here. Let us know if you'd like guidance on redacting sensitive information before uploading."
       "Your response: "
       "Of course! Here is our orders spreadsheet:
-       <table> 
-       <tr><th>Order ID</th> <th>Customer Name</th> <th>Order Date</th> <th>Product</th> <th>Quantity</th> <th>Delivery Date</th> <th>Status</th></tr> 
-       <tr><td>1001</td> <td>ABC Industries</td> <td>2023-10-01</td> <td>Ice Melt 50lb</td><td>300</td> <td>2023-10-05</td> <td>Processing</td></tr> 
-       <tr><td>1002</td> <td>XYZ Co.</td> <td>2023-10-02</td> <td>Eco Melt 25lb</td><td>500</td> <td>2023-10-07</td> <td>Shipped</td></tr> 
-       <tr><td>1003</td> <td>PQR Services</td> <td>2023-10-03</td> <td>Ice Melt 50lb</td><td>150</td> <td>2023-10-08</td> <td>Pending</td></tr> 
-       </table> ")) 
+       <table>
+        <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>Customer Name</th>
+                <th>Order Date</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Delivery Date</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>101</td>
+                <td>ABC Industries</td>
+                <td>2023-10-20</td>
+                <td>Carpet Type A</td>
+                <td>200</td>
+                <td>2023-11-01</td>
+                <td>In Production</td>
+            </tr>
+            <tr>
+                <td>102</td>
+                <td>XYZ Corporation</td>
+                <td>2023-10-22</td>
+                <td>Carpet Type B</td>
+                <td>150</td>
+                <td>2023-11-03</td>
+                <td>Pending</td>
+            </tr>
+            <tr>
+                <td>103</td>
+                <td>Global Solutions</td>
+                <td>2023-10-23</td>
+                <td>Carpet Type C</td>
+                <td>300</td>
+                <td>2023-11-05</td>
+                <td>Shipped</td>
+            </tr>
+            <tr>
+                <td>104</td>
+                <td>Acme Co.</td>
+                <td>2023-10-24</td>
+                <td>Carpet Type A</td>
+                <td>250</td>
+                <td>2023-11-07</td>
+                <td>In Production</td>
+            </tr>
+            <tr>
+                <td>105</td>
+                <td>Widget Works</td>
+                <td>2023-10-25</td>
+                <td>Carpet Type B</td>
+                <td>100</td>
+                <td>2023-11-09</td>
+                <td>Pending</td>
+            </tr>
+            <tr>
+                <td>106</td>
+                <td>Pinnacle Group</td>
+                <td>2023-10-26</td>
+                <td>Carpet Type A</td>
+                <td>180</td>
+                <td>2023-11-11</td>
+                <td>In Production</td>
+            </tr>
+            <tr>
+                <td>107</td>
+                <td>Echo Dynamics</td>
+                <td>2023-10-27</td>
+                <td>Carpet Type C</td>
+                <td>220</td>
+                <td>2023-11-13</td>
+                <td>Shipped</td>
+            </tr>
+            <tr>
+                <td>108</td>
+                <td>NextGen Solutions</td>
+                <td>2023-10-28</td>
+                <td>Carpet Type B</td>
+                <td>300</td>
+                <td>2023-11-15</td>
+                <td>Pending</td>
+            </tr>
+            <tr>
+                <td>109</td>
+                <td>Future Enterprises</td>
+                <td>2023-10-29</td>
+                <td>Carpet Type A</td>
+                <td>400</td>
+                <td>2023-11-17</td>
+                <td>In Production</td>
+            </tr>
+            <tr>
+                <td>110</td>
+                <td>Prime Ventures</td>
+                <td>2023-10-30</td>
+                <td>Carpet Type C</td>
+                <td>350</td>
+                <td>2023-11-19</td>
+                <td>Shipped</td>
+            </tr>
+        </tbody>
+    </table>")) 
 
 (defn system-instruction
   "This is the instruction that configures the role of the OpenAI assistant for a surrogate domain expert."
