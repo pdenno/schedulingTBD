@@ -57,9 +57,9 @@
                   :thread-id "thread_S4WYlV1EKLnWPmJRqPg0XQYc",
                   :model-class :gpt,
                   :llm-provider :openai,
-                  :assistant-id "asst_lVdN6WQ66CukxXI1vlXlBRmD",
+                  :assistant-id "asst_lGxJD5DadbGxFQos4NZOhKcd",
                   :id :scheduling-challenges-agent-openai,
-                  :timestamp #inst "2025-03-03T15:43:49.498-00:00"}
+                  :timestamp #inst "2025-03-06T16:56:34.081-00:00"}
           #:agent{:agent-type :shared-assistant,
                   :assistant-id "asst_IQJUvMRB9Mf911ZK1wXwIlJN",
                   :base-type :optimality-interview-agent,
@@ -162,6 +162,9 @@
           #:project{:dir "/opt/scheduling/projects/sur-carpet/db/",
                     :id :sur-carpet,
                     :name "SUR Carpet"}
+          #:project{:dir "/opt/scheduling/projects/ice-cream/db/",
+                    :id :ice-cream,
+                    :name "Ice Cream"}
           #:project{:dir
                     "/opt/scheduling/projects/sur-plate-glass/db/",
                     :id :sur-plate-glass,
@@ -195,9 +198,19 @@
           #:project{:dir "/opt/scheduling/projects/sur-brake-pads/db/",
                     :id :sur-brake-pads,
                     :name "SUR Brake Pads"}
+   #:project{:dir   "/opt/scheduling/projects/sur-ice-melt/db/",
+                    :id :sur-ice-melt,
+                    :name "SUR Ice Melt"}
           #:project{:dir
                     "/opt/scheduling/projects/sur-optical-fiber/db/",
                     :id :sur-optical-fiber,
-                    :name "SUR Optical Fiber"}]}
+                    :name "SUR Optical Fiber"}],
+         :warm-ups
+         [#:warm-up{:conversation :process,
+                    :question
+                    "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."}
+          #:warm-up{:conversation :data,
+                    :question
+                    "Let's talk about the data you use to do your work. Typically, and especially in small businesses, information about customer orders, resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you use and how you maintain and store it."}]}
 
 ]

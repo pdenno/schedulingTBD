@@ -82,6 +82,17 @@
    :system/projects
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "the projects known by the system."}
+   :system/warm-ups
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "warm-up objects for various conversations."}
+
+;;; ---------------------- warm-up
+   :warm-up/conversation
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
+        :doc "Names a conversation (:process, :data, etc.)"}
+   :warm-up/question
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+        :doc "A warm-up question for the given conversation."}
 })
 
 
@@ -186,9 +197,9 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
    :message/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, "
-                  "which aren't stored, some values can be skipped.")}
+                  "which aren't stored, some values can be skipped. Because these are not unique to the DB, they are not :db.unique/identity.")}
    :message/question-type
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "A label (from interview instructions) associated with this question or answer."}
@@ -869,7 +880,7 @@
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
-;;; (db/create-proj-db! {:project/id :remove-me :project/name "remove me"} {} {:force? true})
+;;; (db/create-proj-db! {:project/id :test :project/name "Test Project"} {} {:force-this-name? true})
 (defn create-proj-db!
   "Create a project database for the argument project.
    The project-info map must include :project/id and :project/name.

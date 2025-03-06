@@ -1,401 +1,72 @@
-[#:project{:conversations
-           [#:conversation{:done? true,
-                           :id :process,
-                           :messages
-                           [#:message{:content
-                                      "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
-                                      :from :system,
-                                      :id 1,
-                                      :question-type :warm-up,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:54:33.595-00:00"}
-                            #:message{:content
-                                      "We produce a variety of ice cream flavors, including traditional favorites and seasonal specials, in different packaging options like pints, quarts, and bulk containers for food service. Our scheduling challenge involves balancing the production schedule to meet fluctuating demand, especially during peak seasons, while managing supply chain constraints such as ingredient availability and production line capacities. Additionally, coordinating delivery schedules to ensure timely distribution without overstocking or understocking our retailers is crucial.",
-                                      :from :surrogate,
-                                      :id 2,
-                                      :question-type :warm-up,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:54:33.653-00:00"}
-                            #:message{:content
-                                      "Great, we'll call your project Sur ice cream.",
-                                      :from :system,
-                                      :id 3,
-                                      :tags
-                                      [:!describe-challenge
-                                       :informative],
-                                      :time
-                                      #inst "2024-11-16T19:54:43.936-00:00"}
-                            #:message{:content
-                                      "Would you characterize your company's work as primarily providing a product, a service or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
-                                      :from :system,
-                                      :id 4,
-                                      :question-type :work-type,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:54:50.762-00:00"}
-                            #:message{:content "PRODUCT",
-                                      :from :surrogate,
-                                      :id 5,
-                                      :question-type :work-type,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:54:50.780-00:00"}
-                            #:message{:content
-                                      "Some work is performed in your own facility, some, like cutting down trees, has to be performed at the customer's site. Which is most common in your work? Respond with the single work OUR-FACILITY, CUSTOMER-SITE, or if it isn't straightforward, an explanation.",
-                                      :from :system,
-                                      :id 6,
-                                      :question-type
-                                      :production-location,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:55:06.126-00:00"}
-                            #:message{:content "OUR-FACILITY",
-                                      :from :surrogate,
-                                      :id 7,
-                                      :question-type
-                                      :production-location,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:55:06.149-00:00"}
-                            #:message{:content
-                                      "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product is configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
-                                      :from :system,
-                                      :id 8,
-                                      :question-type
-                                      :production-motivation,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:55:18.922-00:00"}
-                            #:message{:content "MAKE-TO-STOCK",
-                                      :from :surrogate,
-                                      :id 9,
-                                      :question-type
-                                      :production-motivation,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:55:18.943-00:00"}
-                            #:message{:content
-                                      "There are a few common patterns or system designs by which a product is made. In a FLOW-SHOP, all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
-                                      :from :system,
-                                      :id 10,
-                                      :question-type
-                                      :production-system-type,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:55:33.054-00:00"}
-                            #:message{:content "FLOW-SHOP",
-                                      :from :surrogate,
-                                      :id 11,
-                                      :question-type
-                                      :production-system-type,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:55:33.101-00:00"}
-                            #:message{:content
-                                      "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
-                                      :from :system,
-                                      :id 12,
-                                      :question-type :process-steps,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:55:47.706-00:00"}
-                            #:message{:content
-                                      "1. Mix Ingredients\n2. Pasteurize Mixture\n3. Homogenize Mixture\n4. Age Mixture\n5. Add Flavors and Inclusions\n6. Freeze Mixture\n7. Fill Containers\n8. Harden Ice Cream\n9. Package\n10. Label and Inspect",
-                                      :from :surrogate,
-                                      :id 13,
-                                      :question-type :process-steps,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:55:47.735-00:00"}
-                            #:message{:content
-                                      "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
-                                      :from :system,
-                                      :id 14,
-                                      :question-type :process-durations,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:56:09.520-00:00"}
-                            #:message{:content
-                                      "1. Mix Ingredients (30 minutes)\n2. Pasteurize Mixture (15 minutes)\n3. Homogenize Mixture (10 minutes)\n4. Age Mixture (4 hours)\n5. Add Flavors and Inclusions (20 minutes)\n6. Freeze Mixture (30 minutes)\n7. Fill Containers (20 minutes)\n8. Harden Ice Cream (3 hours)\n9. Package (15 minutes)\n10. Label and Inspect (10 minutes)",
-                                      :from :surrogate,
-                                      :id 15,
-                                      :question-type :process-durations,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:56:09.583-00:00"}
-                            #:message{:content
-                                      "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
-                                      :from :system,
-                                      :id 16,
-                                      :tags [:info-to-user :minizinc],
-                                      :time
-                                      #inst "2024-11-16T19:57:06.319-00:00"}
-                            #:message{:content
-                                      "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just '1000 packages'. If, however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling (2000 packages)\n 3. Bake Wafers (1000 packages)\n 4. Assemble Cookies (1000 packages)\n 5. Package (1000 packages)",
-                                      :from :system,
-                                      :id 17,
-                                      :question-type :batch-size,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:57:16.388-00:00"}
-                            #:message{:content
-                                      "1. Mix Ingredients (500 gallons)\n2. Pasteurize Mixture (500 gallons)\n3. Homogenize Mixture (500 gallons)\n4. Age Mixture (500 gallons)\n5. Add Flavors and Inclusions (500 gallons)\n6. Freeze Mixture (500 gallons)\n7. Fill Containers (1000 pints)\n8. Harden Ice Cream (1000 pints)\n9. Package (1000 pints)\n10. Label and Inspect (1000 pints)",
-                                      :from :surrogate,
-                                      :id 18,
-                                      :question-type :batch-size,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:57:16.412-00:00"}
-                            #:message{:content
-                                      "Earlier, you listed the process steps typically used in making product (e.g. 1. Mix Ingredients, 2. Pasteurize Mixture, etc.) and for each, you specified typical durations. Now we'd like you to tell us what raw materials and intermediate products go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n 1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n 2. Make Filling (sugar, water, vanilla flavoring)\n 3. Bake Wafers (use dough from Make Cookie Dough)\n 4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n 5. Package (use cookies from Assemble Cookies)",
-                                      :from :system,
-                                      :id 19,
-                                      :question-type :process-ordering,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-16T19:57:39.424-00:00"}
-                            #:message{:content
-                                      "1. Mix Ingredients (milk, cream, sugar, stabilizers, emulsifiers)\n2. Pasteurize Mixture (use mixture from Mix Ingredients)\n3. Homogenize Mixture (use mixture from Pasteurize Mixture)\n4. Age Mixture (use mixture from Homogenize Mixture)\n5. Add Flavors and Inclusions (use aged mixture, flavorings, inclusions such as fruits, nuts, chocolate chips)\n6. Freeze Mixture (use flavored mixture from Add Flavors and Inclusions)\n7. Fill Containers (use frozen mixture from Freeze Mixture)\n8. Harden Ice Cream (use filled containers from Fill Containers)\n9. Package (use hardened ice cream from Harden Ice Cream)\n10. Label and Inspect (use packaged ice cream from Package)",
-                                      :from :surrogate,
-                                      :id 20,
-                                      :question-type :process-ordering,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-16T19:57:39.488-00:00"}]}
-            #:conversation{:done? true,
-                           :id :data,
-                           :messages
-                           [#:message{:content
-                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
-                                      :from :system,
-                                      :id 21,
-                                      :tags [:conversation-intro],
-                                      :time
-                                      #inst "2024-11-20T15:43:59.083-00:00"}
-                            #:message{:content
-                                      "Let's talk about the data you use to do your work. Typically, and especially in small businesses, information about customer orders, resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you use and how you maintain and store it.",
-                                      :from :system,
-                                      :id 24,
-                                      :question-type :warm-up,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-20T19:35:45.835-00:00"}
-                            #:message{:content
-                                      "In our company, we primarily use spreadsheets to manage and track production schedules, ingredient inventory levels, and customer orders. Each production batch is logged with details about the production date, ingredients used, and quantities produced. We also maintain spreadsheets to monitor supply chain data, such as supplier contact details, order history, and delivery schedules. Customer orders are recorded with relevant details like order quantities, delivery dates, and customer preferences. This data helps us ensure that we align production with demand and manage our resources efficiently.",
-                                      :from :surrogate,
-                                      :id 25,
-                                      :question-type :warm-up,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-20T19:35:45.856-00:00"}]}
-            #:conversation{:done? true,
-                           :id :resources,
-                           :messages
-                           [#:message{:content
-                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
-                                      :from :system,
-                                      :id 22,
-                                      :tags [:conversation-intro],
-                                      :time
-                                      #inst "2024-11-20T15:43:59.101-00:00"}
-                            #:message{:content
-                                      "If you've already contributed to the \"data\" conversation you may have already mentioned resources used in production. We will certainly study what you said there for this interview about resources. Here we will go into more detail. To get started, please write a few new thoughts (a few sentences) about resources, for example, skills required for particular processes, equipment maintenance schedules, equipment capacities and capabilities...whatever you think is most relevant to scheduling.",
-                                      :from :system,
-                                      :id 26,
-                                      :question-type :warm-up,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-20T20:54:01.726-00:00"}
-                            #:message{:content
-                                      "In our ice cream production facility, essential resources include skilled personnel for operating machinery and managing quality control at each production stage. Each process step, such as mixing, pasteurizing, and freezing, requires specific equipment like mixers, pasteurizers, homogenizers, and freezers with defined capacities and maintenance schedules to ensure optimal performance and minimize downtime. For instance, our freezer capacity limits batch sizes, and maintenance is routinely scheduled to prevent disruptions. Additionally, operator training is crucial to handle equipment safely and efficiently, ensuring that production timelines are met without compromising product quality. Resource availability and equipment capacities are critical factors in scheduling to maintain seamless production flow and timely delivery.",
-                                      :from :surrogate,
-                                      :id 27,
-                                      :question-type :warm-up,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-20T20:54:01.777-00:00"}]}
-            #:conversation{:done? true,
-                           :id :optimality,
-                           :messages
-                           [#:message{:content
-                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
-                                      :from :system,
-                                      :id 23,
-                                      :tags [:conversation-intro],
-                                      :time
-                                      #inst "2024-11-20T15:43:59.119-00:00"}
-                            #:message{:content
-                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. Thus far we've assumed that your goal is what operations researchers  call <a href=\"term/makespan\">makespan</a>, getting everything done as soon as possible. That probably isn't your goal; it might not even make sense!  So please spend a little time here (write a few sentences) to explain your scheduling goal. This might repeat some of what you said way back  in the process interview. You might take a look at what you wrote back then.",
-                                      :from :system,
-                                      :id 28,
-                                      :question-type :warm-up,
-                                      :tags [:query],
-                                      :time
-                                      #inst "2024-11-24T17:32:19.619-00:00"}
-                            #:message{:content
-                                      "Our goal in scheduling is to balance efficiently utilizing our production resources while meeting customer demands promptly. A good schedule ensures that we produce the necessary amount of ice cream to satisfy current and upcoming orders without overwhelming our storage or supply chain capacities. We aim to minimize lead time between order receipt and delivery, aligning production with demand peaks, such as seasonality or promotional events, to maximize customer satisfaction and market responsiveness. Additionally, managing equipment maintenance within the schedule is essential to avoid downtimes, guaranteeing a smooth production process. Ultimately, an ideal schedule allows us to fulfill orders on time, maintain product quality, and operate cost-effectively, leveraging both predictable demand patterns and just-in-time principles.",
-                                      :from :surrogate,
-                                      :id 29,
-                                      :question-type :warm-up,
-                                      :tags [:response],
-                                      :time
-                                      #inst "2024-11-24T17:32:19.644-00:00"}]}],
-           :code
-           "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {mixIngredients, pasteurizeMix, homogenizeMix, ageMixture, addFlavors, freezeMix, fillContainers, hardenIceCream, packaging, labelAndInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|0.500, 0.250, 0.167, 4.000, 0.333, 0.500, 0.333, 3.000, 0.250, 0.167|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, mixIngredients] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, mixIngredients] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, mixIngredients] == taskStarts[p, pasteurizeMix]);\nconstraint forall (p in Product) (taskEnds[p, pasteurizeMix] == taskStarts[p, homogenizeMix]);\nconstraint forall (p in Product) (taskEnds[p, homogenizeMix] == taskStarts[p, ageMixture]);\nconstraint forall (p in Product) (taskEnds[p, ageMixture] == taskStarts[p, addFlavors]);\nconstraint forall (p in Product) (taskEnds[p, addFlavors] == taskStarts[p, freezeMix]);\nconstraint forall (p in Product) (taskEnds[p, freezeMix] == taskStarts[p, fillContainers]);\nconstraint forall (p in Product) (taskEnds[p, fillContainers] == taskStarts[p, hardenIceCream]);\nconstraint forall (p in Product) (taskEnds[p, hardenIceCream] == taskStarts[p, packaging]);\nconstraint forall (p in Product) (taskEnds[p, packaging] == taskStarts[p, labelAndInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, labelAndInspect]);",
-           :agents
-           [#:agent{:assistant-id "asst_qTM7IIAfUZckAroJXXqjbf7D",
-                    :base-type :process-interview-agent,
-                    :agent-type :shared-assistant
-                    :id :process-interview-agent-openai,
-                    :llm-provider :openai,
-                    :model-class :gpt,
-                    :thread-id "thread_2k2XHltP83tMQGp8bmrEuTn1",
-                    :timestamp #inst "2024-12-10T16:12:13.503-00:00"}
-            #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
-                    :base-type :data-interview-agent,
-                    :agent-type :shared-assistant
-                    :id :data-interview-agent-openai,
-                    :llm-provider :openai,
-                    :model-class :gpt,
-                    :thread-id "thread_H93OzH5wmhXMkvYlew34qDfI"}
-            #:agent{:assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
-                    :base-type :resources-interview-agent,
-                    :agent-type :shared-assistant
-                    :id :resources-interview-agent-openai,
-                    :llm-provider :openai,
-                    :model-class :gpt,
-                    :thread-id "thread_T6shGG4JM0XpJgvcyfdRJlO8"}
-            #:agent{:assistant-id "asst_M4c6cgeuw306KAXr4nR6E61S",
-                    :base-type :optimality-interview-agent,
-                    :agent-type :shared-assistant
-                    :id :optimality-interview-agent-openai,
-                    :llm-provider :openai,
-                    :model-class :gpt,
-                    :thread-id "thread_WiPmnuON2iUlrpEt67MKrekm"}
-            #:agent{:base-type :sur-ice-cream,
-                    :agent-type :project
-                    :thread-id "thread_PZuu9HhT6Ok3C7QGZIRsJSyF",
-                    :model-class :gpt,
-                    :llm-provider :openai,
-                    :system-instruction
-                    "You manage a company that makes ice cream.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                    :surrogate? true,
-                    :assistant-id "asst_oqkCqei6l8yEUYKjqeoy4HPI",
-                    :id :sur-ice-cream-openai,
-                    :expertise "ice cream",
-                    :timestamp #inst "2024-12-09T22:34:22.772-00:00"}],
-           :processes
-           [#:process{:id :sur-ice-cream,
-                      :interview-class :initial-unordered,
-                      :sub-processes
-                      [#:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "30"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--mixIngredients,
-                                 :name "Mix Ingredients",
-                                 :step-number 1,
-                                 :var-name "mixIngredients"}
-                       #:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "15"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--pasteurizeMix,
-                                 :name "Pasteurize Mixture",
-                                 :step-number 2,
-                                 :var-name "pasteurizeMix"}
-                       #:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "10"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--homogenizeMix,
-                                 :name "Homogenize Mixture",
-                                 :step-number 3,
-                                 :var-name "homogenizeMix"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "4"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--ageMixture,
-                                 :name "Age Mixture",
-                                 :step-number 4,
-                                 :var-name "ageMixture"}
-                       #:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "20"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--addFlavors,
-                                 :name "Add Flavors and Inclusions",
-                                 :step-number 5,
-                                 :var-name "addFlavors"}
-                       #:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "30"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--freezeMix,
-                                 :name "Freeze Mixture",
-                                 :step-number 6,
-                                 :var-name "freezeMix"}
-                       #:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "20"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--fillContainers,
-                                 :name "Fill Containers",
-                                 :step-number 7,
-                                 :var-name "fillContainers"}
-                       #:process{:duration
-                                 #:quantity{:units :hours,
-                                            :value-string "3"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--hardenIceCream,
-                                 :name "Harden Ice Cream",
-                                 :step-number 8,
-                                 :var-name "hardenIceCream"}
-                       #:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "15"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--packaging,
-                                 :name "Package",
-                                 :step-number 9,
-                                 :var-name "packaging"}
-                       #:process{:duration
-                                 #:quantity{:units :minutes,
-                                            :value-string "10"},
-                                 :id
-                                 :sur-ice-cream--initial-unordered--labelAndInspect,
-                                 :name "Label and Inspect",
-                                 :step-number 10,
-                                 :var-name "labelAndInspect"}]}],
-           :current-conversation :process,
-           :claims
-           [#:claim{:conversation-id :process,
-                    :question-type :warm-up,
-                    :string
-                    "(scheduling-challenge :sur-ice-cream :raw-material-uncertainty)"}
-            #:claim{:conversation-id :process,
-                    :string
-                    "(production-mode :sur-ice-cream make-to-stock)"}
-            #:claim{:conversation-id :process,
-                    :question-type :production-location,
-                    :string
-                    "(production-location :sur-ice-cream factory)"}
-            #:claim{:conversation-id :process,
-                    :question-type :production-system-type,
-                    :string "(flow-shop :sur-ice-cream)"}
-            #:claim{:conversation-id :process,
-                    :string "(surrogate :sur-ice-cream)"}
-            #:claim{:conversation-id :process,
-                    :question-type :work-type,
-                    :string "(provides-product :sur-ice-cream)"}
-            #:claim{:conversation-id :process,
-                    :string "(project-id :sur-ice-cream)"}
-            #:claim{:conversation-id :process,
-                    :string
-                    "(project-name :sur-ice-cream \"SUR Ice Cream\")"}],
-           :name "SUR Ice Cream",
-           :id :sur-ice-cream}]
-
+[
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_r8AnBODucGGwJkrv5pXqrZOF",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2025-03-03T12:35:41.989-00:00"}
+           #:agent{:base-type :sur-ice-cream,
+                   :agent-type :project,
+                   :thread-id "thread_7zpG19BpSjRlbsLbbxeoSIWE",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_nPM8hEUtlEeZuxyj4DiSWY4O",
+                   :id :sur-ice-cream-openai,
+                   :expertise "ice cream",
+                   :timestamp #inst "2025-03-03T12:35:43.408-00:00"}],
+          :claims
+          [#:claim{:string "(project-id :sur-ice-cream)"}
+           #:claim{:string
+                   "(project-name :sur-ice-cream \"SUR Ice Cream\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-ice-cream)"}],
+          :conversations
+          [#:conversation{:done? true,
+                          :id :process,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-02-27T13:14:22.556-00:00"}]}
+           #:conversation{:id :data,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-02-27T13:14:22.577-00:00"}]}
+           #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-02-27T13:14:22.597-00:00"}]}
+           #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-02-27T13:14:22.616-00:00"}]}],
+          :current-conversation :process,
+          :id :sur-ice-cream,
+          :name "SUR Ice Cream"}
+]

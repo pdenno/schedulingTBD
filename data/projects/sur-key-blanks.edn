@@ -2,237 +2,69 @@
 #:project{:agents
           [#:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
-                   :thread-id "thread_OgZORVZkYofhZQAVQpp2DipB",
+                   :thread-id "thread_ivFfc3y9RaRucBmwaE8WatdR",
                    :model-class :gpt,
                    :llm-provider :openai,
-                   :assistant-id "asst_eJ7AxECsRib6jGssqREMahgx",
+                   :assistant-id "asst_p9cnmj0rV7EYNMIeiqWm9ppf",
                    :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-01-31T17:13:05.127-00:00"}
+                   :timestamp #inst "2025-03-05T15:05:59.648-00:00"}
            #:agent{:base-type :sur-key-blanks,
                    :agent-type :project,
-                   :thread-id "thread_AcaxPGabkqyCyOYQ7fXIjMEg",
+                   :thread-id "thread_MNw7H0kDEqK5KX7wgrDkdRNl",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :surrogate? true,
-                   :assistant-id "asst_PpDCIQEGnQk0slWPb7M59hUC",
+                   :assistant-id "asst_OfnWZ468jHmTSyViJhClWGjG",
                    :id :sur-key-blanks-openai,
                    :expertise "key blanks",
-                   :timestamp #inst "2025-03-02T20:28:42.417-00:00"}],
+                   :timestamp #inst "2025-03-06T16:42:36.049-00:00"}],
           :claims
           [#:claim{:string "(project-id :sur-key-blanks)"}
            #:claim{:string
                    "(project-name :sur-key-blanks \"SUR Key Blanks\")"}
            #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-key-blanks)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(temp-project-name :sur-key-blanks \"Key Blanks\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string "(temp-project-id :key-blanks)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-key-blanks :resource-assignment)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-key-blanks :delivery-schedules)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-key-blanks :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-key-blanks :equipment-utilization)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(principal-expertise :sur-key-blanks \"Key Blanks\")"}],
+                   :string "(surrogate :sur-key-blanks)"}],
           :conversations
-          [#:conversation{:done? true,
-                          :id :process,
-                          :interviewer-budget 0.5499999999999996,
+          [#:conversation{:id :process,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
-                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
                                      :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-02T20:28:41.408-00:00"}
-                           #:message{:content
-                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
-                                     :from :system,
-                                     :id 5,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:29:06.181-00:00"}
-                           #:message{:content
-                                     "\nWe produce key blanks, which are uncut keys ready to be customized for various lock types. These blanks go through multiple production phases, including material procurement, cutting, finishing, and quality checks. Our main scheduling challenge is coordinating the workflow between processes while accounting for machine capacity, material availability, and meeting tight delivery timelines.",
-                                     :from :surrogate,
-                                     :id 6,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:29:06.215-00:00"}
-                           #:message{:content
-                                     "\nDo all the key blanks undergo the same production process, or do variations in the product require different workflows?",
-                                     :from :system,
-                                     :id 7,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:29:32.509-00:00"}
-                           #:message{:content
-                                     "\nDifferent key blanks require slightly different workflows depending on their material (e.g., brass, nickel, or steel) and design (e.g., standard, high-security). While the core steps like cutting and finishing are common, specialized blanks may need additional treatments such as coating or engraving, which add complexity to the scheduling process.",
-                                     :from :surrogate,
-                                     :id 8,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:29:32.549-00:00"}
-                           #:message{:content
-                                     "\nCould you describe the main steps involved in the production process? For example, what happens after material procurement, and how do cutting, finishing, and quality checks fit in?",
-                                     :from :system,
-                                     :id 9,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:29:47.550-00:00"}
-                           #:message{:content
-                                     "\nAfter material procurement, the production process involves: \n\n1. <b>Cutting</b> - Raw material is cut into key blank shapes.  \n2. <b>Stamping</b> - Key identification codes or branding may be stamped.  \n3. <b>Coating (if required)</b> - Certain blanks may receive protective or aesthetic coatings.  \n4. <b>Finishing</b> - Deburring, polishing, and edge smoothing.  \n5. <b>Quality Checks</b> - Inspection for dimensional accuracy, surface quality, and functionality.  \n6. <b>Packaging</b> - Final products are packed for shipping or inventory.  \n\nEach step ensures the blanks meet the required standards.",
-                                     :from :surrogate,
-                                     :id 10,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:29:47.573-00:00"}
-                           #:message{:content
-                                     "\nAre the production steps always performed in a strict sequence, or is there flexibility to process steps in parallel depending on equipment or material availability?",
-                                     :from :system,
-                                     :id 11,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:30:01.172-00:00"}
-                           #:message{:content
-                                     "\nThere is some flexibility in the production steps. For example, coating and stamping might occur in parallel or be skipped for simpler blanks. However, most steps—like cutting, finishing, and quality checks—must follow a strict sequence. The degree of flexibility depends on the product type and equipment or material availability, which makes efficient scheduling essential.",
-                                     :from :surrogate,
-                                     :id 12,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:30:01.194-00:00"}
-                           #:message{:content
-                                     "\nDo different types of machines or equipment handle specific steps in the process (e.g., dedicated machines for cutting, finishing, etc.), and are there any limitations in their capacity or availability?",
-                                     :from :system,
-                                     :id 13,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:30:22.015-00:00"}
-                           #:message{:content
-                                     "\nYes, specific machines handle different steps. For example, cutting is done on precision blanking machines, finishing involves polishing machines, and stamping or engraving is handled separately. Each machine has capacity limits based on its throughput, and availability depends on regular maintenance schedules, breakdowns, and shared use among product variations. These constraints often create bottlenecks that need careful scheduling.",
-                                     :from :surrogate,
-                                     :id 14,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:30:22.072-00:00"}
-                           #:message{:content
-                                     "\nDo all key blanks follow the same production time for each step, or do different variants require varying times for processes like cutting, finishing, or quality checks?",
-                                     :from :system,
-                                     :id 15,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:30:37.191-00:00"}
-                           #:message{:content
-                                     "\nDifferent variants of key blanks require varying production times for certain steps. For example, high-security or intricate designs may take longer during cutting and finishing, whereas simpler blanks are faster. Quality checks also vary, as more complex products may require additional inspections. These time variations add complexity to scheduling and resource allocation.",
-                                     :from :surrogate,
-                                     :id 16,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:30:37.225-00:00"}
-                           #:message{:content
-                                     "\nAre there any dependencies between the production steps, such as raw materials or intermediate outputs needing to be ready before the next step can begin?",
-                                     :from :system,
-                                     :id 17,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:30:52.786-00:00"}
-                           #:message{:content
-                                     "\nYes, there are dependencies between production steps. Raw materials must be available before cutting can start. Similarly, finishing cannot begin until the blanks are properly cut or stamped, and quality checks rely on completed blanks from prior steps. Delays in any step can cascade to subsequent steps, making coordination and scheduling critical.",
-                                     :from :surrogate,
-                                     :id 18,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:30:52.813-00:00"}
-                           #:message{:content
-                                     "\nIs managing the flow of materials or coordinating tasks between machines and workstations a significant challenge in your scheduling process?",
-                                     :from :system,
-                                     :id 19,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:31:07.062-00:00"}
-                           #:message{:content
-                                     "\nYes, managing the flow of materials and coordinating tasks between machines and workstations is a significant challenge. Ensuring the right materials are at the right machine at the right time, while avoiding bottlenecks or idle resources, requires careful planning. Variations in production times and equipment capacities further complicate this coordination.",
-                                     :from :surrogate,
-                                     :id 20,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:31:07.126-00:00"}
-                           #:message{:content
-                                     "\nDoes your production process demand frequent adjustments to meet different order volumes or timelines, and how does that affect scheduling?",
-                                     :from :system,
-                                     :id 21,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:31:21.149-00:00"}
-                           #:message{:content
-                                     "\nYes, our production process often requires frequent adjustments to meet varying order volumes or tight timelines. Sudden changes in priorities can force us to reallocate resources, reschedule machines, or expedite certain steps. This dynamic environment makes it challenging to maintain an efficient and balanced production schedule.",
-                                     :from :surrogate,
-                                     :id 22,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:31:21.173-00:00"}
-                           #:message{:content
-                                     "\nDo external factors such as supplier delivery times of materials or specific customer delivery deadlines influence how you schedule production?",
-                                     :from :system,
-                                     :id 23,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-03-02T20:31:36.197-00:00"}
-                           #:message{:content
-                                     "\nAbsolutely, supplier delivery times and customer deadlines significantly influence our production scheduling. Late material deliveries can delay the start of production, while tight or changing customer deadlines often require adjusting schedules to prioritize certain orders. These external factors add unpredictability and stress the need for flexibility in our scheduling processes.",
-                                     :from :surrogate,
-                                     :id 24,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-02T20:31:36.246-00:00"}]}
+                                     #inst "2025-03-06T16:42:32.175-00:00"}]}
            #:conversation{:id :data,
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
-                                     :id 2,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-02T20:28:41.429-00:00"}]}
+                                     #inst "2025-03-06T16:42:32.175-00:00"}]}
            #:conversation{:id :resources,
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
-                                     :id 3,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-02T20:28:41.453-00:00"}]}
+                                     #inst "2025-03-06T16:42:32.175-00:00"}]}
            #:conversation{:id :optimality,
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
-                                     :id 4,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-02T20:28:41.471-00:00"}]}],
+                                     #inst "2025-03-06T16:42:32.175-00:00"}]}],
           :current-conversation :process,
           :id :sur-key-blanks,
           :name "SUR Key Blanks"}

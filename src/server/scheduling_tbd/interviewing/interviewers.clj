@@ -17,13 +17,12 @@
      [scheduling-tbd.interviewing.domain.optimality-analysis]
      [scheduling-tbd.interviewing.domain.resources-analysis]
      [scheduling-tbd.llm            :as llm]
-     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim  text-to-var]]
+     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim]]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets :as ws]
      [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
-(s/def ::pid keyword?)
 (s/def ::cid #(#{:process :data :resources :optimality} %))
 
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
@@ -51,8 +50,6 @@
 (s/def ::question string?)
 
 ;;; Optional
-(s/def ::tags (s/coll-of keyword?))
-
 (s/def ::expert-response (s/keys :req-un [:expert/msg-type] :opt-un [:expert/text :expert/table :expert/table-html]))
 (s/def :expert/msg-type #(= % :expert-response))
 (s/def :expert/table map?)

@@ -46,7 +46,7 @@
        "#+end_src"))
 
 (def how-to-provide-tables
- (str "Additionally, if you are asked to upload a table, please do you best to provide a reasonable example for what that table could look like, in HTML." 
+ (str "Additionally, if you are asked to upload a table, please do you best to provide a reasonable example for what that table could look like, in HTML."
       "Here is an example of something that you could be asked, and how you would be expected to answer.
        They: "
       "Could you upload the orders spreadsheet (or a redacted version of it) for discussion? Please note the risks of uploading sensitive data, which you can read about here. Let us know if you'd like guidance on redacting sensitive information before uploading."
@@ -156,7 +156,7 @@
                 <td>Shipped</td>
             </tr>
         </tbody>
-    </table>")) 
+    </table>"))
 
 (defn system-instruction
   "This is the instruction that configures the role of the OpenAI assistant for a surrogate domain expert."
