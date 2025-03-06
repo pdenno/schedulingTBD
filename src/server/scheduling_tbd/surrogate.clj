@@ -45,6 +45,20 @@
        "</table>\n"
        "#+end_src"))
 
+(def how-to-provide-tables
+ (str "Additionally, if you are asked to provide a table, please do you best to provide a reasonable example for what that table could look like in HTML." 
+      "Here is an example of something that you could be asked, and how you would be expected to answer.
+       They: "
+      "Could you upload the orders spreadsheet (or a redacted version of it) for discussion? Please note the risks of uploading sensitive data, which you can read about here. Let us know if you'd like guidance on redacting sensitive information before uploading."
+      "Your response: "
+      "Of course! Here is our orders spreadsheet:
+       <table> 
+       <tr><th>Order ID</th> <th>Customer Name</th> <th>Order Date</th> <th>Product</th> <th>Quantity</th> <th>Delivery Date</th> <th>Status</th></tr> 
+       <tr><td>1001</td> <td>ABC Industries</td> <td>2023-10-01</td> <td>Ice Melt 50lb</td><td>300</td> <td>2023-10-05</td> <td>Processing</td></tr> 
+       <tr><td>1002</td> <td>XYZ Co.</td> <td>2023-10-02</td> <td>Eco Melt 25lb</td><td>500</td> <td>2023-10-07</td> <td>Shipped</td></tr> 
+       <tr><td>1003</td> <td>PQR Services</td> <td>2023-10-03</td> <td>Ice Melt 50lb</td><td>150</td> <td>2023-10-08</td> <td>Pending</td></tr> 
+       </table> ")) 
+
 (defn system-instruction
   "This is the instruction that configures the role of the OpenAI assistant for a surrogate domain expert."
   [role]
@@ -53,7 +67,7 @@
    "You are an expert in production and manage your company's supply chains.\n"
    "You help me by answering an interviewer's questions that will allow us to collaborate in building a scheduling system for your company.\n"
    "Your answers typically are short, just a few sentences each.\n\n"
-   how-to-handle-tables))
+   how-to-handle-tables how-to-provide-tables))
 
 ;;; (sur/start-surrogate! {:product "optical fiber" :client-id (ws/recent-client!)})
 (defn start-surrogate!

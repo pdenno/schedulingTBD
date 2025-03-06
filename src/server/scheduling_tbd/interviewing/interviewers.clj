@@ -13,7 +13,7 @@
      [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
      [scheduling-tbd.db             :as db]
      [scheduling-tbd.interviewing.domain.data-analysis :as dan]
-     [scheduling-tbd.interviewing.domain.process-analysis  :as pan :refer [the-warm-up-type-question]]
+     [scheduling-tbd.interviewing.domain.process-analysis :as pan :refer [the-warm-up-type-question]]
      [scheduling-tbd.interviewing.domain.optimality-analysis]
      [scheduling-tbd.interviewing.domain.resources-analysis]
      [scheduling-tbd.llm            :as llm]
@@ -383,14 +383,26 @@
                           (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q)))))
        (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
+;TODO: add for other interviews
+(defn analyze-response
+  "Analyze the response from the expert (human or surrogate)."
+  [pid cid response]
+  (assert (s/valid? ::cid cid))
+  (cond
+    (= :process cid) (log! :info (str "process analysis " pid ": " response))
+    (= :data cid) (dan/analyze-response pid response)
+    (= :resources cid) (log! :info (str "resources analysis " pid ": " response))
+    (= :optimality cid) (log! :info (str "optimality analysis" pid ": " response)))
+  )
+
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
    discussion on the given topic."
   [pid cid]
   (case cid
     ;; ToDo: Someday we will be able to do better than this!
-    (:data :resources :optimality) (find-claim '(flow-shop ?x) (db/get-claims pid))
-    :process true))
+    (:resources :optimality) (find-claim '(flow-shop ?x) (db/get-claims pid))
+    (:process :data) true))
 
 (defn redirect-user-to-discussion
   "Put a message in the current chat to go to the recommended chat."
@@ -466,12 +478,12 @@
 (defn resume-conversation
   "Resume the interview loop for an established project and given cid."
   [{:keys [client-id pid cid] :as ctx}]
-  (assert (string? client-id))
-  (assert (#{:process :data :resources :optimality} cid))
+  (assert (s/valid? ::client-id client-id))
+  (assert (s/valid? ::cid cid))
   (log! :debug (str "--------- Resume conversation: ctx: " ctx))
   (reset! course-correction-count 0)
   (try
-    (if (and (not= :process cid) (not (ready-for-discussion? pid cid)))
+    (if (not (ready-for-discussion? pid cid))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
       (let [asking-role (-> (str cid "-interviewer") keyword)
@@ -490,6 +502,7 @@
                       (doseq [msg conversation]
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
+                      (analyze-response pid cid expert-response) ; <================================ NL add
                       (cond
                         (> cnt 10)                                  :exceeded-questions-safety-stop
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.

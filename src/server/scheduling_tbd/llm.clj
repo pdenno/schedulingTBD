@@ -343,13 +343,12 @@
 ;;; The assistant aid you are providing must be linked to an assistant that has the file_search tool activated in order for this to work.
 ;;; NB: there is a 1 vector store per assistant limit at the moment
 (defn add-vector-store-to-assistant
-  [{:keys [vector-store-id aid llm-provider] :as ctx :or {llm-provider @default-llm-provider}}]
+  [{:keys [vector-store-id aid llm-provider] :as _ctx :or {llm-provider @default-llm-provider}}]
   (openai/modify-assistant {:assistant-id aid
                             :tool-resources
                             {:file_search
                              {:vector-store-ids [vector-store-id]}}}
-                           (api-credentials llm-provider))
-  )
+                           (api-credentials llm-provider)))
 
 ;;;------------------- Starting and stopping ---------------
 (defn llm-start []

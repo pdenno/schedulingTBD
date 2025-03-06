@@ -22,6 +22,24 @@
 
   <!-- Without this, there is a scroll bar when not needed -->
    <style>
+     table, th, td {
+      border: 1px solid;
+      border-collapse: collapse;
+      }
+
+      th {
+        text-align: center;
+      }
+
+      tr:hover {
+        background-color: #d4e9fa;
+      }
+
+      th, td {
+        padding: 2px;
+        text-align: left;
+      }
+
      .cm-scroller { font-family: var(--code-font) !important; }
      .cm-editor   { resize: true; overflow: hidden; }
      .CodeMirror  { theme: material-dark }
@@ -2180,6 +2198,7 @@
   position: relative;
   height: 100%;
 }
+
 
    </style>
 
