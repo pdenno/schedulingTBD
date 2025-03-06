@@ -15,8 +15,7 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
    [scheduling-tbd.util     :as util :refer [now]]
-   [taoensso.telemere       :refer [log!]]
-   [scheduling-tbd.interviewing.response-utils :as ru]))
+   [taoensso.telemere       :refer [log!]])) ; Here only
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:

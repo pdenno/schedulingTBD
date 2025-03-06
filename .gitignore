@@ -34,3 +34,5 @@ node_modules/
 resources/public/js/
 
 .DS_Store
+
+opt/
