@@ -1,10 +1,10 @@
 (ns scheduling-tbd.interviewing.domain.resources-analysis
-    "Planning operators for the resource interview."
+  "Planning operators for the resource interview."
   (:require
-   [scheduling-tbd.interviewing.response-utils    :as ru :refer [defanalyze]]
+   [scheduling-tbd.interviewing.response-utils    :as ru :refer [analyze-warm-up]]
    [taoensso.telemere                             :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
-(defanalyze :resources/warm-up  [{:keys [response _client-id _pid] :as _ctx}]
+(defmethod analyze-warm-up :optimality [_tag response]
   (log! :debug (str "*******analysis :resources/warm-up, response = " response)))

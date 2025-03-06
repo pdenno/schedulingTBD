@@ -1,353 +1,33 @@
 [
-#:project{:conversations
-          [#:conversation{:done? true,
-                          :id :process,
-                          :interviewer-budget 0.5,
-                          :messages
-                          [#:message{:content
-                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
-                                     :from :system,
-                                     :id 1,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2025-01-30T17:38:23.283-00:00"}
-                           #:message{:content
-                                     "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
-                                     :from :system,
-                                     :id 5,
-                                     :question-type :process/warm-up,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:38:38.877-00:00"}
-                           #:message{:content
-                                     "We produce a variety of plate glass products, including standard clear glass, tinted glass, tempered glass, and laminated glass used in construction, automotive, and specialty applications. The main scheduling challenge is coordinating production cycles with supply chain logistics and customer demand. We must optimally allocate resources to minimize machine downtime and ensure timely delivery while managing raw material availability and varying lead times for customized orders.",
-                                     :from :surrogate,
-                                     :id 6,
-                                     :question-type :process/warm-up,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:38:38.906-00:00"}
-                           #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product, a service or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
-                                     :from :system,
-                                     :id 7,
-                                     :question-type :process/work-type,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:38:57.831-00:00"}
-                           #:message{:content "PRODUCT",
-                                     :from :surrogate,
-                                     :id 8,
-                                     :question-type :process/work-type,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:38:57.852-00:00"}
-                           #:message{:content
-                                     "Some work is performed in your own facility, some, like cutting down trees, has to be performed at the customer's site. Which is most common in your work? Respond with the single word OUR-FACILITY, CUSTOMER-SITE, or if it isn't straightforward, an explanation.",
-                                     :from :system,
-                                     :id 9,
-                                     :question-type
-                                     :process/production-location,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:39:11.831-00:00"}
-                           #:message{:content "OUR-FACILITY",
-                                     :from :surrogate,
-                                     :id 10,
-                                     :question-type
-                                     :process/production-location,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:39:11.865-00:00"}
-                           #:message{:content
-                                     "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER, or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
-                                     :from :system,
-                                     :id 11,
-                                     :question-type
-                                     :process/production-motivation,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:39:37.145-00:00"}
-                           #:message{:content "MAKE-TO-ORDER",
-                                     :from :surrogate,
-                                     :id 12,
-                                     :question-type
-                                     :process/production-motivation,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:39:37.177-00:00"}
-                           #:message{:content
-                                     "There are a few common patterns or system designs by which product is made. In a FLOW-SHOP, all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
-                                     :from :system,
-                                     :id 13,
-                                     :question-type
-                                     :process/production-system-type,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:40:00.163-00:00"}
-                           #:message{:content "FLOW-SHOP",
-                                     :from :surrogate,
-                                     :id 14,
-                                     :question-type
-                                     :process/production-system-type,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:40:00.209-00:00"}
-                           #:message{:content
-                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
-                                     :from :system,
-                                     :id 15,
-                                     :question-type
-                                     :process/process-steps,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:40:17.414-00:00"}
-                           #:message{:content
-                                     "1. Prepare Raw Materials\n2. Melt and Form Glass\n3. Anneal Glass\n4. Cut Glass to Size\n5. Temper or Laminate (if required)\n6. Inspect and Quality Check\n7. Package and Label",
-                                     :from :surrogate,
-                                     :id 16,
-                                     :question-type
-                                     :process/process-steps,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:40:17.442-00:00"}
-                           #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
-                                     :from :system,
-                                     :id 17,
-                                     :question-type
-                                     :process/process-durations,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:40:32.366-00:00"}
-                           #:message{:content
-                                     "1. Prepare Raw Materials (2-3 hours)\n2. Melt and Form Glass (8-12 hours)\n3. Anneal Glass (4-6 hours)\n4. Cut Glass to Size (1-2 hours)\n5. Temper or Laminate (if required) (4-5 hours)\n6. Inspect and Quality Check (1-2 hours)\n7. Package and Label (1-2 hours)",
-                                     :from :surrogate,
-                                     :id 18,
-                                     :question-type
-                                     :process/process-durations,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:40:32.397-00:00"}
-                           #:message{:content
-                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
-                                     :from :system,
-                                     :id 19,
-                                     :tags [:info-to-user :minizinc],
-                                     :time
-                                     #inst "2025-01-30T17:41:38.900-00:00"}
-                           #:message{:content
-                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just \"1000 packages.\" If, however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling      (2000 packages)\n 3. Bake Wafers       (1000 packages)\n 4. Assemble Cookies  (1000 packages)\n 5. Package           (1000 packages)",
-                                     :from :system,
-                                     :id 20,
-                                     :question-type
-                                     :process/batch-size,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:41:57.755-00:00"}
-                           #:message{:content
-                                     "1. Prepare Raw Materials (varies based on product size)\n2. Melt and Form Glass (1000-2000 square meters)\n3. Anneal Glass (1000-2000 square meters)\n4. Cut Glass to Size (200-500 pieces)\n5. Temper or Laminate (if required) (200-500 pieces)\n6. Inspect and Quality Check (200-500 pieces)\n7. Package and Label (200-500 pieces)",
-                                     :from :surrogate,
-                                     :id 21,
-                                     :question-type
-                                     :process/batch-size,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:41:57.784-00:00"}
-                           #:message{:content
-                                     "Earlier, you listed the process steps typically used in making product (e.g. 1. Prepare Raw Materials, 2. Melt and Form Glass, etc.) and for each you specified typical durations. Now we'd like you to tell us what raw materials and intermediate products go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n 1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n 2. Make Filling (sugar, water vanilla flavoring)\n 3. Bake Wafers (use dough from Make Cookie Dough)\n 4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n 5. Package (use cookies from Assemble Cookies)",
-                                     :from :system,
-                                     :id 22,
-                                     :question-type
-                                     :process/process-ordering,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2025-01-30T17:42:17.423-00:00"}
-                           #:message{:content
-                                     "1. Prepare Raw Materials (silica sand, soda ash, limestone, dolomite)\n2. Melt and Form Glass (use raw materials from Prepare Raw Materials)\n3. Anneal Glass (use glass from Melt and Form Glass)\n4. Cut Glass to Size (use glass from Anneal Glass)\n5. Temper or Laminate (if required) (use glass from Cut Glass to Size, additional interlayers for lamination)\n6. Inspect and Quality Check (use glass from Temper or Laminate)\n7. Package and Label (use glass from Inspect and Quality Check)",
-                                     :from :surrogate,
-                                     :id 23,
-                                     :question-type
-                                     :process/process-ordering,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-01-30T17:42:17.446-00:00"}]}
-           #:conversation{:id :data,
-                          :interviewer-budget 1.0,
-                          :messages
-                          [#:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
-                                     :from :system,
-                                     :id 2,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2025-01-30T17:38:23.303-00:00"}]}
-           #:conversation{:id :resources,
-                          :interviewer-budget 1.0,
-                          :messages
-                          [#:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
-                                     :from :system,
-                                     :id 3,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2025-01-30T17:38:23.332-00:00"}]}
-           #:conversation{:id :optimality,
-                          :interviewer-budget 1.0,
-                          :messages
-                          [#:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
-                                     :from :system,
-                                     :id 4,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2025-01-30T17:38:23.352-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {prepareMaterials, meltFormGlass, annealGlass, cutGlass, laminateGlass, inspectQuality};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.500, 10.000, 5.000, 1.500, 4.500, 1.500|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, prepareMaterials] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, prepareMaterials] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, prepareMaterials] == taskStarts[p, meltFormGlass]);\nconstraint forall (p in Product) (taskEnds[p, meltFormGlass] == taskStarts[p, annealGlass]);\nconstraint forall (p in Product) (taskEnds[p, annealGlass] == taskStarts[p, cutGlass]);\nconstraint forall (p in Product) (taskEnds[p, cutGlass] == taskStarts[p, laminateGlass]);\nconstraint forall (p in Product) (taskEnds[p, laminateGlass] == taskStarts[p, inspectQuality]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, inspectQuality]);",
-          :agents
+#:project{:agents
           [#:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
-                   :thread-id "thread_d0r3wv6Aaii508rLRxXZ61hL",
+                   :thread-id "thread_q1rJiz69z4FJfHRzmbc8bHY1",
                    :model-class :gpt,
                    :llm-provider :openai,
-                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
+                   :assistant-id "asst_p9cnmj0rV7EYNMIeiqWm9ppf",
                    :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
+                   :timestamp #inst "2025-03-05T15:05:59.648-00:00"}
            #:agent{:base-type :sur-plate-glass,
                    :agent-type :project,
-                   :thread-id "thread_D8ZQtTXZs7wme2dezsMrfKb9",
+                   :thread-id "thread_WJlieqcmQCiois9mr58SqM5r",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :surrogate? true,
-                   :assistant-id "asst_vS3Ssk1th8eSa6d5WJn0OEmd",
+                   :assistant-id "asst_H2WCcMxVIcqJzo8JvHbwnMGS",
                    :id :sur-plate-glass-openai,
                    :expertise "plate glass",
-                   :timestamp #inst "2025-01-30T17:38:24.945-00:00"}],
-          :processes
-          [#:process{:id :sur-plate-glass,
-                     :interview-class :initial-unordered,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "3"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--prepareMaterials,
-                                :name "Prepare Raw Materials",
-                                :step-number 1,
-                                :var-name "prepareMaterials"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "12"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "8"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--meltFormGlass,
-                                :name "Melt and Form Glass",
-                                :step-number 2,
-                                :var-name "meltFormGlass"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "6"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "4"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--annealGlass,
-                                :name "Anneal Glass",
-                                :step-number 3,
-                                :var-name "annealGlass"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--cutGlass,
-                                :name "Cut Glass to Size",
-                                :step-number 4,
-                                :var-name "cutGlass"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "5"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "4"}},
-                                :duration-comment "(if required)",
-                                :id
-                                :sur-plate-glass--initial-unordered--laminateGlass,
-                                :name "Tempor or Laminate",
-                                :step-number 5,
-                                :var-name "laminateGlass"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--inspectQuality,
-                                :name "Inspect and Quality Check",
-                                :step-number 6,
-                                :var-name "inspectQuality"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-plate-glass--initial-unordered--packageLabel,
-                                :name "Package and Label",
-                                :step-number 7,
-                                :supply-chain? true,
-                                :var-name "packageLabel"}]}],
-          :current-conversation :process,
+                   :timestamp #inst "2025-03-05T15:06:39.496-00:00"}],
           :claims
           [#:claim{:string "(project-id :sur-plate-glass)"}
            #:claim{:string
                    "(project-name :sur-plate-glass \"SUR Plate Glass\")"}
            #:claim{:conversation-id :process,
                    :string "(surrogate :sur-plate-glass)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :delivery-schedules)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
@@ -363,57 +43,229 @@
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-plate-glass :equipment-utilization)"}
+                   "(scheduling-challenge :sur-plate-glass :equipment-availability)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-plate-glass :process-variation)"}
+                   "(scheduling-challenge :sur-plate-glass :variation-in-demand)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-plate-glass :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string "(provides-product :sur-plate-glass)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
-                   :string
-                   "(production-location :sur-plate-glass factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-plate-glass make-to-order)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string "(flow-shop :sur-plate-glass)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-plate-glass 1 \"Prepare Raw Materials\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-plate-glass 2 \"Melt and Form Glass\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-plate-glass 3 \"Anneal Glass\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-plate-glass 4 \"Cut Glass to Size\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-plate-glass 5 \"Temper or Laminate\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-plate-glass 6 \"Inspect and Quality Check\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-plate-glass 7 \"Package and Label\")"}],
-          :name "SUR Plate Glass",
-          :id :sur-plate-glass}
+                   "(scheduling-challenge :sur-plate-glass :process-variation)"}],
+          :conversations
+          [#:conversation{:EADS
+                          "{:message-type :PHASE-2-EADS, :EADS {:interview-objective \"Produce a data structure similar in form to the EADS in this object, but describing the interviewees' production processes.\", :EADS {:process-id {:val \"pencil-manufacturing\", :comment \"This is the top-level process. You can name it as you see fit; don't ask the interviewees.\"}, :inputs {:val [\"graphite\" \"clay\" \"water\" \"cedar wood\" \"metal\" \"eraser material\" \"paint\"], :comment \"These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes.\"}, :outputs {:val [{:item-id \"finished pencils\", :quantity {:units \"finished pencils\", :value-string \"100000\"}}], :comment \"inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.\"}, :resources {:val [\"extruder\" \"kiln\" \"milling machine\" \"glue applicator\" \"shaping machine\"], :comment \"Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer.\"}, :duration {:val {:units \"hours\", :value-string \"4\"}, :comment \"We use a string for 'value-string' in case interviewees answer it something like 'it varies'\"}, :subprocesses [{:process-id \"graphite-core-production\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite core\", :quantity {:units \"graphite cores\", :value-string \"100000\"}}], :resources [\"mixer\" \"extruder\" \"kiln\"], :subprocesses [{:process-id \"mix-graphite-and-clay\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite-clay paste\", :quantity {:units \"liters\", :value-string \"100\"}}], :resources [\"mixer\"], :duration {:units \"hours\", :value-string \"1\"}, :subprocesses []} {:process-id \"extrude-core\", :inputs [\"graphite-clay paste\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"extruder\"], :duration {:units \"minutes\", :value-string \"20\"}, :subprocesses []} {:process-id \"dry-and-bake-core\", :inputs [\"extruded graphite rods\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"kiln\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"wood-casing-production\", :inputs [\"cedar wood\"], :outputs [\"wood slats with grooves\"], :resources [\"milling machine\"], :subprocess-flow {:val \"individuals-from-batch\", :comment \"The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\\nyou can start 'cut-grooves-in-slats' as soon as the first slat is available.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses.\"}, :subprocesses [{:process-id \"mill-wood-slats\", :inputs [\"cedar wood\"], :outputs [\"milled wood slats\"], :resources [\"milling machine\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []} {:process-id \"cut-grooves-in-slats\", :inputs [\"milled wood slats\"], :outputs [\"wood slats with grooves\"], :resources [\"groove cutter\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"assembly\", :inputs {:val [{:item-id \"graphite core\", :from \"graphite-core-production\"} {:item-id \"wood slats with grooves\", :from \"wood-casing-production\"} \"metal\" \"erasers\" \"paint\"], :comment \"The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\\nThe 'from' property is essential to understanding process ordering and potential for concurrency.\"}, :outputs [\"finished pencil\"], :resources [\"glue applicator\" \"shaping machine\"], :subprocesses [{:process-id \"insert-core-into-slats\", :inputs [\"graphite core\" \"wood slats with grooves\"], :outputs [\"pencil blanks\"], :resources [\"glue applicator\"], :subprocesses []} {:process-id \"shape-and-paint-pencil\", :inputs [\"pencil blanks\" \"paint\"], :outputs [\"shaped and painted pencils\"], :resources [\"shaping machine\" \"painting station\"], :subprocesses []} {:process-id \"attach-eraser\", :optional? {:val true, :comment \"'optional?' means that the process does not occur for every product. Not every pencil has an eraser.\"}, :inputs [\"shaped and painted pencils\" \"metal\" \"erasers\"], :outputs [\"finished pencils\"], :resources [\"crimping tool\"], :subprocesses []}]}]}}}",
+                          :id :process,
+                          :interviewer-budget 0.4999999999999996,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}
+                           #:message{:content
+                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:06:51.378-00:00"}
+                           #:message{:content
+                                     "\nWe produce plate glass, which includes standard, tempered, laminated, and specialty glass products. The scheduling challenge lies in coordinating production processes like glass melting, shaping, annealing, and finishing while ensuring supply chain alignment for raw materials and accommodating varying customer lead times. Demand variability and equipment availability add additional complexity to the process.",
+                                     :from :surrogate,
+                                     :id 3,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:06:51.397-00:00"}
+                           #:message{:content
+                                     "\nIs plate glass production broken down into distinct stages that occur in a fixed sequence for all product types, or do different product types require different sequences of production steps?",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:07:08.385-00:00"}
+                           #:message{:content
+                                     "\nPlate glass production involves a core sequence of stages—melting, shaping, annealing, and cutting—that are common to all products. However, specific product types like tempered or laminated glass require additional steps, such as heat treatment or interlayer lamination, which alter the sequence and add complexity to scheduling.",
+                                     :from :surrogate,
+                                     :id 5,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:07:08.412-00:00"}
+                           #:message{:content
+                                     "\nCan you provide a high-level overview of the production process for plate glass, including the main steps and any subprocesses involved?",
+                                     :from :system,
+                                     :id 6,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:07:34.585-00:00"}
+                           #:message{:content
+                                     "\nCertainly! The high-level production process for plate glass includes these main steps:\n\n1. <b>Raw Material Preparation:</b> Sand, soda ash, lime, and other ingredients are mixed and prepared.\n2. <b>Melting:</b> Raw materials are melted in a furnace at high temperatures to form molten glass.\n3. <b>Shaping:</b> The molten glass is floated on molten tin (for float glass) or rolled into the desired thickness.\n4. <b>Annealing:</b> The shaped glass passes through an annealing lehr to cool gradually and relieve internal stresses.\n5. <b>Cutting:</b> The cooled glass is cut to the required dimensions.\n\nFor specialty products, additional subprocesses follow:\n- <b>Tempering Process:</b> Cut glass is reheated and rapidly cooled to strengthen it.\n- <b>Laminating Process:</b> Interlayers, typically of PVB, are sandwiched and fused between multiple glass sheets.\n- <b>Coating Applications:</b> Layers like reflective or low-emissivity coatings are applied for functionality.",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-preparation\"} {\"process-id\" \"melting\"} {\"process-id\" \"shaping\"} {\"process-id\" \"annealing\"} {\"process-id\" \"cutting\"} {\"process-id\" \"tempering-process\"} {\"process-id\" \"laminating-process\"} {\"process-id\" \"coating-applications\"}], \"process-id\" \"plate-glass-production\"}, :commit-notes \"Created the top-level process structure for plate glass production based on the interviewee's high-level production overview.\"}",
+                                     :from :surrogate,
+                                     :id 7,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:07:34.614-00:00"}
+                           #:message{:content
+                                     "\nCan you provide approximate durations for each of the production steps, including additional processes like tempering, laminating, and coating? For example, you could specify durations as '2 hours', '30 minutes', etc.",
+                                     :from :system,
+                                     :id 8,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:08:00.622-00:00"}
+                           #:message{:content
+                                     "\nHere are my estimates for the durations of each production step, including additional processes:\n\n1. <b>Raw Material Preparation</b>: 1-2 hours.\n2. <b>Melting</b>: 24-48 hours (continuous process, batch-dependent).\n3. <b>Shaping</b>: 30 minutes to 1 hour.\n4. <b>Annealing</b>: 3-4 hours (depending on glass thickness).\n5. <b>Cutting</b>: 30 minutes.\n\nAdditional processes:\n- <b>Tempering Process</b>: 1-2 hours.\n- <b>Laminating Process</b>: 1-5 hours (depending on complexity and number of layers).\n- <b>Coating Applications</b>: 30 minutes to 2 hours (depending on coating type).",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-preparation\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}} {\"process-id\" \"melting\", \"duration\" {\"units\" \"hours\", \"value-string\" \"24-48\"}} {\"process-id\" \"shaping\", \"duration\" {\"units\" \"minutes\", \"value-string\" \"30-60\"}} {\"process-id\" \"annealing\", \"duration\" {\"units\" \"hours\", \"value-string\" \"3-4\"}} {\"process-id\" \"cutting\", \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}} {\"process-id\" \"tempering-process\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}} {\"process-id\" \"laminating-process\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-5\"}} {\"process-id\" \"coating-applications\", \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-120\"}}], \"process-id\" \"plate-glass-production\"}, :commit-notes \"Added durations to each of the subprocesses based on the provided estimates from the interviewee.\"}",
+                                     :from :surrogate,
+                                     :id 9,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:08:00.649-00:00"}
+                           #:message{:content
+                                     "\nWe would like to understand the inputs, outputs, and resources for each process step. Here's a table template for this:\n\n#+begin_src comment\nFill in each row specifying the raw materials needed, outputs produced, and resources required (e.g., machines, tools, or labor) for each process step.",
+                                     :from :system,
+                                     :id 10,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:08:40.120-00:00"}
+                           #:message{:content
+                                     "\nHere is a breakdown of the resources, inputs, and outputs for each step of the plate glass production process:\n",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-preparation\", \"outputs\" [\"mixed glass batch\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"silica sand\" \"soda ash\" \"lime\" \"additives\"], \"resources\" [\"mixers\" \"labor\"]} {\"process-id\" \"melting\", \"outputs\" [\"molten glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"24-48\"}, \"inputs\" [\"mixed glass batch\" \"energy (gas/electricity)\"], \"resources\" [\"furnace\" \"skilled operators\"]} {\"process-id\" \"shaping\", \"outputs\" [\"shaped glass sheets\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30-60\"}, \"inputs\" [\"molten glass\"], \"resources\" [\"float bath/tin bath\" \"rollers\"]} {\"process-id\" \"annealing\", \"outputs\" [\"stress-relieved glass sheets\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"3-4\"}, \"inputs\" [\"shaped glass sheets\"], \"resources\" [\"annealing lehr\" \"temperature control systems\"]} {\"process-id\" \"cutting\", \"outputs\" [\"glass cut to size\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"inputs\" [\"cooled glass sheets\"], \"resources\" [\"cutting tools\" \"skilled labor\"]} {\"process-id\" \"tempering-process\", \"outputs\" [\"tempered (strengthened) glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"cut glass sheets\"], \"resources\" [\"heat furnace\" \"quenching equipment\"]} {\"process-id\" \"laminating-process\", \"outputs\" [\"laminated glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-5\"}, \"inputs\" [\"glass sheets\" \"interlayer material (e.g. PVB)\"], \"resources\" [\"autoclave\" \"rollers\" \"lamination equipment\"]} {\"process-id\" \"coating-applications\", \"outputs\" [\"coated functional glass\"], \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-120\"}, \"inputs\" [\"glass sheets\" \"coating chemicals\"], \"resources\" [\"coating machines\" \"drying equipment\"]}], \"process-id\" \"plate-glass-production\"}, :commit-notes \"Added inputs, outputs, and resources for each process step based on the interviewee's response.\"}",
+                                     :from :surrogate,
+                                     :id 11,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:08:40.149-00:00"}
+                           #:message{:content
+                                     "\nAre there any dependencies or constraints to be considered in this production process, such as waiting times between steps, overlaps, or certain conditions that must be met before starting a step (e.g., resource availability, cooling times, or quality checks)?",
+                                     :from :system,
+                                     :id 12,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:09:08.166-00:00"}
+                           #:message{:content
+                                     "\nYes, there are several dependencies and constraints in the production process:\n\n1. <b>Cooling Times</b>: The glass must fully cool during annealing before cutting or further processing.\n2. <b>Quality Checks</b>: Each step has quality control checkpoints (e.g., optical distortions or stress checks) that must pass before proceeding.\n3. <b>Resource Availability</b>: Limited availability of furnaces, lehrs, or lamination equipment can cause bottlenecks.\n4. <b>Batch Scheduling</b>: Melting and shaping are continuous processes, so batches must be synchronized to minimize downtime.\n5. <b>Environmental Conditions</b>: Temperature and humidity control are critical for certain steps like lamination and coating.\n6. <b>Overlap Potential</b>: Finishing steps (e.g., tempering, laminating) can overlap with the next batch entering earlier processes to optimize throughput, depending on machine availability.\n\nThese constraints must be carefully managed to avoid delays and maintain quality.",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-preparation\", \"outputs\" [\"mixed glass batch\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"silica sand\" \"soda ash\" \"lime\" \"additives\"], \"resources\" [\"mixers\" \"labor\"]} {\"process-id\" \"melting\", \"outputs\" [\"molten glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"24-48\"}, \"inputs\" [\"mixed glass batch\" \"energy (gas/electricity)\"], \"resources\" [\"furnace\" \"skilled operators\"]} {\"process-id\" \"shaping\", \"outputs\" [\"shaped glass sheets\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30-60\"}, \"inputs\" [\"molten glass\"], \"resources\" [\"float bath/tin bath\" \"rollers\"]} {\"process-id\" \"annealing\", \"outputs\" [\"stress-relieved glass sheets\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"3-4\"}, \"inputs\" [\"shaped glass sheets\"], \"resources\" [\"annealing lehr\" \"temperature control systems\"]} {\"process-id\" \"cutting\", \"outputs\" [\"glass cut to size\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"inputs\" [\"cooled glass sheets\"], \"resources\" [\"cutting tools\" \"skilled labor\"]} {\"process-id\" \"tempering-process\", \"outputs\" [\"tempered (strengthened) glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"cut glass sheets\"], \"resources\" [\"heat furnace\" \"quenching equipment\"]} {\"process-id\" \"laminating-process\", \"outputs\" [\"laminated glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-5\"}, \"inputs\" [\"glass sheets\" \"interlayer material (e.g. PVB)\"], \"resources\" [\"autoclave\" \"rollers\" \"lamination equipment\"]} {\"process-id\" \"coating-applications\", \"outputs\" [\"coated functional glass\"], \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-120\"}, \"inputs\" [\"glass sheets\" \"coating chemicals\"], \"resources\" [\"coating machines\" \"drying equipment\"]}], \"dependencies\" [{\"description\" \"Cooling times must be observed during annealing before cutting or further processing.\"} {\"description\" \"Quality control checkpoints at each step must be passed before proceeding.\"} {\"description\" \"Limited availability of furnaces, lehrs, or lamination equipment can introduce bottlenecks.\"} {\"description\" \"Melting and shaping as continuous processes require batch synchronization to minimize downtime.\"} {\"description\" \"Environmental conditions like temperature and humidity control are critical for lamination and coating.\"} {\"description\" \"Overlap potential exists; finishing steps like tempering or laminating can overlap with the next batch entering earlier processes depending on machine availability.\"}], \"process-id\" \"plate-glass-production\"}, :commit-notes \"Added dependencies and constraints to the process structure, including cooling times, quality checks, resource availability, and overlap potential.\"}",
+                                     :from :surrogate,
+                                     :id 13,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:09:08.197-00:00"}
+                           #:message{:content
+                                     "\nAre there any specific environmental or external factors, such as supply chain dependencies or seasonal demand patterns, that influence scheduling decisions in your plate glass production?",
+                                     :from :system,
+                                     :id 14,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:09:47.066-00:00"}
+                           #:message{:content
+                                     "\nYes, several external factors influence scheduling decisions:\n\n1. <b>Supply Chain Dependencies</b>: Timely delivery of raw materials (e.g., silica sand, PVB interlayers) is crucial to avoid disruptions. Delays in procurement or transportation can impact production schedules.\n2. <b>Seasonal Demand Patterns</b>: Demand often peaks during construction seasons or before weather changes, requiring careful planning to meet orders.\n3. <b>Energy Costs</b>: Production processes like melting are energy-intensive, so electricity or gas prices may drive decisions about optimal production times.\n4. <b>Customer Deadlines</b>: Custom or specialty orders often come with strict deadlines, adding pressure to adjust schedules.\n5. <b>Equipment Downtime</b>: Regular maintenance windows or unexpected breakdowns can disrupt production and require rescheduling.\n6. <b>Regulatory Compliance</b>: Environmental regulations, such as emissions caps, may limit production throughput at certain times. \n\nThese factors create a dynamic environment where flexibility and foresight are critical in scheduling.",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-preparation\", \"outputs\" [\"mixed glass batch\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"silica sand\" \"soda ash\" \"lime\" \"additives\"], \"resources\" [\"mixers\" \"labor\"]} {\"process-id\" \"melting\", \"outputs\" [\"molten glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"24-48\"}, \"inputs\" [\"mixed glass batch\" \"energy (gas/electricity)\"], \"resources\" [\"furnace\" \"skilled operators\"]} {\"process-id\" \"shaping\", \"outputs\" [\"shaped glass sheets\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30-60\"}, \"inputs\" [\"molten glass\"], \"resources\" [\"float bath/tin bath\" \"rollers\"]} {\"process-id\" \"annealing\", \"outputs\" [\"stress-relieved glass sheets\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"3-4\"}, \"inputs\" [\"shaped glass sheets\"], \"resources\" [\"annealing lehr\" \"temperature control systems\"]} {\"process-id\" \"cutting\", \"outputs\" [\"glass cut to size\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"inputs\" [\"cooled glass sheets\"], \"resources\" [\"cutting tools\" \"skilled labor\"]} {\"process-id\" \"tempering-process\", \"outputs\" [\"tempered (strengthened) glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"cut glass sheets\"], \"resources\" [\"heat furnace\" \"quenching equipment\"]} {\"process-id\" \"laminating-process\", \"outputs\" [\"laminated glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-5\"}, \"inputs\" [\"glass sheets\" \"interlayer material (e.g. PVB)\"], \"resources\" [\"autoclave\" \"rollers\" \"lamination equipment\"]} {\"process-id\" \"coating-applications\", \"outputs\" [\"coated functional glass\"], \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-120\"}, \"inputs\" [\"glass sheets\" \"coating chemicals\"], \"resources\" [\"coating machines\" \"drying equipment\"]}], \"dependencies\" [{\"description\" \"Cooling times must be observed during annealing before cutting or further processing.\"} {\"description\" \"Quality control checkpoints at each step must be passed before proceeding.\"} {\"description\" \"Limited availability of furnaces, lehrs, or lamination equipment can introduce bottlenecks.\"} {\"description\" \"Melting and shaping as continuous processes require batch synchronization to minimize downtime.\"} {\"description\" \"Environmental conditions like temperature and humidity control are critical for lamination and coating.\"} {\"description\" \"Overlap potential exists; finishing steps like tempering or laminating can overlap with the next batch entering earlier processes depending on machine availability.\"}], \"process-id\" \"plate-glass-production\", \"external-factors\" [{\"description\" \"Timely delivery of raw materials is critical to avoid production disruptions.\"} {\"description\" \"Seasonal demand peaks during construction seasons or before weather changes require planning.\"} {\"description\" \"Energy-intensive processes are influenced by electricity or gas price fluctuations.\"} {\"description\" \"Custom or specialty orders with strict deadlines add scheduling pressure.\"} {\"description\" \"Regular maintenance or unexpected equipment breakdowns require rescheduling.\"} {\"description\" \"Regulatory compliance, such as emissions limits, may restrict production at times.\"}]}, :commit-notes \"Added external factors influencing scheduling, including supply chain dependencies, seasonal demand, energy costs, customer deadlines, equipment downtime, and regulatory compliance.\"}",
+                                     :from :surrogate,
+                                     :id 15,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:09:47.087-00:00"}
+                           #:message{:content
+                                     "\nDo you have any constraints on batch sizes or production lot sizes for different product types within the plate glass production process? For example, are there minimum or maximum sizes due to equipment or customer requirements?",
+                                     :from :system,
+                                     :id 16,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:10:15.529-00:00"}
+                           #:message{:content
+                                     "\nYes, there are constraints on batch sizes and production lot sizes:\n\n1. <b>Minimum Batch Size</b>: Melting furnaces are large and continuous, so we must produce a minimum amount of glass (several tons, depending on furnace size) to keep the process economically viable.\n2. <b>Maximum Batch Size</b>: Tank capacity and equipment, like annealing lehrs, impose upper limits on batch sizes.\n3. <b>Product-Specific Constraints</b>: Specialty glass (e.g., tempered, coated) may require smaller batches due to the longer processing time and customization.\n4. <b>Customer Orders</b>: Lot sizes must align with customer requirements, which may require splitting or combining production.\n5. <b>Changeover Time</b>: Switching between product specifications (e.g., thickness, coatings) requires time, so scheduling larger lots of a single type is more efficient. \n\nBalancing these constraints ensures both cost-efficiency and responsiveness to demand.",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-preparation\", \"outputs\" [\"mixed glass batch\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"silica sand\" \"soda ash\" \"lime\" \"additives\"], \"resources\" [\"mixers\" \"labor\"]} {\"process-id\" \"melting\", \"outputs\" [\"molten glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"24-48\"}, \"inputs\" [\"mixed glass batch\" \"energy (gas/electricity)\"], \"resources\" [\"furnace\" \"skilled operators\"]} {\"process-id\" \"shaping\", \"outputs\" [\"shaped glass sheets\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30-60\"}, \"inputs\" [\"molten glass\"], \"resources\" [\"float bath/tin bath\" \"rollers\"]} {\"process-id\" \"annealing\", \"outputs\" [\"stress-relieved glass sheets\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"3-4\"}, \"inputs\" [\"shaped glass sheets\"], \"resources\" [\"annealing lehr\" \"temperature control systems\"]} {\"process-id\" \"cutting\", \"outputs\" [\"glass cut to size\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"inputs\" [\"cooled glass sheets\"], \"resources\" [\"cutting tools\" \"skilled labor\"]} {\"process-id\" \"tempering-process\", \"outputs\" [\"tempered (strengthened) glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"cut glass sheets\"], \"resources\" [\"heat furnace\" \"quenching equipment\"]} {\"process-id\" \"laminating-process\", \"outputs\" [\"laminated glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-5\"}, \"inputs\" [\"glass sheets\" \"interlayer material (e.g. PVB)\"], \"resources\" [\"autoclave\" \"rollers\" \"lamination equipment\"]} {\"process-id\" \"coating-applications\", \"outputs\" [\"coated functional glass\"], \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-120\"}, \"inputs\" [\"glass sheets\" \"coating chemicals\"], \"resources\" [\"coating machines\" \"drying equipment\"]}], \"dependencies\" [{\"description\" \"Cooling times must be observed during annealing before cutting or further processing.\"} {\"description\" \"Quality control checkpoints at each step must be passed before proceeding.\"} {\"description\" \"Limited availability of furnaces, lehrs, or lamination equipment can introduce bottlenecks.\"} {\"description\" \"Melting and shaping as continuous processes require batch synchronization to minimize downtime.\"} {\"description\" \"Environmental conditions like temperature and humidity control are critical for lamination and coating.\"} {\"description\" \"Overlap potential exists; finishing steps like tempering or laminating can overlap with the next batch entering earlier processes depending on machine availability.\"}], \"process-id\" \"plate-glass-production\", \"external-factors\" [{\"description\" \"Timely delivery of raw materials is critical to avoid production disruptions.\"} {\"description\" \"Seasonal demand peaks during construction seasons or before weather changes require planning.\"} {\"description\" \"Energy-intensive processes are influenced by electricity or gas price fluctuations.\"} {\"description\" \"Custom or specialty orders with strict deadlines add scheduling pressure.\"} {\"description\" \"Regular maintenance or unexpected equipment breakdowns require rescheduling.\"} {\"description\" \"Regulatory compliance, such as emissions limits, may restrict production at times.\"}], \"batch-and-lot-constraints\" [{\"description\" \"Minimum batch size must match the melting furnace's economic operating volume, typically several tons.\"} {\"description\" \"Maximum batch size is limited by the capacity of tanks and annealing lehrs.\"} {\"description\" \"Specialty glass products require smaller batches due to longer processing times and custom specifications.\"} {\"description\" \"Customer orders dictate lot sizes, sometimes necessitating batch splitting or combining.\"} {\"description\" \"Changeovers between product specifications impose time costs, making larger single-type lots more efficient.\"}]}, :commit-notes \"Added batch size and production lot size constraints, including minimum sizes due to furnace economics, maximum sizes due to equipment limitations, and product-specific or customer-driven constraints.\"}",
+                                     :from :surrogate,
+                                     :id 17,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:10:15.563-00:00"}
+                           #:message{:content
+                                     "\nAre there specific quality control checks or procedures at any stages in the plate glass production process? If so, could you describe them briefly, including what is being checked and how issues are addressed?",
+                                     :from :system,
+                                     :id 18,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:10:48.275-00:00"}
+                           #:message{:content
+                                     "\nYes, there are quality control checks throughout the plate glass production process:\n\n1. <b>Raw Material Inspection</b>: Initial checks ensure the purity and proper mix of silica sand, soda ash, and other raw materials. Any issues are corrected before melting.\n2. <b>Molten Glass Quality</b>: Visual and automated checks assess clarity and impurity levels during melting. Impurities are skimmed off, if detected.\n3. <b>Thickness and Flatness</b>: During shaping, sensors and gauges monitor consistency in thickness and flatness. Deviations trigger adjustments in shaping equipment.\n4. <b>Annealing Stress Test</b>: Polarization tools check for internal stresses after annealing. Defective sheets are either discarded or recycled.\n5. <b>Cutting Accuracy</b>: Measurements are taken to ensure proper dimensions during cutting. Incorrectly cut pieces are discarded.\n6. <b>Specialty Quality Checks</b>: For tempered, laminated, or coated glass, additional checks (e.g., surface strength, adhesion) verify product integrity. Issues are reworked or removed from the batch.\n\nAddressing issues involves reprocessing where possible (e.g., recycling improperly annealed glass) or discarding defective products to maintain quality standards.",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-preparation\", \"outputs\" [\"mixed glass batch\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"silica sand\" \"soda ash\" \"lime\" \"additives\"], \"resources\" [\"mixers\" \"labor\"]} {\"process-id\" \"melting\", \"outputs\" [\"molten glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"24-48\"}, \"inputs\" [\"mixed glass batch\" \"energy (gas/electricity)\"], \"resources\" [\"furnace\" \"skilled operators\"]} {\"process-id\" \"shaping\", \"outputs\" [\"shaped glass sheets\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30-60\"}, \"inputs\" [\"molten glass\"], \"resources\" [\"float bath/tin bath\" \"rollers\"]} {\"process-id\" \"annealing\", \"outputs\" [\"stress-relieved glass sheets\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"3-4\"}, \"inputs\" [\"shaped glass sheets\"], \"resources\" [\"annealing lehr\" \"temperature control systems\"]} {\"process-id\" \"cutting\", \"outputs\" [\"glass cut to size\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"inputs\" [\"cooled glass sheets\"], \"resources\" [\"cutting tools\" \"skilled labor\"]} {\"process-id\" \"tempering-process\", \"outputs\" [\"tempered (strengthened) glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"cut glass sheets\"], \"resources\" [\"heat furnace\" \"quenching equipment\"]} {\"process-id\" \"laminating-process\", \"outputs\" [\"laminated glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-5\"}, \"inputs\" [\"glass sheets\" \"interlayer material (e.g. PVB)\"], \"resources\" [\"autoclave\" \"rollers\" \"lamination equipment\"]} {\"process-id\" \"coating-applications\", \"outputs\" [\"coated functional glass\"], \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-120\"}, \"inputs\" [\"glass sheets\" \"coating chemicals\"], \"resources\" [\"coating machines\" \"drying equipment\"]}], \"dependencies\" [{\"description\" \"Cooling times must be observed during annealing before cutting or further processing.\"} {\"description\" \"Quality control checkpoints at each step must be passed before proceeding.\"} {\"description\" \"Limited availability of furnaces, lehrs, or lamination equipment can introduce bottlenecks.\"} {\"description\" \"Melting and shaping as continuous processes require batch synchronization to minimize downtime.\"} {\"description\" \"Environmental conditions like temperature and humidity control are critical for lamination and coating.\"} {\"description\" \"Overlap potential exists; finishing steps like tempering or laminating can overlap with the next batch entering earlier processes depending on machine availability.\"}], \"process-id\" \"plate-glass-production\", \"external-factors\" [{\"description\" \"Timely delivery of raw materials is critical to avoid production disruptions.\"} {\"description\" \"Seasonal demand peaks during construction seasons or before weather changes require planning.\"} {\"description\" \"Energy-intensive processes are influenced by electricity or gas price fluctuations.\"} {\"description\" \"Custom or specialty orders with strict deadlines add scheduling pressure.\"} {\"description\" \"Regular maintenance or unexpected equipment breakdowns require rescheduling.\"} {\"description\" \"Regulatory compliance, such as emissions limits, may restrict production at times.\"}], \"quality-control-checks\" [{\"check\" \"Inspect purity and proper mix of silica sand, soda ash, and additives.\", \"action-on-issue\" \"Correct mix before melting.\", \"stage\" \"Raw Material Preparation\"} {\"check\" \"Ensure clarity and impurity levels using visual and automated checks.\", \"action-on-issue\" \"Skim off impurities as needed.\", \"stage\" \"Melting\"} {\"check\" \"Monitor thickness and flatness with sensors and gauges.\", \"action-on-issue\" \"Trigger adjustments in shaping equipment for deviations.\", \"stage\" \"Shaping\"} {\"check\" \"Check for internal stresses using polarization tools.\", \"action-on-issue\" \"Recycle or discard defective sheets.\", \"stage\" \"Annealing\"} {\"check\" \"Ensure proper dimensions through measurements.\", \"action-on-issue\" \"Discard incorrectly cut pieces.\", \"stage\" \"Cutting\"} {\"check\" \"Verify surface strength, adhesion, or coating integrity.\", \"action-on-issue\" \"Rework or remove defective items from batch.\", \"stage\" \"Specialty Processing (Tempering, Laminating, Coating)\"}], \"batch-and-lot-constraints\" [{\"description\" \"Minimum batch size must match the melting furnace's economic operating volume, typically several tons.\"} {\"description\" \"Maximum batch size is limited by the capacity of tanks and annealing lehrs.\"} {\"description\" \"Specialty glass products require smaller batches due to longer processing times and custom specifications.\"} {\"description\" \"Customer orders dictate lot sizes, sometimes necessitating batch splitting or combining.\"} {\"description\" \"Changeovers between product specifications impose time costs, making larger single-type lots more efficient.\"}]}, :commit-notes \"Added quality control checks for multiple stages of the plate glass production, including raw material inspection, molten glass quality, thickness and flatness checks, annealing stress tests, cutting accuracy, and specialty product quality checks.\"}",
+                                     :from :surrogate,
+                                     :id 19,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:10:48.333-00:00"}
+                           #:message{:content
+                                     "\nAre there any reprocessing or recycling steps for defective glass sheets or byproducts in your production process? If so, could you describe how these are handled?",
+                                     :from :system,
+                                     :id 20,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:11:30.040-00:00"}
+                           #:message{:content
+                                     "\nYes, defective glass sheets and byproducts are reprocessed or recycled as follows:\n\n1. <b>Defective Glass Sheets</b>: Defective sheets from steps like annealing or cutting are typically crushed and recycled into cullet. Cullet is then re-melted with the raw materials in the furnace.\n2. <b>Byproducts and Waste</b>: Trimmings and waste glass generated during cutting are similarly collected and recycled into the production process.\n3. <b>Coating or Lamination Scrap</b>: For specialty products like laminated or coated glass, defective pieces generally cannot be recycled directly into the furnace due to contaminants. They are instead sent to specialized recycling facilities or processed separately if possible.\n\nThis recycling reduces waste, lowers material costs, and helps adhere to environmental regulations, though the amount of recyclable material varies depending on product type and defect severity.",
+                                     :from :surrogate,
+                                     :id 21,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:11:30.071-00:00"}
+                           #:message{:content
+                                     "\nAre there any reprocessing steps or recycling methods for defective glass or byproducts in your plate glass production process? If so, can you explain how they fit into your workflow?",
+                                     :from :system,
+                                     :id 22,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-05T15:11:41.113-00:00"}
+                           #:message{:content
+                                     "\nYes, reprocessing and recycling are integral to our workflow:\n\n1. <b>Cullet Recycling</b>: Defective glass sheets or trimmings from processes like cutting, annealing, or shaping are collected and crushed into cullet. The cullet is then reintegrated into the raw material preparation stage and melted in the furnace, reducing the need for virgin materials.\n2. <b>Edge Trimmings</b>: Waste generated during shaping or cutting is similarly recycled into the production cycle as cullet.\n3. <b>Specialty Glass</b>: For laminated or coated glass, reprocessing is more complex. Laminated glass is typically sent off-site for specialized recycling, as interlayers like PVB complicate in-house reprocessing. Coated glass may need to have coatings removed before being crushed and recycled.\n\nThese steps fit into the workflow by creating a closed-loop system for standard glass while external processing is necessary for specialized products, minimizing waste and maximizing efficiency.",
+                                     :data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"reprocessing-and-recycling\" [{\"description\" \"Defective glass sheets from annealing or cutting are crushed and recycled as cullet, re-melted with raw materials in the furnace.\"} {\"description\" \"Trimmings and waste glass from cutting are collected and recycled into the production process.\"} {\"description\" \"Defective laminated or coated glass cannot be recycled into the furnace and is sent to specialized recycling facilities or processed separately if possible.\"}], \"subprocesses\" [{\"process-id\" \"raw-material-preparation\", \"outputs\" [\"mixed glass batch\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"silica sand\" \"soda ash\" \"lime\" \"additives\"], \"resources\" [\"mixers\" \"labor\"]} {\"process-id\" \"melting\", \"outputs\" [\"molten glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"24-48\"}, \"inputs\" [\"mixed glass batch\" \"energy (gas/electricity)\"], \"resources\" [\"furnace\" \"skilled operators\"]} {\"process-id\" \"shaping\", \"outputs\" [\"shaped glass sheets\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30-60\"}, \"inputs\" [\"molten glass\"], \"resources\" [\"float bath/tin bath\" \"rollers\"]} {\"process-id\" \"annealing\", \"outputs\" [\"stress-relieved glass sheets\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"3-4\"}, \"inputs\" [\"shaped glass sheets\"], \"resources\" [\"annealing lehr\" \"temperature control systems\"]} {\"process-id\" \"cutting\", \"outputs\" [\"glass cut to size\"], \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"inputs\" [\"cooled glass sheets\"], \"resources\" [\"cutting tools\" \"skilled labor\"]} {\"process-id\" \"tempering-process\", \"outputs\" [\"tempered (strengthened) glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"inputs\" [\"cut glass sheets\"], \"resources\" [\"heat furnace\" \"quenching equipment\"]} {\"process-id\" \"laminating-process\", \"outputs\" [\"laminated glass\"], \"duration\" {\"units\" \"hours\", \"value-string\" \"1-5\"}, \"inputs\" [\"glass sheets\" \"interlayer material (e.g. PVB)\"], \"resources\" [\"autoclave\" \"rollers\" \"lamination equipment\"]} {\"process-id\" \"coating-applications\", \"outputs\" [\"coated functional glass\"], \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-120\"}, \"inputs\" [\"glass sheets\" \"coating chemicals\"], \"resources\" [\"coating machines\" \"drying equipment\"]}], \"dependencies\" [{\"description\" \"Cooling times must be observed during annealing before cutting or further processing.\"} {\"description\" \"Quality control checkpoints at each step must be passed before proceeding.\"} {\"description\" \"Limited availability of furnaces, lehrs, or lamination equipment can introduce bottlenecks.\"} {\"description\" \"Melting and shaping as continuous processes require batch synchronization to minimize downtime.\"} {\"description\" \"Environmental conditions like temperature and humidity control are critical for lamination and coating.\"} {\"description\" \"Overlap potential exists; finishing steps like tempering or laminating can overlap with the next batch entering earlier processes depending on machine availability.\"}], \"process-id\" \"plate-glass-production\", \"external-factors\" [{\"description\" \"Timely delivery of raw materials is critical to avoid production disruptions.\"} {\"description\" \"Seasonal demand peaks during construction seasons or before weather changes require planning.\"} {\"description\" \"Energy-intensive processes are influenced by electricity or gas price fluctuations.\"} {\"description\" \"Custom or specialty orders with strict deadlines add scheduling pressure.\"} {\"description\" \"Regular maintenance or unexpected equipment breakdowns require rescheduling.\"} {\"description\" \"Regulatory compliance, such as emissions limits, may restrict production at times.\"}], \"quality-control-checks\" [{\"check\" \"Inspect purity and proper mix of silica sand, soda ash, and additives.\", \"action-on-issue\" \"Correct mix before melting.\", \"stage\" \"Raw Material Preparation\"} {\"check\" \"Ensure clarity and impurity levels using visual and automated checks.\", \"action-on-issue\" \"Skim off impurities as needed.\", \"stage\" \"Melting\"} {\"check\" \"Monitor thickness and flatness with sensors and gauges.\", \"action-on-issue\" \"Trigger adjustments in shaping equipment for deviations.\", \"stage\" \"Shaping\"} {\"check\" \"Check for internal stresses using polarization tools.\", \"action-on-issue\" \"Recycle or discard defective sheets.\", \"stage\" \"Annealing\"} {\"check\" \"Ensure proper dimensions through measurements.\", \"action-on-issue\" \"Discard incorrectly cut pieces.\", \"stage\" \"Cutting\"} {\"check\" \"Verify surface strength, adhesion, or coating integrity.\", \"action-on-issue\" \"Rework or remove defective items from batch.\", \"stage\" \"Specialty Processing (Tempering, Laminating, Coating)\"}], \"batch-and-lot-constraints\" [{\"description\" \"Minimum batch size must match the melting furnace's economic operating volume, typically several tons.\"} {\"description\" \"Maximum batch size is limited by the capacity of tanks and annealing lehrs.\"} {\"description\" \"Specialty glass products require smaller batches due to longer processing times and custom specifications.\"} {\"description\" \"Customer orders dictate lot sizes, sometimes necessitating batch splitting or combining.\"} {\"description\" \"Changeovers between product specifications impose time costs, making larger single-type lots more efficient.\"}]}, :commit-notes \"Added reprocessing and recycling steps for defective glass sheets and byproducts, detailing how cullet is reintegrated and how specialty scraps are handled.\"}",
+                                     :from :surrogate,
+                                     :id 23,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:11:41.138-00:00"}]}
+           #:conversation{:id :data,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}]}
+           #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}]}
+           #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}]}],
+          :current-conversation :process,
+          :id :sur-plate-glass,
+          :name "SUR Plate Glass"}
 ]

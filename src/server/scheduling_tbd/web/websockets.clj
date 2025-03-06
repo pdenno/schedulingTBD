@@ -258,11 +258,13 @@
   "Handle websocket message with dispatch key :domain-expert-says. This will typically clear a promise-key.
    Note that we call it 'domain-expert' rather than 'user' because the role is just that, and it can be
    filled by a human or surrogate expert."
-  [{:keys [msg-text client-id promise-keys] :as msg}]
+  [{:keys [msg-text table client-id promise-keys] :as msg}]
   (log! :debug (str "domain-expert-says: " msg))
   (if-let [prom-obj (select-promise promise-keys)]
     (do (log! :debug (str "Before resolve!: prom-obj = " prom-obj))
-        (p/resolve! (:prom prom-obj) msg-text)
+        (p/resolve! (:prom prom-obj) (cond-> {:msg-type :expert-response}
+                                       msg-text (assoc :text msg-text)
+                                       table    (assoc :table table)))
         (clear-keys client-id [(:p-key prom-obj)]))
     (log! :error "domain-expert-says: no p-key (e.g. no question in play)")))
 

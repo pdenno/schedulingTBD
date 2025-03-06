@@ -1,12 +1,14 @@
-(ns scheduling-tbd.interviewing.annotated-data-structures.flow-shop
+(ns scheduling-tbd.interviewing.EADS.job-shop
   "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a flow-shop scheduling problem.
-       As the case is with flow-shop problems, this structure defines the flow of work through resources.
-   (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
+       As the case is with job-shop problems, this structure defines work to be performed in typical job.
+   (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer.
+
+   Note: We don't load this code at system startup. When you compile it, it writes the EADS to resources/EADS/flow-shop.txt"
   (:require
-   [clojure.spec.alpha         :as s]
+   [clojure.data.json]
    [clojure.pprint             :refer [pprint]]
-   [clojure.string             :as str]
-   [jsonista.core              :as json]))
+   [clojure.spec.alpha         :as s]
+   [taoensso.telemere          :as tel :refer [log!]]))
 
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
 (s/def ::data-structure (s/keys :req-un [::notes-on-data-structure ::annotated-data-structure]))
@@ -76,20 +78,10 @@
 (s/def ::units string?)
 (s/def ::value-string string?)
 
-;;; (s/valid? ::fshop/EADS (:annotated-data-structure fshop/flow-eads))
-(def flow-eads
+;;; (s/valid? ::fshop/EADS (:EADS fshop/flow-shop))
+(def job-shop
   "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of Phase 2 of a flow-shop problem."
-  {:notes-on-data-structure
-   (str "Below is an annotated data structure that provides an example of what we'd like you to produce.\n"
-        "By 'annotated' we mean that in some places, rather than just providing a primitive value (a string or number), we provide an object that contains that value (property 'val') and a comment (property 'comment').\n"
-        "The comments are there to help you understand the intent of the example. You do not have to put comments in what you produce, but if you could if you'd like.\n"
-        "You can use annotations on any property. Where you choose to use them should be entirely independent of where we used them.\n"
-        "Where you do use annotations, the 'comment' text should flag something about how you arrived at the 'val', for example, how it is unclear from the interviewees' answer what belongs in the value.\n"
-        "For example, if you were asking the interviewees how long shipping takes, they might answer 'it depends'.\n"
-        "You could flag this difficulty with an annotation: {'val' : 'it depends', 'comment' : 'The interviewees did not elaborate.'}.\n"
-        "By using an annotation here, you've flagged something that we can pursue with another agent and the interviewees.")
-
-   :annotated-data-structure ; This would be provided as JSON, I guess.
+  {:EADS
    {:process-id {:val "pencil-manufacturing",
                  :comment "This is the top-level process. You can name it as you see fit; don't ask the interviewees."}
 
@@ -195,3 +187,15 @@
                                     :outputs ["finished pencils"],
                                     :resources ["crimping tool"],
                                     :subprocesses []}]}]}})
+
+(def interview-objective
+
+(if (s/valid? ::EADS (:EADS job-shop))
+  (spit "resources/EADS/flow-shop.edn"
+        (with-out-str
+          (pprint
+           {:message-type :PHASE-2-EADS
+            :interview-objective "Produce a data structure similar in form to the EADS in this object, but describing the interviewees' production processes."
+            :EADS (with-out-str (clojure.data.json/pprint (:EADS job-shop)))})))
+  (do (log! :error "job-shop EADS does not pass specs.")
+      {:invalid-EADS-spec :job-shop}))

@@ -1,6 +1,15 @@
 ;;; https://github.com/borkdude/clj-kondo/blob/master/doc/config.md
 
+;;; Ideas:
+;;; 1) When things don't work, delete .cache.
+;;; 2) When things don't work, check how old clj-kondo is: /usr/local/bin/clj-kondo --version. Ditto for clojure-lsp.
+;;; 3) To see which linter is generating a warning put one of these in front of the expression:
+;;;    #_:clj-kondo/ignore   (def ^:diag diag (atom nil))
+;;;    #_:clojure-lsp/ignore (def ^:diag diag (atom nil))
+
 {:project-root-uri "file:///home/pdenno/Documents/git/schedulingTBD" ; ToDo: Fix this!
+
+;;; Do some linters have ns-qualified names and other not?
 
  :linters {;; unused-referred-var is about :refer. https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md#unused-referred-var
            :unused-referred-var {:exclude {taoensso.timbre [error debug info log]
@@ -13,7 +22,6 @@
            :unresolved-var      {:exclude [datahike.api ajax.core
                                            taoensso.telemere/with-kind-filter
                                            taoensso.telemere/signal!
-
                                            taoensso.telemere/*ctx*
                                            taoensso.telemere/add-handler!
                                            taoensso.telemere/handler:console
@@ -22,7 +30,7 @@
                                            taoensso.telemere/set-ctx!
                                            taoensso.telemere/set-middleware!
                                            taoensso.telemere/stop-handlers!]}
-           :unused-pubic-var    {:exclude-when-contains-meta #{:diag}}
+           :clj-kondo/unused-public-var {:exclude-when-contains-meta #{:diag}}
 
            ;; :exclude-patterns is for bindings, not vars. See https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md
            #_#_:unused-binding {:exclude-patterns ["^recreate.*" "^unknown-projects" "^backup.*"]}
@@ -31,13 +39,15 @@
 
            ;; https://clojure-lsp.io/settings/#clojure-lspunused-public-var
            :clojure-lsp/unused-public-var {:level :warning
-                                           #_#_:exclude #{scheduling-tbd.db/backup-proj-dbs    ; These are things that can be called by the developer.
+                                           :exclude #{scheduling-tbd.db/backup-proj-dbs    ; These are things that can be called by the developer.
                                                       scheduling-tbd.db/backup-system-db   ; I suppose another way to do this is just put ^:diag on them.
                                                       scheduling-tbd.db/proj-base-cfg      ; But, as indicated below, ^:diag isn't working.
-                                                      scheduling-tbd.db/delete-project
+                                                      scheduling-tbd.db/delete-project!
                                                       scheduling-tbd.db/recreate-dbs!
+                                                      scheduling-tbd.db/retract-conversation-done!
+                                                      scheduling-tbd.db/update-all-projects-for-schema!
                                                       scheduling-tbd.db/unknown-projects}
-                                           :exclude-when-contains-meta #{:diag}}} ; This works again [2024-05-18 Sat]
+                                           :exclude-when-contains-meta #{:diag}}} ; This works again [2024-05-18 Sat] ; And it stopped again [2025-03-04]
 
 
  ;; Gist for defstate: https://gist.github.com/ethpran/e1741a5c408aec831b5e3a7e24f40fea

@@ -15,7 +15,7 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
    [scheduling-tbd.util     :as util :refer [now]]
-   [taoensso.telemere       :refer [log!]]))
+   [taoensso.telemere       :refer [log!]])) ; Here only
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
@@ -157,6 +157,9 @@
    :conversation/done?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if we don't have more to add (though user might)."}
+   :conversation/EADS
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string that can be edn/read-string into the Example Annotated Data Structure (EADS) for this conversation."}
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
@@ -176,6 +179,9 @@
    :message/content
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string with optional html links."}
+   :message/data-structure
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string that can be edn/read-string into a data structure inferred from conversation so far."}
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
@@ -189,6 +195,9 @@
    :message/tags
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "Optional keywords used to classify the message."}
+   :message/table
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An optional table that that is the response, or part of the response of a user."}
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
@@ -362,61 +371,46 @@
    :table/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "The ID of a table, unique in the context of this project DB."}
-
    :table/purpose
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The purpose of this table, on of the enumeration #{:customer orders}"}
-
    :table/filename
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The filename as it appears in the project directory}"}
-
    :table/identity-condition ; ToDo: we expect more cardinality :many, but not yet.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "The subset of column names (:object/attribute-name) that identify objects."}
-
    :table/attributes
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "Attribute objects for the tableThe subset of column names (:object/attribute-name) that identify objects."}
-
    :table/data
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "A vector of :object objects."}
-
    :attribute/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The name of the attribute, often based on the column name."}
-
    :attribute/description
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "A description of the purpose of the attribute."}
-
    :attribute/cardinality
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "#{:one :many}"}
-
    :attribute/datatype
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "#{:string :number, etc.}"}
-
    :object/row
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc "Row that realized this object."}
-
    :object/attribute-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "Name of the column (or generated name) for tRow that realized this object."}
-
    :object/attribute-value
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "Name of the column (or generated name) for tRow that realized this object."}
-
    :object/attribute-value-pairs
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref}
-
    :column/tuple
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword}})
-
 
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
@@ -449,7 +443,7 @@
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
   [pid cid]
-  (assert (#{:process :data :resource :resources :optimality} cid))
+  (assert (#{:process :data :resources :optimality} cid))
   (d/q '[:find ?eid .
          :in $ ?cid
          :where [?eid :conversation/id ?cid]]
@@ -504,20 +498,19 @@
          vec))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/id :conversation/interviewer-budget :conversation/messages :message/id :message/from :message/content :message/time :message/tags :message/question-type})
+  #{:conversation/data-structure :conversation/EADS :conversation/id :conversation/interviewer-budget :conversation/messages
+    :message/content :message/from :message/id :message/question-type :message/tags :message/time})
 
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
   [pid cid]
   (assert (#{:process :data :resources :optimality} cid))
   (if-let [eid (conversation-exists? pid cid)]
-    (->> (resolve-db-id {:db/id eid}
+    (-> (resolve-db-id {:db/id eid}
                         (connect-atm pid)
                         :keep-set message-keep-set)
-         :conversation/messages
-         (sort-by :message/id)
-         vec)
-    []))
+         (update :conversation/messages #(->> % (sort-by :message/id) vec)))
+    {}))
 
 (defn get-code
   "Return the code string for the argument project (or an empty string if it does not exist)."
@@ -737,10 +730,8 @@
 
 (defn max-msg-id
   "Return the current highest message ID used in the project."
-  [pid]
-  (let [ids (d/q '[:find [?msg-id ...]
-                   :where [_ :message/id ?msg-id]]
-                 @(connect-atm pid))]
+  [pid cid]
+  (let [ids (->> (get-conversation pid cid) :conversation/messages (mapv :message/id))]
     (if (empty? ids) 0 (apply max ids))))
 
 ;;; See "Map forms" at https://docs.datomic.com/pro/transactions/transactions.html
@@ -749,21 +740,22 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to current conversation of the database with :project/id = id."
-  [{:keys [pid cid from text tags question-type]}]
+  [{:keys [pid cid from text table tags question-type]}]
   (assert (keyword? cid))
   (assert (#{:system :human :surrogate :developer-injected} from))
   (assert (string? text))
   (log! :debug (str "add-msg: pid = " pid "text = " text))
   (if-let [conn (connect-atm pid)]
-    (let [msg-id (inc (max-msg-id pid))]
+    (let [msg-id (inc (max-msg-id pid cid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
+                                                            table            (assoc :message/table table)
                                                             (not-empty tags) (assoc :message/tags tags)
                                                             question-type    (assoc :message/question-type question-type))}]}))
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
 (defn get-budget
-  "Return the :converation/interviewer-budget."
+  "Return the :conversation/interviewer-budget."
   [pid cid]
    (d/q '[:find ?budget .
           :in $ ?cid
@@ -780,6 +772,60 @@
                    :where [?eid :conversation/id ?cid]] @conn-atm cid)]
     (if eid
       (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
+      (log! :error (str "No such conversation: " cid)))))
+
+(defn get-eads
+  "Return the :conversation/EADS."
+  [pid cid]
+  (when-let [s (d/q '[:find ?eads .
+                      :in $ ?cid
+                      :where
+                      [?e :conversation/id ?cid]
+                      [?e :conversation/EADS ?eads]]
+                    @(connect-atm pid) cid)]
+    (edn/read-string s)))
+
+(defn put-eads!
+  "Put a stringified representation of the EADS (edn, not JSON) argument in the project's argument conversation."
+  [pid cid eads]
+    (let [conn-atm (connect-atm pid)
+        eid (d/q '[:find ?eid .
+                   :in $ ?cid
+                   :where [?eid :conversation/id ?cid]] @conn-atm cid)]
+    (if eid
+      (d/transact conn-atm {:tx-data [{:db/id eid :conversation/EADS (str eads)}]})
+      (log! :error (str "No such conversation: " cid)))))
+
+(defn get-ds
+  "Return a vector of maps of data structures where :message/id is where the :message/data-structure was created."
+  [pid cid]
+  (->> (d/q '[:find ?id ?ds
+              :keys message/id message/data-structure
+              :in $ ?cid
+              :where
+              [?e :conversation/id ?cid]
+              [?conv :conversation/messages ?m]
+              [?m :message/data-structure ?ds]
+              [?m :message/id ?id]]
+            @(connect-atm pid) cid)
+       (mapv #(update % :message/data-structure edn/read-string))
+       not-empty))
+
+;;; ToDo: latest :human/surrogate message might be better?
+;;; (db/backup-proj-db :sur-optical-fiber)
+(defn put-ds!
+  "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message."
+  [pid cid ds]
+  (let [max-id (max-msg-id pid cid)
+        conn-atm (connect-atm pid)
+        eid (d/q '[:find ?eid .
+                   :in $ ?cid ?max-id
+                   :where
+                   [?conv :conversation/id ?cid]
+                   [?conv :conversation/messages ?eid]
+                   [?eid :message/id ?max-id]] @conn-atm cid max-id)]
+    (if eid
+      (d/transact conn-atm {:tx-data [{:db/id eid :message/data-structure (str ds)}]})
       (log! :error (str "No such conversation: " cid)))))
 
 (defn add-project-to-system
@@ -841,7 +887,7 @@
    (let [{id :project/id pname :project/name} (if force-this-name? proj-info (unique-proj proj-info))
          cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
          dir (-> cfg :store :path)
-         files-dir (-> cfg :base-dir (str "/" pname  "/files"))]
+         files-dir (-> cfg :base-dir (str "/projects/" pname  "/files"))]
      (when-not in-mem?
        (when-not (-> dir io/as-file .isDirectory)
          (-> cfg :store :path io/make-parents)

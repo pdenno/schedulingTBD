@@ -31,16 +31,16 @@
            heading (-> (str "\n" (name kind) "/" (name level) " ") str/upper-case)]
        (cond (= :error level)      (pr-bling (bling [:bold.red.white-bg heading] " " [:red    (str file ":" line " - " msg)]))
              (= :warn  level)      (pr-bling (bling [:bold.blue heading]         " " [:yellow (str file ":" line " - " msg)]))
-             :else                 (pr-bling (bling [:bold.blue heading]         " "  (str file ":" line " - " msg))))))))
+             :else                 (pr-bling (bling [:bold.blue heading]         " " [:olive  (str file ":" line " - " msg)])))))))
 
 (defn agents-log-output-fn
   "Output verbatim agent interactions to a log file."
   ([] :can-be-a-no-op)
   ([signal]
    (when (= (:kind signal) :agents)
-     (let [{:keys [inst msg_]} signal
+     (let [{:keys [msg_]} signal
            msg (if-let [s (not-empty (force msg_))] s "\"\"")]
-       (str inst ": " msg "\n")))))
+       (str msg "\n")))))
 
 (defn config-log!
   "Configure Telemere: set reporting levels and specify a custom :output-fn."

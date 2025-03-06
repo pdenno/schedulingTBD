@@ -2,70 +2,18 @@
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:refer-clojure :exclude [send])
   (:require
-   [clojure.spec.alpha            :as s]
    [clojure.datafy                :refer [datafy]]
    [clojure.core.unify            :as uni]
    [clojure.pprint                :refer [cl-format pprint]]
+   [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
    [jsonista.core                 :as json]
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.web.websockets :as ws]
-   [taoensso.telemere             :refer [log!]]))
+   [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
-
-(defmacro defanalyze
-  "Macro to wrap methods for updating the project's database for effects from running an operation.
-   Returned value is not meaningful."
-  {:clj-kondo/lint-as 'clojure.core/defmacro
-   :arglists '(tag [arg-map] & body)}
-  [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  `(defmethod analyze-response-meth ~tag [~arg-map]
-     (log! :debug (cl-format nil "==> ~A (act)" ~tag))
-     (let [res# (do ~@body)]
-       (if (seq? res#) (doall res#) res#)
-       (do (log! :debug (cl-format nil "<-- ~A (act) returns ~S" ~tag res#))
-           res#))))
-
-;;; Needs work: I get scheduling_tbd/web/websockets.clj:289 - Could not find out async channel for client
-#_(defmacro defanalyze
-  "Macro to wrap methods for updating the project's database for effects from running an operation.
-   Returned value is not meaningful."
-  {:clj-kondo/lint-as 'clojure.core/defmacro
-   :arglists '(tag [arg-map] & body)}
-  [tag [arg-map] & body]  ; ToDo: Currently to use more-args, the parameter list needs _tag before the useful one.
-  (let [as-var# (:as arg-map)]
-    `(defmethod analyze-response-meth ~tag [~arg-map]
-       (try
-         (do
-           (when-let [client-id# (:client-id ~as-var#)]
-             (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id#}))
-           (log! :debug (cl-format nil "==> ~A (act)" ~tag))
-           (let [res# (do ~@body)]
-             (if (seq? res#) (doall res#) res#)
-             (log! :debug (cl-format nil "<-- ~A (act) returns ~S" ~tag res#))
-             res#))
-         (finally
-           (when-let [client-id# (:client-id ~as-var#)]
-             (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id#})))))))
-
-
-(s/def ::dispatch-args (s/keys :req-un [::question-type]))
-(s/def ::question-type (s/and keyword?
-                              #(#{"process" "data" "resources" "optimality"} (namespace %))))
-
-(defn analyze-response--dispatch
-  "Parameters to analyze-response is a object with at least a :plan-step in it and a response from operator-meth (user response)."
-  [{:keys [question-type cid] :as args}]
-  (s/assert ::dispatch-args args)
-  (if (and question-type cid)
-    (keyword (name cid) (name question-type))
-    (do
-      (log! :error (str "analyze-response-dispatch: No dispatch for question-type. ctx = " args))
-      (throw (ex-info "No method to analyze response: " {:args args})))))
-
-(defmulti analyze-response-meth #'analyze-response--dispatch)
 
 (defn find-claim
   "Unify the fact (which need not be ground) to the fact-list"
@@ -107,17 +55,37 @@
    (regarding this, see function good-for-var?)
    Call the text-to-var agent on the argument text, returning a map containing keys:
    :INPUT-TEXT and :CORRESPONDING-VAR."
-  [text]
-  (if (good-for-var? text)
-    (make-var-from-string text)
-    (let [res (try (-> (adb/query-agent :text-to-var (format "{\"INPUT-TEXT\" : \"%s\"}" text))
-                       json/read-value
-                       (update-keys keyword))
-                   (catch Exception e
-                     (let [d-e (datafy e)]
-                       (log! :warn (str "text-to-var failed\n "
-                                        "\nmessage: " (-> d-e :via first :message)
-                                        "\ncause: " (-> d-e :data :body)
-                                        "\ntrace: " (with-out-str (pprint (:trace d-e))))))))]
-      (s/assert ::text-to-var res)
-      (:CORRESPONDING-VAR res))))
+  ([text] (text-to-var text {}))
+  ([text {:keys [asking-role]}]
+   (if (good-for-var? text)
+     (make-var-from-string text)
+     (let [res (try (-> (adb/query-agent :text-to-var
+                                         (format "{\"INPUT-TEXT\" : \"%s\"}" text)
+                                         (when asking-role {:asking-role asking-role}))
+                        json/read-value
+                        (update-keys keyword))
+                    (catch Exception e
+                      (let [d-e (datafy e)]
+                        (log! :warn (str "text-to-var failed\n "
+                                         "\nmessage: " (-> d-e :via first :message)
+                                         "\ncause: " (-> d-e :data :body)
+                                         "\ntrace: " (with-out-str (pprint (:trace d-e))))))))]
+       (s/assert ::text-to-var res)
+       (:CORRESPONDING-VAR res)))))
+
+(defn deep-keys [obj]
+  (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m (keyword k) (deep-keys v))) {} obj)
+        (vector? obj)   (mapv deep-keys obj)
+        :else           obj))
+
+;;; ====================== Shared by use of tags :process :data :resources :optimality ====================
+(defn analyze-warm-up--dispatch [tag & _] tag)
+
+;;; The methods for this are in the interviewing/domain directory.
+(defmulti analyze-warm-up #'analyze-warm-up--dispatch)
+
+(defn eads-response--dispatch [tag & _] tag)
+
+;;; The methods for this are in the interviewing/domain directories.
+;;; Returns a PHASE-2-EADS message. (See for example the one for :process in process_analysis.clj.
+(defmulti eads-response! #'eads-response--dispatch)

@@ -4,8 +4,8 @@
            com.cemerick/url                    {:mvn/version "0.1.1"}
            com.github.pdenno/mznp              {:mvn/version "1.0.89"}
            com.taoensso/timbre                 {:mvn/version "6.6.1"} ; Keep
-           com.taoensso/telemere               {:mvn/version "1.0.0-RC2"}
-           com.taoensso/telemere-slf4j         {:mvn/version "1.0.0-RC2"} ; Just adding it here initializes it; try (tel/check-interop).
+           com.taoensso/telemere               {:mvn/version "1.0.0-RC3"}
+           com.taoensso/telemere-slf4j         {:mvn/version "1.0.0-RC3"} ; Just adding it here initializes it; try (tel/check-interop).
            com.wsscode/pathom3                 {:mvn/version "2025.01.16-alpha"}
            dk.ative/docjure                    {:mvn/version "1.21.0"}   ; spreadsheets
            io.github.paintparty/bling          {:mvn/version "0.4.2"}
@@ -21,9 +21,10 @@
            org.clj-commons/hickory             {:mvn/version "0.7.5"}
            org.clojure/clojure                 {:mvn/version "1.12.0"}
            org.clojure/core.unify              {:mvn/version "0.7.0"}
+           org.clojure/data.json               {:mvn/version "2.5.1"}    ; So far, this is only used to pprint for EADS. ToDo: This, jsonista, or both?
            org.clojure/data.xml                {:mvn/version "0.0.8"}
            org.clojure/tools.logging           {:mvn/version "1.3.0"}
-           org.ring-clojure/ring-websocket-async {:mvn/version "0.2.0"} ;  "0.1.19" Does not exist.
+           org.ring-clojure/ring-websocket-async {:mvn/version "0.2.0"}
            ring/ring-defaults                  {:mvn/version "0.6.0"}
            ring/ring-jetty-adapter             {:mvn/version "1.13.0"}  ;; These could be 2.0.0-alpha1, but currently problems with ring-websocket-async
            ring/ring-core                      {:mvn/version "1.13.0"}  ;; I switched to try org.ring-clojure/ring-websocket-async
@@ -86,5 +87,5 @@
 ;;;   |          |                io.replikativ/datahike |    0.6.1592 |        0.6.1594 | Not now
 ;;;   |          |                           mount/mount |      0.1.20 |          0.1.21 |
 ;;;   |          |                           nrepl/nrepl |       1.3.0 |           1.3.1 |
-;;;   |          | org.ring-clojure/ring-websocket-async | 0.1.0-beta2 |           0.2.0 | There is also a 0.1.0, if 0.2.0 doesn't work.
+;;;   |          | org.ring-clojure/ring-websocket-async | 0.1.0-beta2 |           0.2.0 |
 ;;;   |          |                         selmer/selmer |     1.12.61 |         1.12.62 |

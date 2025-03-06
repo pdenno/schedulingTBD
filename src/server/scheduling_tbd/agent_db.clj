@@ -217,13 +217,13 @@
       (new java.util.Date newest))))
 
 (defn remake-needs
-  "This makes pragmatic and policy-based decisions on remaking an agent or creating a newest thread for it.
+  "This makes PRAGMATIC and POLICY-BASED decisions on remaking an agent or creating a newest thread for it.
    It updates the argument status object with :remake? and :make-thread? appropriately.
-   The pragmatic decision is simply if the llm-provider doesn't have the assistant or thread, the agent is recreated.
-   The policy-based decision is that if the agent is :share-assistant and the llm-provider has the stuff,
+   The PRAGMATIC decision is simply that if the llm-provider doesn't have the assistant or thread, the agent is recreated.
+   The POLICY-BASED decision is that if the agent is :share-assistant and the llm-provider has the stuff,
    it won't be recreated, even if the assistant instructions are outdated relative to what the agent is using.
    This choice is to preserve the context already built up by the current agent.
-   You can force a fresh instance in ensure-agent! with :force? = true."
+   You can force a fresh instance in ensure-agent! with :force-new? = true. This is the default for surrogate experts."
   [{:keys [base-type agent-type missing-here missing-at-provider outdated? substitute-aid] :as status}]
   (let [missing? (or missing-here missing-at-provider)
         res (case agent-type
@@ -467,10 +467,11 @@
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
     :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
-  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn base-type]
+  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn asked-role asking-role]
       :or {test-fn (fn [_] true),
            preprocess-fn identity
-           base-type :unknown
+           asked-role :unknown
+           asking-role :unknown
            llm-provider @default-llm-provider
            timeout-secs 60
            role "user"} :as obj}]
@@ -481,11 +482,11 @@
     (if (> (:tries obj) 0)
       (try
         (tel/with-kind-filter {:allow :agents}
-          (tel/signal! {:kind :agents :level :info :msg (str "\n\n" (name base-type) " ===> " query-text)}))
+          (tel/signal! {:kind :agents :level :info :msg (str "\n\n" (name asking-role) " ===> " query-text)}))
         (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
               res (preprocess-fn raw)]
           (tel/with-kind-filter {:allow :agents}
-            (tel/signal! {:kind :agents :level :info :msg (str "\n" (name base-type) " <=== " raw)}))
+            (tel/signal! {:kind :agents :level :info :msg (str "\n" (name asked-role) " <=== " raw)}))
           (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
         (catch Exception e
           (let [d-e (datafy e)]
@@ -497,9 +498,14 @@
       (log! :warn "Query on thread exhausted all tries."))))
 
 (defn query-agent
-  "Make a query to a named agent. Convenience function for query-on-thread."
+  "Make a query to a named agent. Convenience function for query-on-thread.
+    opts-map might include:
+       :test-fn - a function to test the response of validity,
+       :tries - how many times to ask the agent while test-fn fails.
+       :asked-role - defaults to the base-type, so entirely unnecessary if agent-or-info is the agent keyword.
+       :asking-role - useful for logging and debugging, typically some interviewer keyword."
   ([agent-or-info text] (query-agent agent-or-info text {}))
-  ([agent-or-info text opts]
+  ([agent-or-info text {:keys [asked-role] :as opts-map}]
    (try
      (let [agent (cond (keyword? agent-or-info)                   (ensure-agent! {:base-type agent-or-info})
                        (and (map? agent-or-info)
@@ -507,12 +513,24 @@
                             (contains? agent-or-info :tid))       agent-or-info
                        (and (map? agent-or-info)
                             (contains? agent-or-info :base-type)) (ensure-agent! agent-or-info))
-           {:keys [aid tid]} agent]
+           {:keys [aid tid base-type]} agent]
        (assert (string? aid))
        (assert (string? tid))
-       (query-on-thread (merge opts {:aid aid :tid tid :query-text text})))
+       (query-on-thread (merge opts-map {:aid aid
+                                         :tid tid
+                                         :query-text text
+                                         :asked-role (or asked-role base-type)})))
      (catch Exception e
        (log! :error (str "query-agent failed: " e))))))
+
+(defn agent-log
+  "Log info-string to agent log"
+  [& args]
+  (let [date (str (java.util.Date.))]
+    (tel/with-kind-filter {:allow :agents}
+      (tel/signal!
+       {:kind :agents :level :info
+        :msg (str "===== " date " " (apply str args))}))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-agents!
