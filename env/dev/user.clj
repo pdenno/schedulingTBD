@@ -11,11 +11,11 @@
    [mount.core :as mount]
    [lambdaisland.classpath.watch-deps :as watch-deps]      ; hot loading for deps.
    [scheduling-tbd.core :refer [server]]                   ; for mount.
-   [scheduling-tbd.domain.data-analysis]                   ; for mount.
-   [scheduling-tbd.domain.process-analysis]                ; for mount.
-   [scheduling-tbd.domain.resources-analysis]              ; for mount.
+   [scheduling-tbd.interviewing.domain.data-analysis]                   ; for mount.
+   [scheduling-tbd.interviewing.domain.process-analysis]                ; for mount.
+   [scheduling-tbd.interviewing.domain.resources-analysis]              ; for mount.
    [scheduling-tbd.llm  :as llm]                           ; Because of deep synchronization problems when this is from mount.
-   [scheduling-tbd.interviewers :refer [iviewers]]         ; for mount
+   [scheduling-tbd.interviewing.interviewers :refer [iviewers]]         ; for mount
    [scheduling-tbd.web.handler]                            ; for mount, defines rm.server.config/config, and router stuff.
    [taoensso.telemere :as tel :refer [log!]]))
 
@@ -40,8 +40,6 @@
 (defn stop
   "Stop the web server"
   []
-
-
   (mount/stop))
 
 (defn restart

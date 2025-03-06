@@ -1,0 +1,8 @@
+{:type "json_schema",
+ :json_schema {:name "text_to_var", ; No spaces allowed.
+               :strict true,
+               :schema {:type "object",
+                        :properties {:INPUT-TEXT        {:type "string"}
+                                     :CORRESPONDING-VAR {:type "string"}}
+                        :required ["INPUT-TEXT", "CORRESPONDING-VAR"],
+                        :additionalProperties false}}}

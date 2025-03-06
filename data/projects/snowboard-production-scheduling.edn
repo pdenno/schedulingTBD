@@ -1,0 +1,73 @@
+[#:project{:conversations
+           [#:conversation{:id :data,
+                           :messages
+                           [#:message{:content
+                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                      :from :system,
+                                      :id 4,
+                                      :tags [:conversation-intro],
+                                      :time
+                                      #inst "2024-11-20T12:53:10.977-00:00"}
+                            #:message{:content
+                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                      :from :system,
+                                      :id 7,
+                                      :tags [:conversation-intro],
+                                      :time
+                                      #inst "2024-11-20T13:32:52.723-00:00"}]}
+            #:conversation{:done? true,
+                           :id :process,
+                           :messages
+                           [#:message{:content
+                                      "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.",
+                                      :from :system,
+                                      :id 1,
+                                      :time
+                                      #inst "2023-11-14T15:05:39.985-00:00"}
+                            #:message{:content
+                                      "Our principal scheduling problem boils down to efficiently coordinating multiple variable elements in our production process. These include reconciling supplier timelines for raw materials delivery, regulating internal manufacturing stages, accounting for fluctuating seasonal demand, and ensuring timely shipment to retailers. Additionally, unanticipated demand surge or supply chain disruptions pose considerable challenges. The issue is mainly compounded by the product's seasonality, which calls for careful forecasting and demand planning. Finally, the production process for custom-designed snowboards results in frequent changes in the production schedule.",
+                                      :from :human,
+                                      :id 2,
+                                      :time
+                                      #inst "2023-11-14T10:05:40.007-00:00"}
+                            #:message{:content
+                                      "Great! We'll call your project 'Snowboards production scheduling'.",
+                                      :from :system,
+                                      :id 3,
+                                      :time
+                                      #inst "2023-11-14T10:05:40.028-00:00"}]}
+            #:conversation{:id :resources,
+                           :messages
+                           [#:message{:content
+                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                      :from :system,
+                                      :id 5,
+                                      :tags [:conversation-intro],
+                                      :time
+                                      #inst "2024-11-20T12:53:10.999-00:00"}
+                            #:message{:content
+                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                      :from :system,
+                                      :id 8,
+                                      :tags [:conversation-intro],
+                                      :time
+                                      #inst "2024-11-20T13:32:52.740-00:00"}]}
+            #:conversation{:id :optimality,
+                           :messages
+                           [#:message{:content
+                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                      :from :system,
+                                      :id 6,
+                                      :tags [:conversation-intro],
+                                      :time
+                                      #inst "2024-11-20T12:53:11.019-00:00"}
+                            #:message{:content
+                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                      :from :system,
+                                      :id 9,
+                                      :tags [:conversation-intro],
+                                      :time
+                                      #inst "2024-11-20T13:32:52.759-00:00"}]}],
+           :current-conversation :process,
+           :id :snowboards-production-scheduling,
+           :name "Snowboards production scheduling"}]

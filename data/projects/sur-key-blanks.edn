@@ -1,327 +1,40 @@
 [
-#:project{:conversations
-          [#:conversation{:id :process,
-                          :messages
-                          [#:message{:content
-                                     "This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
-                                     :from :system,
-                                     :id 1,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-12-04T16:32:06.753-00:00"}
-                           #:message{:content
-                                     "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
-                                     :from :system,
-                                     :id 5,
-                                     :question-type :process/warm-up,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:32:23.262-00:00"}
-                           #:message{:content
-                                     "We primarily manufacture key blanks, which are unfinished keys that locksmiths and key cutting professionals can customize for specific locks. Our scheduling challenge involves coordinating the production process to ensure that we meet fluctuating demand while managing inventory levels effectively. This requires precise timing and coordination across multiple stages, from raw material procurement to production and distribution, to minimize lead times and ensure timely deliveries.",
-                                     :from :surrogate,
-                                     :id 6,
-                                     :question-type :process/warm-up,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:32:23.349-00:00"}
-                           #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
-                                     :from :system,
-                                     :id 7,
-                                     :question-type :process/work-type,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:32:38.575-00:00"}
-                           #:message{:content "PRODUCT",
-                                     :from :surrogate,
-                                     :id 8,
-                                     :question-type :process/work-type,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:32:38.667-00:00"}
-                           #:message{:content
-                                     "Some work is performed in your own facility, some, like cutting down trees, has to be performed at the customer's site. Which is most common in your work? Respond with the single word OUR-FACILITY, CUSTOMER-SITE, or if it isn't straightforward, an explanation.",
-                                     :from :system,
-                                     :id 9,
-                                     :question-type
-                                     :process/production-location,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:32:48.244-00:00"}
-                           #:message{:content "OUR-FACILITY",
-                                     :from :surrogate,
-                                     :id 10,
-                                     :question-type
-                                     :process/production-location,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:32:48.293-00:00"}
-                           #:message{:content
-                                     "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER, or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
-                                     :from :system,
-                                     :id 11,
-                                     :question-type
-                                     :process/production-motivation,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:33:04.404-00:00"}
-                           #:message{:content "MAKE-TO-STOCK",
-                                     :from :surrogate,
-                                     :id 12,
-                                     :question-type
-                                     :process/production-motivation,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:33:04.460-00:00"}
-                           #:message{:content
-                                     "There are a few common patterns or system designs by which products are made. In a FLOW-SHOP, all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
-                                     :from :system,
-                                     :id 13,
-                                     :question-type
-                                     :process/production-system-type,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:33:16.698-00:00"}
-                           #:message{:content "FLOW-SHOP",
-                                     :from :surrogate,
-                                     :id 14,
-                                     :question-type
-                                     :process/production-system-type,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:33:16.748-00:00"}
-                           #:message{:content
-                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
-                                     :from :system,
-                                     :id 15,
-                                     :question-type
-                                     :process/process-steps,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:33:32.270-00:00"}
-                           #:message{:content
-                                     "1. Acquire Raw Materials\n2. Cut Key Blanks to Standard Size\n3. Stamp Key Blanks with Identification\n4. Perform Quality Inspection\n5. Package Key Blanks\n6. Distribute to Warehouses/Customers",
-                                     :from :surrogate,
-                                     :id 16,
-                                     :question-type
-                                     :process/process-steps,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:33:32.340-00:00"}
-                           #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
-                                     :from :system,
-                                     :id 17,
-                                     :question-type
-                                     :process/process-durations,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:33:49.927-00:00"}
-                           #:message{:content
-                                     "1. Acquire Raw Materials (1-2 days)\n2. Cut Key Blanks to Standard Size (2-3 hours)\n3. Stamp Key Blanks with Identification (1-2 hours)\n4. Perform Quality Inspection (1 hour)\n5. Package Key Blanks (1-2 hours)\n6. Distribute to Warehouses/Customers (1-3 days)",
-                                     :from :surrogate,
-                                     :id 18,
-                                     :question-type
-                                     :process/process-durations,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:33:49.983-00:00"}
-                           #:message{:content
-                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
-                                     :from :system,
-                                     :id 19,
-                                     :tags [:info-to-user :minizinc],
-                                     :time
-                                     #inst "2024-12-04T16:34:36.720-00:00"}
-                           #:message{:content
-                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just \"1000 packages.\" If, however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and, for each step, tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling (2000 packages)\n 3. Bake Wafers (1000 packages)\n 4. Assemble Cookies (1000 packages)\n 5. Package (1000 packages)",
-                                     :from :system,
-                                     :id 20,
-                                     :question-type
-                                     :process/batch-size,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:34:52.996-00:00"}
-                           #:message{:content
-                                     "1. Acquire Raw Materials (5000 key blanks)\n2. Cut Key Blanks to Standard Size (5000 key blanks)\n3. Stamp Key Blanks with Identification (5000 key blanks)\n4. Perform Quality Inspection (5000 key blanks)\n5. Package Key Blanks (5000 key blanks)\n6. Distribute to Warehouses/Customers (5000 key blanks)",
-                                     :from :surrogate,
-                                     :id 21,
-                                     :question-type
-                                     :process/batch-size,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:34:53.055-00:00"}
-                           #:message{:content
-                                     "Earlier, you listed the process steps typically used in making the product and for each, you specified typical durations. Now, we'd like you to tell us what raw materials and intermediate products go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process steps list, it would look like this:\n\n 1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n 2. Make Filling (sugar, water, vanilla flavoring)\n 3. Bake Wafers (use dough from Make Cookie Dough)\n 4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n 5. Package (use cookies from Assemble Cookies)",
-                                     :from :system,
-                                     :id 22,
-                                     :question-type
-                                     :process/process-ordering,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-12-04T16:35:09.342-00:00"}
-                           #:message{:content
-                                     "1. Acquire Raw Materials (metal sheets or rods, packaging materials)\n2. Cut Key Blanks to Standard Size (use metal sheets or rods from Acquire Raw Materials)\n3. Stamp Key Blanks with Identification (use key blanks from Cut Key Blanks to Standard Size)\n4. Perform Quality Inspection (use stamped key blanks from Stamp Key Blanks with Identification)\n5. Package Key Blanks (use key blanks from Perform Quality Inspection, packaging materials from Acquire Raw Materials)\n6. Distribute to Warehouses/Customers (use packaged key blanks from Package Key Blanks)",
-                                     :from :surrogate,
-                                     :id 23,
-                                     :question-type
-                                     :process/process-ordering,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-12-04T16:35:09.391-00:00"}]}
-           #:conversation{:id :data,
-                          :messages
-                          [#:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
-                                     :from :system,
-                                     :id 2,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-12-04T16:32:06.808-00:00"}]}
-           #:conversation{:id :resources,
-                          :messages
-                          [#:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
-                                     :from :system,
-                                     :id 3,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-12-04T16:32:06.876-00:00"}]}
-           #:conversation{:id :optimality,
-                          :messages
-                          [#:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
-                                     :from :system,
-                                     :id 4,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-12-04T16:32:06.937-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {cutKeyBlanks, stampIdentification, qualityInspect, packageBlanks};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.500, 1.500, 1.000, 1.500|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, cutKeyBlanks] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, cutKeyBlanks] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, cutKeyBlanks] == taskStarts[p, stampIdentification]);\nconstraint forall (p in Product) (taskEnds[p, stampIdentification] == taskStarts[p, qualityInspect]);\nconstraint forall (p in Product) (taskEnds[p, qualityInspect] == taskStarts[p, packageBlanks]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packageBlanks]);",
-          :agents
-          [#:agent{:assistant-id "asst_Zz3XcnFcPnVJ622Z0RU5zCYJ",
-                   :base-type :process-interview-agent,
-                   :agent-type :shared-assistant
-                   :id :process-interview-agent-openai,
-                   :llm-provider :openai,
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_OgZORVZkYofhZQAVQpp2DipB",
                    :model-class :gpt,
-                   :thread-id "thread_eibnmYen4W7icr4ZtyEdRJxU"}
-           #:agent{:base-type :sur-key-blanks,
-                   :agent-type :project
-                   :thread-id "thread_C261CZLnp6u3mTP2IXsXXg7I",
                    :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes key blanks.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :assistant-id "asst_eJ7AxECsRib6jGssqREMahgx",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2025-01-31T17:13:05.127-00:00"}
+           #:agent{:base-type :sur-key-blanks,
+                   :agent-type :project,
+                   :thread-id "thread_AcaxPGabkqyCyOYQ7fXIjMEg",
+                   :model-class :gpt,
+                   :llm-provider :openai,
                    :surrogate? true,
-                   :assistant-id "asst_OtZ2H6H80e5aj7ToKVUFQi96",
+                   :assistant-id "asst_PpDCIQEGnQk0slWPb7M59hUC",
                    :id :sur-key-blanks-openai,
                    :expertise "key blanks",
-                   :timestamp #inst "2024-12-08T16:12:48.635-00:00"}],
-          :processes
-          [#:process{:id :sur-key-blanks,
-                     :interview-class :initial-unordered,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :days,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :days,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-key-blanks--initial-unordered--acquireMaterials,
-                                :name "Acquire Raw Materials",
-                                :step-number 1,
-                                :supply-chain? true,
-                                :var-name "acquireMaterials"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "3"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"}},
-                                :id
-                                :sur-key-blanks--initial-unordered--cutKeyBlanks,
-                                :name
-                                "Cut Key Blanks to Standard Size",
-                                :step-number 2,
-                                :var-name "cutKeyBlanks"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-key-blanks--initial-unordered--stampIdentification,
-                                :name
-                                "Stamp Key Blanks with Identification",
-                                :step-number 3,
-                                :var-name "stampIdentification"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id
-                                :sur-key-blanks--initial-unordered--qualityInspect,
-                                :name "Perform Quality Inspection",
-                                :step-number 4,
-                                :var-name "qualityInspect"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "2"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :hours,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-key-blanks--initial-unordered--packageBlanks,
-                                :name "Package Key Blanks",
-                                :step-number 5,
-                                :var-name "packageBlanks"}
-                      #:process{:duration
-                                #:quantity-range{:high
-                                                 #:quantity{:units
-                                                            :days,
-                                                            :value-string
-                                                            "3"},
-                                                 :low
-                                                 #:quantity{:units
-                                                            :days,
-                                                            :value-string
-                                                            "1"}},
-                                :id
-                                :sur-key-blanks--initial-unordered--distributeProducts,
-                                :name
-                                "Distribute to Warehouses/Customers",
-                                :step-number 6,
-                                :supply-chain? true,
-                                :var-name "distributeProducts"}]}],
-          :current-conversation :process,
+                   :timestamp #inst "2025-03-02T20:28:42.417-00:00"}],
           :claims
           [#:claim{:string "(project-id :sur-key-blanks)"}
            #:claim{:string
                    "(project-name :sur-key-blanks \"SUR Key Blanks\")"}
            #:claim{:conversation-id :process,
                    :string "(surrogate :sur-key-blanks)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(temp-project-name :sur-key-blanks \"Key Blanks\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string "(temp-project-id :key-blanks)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-key-blanks :resource-assignment)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
@@ -333,53 +46,194 @@
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(principal-expertise :sur-key-blanks \"Key Blanks\")"}
+                   "(scheduling-challenge :sur-key-blanks :equipment-utilization)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
                    :string
-                   "(scheduling-challenge :sur-key-blanks :variation-in-demand)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-key-blanks :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string "(provides-product :sur-key-blanks)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
-                   :string
-                   "(production-location :sur-key-blanks factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-key-blanks make-to-stock)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string "(flow-shop :sur-key-blanks)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-key-blanks 1 \"Acquire Raw Materials\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-key-blanks 2 \"Cut Key Blanks to Standard Size\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-key-blanks 3 \"Stamp Key Blanks with Identification\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-key-blanks 4 \"Perform Quality Inspection\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-key-blanks 5 \"Package Key Blanks\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-key-blanks 6 \"Distribute to Warehouses\")"}],
-          :name "SUR Key Blanks",
-          :id :sur-key-blanks}
+                   "(principal-expertise :sur-key-blanks \"Key Blanks\")"}],
+          :conversations
+          [#:conversation{:done? true,
+                          :id :process,
+                          :interviewer-budget 0.5499999999999996,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-02T20:28:41.408-00:00"}
+                           #:message{:content
+                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 5,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:29:06.181-00:00"}
+                           #:message{:content
+                                     "\nWe produce key blanks, which are uncut keys ready to be customized for various lock types. These blanks go through multiple production phases, including material procurement, cutting, finishing, and quality checks. Our main scheduling challenge is coordinating the workflow between processes while accounting for machine capacity, material availability, and meeting tight delivery timelines.",
+                                     :from :surrogate,
+                                     :id 6,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:29:06.215-00:00"}
+                           #:message{:content
+                                     "\nDo all the key blanks undergo the same production process, or do variations in the product require different workflows?",
+                                     :from :system,
+                                     :id 7,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:29:32.509-00:00"}
+                           #:message{:content
+                                     "\nDifferent key blanks require slightly different workflows depending on their material (e.g., brass, nickel, or steel) and design (e.g., standard, high-security). While the core steps like cutting and finishing are common, specialized blanks may need additional treatments such as coating or engraving, which add complexity to the scheduling process.",
+                                     :from :surrogate,
+                                     :id 8,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:29:32.549-00:00"}
+                           #:message{:content
+                                     "\nCould you describe the main steps involved in the production process? For example, what happens after material procurement, and how do cutting, finishing, and quality checks fit in?",
+                                     :from :system,
+                                     :id 9,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:29:47.550-00:00"}
+                           #:message{:content
+                                     "\nAfter material procurement, the production process involves: \n\n1. <b>Cutting</b> - Raw material is cut into key blank shapes.  \n2. <b>Stamping</b> - Key identification codes or branding may be stamped.  \n3. <b>Coating (if required)</b> - Certain blanks may receive protective or aesthetic coatings.  \n4. <b>Finishing</b> - Deburring, polishing, and edge smoothing.  \n5. <b>Quality Checks</b> - Inspection for dimensional accuracy, surface quality, and functionality.  \n6. <b>Packaging</b> - Final products are packed for shipping or inventory.  \n\nEach step ensures the blanks meet the required standards.",
+                                     :from :surrogate,
+                                     :id 10,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:29:47.573-00:00"}
+                           #:message{:content
+                                     "\nAre the production steps always performed in a strict sequence, or is there flexibility to process steps in parallel depending on equipment or material availability?",
+                                     :from :system,
+                                     :id 11,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:30:01.172-00:00"}
+                           #:message{:content
+                                     "\nThere is some flexibility in the production steps. For example, coating and stamping might occur in parallel or be skipped for simpler blanks. However, most steps—like cutting, finishing, and quality checks—must follow a strict sequence. The degree of flexibility depends on the product type and equipment or material availability, which makes efficient scheduling essential.",
+                                     :from :surrogate,
+                                     :id 12,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:30:01.194-00:00"}
+                           #:message{:content
+                                     "\nDo different types of machines or equipment handle specific steps in the process (e.g., dedicated machines for cutting, finishing, etc.), and are there any limitations in their capacity or availability?",
+                                     :from :system,
+                                     :id 13,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:30:22.015-00:00"}
+                           #:message{:content
+                                     "\nYes, specific machines handle different steps. For example, cutting is done on precision blanking machines, finishing involves polishing machines, and stamping or engraving is handled separately. Each machine has capacity limits based on its throughput, and availability depends on regular maintenance schedules, breakdowns, and shared use among product variations. These constraints often create bottlenecks that need careful scheduling.",
+                                     :from :surrogate,
+                                     :id 14,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:30:22.072-00:00"}
+                           #:message{:content
+                                     "\nDo all key blanks follow the same production time for each step, or do different variants require varying times for processes like cutting, finishing, or quality checks?",
+                                     :from :system,
+                                     :id 15,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:30:37.191-00:00"}
+                           #:message{:content
+                                     "\nDifferent variants of key blanks require varying production times for certain steps. For example, high-security or intricate designs may take longer during cutting and finishing, whereas simpler blanks are faster. Quality checks also vary, as more complex products may require additional inspections. These time variations add complexity to scheduling and resource allocation.",
+                                     :from :surrogate,
+                                     :id 16,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:30:37.225-00:00"}
+                           #:message{:content
+                                     "\nAre there any dependencies between the production steps, such as raw materials or intermediate outputs needing to be ready before the next step can begin?",
+                                     :from :system,
+                                     :id 17,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:30:52.786-00:00"}
+                           #:message{:content
+                                     "\nYes, there are dependencies between production steps. Raw materials must be available before cutting can start. Similarly, finishing cannot begin until the blanks are properly cut or stamped, and quality checks rely on completed blanks from prior steps. Delays in any step can cascade to subsequent steps, making coordination and scheduling critical.",
+                                     :from :surrogate,
+                                     :id 18,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:30:52.813-00:00"}
+                           #:message{:content
+                                     "\nIs managing the flow of materials or coordinating tasks between machines and workstations a significant challenge in your scheduling process?",
+                                     :from :system,
+                                     :id 19,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:31:07.062-00:00"}
+                           #:message{:content
+                                     "\nYes, managing the flow of materials and coordinating tasks between machines and workstations is a significant challenge. Ensuring the right materials are at the right machine at the right time, while avoiding bottlenecks or idle resources, requires careful planning. Variations in production times and equipment capacities further complicate this coordination.",
+                                     :from :surrogate,
+                                     :id 20,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:31:07.126-00:00"}
+                           #:message{:content
+                                     "\nDoes your production process demand frequent adjustments to meet different order volumes or timelines, and how does that affect scheduling?",
+                                     :from :system,
+                                     :id 21,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:31:21.149-00:00"}
+                           #:message{:content
+                                     "\nYes, our production process often requires frequent adjustments to meet varying order volumes or tight timelines. Sudden changes in priorities can force us to reallocate resources, reschedule machines, or expedite certain steps. This dynamic environment makes it challenging to maintain an efficient and balanced production schedule.",
+                                     :from :surrogate,
+                                     :id 22,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:31:21.173-00:00"}
+                           #:message{:content
+                                     "\nDo external factors such as supplier delivery times of materials or specific customer delivery deadlines influence how you schedule production?",
+                                     :from :system,
+                                     :id 23,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-03-02T20:31:36.197-00:00"}
+                           #:message{:content
+                                     "\nAbsolutely, supplier delivery times and customer deadlines significantly influence our production scheduling. Late material deliveries can delay the start of production, while tight or changing customer deadlines often require adjusting schedules to prioritize certain orders. These external factors add unpredictability and stress the need for flexibility in our scheduling processes.",
+                                     :from :surrogate,
+                                     :id 24,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-02T20:31:36.246-00:00"}]}
+           #:conversation{:id :data,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-02T20:28:41.429-00:00"}]}
+           #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     :from :system,
+                                     :id 3,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-02T20:28:41.453-00:00"}]}
+           #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-02T20:28:41.471-00:00"}]}],
+          :current-conversation :process,
+          :id :sur-key-blanks,
+          :name "SUR Key Blanks"}
 ]

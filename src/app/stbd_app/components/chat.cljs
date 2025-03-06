@@ -119,7 +119,7 @@
 
 (defn add-msg
   "Add messages to the msgs-atm.
-   This is typically used for individual messages that come through :tbd-says or :sur-says,
+   This is typically used for individual messages that come through :iviewr-says or :sur-says,
    as opposed to bulk update through get-conversation."
   [text from]
   (assert (#{:system :surrogate :human :developer-interjected} from))
@@ -130,11 +130,11 @@
 (register-fn :interviewer-busy?     (fn [{:keys [value]}]
                                       ((lookup-fn :set-busy?) value)))
 
-(register-fn :tbd-says              (fn [{:keys [p-key text]}]
+(register-fn :iviewr-says           (fn [{:keys [p-key text]}]
                                       (when p-key (remember-promise p-key))
-                                      (log! :debug (str "tbd-says text: " text " before = " (count @msgs-atm)))
+                                      (log! :debug (str "iviewr-says text: " text " before = " (count @msgs-atm)))
                                       (add-msg text :system)
-                                      (log! :debug (str "tbd-says text: " text " after = " (count @msgs-atm)))))
+                                      (log! :debug (str "iviewr-says text: " text " after = " (count @msgs-atm)))))
 
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))

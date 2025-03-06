@@ -6,6 +6,7 @@ pom.xml.asc
 *.jar
 *.class
 /lib/
+/logs/
 /classes/
 /target/
 /checkouts/
@@ -33,3 +34,5 @@ node_modules/
 resources/public/js/
 
 .DS_Store
+
+opt/

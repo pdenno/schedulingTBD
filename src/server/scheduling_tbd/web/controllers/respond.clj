@@ -25,7 +25,7 @@
     (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
     (let [eid (db/project-exists? pid)
           pname (db/get-project-name pid)
-          msgs (if eid (db/get-conversation pid cid) [])
+          msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) [])
           code (if eid (db/get-code pid) "")]
       (http/ok {:project-id pid :project-name pname :conv msgs :cid cid :code code}))))
 

@@ -9,8 +9,8 @@
    [jsonista.core                          :as json]
    [scheduling-tbd.agent-db                :as adb]
    [scheduling-tbd.db                      :as db]
-   [scheduling-tbd.domain.process-analysis :as pan]
-   [scheduling-tbd.interviewers            :as inv :refer [tell-interviewer]]
+   [scheduling-tbd.interviewing.domain.process-analysis :as pan]
+   [scheduling-tbd.interviewing.interviewers            :as inv :refer [tell-interviewer]]
    [scheduling-tbd.llm                     :as llm :refer [query-llm]]
    [scheduling-tbd.response-utils          :as ru]
    [scheduling-tbd.util                    :as util]
@@ -60,8 +60,8 @@
   (safe-alias 'px     'promesa.exec)
   (safe-alias 'adb    'scheduling-tbd.agent-db)
   (safe-alias 'core   'scheduling-tbd.core)
-  (safe-alias 'pan    'scheduling-tbd.domain.process-analysis)
-  (safe-alias 'pant   'scheduling-tbd.domain.process-analysis-test)
+  (safe-alias 'pan    'scheduling-tbd.interviewing.domain.process-analysis)
+  (safe-alias 'pant   'scheduling-tbd.interviewing.domain.process-analysis-test)
   (safe-alias 'db     'scheduling-tbd.db)
   (safe-alias 'dbt    'scheduling-tbd.db-test)
   (safe-alias 'how    'scheduling-tbd.how-made)
@@ -468,7 +468,7 @@
     (d/transact (sutil/connect-atm pid) {:tx-data [{:project/id pid
                                                     :project/conversations [{:conversation/id :optimality}]}]})
     (doseq [cid [:data :resources :optimality]]
-      (when (empty? (db/get-conversation pid cid))
+      (when (empty? (-> (db/get-conversation-msgs pid cid) :conversation/messages))
         (db/add-msg {:pid pid :cid cid :from :system :text (get db/conversation-intros cid) :tags [:conversation-intro]})))
     (db/backup-proj-db pid)
     (db/recreate-project-db! pid)))

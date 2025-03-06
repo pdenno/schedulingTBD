@@ -2,6 +2,7 @@
 #:project{:conversations
           [#:conversation{:done? true,
                           :id :process,
+                          :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
                                      "You are at the right start point. This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
@@ -175,6 +176,7 @@
                                      #inst "2024-11-20T22:20:41.747-00:00"}]}
            #:conversation{:done? true,
                           :id :data,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -201,6 +203,7 @@
                                      #inst "2024-11-20T22:29:24.626-00:00"}]}
            #:conversation{:done? true,
                           :id :resources,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
@@ -227,6 +230,7 @@
                                      #inst "2024-11-20T22:31:29.647-00:00"}]}
            #:conversation{:done? true,
                           :id :optimality,
+                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
@@ -254,45 +258,46 @@
           :code
           "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {fiberPrep, dyeingColor, yarnSpin, weaveTuft, backAttach, finishTreat, qualityInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 3.500, 4.500, 7.000, 2.500, 1.500, 1.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, fiberPrep] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, fiberPrep] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, fiberPrep] == taskStarts[p, dyeingColor]);\nconstraint forall (p in Product) (taskEnds[p, dyeingColor] == taskStarts[p, yarnSpin]);\nconstraint forall (p in Product) (taskEnds[p, yarnSpin] == taskStarts[p, weaveTuft]);\nconstraint forall (p in Product) (taskEnds[p, weaveTuft] == taskStarts[p, backAttach]);\nconstraint forall (p in Product) (taskEnds[p, backAttach] == taskStarts[p, finishTreat]);\nconstraint forall (p in Product) (taskEnds[p, finishTreat] == taskStarts[p, qualityInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, qualityInspect]);",
           :agents
-          [#:agent{:assistant-id "asst_PkytTl2BpwwIiEL6FcrcwQnd",
+          [#:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_PkytTl2BpwwIiEL6FcrcwQnd",
                    :base-type :process-interview-agent,
-                   :agent-type :shared-assistant
                    :id :process-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_LzAxrMXSXV1CzN6Vc3BQEi2T"}
-           #:agent{:assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
                    :base-type :data-interview-agent,
-                   :agent-type :shared-assistant
                    :id :data-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_m7RQP4Zo9PhpyjJwQCKOXHVY"}
-           #:agent{:assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
                    :base-type :resources-interview-agent,
-                   :agent-type :shared-assistant
                    :id :resources-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_Dt0rSIWxd3IrzMqjKNktoFjQ"}
-           #:agent{:assistant-id "asst_d3bE53OkEhzf1PYs9eldZCkf",
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_d3bE53OkEhzf1PYs9eldZCkf",
                    :base-type :optimality-interview-agent,
-                   :agent-type :shared-assistant
                    :id :optimality-interview-agent-openai,
                    :llm-provider :openai,
                    :model-class :gpt,
                    :thread-id "thread_h8wj3GtfK7ZLRQ25xgr73QXF"}
            #:agent{:base-type :sur-carpet,
-                   :agent-type :project
-                   :thread-id "thread_Hj40gg9N9o19VXsSETc4owrH",
+                   :agent-type :project,
+                   :thread-id "thread_rvPoXWkKgEDRKgBZ3Vbd3U2w",
+                   :model-class :gpt,
                    :llm-provider :openai,
                    :system-instruction
                    "You manage a company that makes carpet.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
                    :surrogate? true,
-                   :assistant-id "asst_MqRwyGaZEwWo93XtbVx7Y2gz",
+                   :assistant-id "asst_R7LnZnVDDJGkXuhBZNBGLwVe",
                    :id :sur-carpet-openai,
                    :expertise "carpet",
-                   :timestamp #inst "2024-12-08T16:12:48.505-00:00"}],
+                   :timestamp #inst "2024-12-12T14:14:39.633-00:00"}],
           :processes
           [#:process{:id :sur-carpet,
                      :interview-class :initial-unordered,
