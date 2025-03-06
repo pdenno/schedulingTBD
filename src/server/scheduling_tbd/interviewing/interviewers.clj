@@ -130,8 +130,9 @@
 (s/def :iviewr/commit-notes string?)
 (s/def :iviewr/data-structure map?)
 
-(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/budget :iviewr/Q-A-pairs] :opt-un [:iviewr/data-structure :iviewr/EADS]))
+(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/budget :iviewr/Q-A-pairs :iviewr/interviewee-type] :opt-un [:iviewr/data-structure :iviewr/EADS]))
 (s/def :iviewr/budget number?)
+(s/def :iviewr/interviewee-type #(#{:human :machine} %))
 (s/def :iviewr/Q-A-pairs (s/coll-of :iviewr/q-a-map :kind vector?))
 (s/def :iviewr/q-a-map (s/keys :req-un [:iviewr/question :iviewr/answer]))
 (s/def :iviewr/question string?)
@@ -245,6 +246,8 @@
              wants-a-break?
              raises-a-question?))  (into (handle-other-non-responsive question response ctx))))))
 
+(defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
+
 ;;; ToDo: It isn't obvious that the interview agent needs to see all this. Only useful when the thread was destroyed?
 ;;;       It might be sufficient to explain the claims. ToDo: V4 doesn't have claims, but this still holds
 (defn conversation-history
@@ -256,6 +259,7 @@
   (let [msgs (-> (db/get-conversation pid cid) :conversation/messages)
         questions (filter #(= :system (:message/from %)) msgs)] ; Some aren't questions; we deal with it.
     (cond-> {:message-type "CONVERSATION-HISTORY"
+             :interviewee-type (if (surrogate? pid) :machine :human)
              :budget (db/get-budget pid cid)
              :Q-A-pairs (->> questions
                              (map (fn [q]
@@ -274,7 +278,9 @@
   [{:keys [pid cid] :as _ctx}]
   {:message-type "SUPPLY-QUESTION" :budget (db/get-budget pid cid)})
 
-(defn fix-off-course [q _ctx] q) ; ToDo: NYI
+(defn fix-off-course--question
+  "Generate and communicate a COURSE-CORRECTION message based on the argument question."
+  [q _ctx] q) ; ToDo: NYI
 
 ;;; --------------- Handle tables from interviewer --------------------------------------
 (defn table-xml2clj
@@ -376,7 +382,7 @@
   (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
                           (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type "QUESTION-TO-ASK", :question "...'}
                           (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
-                          (fix-off-course ctx))]  ; Currently a no-op. Returns argument.
+                          (fix-off-course--question ctx))]         ; Currently a no-op. Returns argument.
          (when (= :human responder-type) (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
          ;; This returns a VECTOR of statements from the interviewees and interviewer.
          (get-an-answer (cond-> ctx
@@ -403,8 +409,6 @@
                       (name recommended-chat)))]
     ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
     (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :text text})))
-
-(defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
 
 (defn ctx-surrogate
   "Return context updated with surrogate info."
@@ -460,6 +464,10 @@
        (assoc :pid pid)
        (assoc :force-new? true))))
 
+(defn check-and-put-ds
+  [iviewr-response {:keys [pid cid] :as _ctx}]
+  (db/put-ds! pid cid iviewr-response))
+
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
 (defn resume-conversation
@@ -490,7 +498,7 @@
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
                       (cond
-                        (> cnt 20)                                  :exceeded-questions-safety-stop
+                        (> cnt 10)                                  :exceeded-questions-safety-stop
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.
                         (<= (db/get-budget pid cid) 0)              (db/assert-conversation-done! pid cid)
                         :else
@@ -502,7 +510,7 @@
                           (when (surrogate? pid) (ru/refresh-client client-id pid cid))
                           (case (:message-type iviewr-response)
                             "PHASE-1-CONCLUSION"          (tell-interviewer (ru/eads-response! :process pid cid iviewr-response) ctx)
-                            "DATA-STRUCTURE-REFINEMENT"   (db/put-ds! pid cid iviewr-response)
+                            "DATA-STRUCTURE-REFINEMENT"   (check-and-put-ds iviewr-response ctx)
                             nil)
                           (recur (inc cnt)))))
                     (log! :warn "Exiting because active? atom is false."))))

@@ -27,6 +27,7 @@ The following is an example Phase 1 interaction:
 
   We: {"message-type" : "CONVERSATION-HISTORY",
        "budget"  : 1.0,
+       "interviewee-type" : "human",
        "Q-A-pairs" : [{"question" : "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
 		       "answer" : "We make sandwich cookies and sell them locally through our own stores and to a small collection of local grocery markets.
 				   Our principal challenge is in assuring that we have the ingredients needed to meet the demand for our various cookie products.
@@ -117,9 +118,6 @@ We now continue the running example:
    'resources':['mixer', 'extruder', 'kiln'],
    'subprocesses':
    [{'process-id':'mix-graphite-and-clay',
-     'process-var':
-     {'val':'mix',
-      'comment': 'Include a camelCase variable of less than 25 characters that describes the process. We'll use these in the translation to MiniZinc.'},
      'inputs':['graphite', 'clay', 'water'],
      'outputs':
      [{'item-id':'graphite-clay paste',
@@ -128,7 +126,6 @@ We now continue the running example:
      'duration':{'units':'hours', 'value-string':'1'},
      'subprocesses':[]},
     {'process-id':'extrude-core',
-     'process-var':'extrude',
      'inputs':['graphite-clay paste'],
      'outputs':
      [{'item-id':'extruded graphite rods',
@@ -138,7 +135,6 @@ We now continue the running example:
      'duration':{'units':'minutes', 'value-string':'20'},
      'subprocesses':[]},
     {'process-id':'dry-and-bake-core',
-     'process-var':'dryAndBakeCores',
      'inputs':['extruded graphite rods'],
      'outputs':
      [{'item-id':'extruded graphite rods',
@@ -159,14 +155,12 @@ We now continue the running example:
     'comment': 'Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses.'},
    'subprocesses':
    [{'process-id':'mill-wood-slats',
-     'process-var':'millSlats',
      'inputs':['cedar wood'],
      'outputs':['milled wood slats'],
      'resources':['milling machine'],
      'duration':{'units':'hours', 'value-string':'2'},
      'subprocesses':[]},
     {'process-id':'cut-grooves-in-slats',
-     'process-var':'cutGrooves',
      'inputs':['milled wood slats'],
      'outputs':['wood slats with grooves'],
      'resources':['groove cutter'],
@@ -184,19 +178,16 @@ We now continue the running example:
    'resources':['glue applicator', 'shaping machine'],
    'subprocesses':
    [{'process-id':'insert-core-into-slats',
-     'process-var':'insert-cores',
      'inputs':['graphite core', 'wood slats with grooves'],
      'outputs':['pencil blanks'],
      'resources':['glue applicator'],
      'subprocesses':[]},
     {'process-id':'shape-and-paint-pencil',
-     'process-var':'shapeAndPaint',
      'inputs':['pencil blanks', 'paint'],
      'outputs':['shaped and painted pencils'],
      'resources':['shaping machine', 'painting station'],
      'subprocesses':[]},
     {'process-id':'attach-eraser',
-     'process-var':'attachErasers',
      'optional?':
      {'val':true,
       'comment': ''optional?' means that the process does not occur for every product. Not every pencil has an eraser.'},
@@ -432,12 +423,15 @@ inform you how much more resources remain for you to ask questions. In future im
 budget on beyond QUESTION-TO-ASK, but for the time being it is just that, and each question costs 0.05, so we expect that you can
 complete your work in 20 questions. Note also that QUESTION-TO-ASK questions that asks the interviewees to fill out a (partially completed)
 table kill a lot of birds with one 0.05 stone.
+We encourage you to use tables with human interviewees because it may save them some typing.
+With machine interviewees, using tables is not necessary.
+We tell you whether you are talking to humans or machines with the 'interviewee-type' property of CONVERSATION-HISTORY.
 
 Also regarding questions with tables, notice that we delimit the table with '#+begin_src HTML' and '#+end_src'.
 You can also attach directions about filling in the table to convey to the interviewees using '#+begin_src comment' and '#+end_src'
 inside the 'question' property of the QUESTION-TO-ASK object.
 
-Note that we encourage an occassional open-ended question such as in the running example where you ask "I think we now have a reasonable understanding of your processes, but maybe you disagree. Is this really what you do?"
+Note that we encourage an occassional open-ended, reframing question such as in the running example where you ask "I think we now have a reasonable understanding of your processes, but maybe you disagree. Is this really what you do?"
 These help us stay on the right path.
 
 Finally, let's look at the complete protocol by which we communicate with you.
@@ -449,7 +443,7 @@ The running example uses all of these except COURSE-CORRECTION.
 2) QUESTION-TO-ASK - This is a response from you to us. In the 'question' property you provide the question, and can use #+begin_src HTML ... #+end_src, and #+begin_src comment ... #+end_src to delimit the parts of questions that contain tables.
 
 3) INTERVIEWEES-RESPOND - This is notification from us to you about what the interviewees said in response to your question. You respond to this message with either
-                          1) a PHASE-1-CONCLUSION. 
+			  1) a PHASE-1-CONCLUSION.
 			  2) a DATA-STRUCTURE-REFINEMENT structure.
 
 4) DATA-STRUCTURE-REFINEMENT - This is the key response from you! Properties of this message include
@@ -462,15 +456,15 @@ The running example uses all of these except COURSE-CORRECTION.
 5) CONVERSATION-HISTORY - This is a notification from us to you. It contains the complete interview we've had on the topic you are interviewing.
 			  If prior conversation produced a data structure, it will contain this in its 'data-structure' property.
 			  It can be used to "restart" the interview in cases where we get disconnected.
-			  Minimally it has the properties, 'budget' and 'Q-A-pairs' as shown in the example, but in Phase 2, it might also provide
+			  Minimally it has the properties, 'budget', 'Q-A-pairs' and 'interviewee-type' as shown in the example, but in Phase 2, it might also provide
 			  1) 'data-structure' - the most refined EADS-like data structure from your prior DATA-STRUCTURE-REFINEMENT messages, and
 			  2) 'EADS' - The EADS from which you were refining a data structure.
 
 6) PHASE-1-CONCLUSION - This is a notification from you to us telling us what kind of scheduling problem you think is relevant to the interviewees' situation.
-                        There are two message properties by which you can specify this:
+			There are two message properties by which you can specify this:
 			1) problem-type should be one of the five types listed at the top of the instructions (FLOW-SHOP-SCHEDULING-PROBLEM, RESOURCE-ASSIGNMENT-PROBLEM, etc.)
 			2) 'cyclical?' is an optional property which is set to true to signify that they seek a solution that produces repeatable schedules that can be applied periodically.
-      		           Cyclical scheduling problems can include resource assignment problem characteristics (e.g. scheduling music lessons in a music school) or flow shop characteristics
+			   Cyclical scheduling problems can include resource assignment problem characteristics (e.g. scheduling music lessons in a music school) or flow shop characteristics
 			   (e.g. scheduling a repeatable sequence of vehicles types to make in a synchronous tractor production to avoid the emergence of bottlenecks or work overload at any workstation).
 
 

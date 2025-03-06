@@ -73,6 +73,11 @@
        (s/assert ::text-to-var res)
        (:CORRESPONDING-VAR res)))))
 
+(defn deep-keys [obj]
+  (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m (keyword k) (deep-keys v))) {} obj)
+        (vector? obj)   (mapv deep-keys obj)
+        :else           obj))
+
 ;;; ====================== Shared by use of tags :process :data :resources :optimality ====================
 (defn analyze-warm-up--dispatch [tag & _] tag)
 
