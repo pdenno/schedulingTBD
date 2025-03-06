@@ -25,12 +25,12 @@
                   :id :process-ordering-agent-openai,
                   :timestamp #inst "2024-12-05T21:39:37.396-00:00"}
           #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
+                  :assistant-id "asst_p9cnmj0rV7EYNMIeiqWm9ppf",
                   :base-type :process-interview-agent,
                   :id :process-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2025-03-03T12:35:41.989-00:00"}
+                  :timestamp #inst "2025-03-05T15:05:59.648-00:00"}
           #:agent{:agent-type :system,
                   :assistant-id "asst_eaxRDWsEwmdWHObw5MjTiPQP",
                   :base-type :answers-the-question?,
@@ -54,19 +54,19 @@
                   :timestamp #inst "2024-12-05T21:39:34.439-00:00"}
           #:agent{:base-type :scheduling-challenges-agent,
                   :agent-type :system,
-                  :thread-id "thread_tWC6VKRPtItcb8UQ7WQ7HJux",
+                  :thread-id "thread_S4WYlV1EKLnWPmJRqPg0XQYc",
                   :model-class :gpt,
                   :llm-provider :openai,
-                  :assistant-id "asst_i8PVzL4NAelr1TYKalh0J49C",
+                  :assistant-id "asst_lVdN6WQ66CukxXI1vlXlBRmD",
                   :id :scheduling-challenges-agent-openai,
-                  :timestamp #inst "2024-12-13T18:59:16.559-00:00"}
+                  :timestamp #inst "2025-03-03T15:43:49.498-00:00"}
           #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_Rx6NcEXEVGZi5WtBffD7umSF",
+                  :assistant-id "asst_IQJUvMRB9Mf911ZK1wXwIlJN",
                   :base-type :optimality-interview-agent,
                   :id :optimality-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2024-12-05T21:39:34.846-00:00"}
+                  :timestamp #inst "2025-03-05T15:11:11.228-00:00"}
           #:agent{:base-type :response-analysis-agent,
                   :agent-type :system,
                   :thread-id "thread_wDcvDiGb8ZbRrVANUuTLLCmk",
@@ -101,8 +101,7 @@
          :default-project-id :blank-project,
          :name "SYSTEM",
          :projects
-         [#:project{:dir
-                    "/opt/scheduling/projects/blank-project",
+         [#:project{:dir "/opt/scheduling/projects/blank-project",
                     :id :blank-project,
                     :name "Blank Project"}
           #:project{:dir
@@ -163,9 +162,6 @@
           #:project{:dir "/opt/scheduling/projects/sur-carpet/db/",
                     :id :sur-carpet,
                     :name "SUR Carpet"}
-          #:project{:dir "/opt/scheduling/projects/ice-cream/db/",
-                    :id :ice-cream,
-                    :name "Ice Cream"}
           #:project{:dir
                     "/opt/scheduling/projects/sur-plate-glass/db/",
                     :id :sur-plate-glass,
@@ -198,6 +194,10 @@
                     :name "SUR Mechanical Pencils"}
           #:project{:dir "/opt/scheduling/projects/sur-brake-pads/db/",
                     :id :sur-brake-pads,
-                    :name "SUR Brake Pads"}]}
+                    :name "SUR Brake Pads"}
+          #:project{:dir
+                    "/opt/scheduling/projects/sur-optical-fiber/db/",
+                    :id :sur-optical-fiber,
+                    :name "SUR Optical Fiber"}]}
 
 ]

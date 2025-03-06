@@ -12,17 +12,19 @@
      [promesa.exec                  :as px]
      [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
      [scheduling-tbd.db             :as db]
-     [scheduling-tbd.interviewing.domain.data-analysis]
-     [scheduling-tbd.interviewing.domain.process-analysis :as pan :refer [the-warm-up-type-question]]
+     [scheduling-tbd.interviewing.domain.data-analysis :as dan]
+     [scheduling-tbd.interviewing.domain.process-analysis  :as pan :refer [the-warm-up-type-question]]
      [scheduling-tbd.interviewing.domain.optimality-analysis]
      [scheduling-tbd.interviewing.domain.resources-analysis]
-     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim]]
      [scheduling-tbd.llm            :as llm]
+     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim  text-to-var]]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets :as ws]
      [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
+(s/def ::pid keyword?)
+(s/def ::cid #(#{:process :data :resources :optimality} %))
 
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
 ;;; (like when it is burning OpenAI asking the same question over and over ;^)).
@@ -50,7 +52,6 @@
 
 ;;; Optional
 (s/def ::tags (s/coll-of keyword?))
-(s/def ::topic #(#{:process :data :resources :optimality} %))
 
 (s/def ::expert-response (s/keys :req-un [:expert/msg-type] :opt-un [:expert/text :expert/table :expert/table-html]))
 (s/def :expert/msg-type #(= % :expert-response))
@@ -205,18 +206,10 @@
   (log! :warn (str "handle-other-non-responsive not yet implemented: response = " response))
   [])
 
-#_{:conversation
- [{:text
-   "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
-   :from :system,
-   :tags [:query]}
-  {:response
-   {:msg-type :expert-response,
-    :text
-    "We manufacture optical fiber, which involves multiple processes such as preform production, fiber drawing, coating, testing, and spooling. The main scheduling challenge revolves around coordinating these tightly interdependent processes to maximize efficiency and minimize downtime. Additionally, balancing customer order deadlines with machine availability and material procurement adds complexity."},
-   :from :surrogate,
-   :tags [:response]}]}
-
+(defn ask-again
+  [question]
+  (let [repeat-blurb "Okay, but we are still interested in this: "]
+    (if (str/starts-with? question repeat-blurb) question (str repeat-blurb question))))
 
 ;;; ToDo: The design question I still have here is how to get back on track when the user's response doesn't answer the question.
 ;;;       This is mostly a matter for handle-raises-a-question ...(Thread/sleep 20000).
@@ -233,8 +226,8 @@
                                                                              (response-analysis question full-text ctx))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
-      (let [same-question (str "Okay, but we are still interested in this: " question)]
-        (into conversation (-> ctx (assoc :question same-question) get-an-answer)))
+      (let [same-question (ask-again question)]
+        (into conversation (get-an-answer (-> ctx (assoc :question same-question)))))
       (cond-> conversation
         answered?                  (conj (-> response
                                              (assoc :from responder-type)
