@@ -1,14 +1,6 @@
 [
 #:system{:agents
-         [#:agent{:base-type :process-dur-agent,
-                  :agent-type :system,
-                  :thread-id "thread_gD1kN7QoWVMkLG0mvV62vMWx",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_WDjZC9jQ8tYarHuzKHLMfHvK",
-                  :id :process-dur-agent-openai,
-                  :timestamp #inst "2024-12-18T01:39:12.245-00:00"}
-          #:agent{:base-type :text-function-agent,
+         [#:agent{:base-type :text-function-agent,
                   :agent-type :system,
                   :thread-id "thread_sLkB7PdJlAgKzcD1keSEY7rB",
                   :model-class :gpt,
@@ -16,14 +8,6 @@
                   :assistant-id "asst_goTNbqcqjK78EPbRMtNwL50S",
                   :id :text-function-agent-openai,
                   :timestamp #inst "2024-12-05T21:39:38.200-00:00"}
-          #:agent{:base-type :process-ordering-agent,
-                  :agent-type :system,
-                  :thread-id "thread_1kgHH7xN613JxIvT4BZm4Hj8",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_5eDrNKn7FlQpaGfWGrZYl6EV",
-                  :id :process-ordering-agent-openai,
-                  :timestamp #inst "2024-12-05T21:39:37.396-00:00"}
           #:agent{:agent-type :shared-assistant,
                   :assistant-id "asst_p9cnmj0rV7EYNMIeiqWm9ppf",
                   :base-type :process-interview-agent,
@@ -39,12 +23,12 @@
                   :model-class :gpt,
                   :thread-id "thread_2vhjT8fIazLPDOmTqD2Qc4Dj"}
           #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_wQtaRFA9jHBBxfRZHbca1mqN",
+                  :assistant-id "asst_K5cStlN2S8MrgGR4Dj0A1KRc",
                   :base-type :data-interview-agent,
                   :id :data-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2024-12-05T21:39:34.070-00:00"}
+                  :timestamp #inst "2025-03-06T20:49:38.351-00:00"}
           #:agent{:agent-type :shared-assistant,
                   :assistant-id "asst_aaDLAj0gxcfigOPWPrO5dUrE",
                   :base-type :resources-interview-agent,
@@ -75,21 +59,6 @@
                   :assistant-id "asst_VaeePwn9LHgSwQsh1gDgoNB4",
                   :id :response-analysis-agent-openai,
                   :timestamp #inst "2024-12-13T21:09:08.701-00:00"}
-          #:agent{:agent-type :system,
-                  :assistant-id "asst_a0lK1BYchdZUN7oza6sU68AP",
-                  :base-type :helpful,
-                  :id :helpful-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2024-12-12T12:46:06.528-00:00"}
-          #:agent{:base-type :helpful-1,
-                  :agent-type :system,
-                  :thread-id "thread_xOlazp212KfATPwJZ2LAc7tM",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_WlPVzM82mT0IgMATtsnWHnx4",
-                  :id :helpful-1-openai,
-                  :timestamp #inst "2024-12-12T13:23:51.572-00:00"}
           #:agent{:base-type :text-to-var,
                   :agent-type :system,
                   :thread-id "thread_GngjkcPOZH4prj4I08VyaBqF",
@@ -198,19 +167,10 @@
           #:project{:dir "/opt/scheduling/projects/sur-brake-pads/db/",
                     :id :sur-brake-pads,
                     :name "SUR Brake Pads"}
-   #:project{:dir   "/opt/scheduling/projects/sur-ice-melt/db/",
+          #:project{:dir "/opt/scheduling/projects/sur-ice-melt/db/",
                     :id :sur-ice-melt,
                     :name "SUR Ice Melt"}
           #:project{:dir
                     "/opt/scheduling/projects/sur-optical-fiber/db/",
                     :id :sur-optical-fiber,
-                    :name "SUR Optical Fiber"}],
-         :warm-ups
-         [#:warm-up{:conversation :process,
-                    :question
-                    "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."}
-          #:warm-up{:conversation :data,
-                    :question
-                    "Let's talk about the data you use to do your work. Typically, and especially in small businesses, information about customer orders, resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you use and how you maintain and store it."}]}
-
-]
+                    :name "SUR Optical Fiber"}]}]

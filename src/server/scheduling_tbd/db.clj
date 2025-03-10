@@ -84,16 +84,7 @@
         :doc "the projects known by the system."}
    :system/warm-ups
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "warm-up objects for various conversations."}
-
-;;; ---------------------- warm-up
-   :warm-up/conversation
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
-        :doc "Names a conversation (:process, :data, etc.)"}
-   :warm-up/question
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
-        :doc "A warm-up question for the given conversation."}
-})
+        :doc "warm-up objects for various conversations."}})
 
 
 ;;;========================================================== Project DBs ==========================================

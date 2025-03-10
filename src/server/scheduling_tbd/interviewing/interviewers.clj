@@ -3,7 +3,9 @@
     (:require
      [clojure.core.unify            :as uni]
      [clojure.data.xml              :as xml]
-     [clojure.pprint                :refer [pprint]]
+     [clojure.edn                   :as edn]
+     [clojure.pprint                :refer [pprint cl-format]]
+     [clojure.java.io               :as io]
      [clojure.spec.alpha            :as s]
      [clojure.string                :as str]
      [jsonista.core                 :as json]
@@ -112,8 +114,7 @@
                                    "INTERVIEWEES-RESPOND"              (s/valid? :iviewr/interviewees-respond msg)
                                    "DATA-STRUCTURE-REFINEMENT"         (s/valid? :iviewr/data-structure-refinement msg)
                                    "CONVERSATION-HISTORY"              (s/valid? :iviewr/conversation-history msg)
-                                   "PHASE-1-CONCLUSION"                (s/valid? :iviewr/phase-1-conclusion msg)
-                                   "PHASE-2-EADS"                      (s/valid? :iviewr/phase-2-eads msg)
+                                   "EADS"                              (s/valid? :iviewr/eads-msg msg)
                                    "COURSE-CORRECTION"                 (s/valid? :iviewr/course-correction msg)
                                    "STATUS"                            #(string? (get % :status))))))
 
@@ -138,11 +139,7 @@
 (s/def :iviewr/data-structure map?)
 (s/def :iviewr/EADS map?) ; ToDo: Tie in the EADSs?
 
-(s/def :iviewr/phase-1-conclusion (s/keys :req-un [:iviewr/problem-type] :opt-un [:iviewr/cyclical?]))
-(s/def :iviewr/problem-type string?)
-(s/def :iviewr/cyclical? boolean?)
-
-(s/def :iviewr/phase-2-eads (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
+(s/def :iviewr/eads-msg (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
 (s/def :iviewr/interview-objective string?)
 (s/def :iviewr/EADS string?)
 
@@ -203,13 +200,40 @@
   (log! :warn (str "handle-other-non-responsive not yet implemented: response = " response))
   [])
 
+;;; ToDo: The design question I still have here is how to get back on track when the user's response doesn't answer the question.
+;;;       This is mostly a matter for handle-raises-a-question ...(Thread/sleep 20000).
+;;; 2025-03-06 I am reverting to this version because the one Nicolas pushed isn't working for me. (That one is commented out below.)
+#_(defn get-an-answer
+  "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
+   Return a vector of the conversation (objects suitable for db/add-msg) terminating in an answer to the question.
+   Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
+  [{:keys [question responder-type human-starting?] :as ctx}]
+  (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
+  (let [conversation [{:text question :from :system :tags [:query]}]
+        {:keys [full-text] :as response}  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
+        answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
+        {:keys [answers-the-question? raises-a-question? wants-a-break?]}  (when (and (not answered?) (string? full-text))
+                                                                             (response-analysis question full-text ctx))
+        answered? (or answered? answers-the-question?)]
+    (if (not (or answered? wants-a-break? raises-a-question?))
+      (let [same-question (str "Okay, but we are still interested in this: " question)]
+        (into conversation (get-an-answer (assoc ctx :question same-question))))
+      (cond-> conversation
+        answered?                  (conj (-> response
+                                             (assoc :from responder-type)
+                                             (assoc :tags [:response])))
+        wants-a-break?             (into (handle-wants-a-break question response ctx))
+        raises-a-question?         (into (handle-raises-a-question question response ctx))
+        (not
+         (or answered?
+             wants-a-break?
+             raises-a-question?))  (into (handle-other-non-responsive question response ctx))))))
+
 (defn ask-again
   [question]
   (let [repeat-blurb "Okay, but we are still interested in this: "]
     (if (str/starts-with? question repeat-blurb) question (str repeat-blurb question))))
 
-;;; ToDo: The design question I still have here is how to get back on track when the user's response doesn't answer the question.
-;;;       This is mostly a matter for handle-raises-a-question ...(Thread/sleep 20000).
 (defn get-an-answer
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    Return a vector of the conversation (objects suitable for db/add-msg) terminating in an answer to the question.
@@ -455,16 +479,42 @@
                             :cid :process}))
       pid))
 
+(def iviewr-infos
+  "These have all the info of agent-db/agent-infos entries and additional information for making instructions.
+   To add these to agent-db/agent-infos, use force-new-interviewer!."
+  (-> "agents/iviewrs/iviewr-infos.edn" io/resource slurp edn/read-string))
+
+(defn write-agent-instructions!
+  "Write the agent instructions to resources/agents/iviewrs/<cid>-iviewr-instructions.txt."
+  [cid]
+  (if-let [info (not-empty (get iviewr-infos cid))]
+    (let [{:keys [iviewr-name focus]} info
+          others (reduce (fn [r x] (if (= (:id x) cid) r (into r [(:iviewr-name x) (:focus x)]))) [] (vals iviewr-infos))
+          instructions (str "You are one of four interviewers engaging humans in conversations to elicit from them requirements for a scheduling system we humans and AI agents will be creating together using MiniZinc.\n"
+                            (format "You are the %s Agent; you ask questions about %s\n" iviewr-name focus)
+                            "The other three agents are:"
+                            (cl-format nil "~{~%     - a ~A Agent: that interviews about ~A~}" others)
+                            "\nIn as far as it is practical, you should avoid asking questions in the areas that are the responsibility of these other agents.\n\n"
+                            (-> "agents/iviewrs/base-iviewr-instructions.txt" io/resource slurp))]
+      (spit (str "resources/agents/iviewrs/" (name cid) "-iviewr-instructions.txt") instructions))
+    (log! :error (str "No conversation cid = " cid))))
+
 ;;; ToDo: Should we add a creation policy for interviewers? We need to force new ones whenever we are working on the system instructions.
-(defn ^:diag force-new-interviewer
+(defn ^:diag force-new-interviewer!
   "As a matter of policy, shared-assistant type agents such as surrogates and interviewers don't update the assistant just because
    the instructions change. This is because we try to preserve the context already built up by the current agent.
    Therefore, if you don't care about that context but you do care about seeing the effect of new instructions, you should call this."
-  [pid cid]
-  (adb/ensure-agent!
-   (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
-       (assoc :pid pid)
-       (assoc :force-new? true))))
+  ([cid] (force-new-interviewer! cid nil))
+  ([cid pid]
+   (assert (#{:process :data :resources :optimality} cid))
+   (let [iviewr-info (not-empty (get iviewr-infos cid))
+         {:keys [base-type] :as info} (cond-> (dissoc iviewr-info :iviewr-name :focus :id :warm-up-question)
+                                        true (assoc :base-type (-> cid name (str "-interview-agent") keyword))
+                                        true (assoc :force-new? true)
+                                        pid  (assoc :pid pid))]
+     (write-agent-instructions! cid)
+     (swap! adb/agent-infos #(assoc % base-type (dissoc info :pid)))
+     (adb/ensure-agent! info))))
 
 (defn check-and-put-ds
   [iviewr-response {:keys [pid cid] :as _ctx}]
@@ -524,7 +574,7 @@
 (defn start-conversation
   "Ask a human the first question (a warm-up question), create a project and call resume-conversation.
    :start-conversation is a dispatch-key from the client, providing, perhaps only the client-id."
-  [{:keys [client-id] :as ctx}]
+  [{:keys [client-id cid] :as ctx}]
   (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :promise? true
                     :text (str "You want to start a new project? This is the right place! "
                                (db/conversation-intros :process))})
@@ -532,7 +582,6 @@
     (let [ctx (merge ctx {:responder-type :human
                           :human-starting? true
                           :question the-warm-up-type-question})
-          _effect! (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
           conversation (get-an-answer ctx)
           response (-> conversation last :text) ; ToDo: Could be more to it...wants-a-break?.
           pid (start-human-project! response)
