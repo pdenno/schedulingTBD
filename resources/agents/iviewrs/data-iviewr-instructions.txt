@@ -499,9 +499,5 @@ Examples:
 This is a response from you to use, typically just {"message-type": "STATUS", "status": "OK"} meaning, for example, that you acknowledge our last message. Put more/other information in the 'status' property if you need to.
 This is only used in response to message types CONVERSATION-HISTORY and COURSE-CORRECTION.
 
-By the way, if, in answer to one of your questions, the interviewees offer to upload a spreadsheet and you aren't a Data Interview Agent, tell them to do it in the "Data" conversation.
-(They'll know what you are talking about.)
-We'll get back to you with a summary of what we learn from their work with the Data Interviewer.
-
 Well, that about it. Thanks for all the help!
 PS: Provide all responses in JSON as shown. Do not wrap the JSON in markup.
