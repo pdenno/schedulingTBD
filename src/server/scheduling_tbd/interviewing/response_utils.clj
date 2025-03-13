@@ -4,7 +4,8 @@
   (:require
    [clojure.datafy                :refer [datafy]]
    [clojure.core.unify            :as uni]
-   [clojure.pprint                :refer [cl-format pprint]]
+   [clojure.pprint                :refer [pprint]]
+   [clojure.set]
    [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
    [jsonista.core                 :as json]
@@ -89,3 +90,28 @@
 ;;; The methods for this are in the interviewing/domain directories.
 ;;; Returns a PHASE-2-EADS message. (See for example the one for :process in process_analysis.clj.
 (defmulti eads-response! #'eads-response--dispatch)
+
+;;; The methods for this are in the interviewing/domain directories.
+(defn active-eads--dispatch [cid & _] cid)
+
+;;; The methods for this are in the interviewing/domain directory.
+(defmulti active-eads #'active-eads--dispatch)
+
+(defn active-eads
+  "Determine which EADS (if any) is being pursued.
+   If none is being pursued, determine which should be pursued."
+  [pid cid])
+
+;;; ================ Some utilities for analyzing interviewer
+(defn collect-keys [obj]
+  (let [okeys (atom #{})]
+    (letfn [(ck [obj]
+              (cond (map? obj)      (doseq [[k v] obj]
+                                      (swap! okeys conj k)
+                                      (ck v))
+                    (vector? obj)   (doseq [x obj] (ck x))))]
+      (ck obj)
+      (sort @okeys))))
+
+(defn extra-keys [obj]
+  (clojure.set/difference (-> obj collect-keys set) eads-keys))

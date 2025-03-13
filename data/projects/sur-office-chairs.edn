@@ -223,59 +223,6 @@
                    :id :sur-office-chairs-openai,
                    :expertise "office chairs",
                    :timestamp #inst "2025-03-05T12:35:13.120-00:00"}],
-          :processes
-          [#:process{:id :sur-office-chairs,
-                     :interview-class :initial-unordered,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "2"},
-                                :id
-                                :sur-office-chairs--initial-unordered--cutComponents,
-                                :name "Cut Chair Components",
-                                :step-number 1,
-                                :var-name "cutComponents"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "3"},
-                                :id
-                                :sur-office-chairs--initial-unordered--assembleFrame,
-                                :name "Assemble Chair Frame",
-                                :step-number 2,
-                                :var-name "assembleFrame"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "4"},
-                                :id
-                                :sur-office-chairs--initial-unordered--upholsterChair,
-                                :name "Upholster Chair",
-                                :step-number 3,
-                                :var-name "upholsterChair"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1.5"},
-                                :id
-                                :sur-office-chairs--initial-unordered--attachComponents,
-                                :name "Attach Chair Components",
-                                :step-number 4,
-                                :var-name "attachComponents"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id
-                                :sur-office-chairs--initial-unordered--inspectQuality,
-                                :name "Inspect Quality",
-                                :step-number 5,
-                                :var-name "inspectQuality"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "0.5"},
-                                :id
-                                :sur-office-chairs--initial-unordered--packageChair,
-                                :name "Package Chair",
-                                :step-number 6,
-                                :supply-chain? true,
-                                :var-name "packageChair"}]}],
           :current-conversation :process,
           :claims
           [#:claim{:string "(project-id :sur-office-chairs)"}

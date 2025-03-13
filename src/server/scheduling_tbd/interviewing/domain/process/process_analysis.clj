@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.process-analysis
+(ns scheduling-tbd.interviewing.domain.process.process-analysis
   "Analysis of the process interview"
   (:require
    [clojure.core.unify                 :as uni]
@@ -97,11 +97,10 @@
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-;;; ToDo: I'm currently not handling anything by flow-shop
+;;; ToDo: I'm currently not handling anything but flow-shop
 (def process-eads2file
   {:FLOW-SHOP-SCHEDULING-PROBLEM      "EADS/flow-shop.edn"
    :RESOURCE-ASSIGNMENT-PROBLEM       nil
-   :CYCLICAL-SCHEDULING-PROBLEM       nil
    :PROJECT-SCHEDULING-PROBLEM        nil
    :JOB-SHOP-SCHEDULING-PROBLEM       "EADS/flow-shop.edn"
    :SINGLE-MACHINE-SCHEDULING-PROBLEM nil})
@@ -109,14 +108,12 @@
 
 (s/def :process/EADS-keyword (fn [key] (#{:FLOW-SHOP-SCHEDULING-PROBLEM
                                           :RESOURCE-ASSIGNMENT-PROBLEM
-                                          :CYCLICAL-SCHEDULING-PROBLEM
                                           :PROJECT-SCHEDULING-PROBLEM
                                           :JOB-SHOP-SCHEDULING-PROBLEM
                                           :SINGLE-MACHINE-SCHEDULING-PROBLEM}
                                         key)))
 
-;;; ToDo: I'm currently ignore :cyclical?
-;;;  "Create a message of type PHASE-2-EADS for the given PHASE-1-CONCLUSION"
+;;;  "Create a message of type EADS for the given PHASE-1-CONCLUSION"
 (defmethod eads-response!
   :process [_tag pid cid {:keys [problem-type _cyclical?] :as _iviewr-response}]
   (let [k (-> problem-type str/upper-case keyword)]
@@ -124,6 +121,6 @@
     (if-let [resource (get process-eads2file k)]
       (let [eads (-> resource io/resource slurp edn/read-string)]
         (db/put-eads! pid cid (str eads))
-        {:message-type "PHASE-2-EADS"
+        {:message-type "EADS"
          :EADS (with-out-str (clojure.data.json/pprint eads))})
       (log! :error (str "No EADS for problem type " k)))))

@@ -156,11 +156,14 @@
         :doc "a number [0,1] expressing how strongly we believe the proposition ."}
 
    ;; ---------------------- conversation
+   :conversation/active-EADS
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "the EADS which is currently being pursued in conversation."}
    :conversation/done?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if we don't have more to add (though user might)."}
-   :conversation/EADS
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+   :conversation/EADSs-used
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
         :doc "a string that can be edn/read-string into the Example Annotated Data Structure (EADS) for this conversation."}
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
@@ -171,11 +174,6 @@
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages of the conversation."}
-
-   ;; ---------------------- duration
-   :duration/value
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to map describing a quantity of time."}
 
    ;; ---------------------- message
    :message/content
@@ -203,82 +201,6 @@
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
-
-   ;; ---------------------- objective (about a scheduling objective)
-   :objective/code
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "MiniZinc expressing the scheduling object."}
-   :objective/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming something to be accomplished."}
-   :objective/text
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
-        :doc "strings expressing the scheduling objective."}
-
-   ;; ---------------------- process (about production process types)
-   :process/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this this process; perhaps stated in an interview."}
-   :process/duration
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to a duration (dur) object; typically an estimate"}
-   :process/duration-comment
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a comment about the duration of a process."}
-   :process/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc (str "A string, perhaps from an interview uniquely identifying the process."
-                  "The top-level production process will have a process-type/id = :project/id.")}
-   :process/interview-class
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a keyword identifying what sort of conversation lead to this process description, for example :initial-unordered for early in the interview."}
-   :process/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "original text naming the process."}
-   :process/pre-processes
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a process/id identifying a process that must occur before this task "}
-   :process/resource
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a keyword naming a resource (type or instance) used in this task"}
-   :process/step-number
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc "a positive integer indicating the order of the process step in the :process/sub-processes vector."}
-   :process/sub-processes
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "process objects that occur within the scope of this project object"}
-   :process/supply-chain?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "true if the process in a supply chain process, rather than production process"}
-   :process/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this process type (e.g. in an ontology)."}
-   :process/var-name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a camelCase string naming the process that can be used in MiniZinc code."}
-
-   ;; ---------------------- process-instance (about actual process that have occurred or will occur).
-   :process-instance/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the task; unique to the project."}
-   :process-instance/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this task; unique to the project."}
-   :process-instance/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a description of this this task; unique to the project."}
-   :process-instance/pre-task
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a task/name identifying a task that must occur before this task "}
-   :process-instance/resource-inst
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a keyword naming a :res-t/id or :res-i/id (type or instance) used in this task"}
-   :process-instance/start
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "a instant object indicating when the process started."}
-   :process-instance/end
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "a instant object indicating when the process ended."}
 
    ;; ---------------------- project
    :project/agents
@@ -322,97 +244,7 @@
         :doc "true if domain expertise is provided by an artificial agent."}
    :project/tables
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "true if domain expertise is provided by an artificial agent."}
-
-   ;; ---------------------- quantity (an amount of something)
-   :quantity/value-string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string on which edn/read-string can be applied to produce a number or term like :several."}
-   :quantity/units
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a keyword identifying the units of measure, :weeks, :months, :meters, etc."}
-
-   ;; ---------------------- quantity-range (a map with two properties low and high, the values of which are quantities.
-   :quantity-range/low
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a quantity value expressing the low end of a range of values."}
-
-   :quantity-range/high
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a quantity value expressing the high end of a range of values."}
-
-   ;; ---------------------- resource type
-   :resource-type/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the resource type; unique to the project."}
-   :resource-type/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this resource; unique to the project."}
-   :resource-type/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this this resource; unique to the project."}
-   :resource-type/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this type (e.g. in an ontology)."}
-
-   ;; ---------------------- resource instance
-   :resource/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the resource; unique to the project."}
-   :resource/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this resource"}
-   :resource/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this resource"}
-   :resource/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
-
-   ;; ------------------------ table
-   :table/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "The ID of a table, unique in the context of this project DB."}
-   :table/purpose
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The purpose of this table, on of the enumeration #{:customer orders}"}
-   :table/filename
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The filename as it appears in the project directory}"}
-   :table/identity-condition ; ToDo: we expect more cardinality :many, but not yet.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "The subset of column names (:object/attribute-name) that identify objects."}
-   :table/attributes
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "Attribute objects for the tableThe subset of column names (:object/attribute-name) that identify objects."}
-   :table/data
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "A vector of :object objects."}
-   :attribute/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The name of the attribute, often based on the column name."}
-   :attribute/description
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "A description of the purpose of the attribute."}
-   :attribute/cardinality
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "#{:one :many}"}
-   :attribute/datatype
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "#{:string :number, etc.}"}
-   :object/row
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc "Row that realized this object."}
-   :object/attribute-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "Name of the column (or generated name) for tRow that realized this object."}
-   :object/attribute-value
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "Name of the column (or generated name) for tRow that realized this object."}
-   :object/attribute-value-pairs
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref}
-   :column/tuple
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword}})
+        :doc "true if domain expertise is provided by an artificial agent."}})
 
 (def ^:diag diag (atom nil))
 (def db-schema-sys  (datahike-schema db-schema-sys+))
@@ -813,8 +645,6 @@
        (mapv #(update % :message/data-structure edn/read-string))
        not-empty))
 
-;;; ToDo: latest :human/surrogate message might be better?
-;;; (db/backup-proj-db :sur-optical-fiber)
 (defn put-ds!
   "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message."
   [pid cid ds]

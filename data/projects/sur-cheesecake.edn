@@ -223,67 +223,6 @@
                    :id :sur-cheesecake-openai,
                    :expertise "cheesecake",
                    :timestamp #inst "2024-12-18T01:37:25.209-00:00"}],
-          :processes
-          [#:process{:id :sur-cheesecake,
-                     :interview-class :initial-unordered,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "15"},
-                                :id
-                                :sur-cheesecake--initial-unordered--prepCrust,
-                                :name "Prepare Cheesecake Crust",
-                                :step-number 1,
-                                :var-name "prepCrust"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "20"},
-                                :id
-                                :sur-cheesecake--initial-unordered--mixFilling,
-                                :name "Mix Cheesecake Filling",
-                                :step-number 2,
-                                :var-name "mixFilling"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "10"},
-                                :id
-                                :sur-cheesecake--initial-unordered--pourFilling,
-                                :name "Pour Filling into Crust",
-                                :step-number 3,
-                                :var-name "pourFilling"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "60"},
-                                :id
-                                :sur-cheesecake--initial-unordered--bakeCheesecake,
-                                :name "Bake Cheesecake",
-                                :step-number 4,
-                                :var-name "bakeCheesecake"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "120"},
-                                :id
-                                :sur-cheesecake--initial-unordered--coolCheesecake,
-                                :name "Cool Cheesecake",
-                                :step-number 5,
-                                :var-name "coolCheesecake"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "15"},
-                                :id
-                                :sur-cheesecake--initial-unordered--applyToppings,
-                                :name "Apply Toppings",
-                                :step-number 6,
-                                :var-name "applyToppings"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "10"},
-                                :id
-                                :sur-cheesecake--initial-unordered--packageCheese,
-                                :name "Package Cheesecake",
-                                :step-number 7,
-                                :supply-chain? true,
-                                :var-name "packageCheese"}]}],
           :current-conversation :process,
           :claims
           [#:claim{:string "(project-id :sur-cheesecake)"}

@@ -19,7 +19,7 @@
      [scheduling-tbd.interviewing.domain.optimality-analysis]
      [scheduling-tbd.interviewing.domain.resources-analysis]
      [scheduling-tbd.llm            :as llm]
-     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim]]
+     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim active-eads]]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets :as ws]
      [taoensso.telemere             :as tel :refer [log!]]))
@@ -533,7 +533,8 @@
     (if (not (ready-for-discussion? pid cid))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
-      (let [asking-role (-> (str cid "-interviewer") keyword)
+      (let [active-eads (ru/active-eads cid pid)
+            asking-role (-> (str cid "-interviewer") keyword)
             ctx (-> (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))
                     (assoc :asking-role asking-role))]
         (when-not (db/conversation-done? pid cid)

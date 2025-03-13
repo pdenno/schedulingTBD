@@ -1,28 +1,5 @@
 [
-#:project{:tables
-          [#:table{:attributes
-                   [#:attribute{:datatype :string,
-                                :description "The order number",
-                                :id :order-number}
-                    #:attribute{:datatype :string,
-                                :description
-                                "The name of the customer",
-                                :id :customer-name}],
-                   :data
-                   [#:object{:attribute-value-pairs
-                             [#:object{:attribute-id :order-number,
-                                       :attribute-value
-                                       #:box{:string-val "NX132432"}}
-                              #:object{:attribute-id :customer-name,
-                                       :attribute-value
-                                       #:box{:string-val "Acme Mfg"}}],
-                             :row 1}],
-                   :filename "foo.xlsx",
-                   :id :keyword-with-date-uploaded-x,
-                   :identity-condition
-                   #:column{:tuple [:order-number]},
-                   :purpose "Table of orders"}],
-          :conversations
+#:project{:conversations
           [#:conversation{:done? true,
                           :id :process,
                           :interviewer-budget 0.5,
@@ -224,89 +201,6 @@
                    :id :sur-aluminum-cans-openai,
                    :expertise "aluminum cans",
                    :timestamp #inst "2024-12-08T16:12:48.451-00:00"}],
-          :processes
-          [#:process{:desc
-                     "1. Material Procurement: 2 days\n2. Coil Slitting: 1 hour\n3. Cupping: 30 minutes\n4. Drawing and Ironing: 1 hour\n5. Trimming: 15 minutes\n6. Washing and Drying: 30 minutes\n7. Internal Coating: 45 minutes\n8. Baking: 1 hour\n9. Printing: 2 hours\n10. Necking: 30 minutes\n11. Packing and Shipment: 1 hour",
-                     :id :sur-aluminum-cans,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity{:units :days,
-                                           :value-string "2"},
-                                :id
-                                :sur-aluminum-cans--materialProcure,
-                                :supply-chain? true,
-                                :var-name "materialProcure"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id :sur-aluminum-cans--coilSlitting,
-                                :pre-processes
-                                [:sur-aluminum-cans--materialProcure],
-                                :var-name "coilSlitting"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "30"},
-                                :id :sur-aluminum-cans--cupping,
-                                :pre-processes
-                                [:sur-aluminum-cans--coilSlitting],
-                                :var-name "cupping"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id :sur-aluminum-cans--drawIron,
-                                :pre-processes
-                                [:sur-aluminum-cans--cupping],
-                                :var-name "drawIron"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "15"},
-                                :id :sur-aluminum-cans--trimming,
-                                :pre-processes
-                                [:sur-aluminum-cans--drawIron],
-                                :var-name "trimming"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "30"},
-                                :id :sur-aluminum-cans--washDry,
-                                :pre-processes
-                                [:sur-aluminum-cans--trimming],
-                                :var-name "washDry"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "45"},
-                                :id :sur-aluminum-cans--intCoating,
-                                :pre-processes
-                                [:sur-aluminum-cans--washDry],
-                                :var-name "intCoating"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id :sur-aluminum-cans--baking,
-                                :pre-processes
-                                [:sur-aluminum-cans--intCoating],
-                                :var-name "baking"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "2"},
-                                :id :sur-aluminum-cans--printing,
-                                :pre-processes
-                                [:sur-aluminum-cans--baking],
-                                :var-name "printing"}
-                      #:process{:duration
-                                #:quantity{:units :minutes,
-                                           :value-string "30"},
-                                :id :sur-aluminum-cans--necking,
-                                :pre-processes
-                                [:sur-aluminum-cans--printing],
-                                :var-name "necking"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id :sur-aluminum-cans--packShip,
-                                :pre-processes
-                                [:sur-aluminum-cans--necking],
-                                :supply-chain? true,
-                                :var-name "packShip"}]}],
           :current-conversation :process,
           :name "SUR Aluminum Cans",
           :id :sur-aluminum-cans}

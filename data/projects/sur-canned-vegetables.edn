@@ -185,55 +185,5 @@
                                      #inst "2024-11-20T13:32:53.188-00:00"}]}],
           :current-conversation :process,
           :id :sur-canned-vegetables,
-          :name "SUR Canned Vegetables",
-          :processes
-          [#:process{:desc
-                     "1. Receiving and Storage (2 hours)\n2. Preparation (3 hours)\n3. Canning (1 hour)\n4. Sterilization (2 hours)\n5. Cooling and Labeling (1 hour)\n6. Packing and Shipping (2 hours)",
-                     :id :sur-canned-vegetables,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "2"},
-                                :id
-                                :sur-canned-vegetables--receiveStore,
-                                :supply-chain? true,
-                                :var-name "receiveStore"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "3"},
-                                :id
-                                :sur-canned-vegetables--preparation,
-                                :pre-processes
-                                [:sur-canned-vegetables--receiveStore],
-                                :var-name "preparation"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id :sur-canned-vegetables--canning,
-                                :pre-processes
-                                [:sur-canned-vegetables--preparation],
-                                :var-name "canning"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "2"},
-                                :id
-                                :sur-canned-vegetables--sterilization,
-                                :pre-processes
-                                [:sur-canned-vegetables--canning],
-                                :var-name "sterilization"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id :sur-canned-vegetables--coolLabel,
-                                :pre-processes
-                                [:sur-canned-vegetables--sterilization],
-                                :var-name "coolLabel"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "2"},
-                                :id :sur-canned-vegetables--packShip,
-                                :pre-processes
-                                [:sur-canned-vegetables--coolLabel],
-                                :supply-chain? true,
-                                :var-name "packShip"}]}]}
+          :name "SUR Canned Vegetables"}
 ]

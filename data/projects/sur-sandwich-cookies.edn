@@ -223,51 +223,6 @@
                    :id :sur-sandwich-cookies-openai,
                    :expertise "sandwich cookies",
                    :timestamp #inst "2025-01-27T18:58:29.511-00:00"}],
-          :processes
-          [#:process{:id :sur-sandwich-cookies,
-                     :interview-class :initial-unordered,
-                     :sub-processes
-                     [#:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "2"},
-                                :id
-                                :sur-sandwich-cookies--initial-unordered--makeDough,
-                                :name "Make Cookie Dough",
-                                :step-number 1,
-                                :var-name "makeDough"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1.5"},
-                                :id
-                                :sur-sandwich-cookies--initial-unordered--makeFilling,
-                                :name "Make Filling",
-                                :step-number 2,
-                                :var-name "makeFilling"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1.5"},
-                                :id
-                                :sur-sandwich-cookies--initial-unordered--bakeWafers,
-                                :name "Bake Cookie Wafers",
-                                :step-number 3,
-                                :var-name "bakeWafers"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "1"},
-                                :id
-                                :sur-sandwich-cookies--initial-unordered--assembleCookies,
-                                :name "Assemble Cookies",
-                                :step-number 4,
-                                :var-name "assembleCookies"}
-                      #:process{:duration
-                                #:quantity{:units :hours,
-                                           :value-string "0.5"},
-                                :id
-                                :sur-sandwich-cookies--initial-unordered--packageCookies,
-                                :name "Package Cookies",
-                                :step-number 5,
-                                :supply-chain? true,
-                                :var-name "packageCookies"}]}],
           :current-conversation :process,
           :claims
           [#:claim{:string "(project-id :sur-sandwich-cookies)"}
