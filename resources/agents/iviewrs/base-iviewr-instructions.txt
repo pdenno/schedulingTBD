@@ -61,7 +61,7 @@ Note that in the EADS below, we use single quote so that we don't have to escape
 						 This might be apparent from the answers that determined the value of problem-type. If not, then you can ask .'},
 		  'cyclical?': {'val': false,
 				'comment': 'cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.
-					    For example, if the made the same collection of products in the same order each week, cylical? would be true.'}}
+					    For example, if the made the same collection of products in the same order each week, cylical? would be true.'}}}
 
   You: {"message-type": "STATUS", "status": "OK"}
 

@@ -14,10 +14,11 @@
      [promesa.exec                  :as px]
      [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
      [scheduling-tbd.db             :as db]
-     [scheduling-tbd.interviewing.domain.data-analysis :as dan]
-     [scheduling-tbd.interviewing.domain.process-analysis :as pan :refer [the-warm-up-type-question]]
-     [scheduling-tbd.interviewing.domain.optimality-analysis]
-     [scheduling-tbd.interviewing.domain.resources-analysis]
+     ;; ToDo: Next four should not be here.
+     [scheduling-tbd.interviewing.domain.data.data-analysis :as dan]
+     [scheduling-tbd.interviewing.domain.process.process-analysis :as pan :refer [the-warm-up-type-question]]
+     [scheduling-tbd.interviewing.domain.optimality.optimality-analysis]
+     [scheduling-tbd.interviewing.domain.resources.resources-analysis]
      [scheduling-tbd.llm            :as llm]
      [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim active-eads]]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
@@ -550,7 +551,7 @@
                       (doseq [msg conversation]
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
-                      (analyze-response pid cid expert-response) ; <================================ NL add
+                      ;(analyze-response pid cid expert-response) ; <================================ NL add
                       (cond
                         (> cnt 10)                                  :exceeded-questions-safety-stop
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.

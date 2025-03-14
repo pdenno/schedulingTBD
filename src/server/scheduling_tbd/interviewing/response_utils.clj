@@ -113,5 +113,5 @@
       (ck obj)
       (sort @okeys))))
 
-(defn extra-keys [obj]
+#_(defn extra-keys [obj]
   (clojure.set/difference (-> obj collect-keys set) eads-keys))
