@@ -130,11 +130,11 @@
 (register-fn :interviewer-busy?     (fn [{:keys [value]}]
                                       ((lookup-fn :set-busy?) value)))
 
-(register-fn :iviewr-says           (fn [{:keys [p-key text]}]
+(register-fn :iviewr-says           (fn [{:keys [p-key text table]}]
                                       (when p-key (remember-promise p-key))
-                                      (log! :debug (str "iviewr-says text: " text " before = " (count @msgs-atm)))
                                       (add-msg text :system)
-                                      (log! :debug (str "iviewr-says text: " text " after = " (count @msgs-atm)))))
+                                      (when table
+                                        ((lookup-fn :set-table) table))))
 
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
