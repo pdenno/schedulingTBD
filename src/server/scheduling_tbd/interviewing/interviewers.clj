@@ -14,10 +14,7 @@
      [promesa.exec                  :as px]
      [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
      [scheduling-tbd.db             :as db]
-<<<<<<< HEAD
-=======
      ;; ToDo: Next four should not be here.
->>>>>>> iview4
      [scheduling-tbd.interviewing.domain.data.data-analysis :as dan]
      [scheduling-tbd.interviewing.domain.process.process-analysis :as pan :refer [the-warm-up-type-question]]
      [scheduling-tbd.interviewing.domain.optimality.optimality-analysis]
