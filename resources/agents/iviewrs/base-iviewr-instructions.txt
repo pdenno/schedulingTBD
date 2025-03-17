@@ -39,9 +39,9 @@ Note that in the EADS below, we use single quote so that we don't have to escape
        "interviewee-type": "human",
        "Q-A-pairs": [{"question": "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
 		       "answer": "We make sandwich cookies and sell them locally through our own stores and to a small collection of local grocery markets.
-				   Our principal challenge is in assuring that we have the ingredients needed to meet the demand for our various cookie products.
-				   Because we have several seasonal cookies, and often offer products experimentally to test the market for cookies that use seasonally available ingredients,
-				   we face challenges in scheduling products."}]}
+				  Our principal challenge is in assuring that we have the ingredients needed to meet the demand for our various cookie products.
+				  Because we have several seasonal cookies, and often offer products experimentally to test the market for cookies that use seasonally available ingredients,
+				  we face challenges in scheduling products."}]}
 
   You: {"message-type": "STATUS", "status": "OK"}
 
@@ -53,14 +53,15 @@ Note that in the EADS below, we use single quote so that we don't have to escape
 	   3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within a project.
 	   4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which jobs visit machines or workstations may vary among the jobs as determined by the job type.
 	   5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.",
-	"EADS": "{'problem-type' : {'val' : 'FLOW-SHOP-SCHEDULING-PROBLEM',
-				     'comment' : 'We asked the pencil-making interviewees a bit more about their operations (not shown here)'},
-		   'continuous?' : {'val' : false,
-				    'comment' : 'continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.
-						 Pencil-making does not work that way. Therefore, false.'},
-		   'cyclical?'   : {'val' : false,
-				    'comment' : 'cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern. For example, if the made the
-						 same collection of products in the same order each week, cylical? would be true. This is not the case for pencil making. Therefore, false.'}}}
+	"EADS": "{'EADS-id': "scheduling-problem-type",
+	          'problem-type': {'val' : 'FLOW-SHOP-SCHEDULING-PROBLEM',
+		    	           'comment' : 'We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop.'},
+                  'continuous?': {'val' : false,
+				  'comment' : 'continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.
+						 This might be apparent from the answers that determined the value of problem-type. If not, then you can ask .'},
+		  'cyclical?': {'val': false,
+				'comment': 'cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.
+					    For example, if the made the same collection of products in the same order each week, cylical? would be true.'}}}
 
   You: {"message-type": "STATUS", "status": "OK"}
 
@@ -92,8 +93,9 @@ Note that in the EADS below, we use single quote so that we don't have to escape
 			    "cyclical?": false}}
 
    We: {"message-type": "EADS",
+        "EADS-id": "flow-shop",
 	"interview-objective":
-	"Produce a data structure similar in form to the EADS provided, but describing the interviewees' production processes."
+	"Produce a data structure similar in form to the EADS provided, but describing the interviewees' production processes. This EADS views the interviewees' production as organized as a flow shop."
 	'EADS' :
 "{'process-id':
  {'val':'pencil-manufacturing',

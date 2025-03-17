@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.EADS.job-shop
+(ns scheduling-tbd.interviewing.domain.process.job-shop
   "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a flow-shop scheduling problem.
        As the case is with job-shop problems, this structure defines work to be performed in typical job.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer.

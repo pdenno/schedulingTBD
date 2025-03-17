@@ -14,12 +14,16 @@
      [promesa.exec                  :as px]
      [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
      [scheduling-tbd.db             :as db]
+<<<<<<< HEAD
+=======
+     ;; ToDo: Next four should not be here.
+>>>>>>> iview4
      [scheduling-tbd.interviewing.domain.data.data-analysis :as dan]
      [scheduling-tbd.interviewing.domain.process.process-analysis :as pan :refer [the-warm-up-type-question]]
      [scheduling-tbd.interviewing.domain.optimality.optimality-analysis]
      [scheduling-tbd.interviewing.domain.resources.resources-analysis]
      [scheduling-tbd.llm            :as llm]
-     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim]]
+     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim active-eads]]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets :as ws]
      [taoensso.telemere             :as tel :refer [log!]]))
@@ -533,7 +537,8 @@
     (if (not (ready-for-discussion? pid cid))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
-      (let [asking-role (-> (str cid "-interviewer") keyword)
+      (let [active-eads (ru/active-eads cid pid)
+            asking-role (-> (str cid "-interviewer") keyword)
             ctx (-> (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))
                     (assoc :asking-role asking-role))]
         (when-not (db/conversation-done? pid cid)
@@ -549,7 +554,7 @@
                       (doseq [msg conversation]
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
-                      (analyze-response pid cid expert-response) ; <================================ NL add
+                      ;(analyze-response pid cid expert-response) ; <================================ NL add
                       (cond
                         (> cnt 10)                                  :exceeded-questions-safety-stop
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.
