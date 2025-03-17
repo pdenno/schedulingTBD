@@ -1,4 +1,4 @@
-(ns scheduling-tbd.domain.data-analysis-test
+(ns scheduling-tbd.interviewing.domain.data-analysis-test
   (:require
    [clojure.core.unify                     :as uni]
    [clojure.test                           :refer [deftest is testing]]
@@ -8,7 +8,7 @@
    [jsonista.core                          :as json]
    [scheduling-tbd.agent-db                :as adb]
    [scheduling-tbd.db                      :as db]
-   [scheduling-tbd.interviewing.domain.process-analysis :as pan]
+   [scheduling-tbd.interviewing.domain.process.process-analysis :as pan]
    [scheduling-tbd.interviewing.interviewers            :as inv :refer [tell-interviewer]]
    [scheduling-tbd.llm                     :as llm :refer [query-llm]]
    [scheduling-tbd.response-utils          :as ru]
@@ -54,17 +54,17 @@
                              :response (:text response)} ctx)
       (ru/refresh-client client-id pid cid))))
 
-;; (defn testing-loop-sur
-;;   [pid cid]
-;;   (let [client-id (ws/recent-client!)
-;;         ctx (merge (ctx-surrogate {:pid pid :cid cid}) {:client-id client-id})
-;;         conversation (q-and-a ctx)
-;;         response (-> conversation last)]
+ (defn testing-loop-sur
+   [pid cid]
+   (let [client-id (ws/recent-client!)
+         ctx (merge (ctx-surrogate {:pid pid :cid cid}) {:client-id client-id})
+         conversation (q-and-a ctx)
+         response (-> conversation last)]
 
-;;     (doseq [msg conversation]
-;;       (db/add-msg (merge {:pid pid :cid cid} msg)))
-;;     (analyze-response pid cid response)
-;;     (do
-;;       (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
-;;                              :response (:text response)} ctx)
-;;       (ru/refresh-client client-id pid cid))))
+     (doseq [msg conversation]
+       (db/add-msg (merge {:pid pid :cid cid} msg)))
+     (analyze-response pid cid response)
+     (do
+       (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
+                              :response (:text response)} ctx)
+       (ru/refresh-client client-id pid cid))))

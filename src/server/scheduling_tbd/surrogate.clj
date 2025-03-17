@@ -8,7 +8,7 @@
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.agent-db  :as adb :refer [agent-log]]
    [scheduling-tbd.db        :as db]
-   [scheduling-tbd.interviewing.domain.process-analysis :as pan]
+   [scheduling-tbd.interviewing.domain.process.process-analysis :as pan]
    [scheduling-tbd.interviewing.interviewers :as inv]
    [scheduling-tbd.interviewing.response-utils :as ru]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm]]

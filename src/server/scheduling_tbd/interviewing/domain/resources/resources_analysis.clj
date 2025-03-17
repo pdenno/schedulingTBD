@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.resources-analysis
+(ns scheduling-tbd.interviewing.domain.resources.resources-analysis
   "Planning operators for the resource interview."
   (:require
    [scheduling-tbd.interviewing.response-utils    :as ru :refer [analyze-warm-up]]

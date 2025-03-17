@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.data-analysis
+(ns scheduling-tbd.interviewing.domain.data.data-analysis
   "Planning operators for the data interview"
   (:require
    [clojure.spec.alpha                        :as s]
@@ -43,17 +43,15 @@
 (s/def ::budget number?) ;this is duplicated from interviewers.clj, not great
 (s/def ::path string?) ;there's probably a way better way to check that this is a valid path
 
-(defn upload-first-vector-store-to-agent 
-  [file-id pid]
-  (log! :info "Unimplemented")
-  )
-
-(defn add-additional-vector-store-to-agent
+(defn upload-first-vector-store-to-agent
   [vector-store-id pid]
   (let [interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos :data-interviewer-agent) (assoc :pid pid)))]
-    (llm/add-vector-store-to-assistant vector-store-id pid)
-    )
-)
+    (llm/add-vector-store-to-assistant {:vector-store-id vector-store-id :pid pid})
+    ))
+
+(defn add-additional-vector-store-to-agent
+  [pid data-path]
+  (log! :info "Unimplemented"))
 
 (defn add-spreadsheet-to-agent
   [pid data-path]

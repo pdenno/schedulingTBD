@@ -1,4 +1,4 @@
-(ns scheduling-tbd.domain.process-analysis-test
+(ns scheduling-tbd.interviewing.domain.process-analysis-test
   "Currently these are more about exploring prompts than they are about test the code."
   (:require
    [clojure.core.unify                     :as uni]
@@ -9,7 +9,7 @@
    [jsonista.core                          :as json]
    [scheduling-tbd.agent-db                :as adb]
    [scheduling-tbd.db                      :as db]
-   [scheduling-tbd.interviewing.domain.process-analysis :as pan]
+   [scheduling-tbd.interviewing.domain.process.process-analysis :as pan]
    [scheduling-tbd.interviewing.interviewers            :as inv :refer [tell-interviewer]]
    [scheduling-tbd.llm                     :as llm :refer [query-llm]]
    [scheduling-tbd.response-utils          :as ru]
