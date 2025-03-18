@@ -73,6 +73,7 @@
   "Return a connection atom for the DB.
    Throw an error if the DB does not exist and :error? is true (default)."
   [k & {:keys [error?] :or {error? true}}]
+  ;(log! :info (str "DB: " k)) - for debugging
   (if-let [db-cfg (get @databases-atm k)]
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)

@@ -149,7 +149,7 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The conversation from which this claim is founded. Currently a cid."}
    :claim/question-type
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The question-type (if any) on which this claim is founded."}
    :claim/confidence
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
