@@ -8,7 +8,6 @@
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.agent-db  :as adb :refer [agent-log]]
    [scheduling-tbd.db        :as db]
-   [scheduling-tbd.interviewing.domain.process.process-analysis :as pan]
    [scheduling-tbd.interviewing.interviewers :as inv]
    [scheduling-tbd.interviewing.response-utils :as ru]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm]]
@@ -69,10 +68,10 @@
     (try ;; Now do the warm-up question.
       (let [ctx (inv/ctx-surrogate {:pid pid
                                     :cid :process
-                                    :question pan/the-warm-up-type-question
+                                    :question (ru/get-warm-up-q :process)
                                     :client-id client-id
                                     :force-new? true}) ; This is about the agent; make a new project agent.
-            conversation (inv/get-an-answer ctx)
+            conversation (inv/get-an-answer ctx) ; get-an-answer also used by q-and-a, but here we have the q.
             response (-> conversation last :text)
             warm-up-claims (ru/analyze-warm-up :process response)
             needed-claims (remove #('#{temp-project-id temp-project-name} (first %)) warm-up-claims)
@@ -88,7 +87,7 @@
                           :new-proj-map {:project/name pname :project/id pid}}))
       (catch Exception e
         (log! :error (str "Error starting surrogate:\n" e)))
-      (finally
+      (finally ; ToDo: Not sure this is needed.
         (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})))))
 
 (defn surrogate-follow-up

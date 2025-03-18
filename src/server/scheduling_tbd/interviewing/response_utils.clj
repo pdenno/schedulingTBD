@@ -4,6 +4,8 @@
   (:require
    [clojure.datafy                :refer [datafy]]
    [clojure.core.unify            :as uni]
+   [clojure.edn                   :as edn]
+   [clojure.java.io               :as io]
    [clojure.pprint                :refer [pprint]]
    [clojure.set]
    [clojure.spec.alpha            :as s]
@@ -78,6 +80,19 @@
   (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m (keyword k) (deep-keys v))) {} obj)
         (vector? obj)   (mapv deep-keys obj)
         :else           obj))
+
+;(defn get-warm-up--dispatch [tag & _] tag)
+;(defmulti get-warm-up #'get-warm-up--dispatch)
+
+(defn get-iviewr-info [cid]
+  (-> "agents/iviewrs/iviewr-infos.edn"
+      io/resource
+      slurp
+      edn/read-string
+      (get cid)))
+
+(defn get-warm-up-q [cid]
+  (-> cid get-iviewr-info :warm-up-question))
 
 ;;; ====================== Shared by use of tags :process :data :resources :optimality ====================
 (defn analyze-warm-up--dispatch [tag & _] tag)
