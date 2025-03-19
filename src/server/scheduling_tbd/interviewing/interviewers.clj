@@ -337,7 +337,7 @@
         titles (if (every? #(= (:tag %) :th) heading)
                  (->> heading
                       (mapv #(-> % :content first))
-                      (mapv #(-> {} (assoc :title %) (assoc :key (-> % ru/text-to-var keyword {:asking-role :table2obj})))))
+                      (mapv #(-> {} (assoc :title %) (assoc :key (-> % ru/text-to-var keyword)))))
                  (log! :warn "No titles in ugly table."))
         title-keys (map :key titles)
         data-rows  (->> ugly-table
@@ -367,7 +367,7 @@
                  (cond (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l) res
                        (re-matches #"(?i)^\s*\#\+end_src\s*"          l) res
                        (not @in-table?) (update res :text       #(str % "\n" l))
-                       @in-table?       (update res :table-html #(str % "\n" l)))))))))
+                       @in-table?       (update res :table-text #(str % "\n" l)))))))))
 
 (defn separate-table
   "Arg may be (1) a string that might contain an embedded table, or (2) a context map that contains :question.
@@ -377,10 +377,10 @@
   (let [text (if (string? arg) arg (:question arg))
         {:keys [table-text] :as res} (separate-table-aux text)]
     (if (not-empty table-text)
-      (try (as-> res ?r
-             (assoc ?r :table (-> ?r :table-html java.io.StringReader. xml/parse table-xml2clj table2obj))
-             (assoc ?r :status :ok))
-           ;; ToDo:  This catch is not catching!?!
+      (try
+        (as-> res ?r
+          (assoc ?r :table (-> ?r :table-text java.io.StringReader. xml/parse table-xml2clj table2obj))
+          (assoc ?r :status :ok))
            (catch Throwable _e (assoc res :status :invalid-table)))
       res)))
 
