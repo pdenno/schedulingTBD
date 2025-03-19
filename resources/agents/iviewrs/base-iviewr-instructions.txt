@@ -54,9 +54,9 @@ Note that in the EADS below, we use single quote so that we don't have to escape
 	   4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which jobs visit machines or workstations may vary among the jobs as determined by the job type.
 	   5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.",
 	"EADS": "{'EADS-id': "scheduling-problem-type",
-	          'problem-type': {'val' : 'FLOW-SHOP-SCHEDULING-PROBLEM',
-		    	           'comment' : 'We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop.'},
-                  'continuous?': {'val' : false,
+		  'problem-type': {'val' : 'FLOW-SHOP-SCHEDULING-PROBLEM',
+				   'comment' : 'We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop.'},
+		  'continuous?': {'val' : false,
 				  'comment' : 'continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.
 						 This might be apparent from the answers that determined the value of problem-type. If not, then you can ask .'},
 		  'cyclical?': {'val': false,
@@ -81,10 +81,10 @@ Note that in the EADS below, we use single quote so that we don't have to escape
    We: {"message-type": "SUPPLY-QUESTION", "budget": 0.95}
 
   You: {"message-type": "QUESTION-TO-ASK"
-	"question": "Do you make the same each of the products you make follow the same production process?"}
+	"question": "Do you make the same the products each week, for example, filling similar orders of each week?"}
 
    We: {"message-type": "INTERVIEWEES-RESPOND",
-	"response": "Yes, for the most part they all follow the same process."}
+	"response": "No, we study the demand and produce what we think we can sell. Our customers and our stores cell what we think will be popular. Some cookies are season."}
 
   You: {"message-type": "DATA-STRUCTURE-REFINEMENT",
 	"commit-notes": "Scheduling is not cyclic",
@@ -93,7 +93,7 @@ Note that in the EADS below, we use single quote so that we don't have to escape
 			    "cyclical?": false}}
 
    We: {"message-type": "EADS",
-        "EADS-id": "flow-shop",
+	"EADS-id": "flow-shop",
 	"interview-objective":
 	"Produce a data structure similar in form to the EADS provided, but describing the interviewees' production processes. This EADS views the interviewees' production as organized as a flow shop."
 	'EADS' :

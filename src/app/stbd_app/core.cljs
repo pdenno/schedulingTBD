@@ -15,6 +15,7 @@
    [scheduling-tbd.util         :refer [config-log!]]
    [stbd-app.components.chat    :as chat]
    [stbd-app.components.editor  :as editor :refer [Editor]]
+   [stbd-app.components.mermaid-example :as mer :refer [MermaidExample]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareLeftRight ShareUpDown]]
    [stbd-app.components.tables  :as tables :refer [DataArea]]
@@ -120,7 +121,8 @@
                       :up ($ Editor {:text code
                                      :name "code-editor"
                                      :height code-side-height})
-                      :dn ($ DataArea)
+                      :dn #_($ MermaidExample {:graph "graph TB\na-->b"})
+                          ($ DataArea)
                       :share-fns (:right-share top-share-fns)})
            :lf-pct 0.50
            :init-width width}))))
