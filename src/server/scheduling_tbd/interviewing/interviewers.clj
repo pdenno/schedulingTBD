@@ -1,5 +1,5 @@
 (ns scheduling-tbd.interviewing.interviewers
-    "Runs an interview uing an interview agent."
+    "Runs an interview using an interview agent."
     (:require
      [clojure.core.unify            :as uni]
      [clojure.data.xml              :as xml]
@@ -14,16 +14,20 @@
      [promesa.exec                  :as px]
      [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
      [scheduling-tbd.db             :as db]
-     ;; ToDo: Next four should not be here.
-     [scheduling-tbd.interviewing.domain.data.data-analysis :as dan]
-     [scheduling-tbd.interviewing.domain.process.process-analysis :as pan :refer [the-warm-up-type-question]]
-     [scheduling-tbd.interviewing.domain.optimality.optimality-analysis]
-     [scheduling-tbd.interviewing.domain.resources.resources-analysis]
      [scheduling-tbd.llm            :as llm]
-     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim active-eads]]
+     [scheduling-tbd.interviewing.response-utils :as ru]
      [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets :as ws]
      [taoensso.telemere             :as tel :refer [log!]]))
+
+;;; The usual way of interviews involves q-and-a called from resume-conversation.
+;;; The alternative way, used only when the human or surrogate expert is starting, is to use get-an-answer.
+;;; get-an-answer is called by q-and-a but is also is directly called by surrogate and human conversations on startup.
+;;; The difference being that these two already know what the question is; it is the warm-up question of whatever
+;;; conversation is running. The call to q-and-a, in contrast, uses SUPPLY-QUESTION to the interviewer.
+;;;
+;;; [resume-conversation] -> q-and-a -> get-an-answer -> chat-pair -> send-to-chat or query-agent (sur).
+;;; [start-up]                       -> get-an-answer -> ...
 
 (def ^:diag diag (atom nil))
 (s/def ::cid #(#{:process :data :resources :optimality} %))
@@ -100,6 +104,7 @@
       :human (if (-> response :text llm/immoderate?)
                {:msg-type :immoderate}
                response)
+      ;; ToDo: Move the let up so can capture tables correctly with human too.
       :surrogate (let [{:keys [full-text text table-html table]} (separate-table response)]
                    (cond-> {:msg-type :expert-response :full-text full-text}
                      text  (assoc :text text)
@@ -200,35 +205,6 @@
   [_question response _ctx]
   (log! :warn (str "handle-other-non-responsive not yet implemented: response = " response))
   [])
-
-;;; ToDo: The design question I still have here is how to get back on track when the user's response doesn't answer the question.
-;;;       This is mostly a matter for handle-raises-a-question ...(Thread/sleep 20000).
-;;; 2025-03-06 I am reverting to this version because the one Nicolas pushed isn't working for me. (That one is commented out below.)
-#_(defn get-an-answer
-  "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
-   Return a vector of the conversation (objects suitable for db/add-msg) terminating in an answer to the question.
-   Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
-  [{:keys [question responder-type human-starting?] :as ctx}]
-  (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
-  (let [conversation [{:text question :from :system :tags [:query]}]
-        {:keys [full-text] :as response}  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
-        answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
-        {:keys [answers-the-question? raises-a-question? wants-a-break?]}  (when (and (not answered?) (string? full-text))
-                                                                             (response-analysis question full-text ctx))
-        answered? (or answered? answers-the-question?)]
-    (if (not (or answered? wants-a-break? raises-a-question?))
-      (let [same-question (str "Okay, but we are still interested in this: " question)]
-        (into conversation (get-an-answer (assoc ctx :question same-question))))
-      (cond-> conversation
-        answered?                  (conj (-> response
-                                             (assoc :from responder-type)
-                                             (assoc :tags [:response])))
-        wants-a-break?             (into (handle-wants-a-break question response ctx))
-        raises-a-question?         (into (handle-raises-a-question question response ctx))
-        (not
-         (or answered?
-             wants-a-break?
-             raises-a-question?))  (into (handle-other-non-responsive question response ctx))))))
 
 (defn ask-again
   [question]
@@ -405,25 +381,13 @@
                           (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q)))))
        (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
-;TODO: add for other interviews
-(defn analyze-response
-  "Analyze the response from the expert (human or surrogate)."
-  [pid cid response]
-  (assert (s/valid? ::cid cid))
-  (cond
-    (= :process cid) (log! :info (str "process analysis " pid ": " response))
-    (= :data cid) (dan/analyze-response pid response)
-    (= :resources cid) (log! :info (str "resources analysis " pid ": " response))
-    (= :optimality cid) (log! :info (str "optimality analysis" pid ": " response)))
-  )
-
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
    discussion on the given topic."
   [pid cid]
   (case cid
     ;; ToDo: Someday we will be able to do better than this!
-    (:resources :optimality) (find-claim '(flow-shop ?x) (db/get-claims pid))
+    (:resources :optimality) (ru/find-claim '(flow-shop ?x) (db/get-claims pid))
     (:process :data) true))
 
 (defn redirect-user-to-discussion
@@ -534,8 +498,7 @@
     (if (not (ready-for-discussion? pid cid))
       (redirect-user-to-discussion client-id cid :process)
       ;; The conversation loop.
-      (let [active-eads (ru/active-eads cid pid)
-            asking-role (-> (str cid "-interviewer") keyword)
+      (let [asking-role (-> (str cid "-interviewer") keyword)
             ctx (-> (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))
                     (assoc :asking-role asking-role))]
         (when-not (db/conversation-done? pid cid)
@@ -545,13 +508,13 @@
                 (loop [cnt 0]
                   (if @active?
                     ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
-                    (let [conversation (q-and-a ctx)
+                    (let [active-eads (ru/active-eads cid pid)
+                          conversation (q-and-a ctx)
                           expert-response (-> conversation last :full-text)] ; ToDo: This assumes the last is meaningful.
                       (log! :info (str "Expert in resume-conversation-loop: " expert-response))
                       (doseq [msg conversation]
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
-                      ;(analyze-response pid cid expert-response) ; <================================ NL add
                       (cond
                         (> cnt 10)                                  :exceeded-questions-safety-stop
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.
@@ -563,10 +526,8 @@
                                                                 ctx)]
                           (log! :info (str "Interviewer in resume-conversation-loop: " iviewr-response))
                           (when (surrogate? pid) (ru/refresh-client client-id pid cid))
-                          (case (:message-type iviewr-response)
-                            "PHASE-1-CONCLUSION"          (tell-interviewer (ru/eads-response! :process pid cid iviewr-response) ctx)
-                            "DATA-STRUCTURE-REFINEMENT"   (check-and-put-ds iviewr-response ctx)
-                            nil)
+                          (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
+                            (check-and-put-ds iviewr-response ctx))
                           (recur (inc cnt)))))
                     (log! :warn "Exiting because active? atom is false."))))
             (log! :warn "Exiting because active? atom is false.")))))
@@ -577,15 +538,16 @@
   "Ask a human the first question (a warm-up question), create a project and call resume-conversation.
    :start-conversation is a dispatch-key from the client, providing, perhaps only the client-id."
   [{:keys [client-id cid] :as ctx}]
+  (assert (= :process cid)) ; Conversation always starts with the :process conversation.
   (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :promise? true
                     :text (str "You want to start a new project? This is the right place! "
                                (db/conversation-intros :process))})
   (try
     (let [ctx (merge ctx {:responder-type :human
                           :human-starting? true
-                          :question the-warm-up-type-question})
-          conversation (get-an-answer ctx)
-          response (-> conversation last :text) ; ToDo: Could be more to it...wants-a-break?.
+                          :question (ru/get-warm-up-q cid)})
+          conversation (get-an-answer ctx) ; get-an-answer also used by q-and-a, but here we have the q.
+          response (-> conversation last :text)
           pid (start-human-project! response)
           [_ _ pname] (ru/find-claim '(project-name ?pid ?pname) (db/get-claims pid))]
       (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
