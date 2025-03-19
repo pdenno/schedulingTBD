@@ -62,7 +62,7 @@
 (defn chat-pair-aux
   "Run one query/response pair of chat elements with a human or a surrogate. This executes blocking.
    For human interactions, the response is based on :dispatch-key :domain-experts-says (See websockets/domain-expert-says)."
-  [{:keys [question table table-text surrogate-agent responder-type preprocess-fn tries asking-role pid cid] :as ctx
+  [{:keys [question table table-html surrogate-agent responder-type preprocess-fn tries asking-role pid cid] :as ctx
     :or {tries 1  preprocess-fn identity}}]
   (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
    (let [asking-role (or asking-role (if cid (-> (str cid "-interviewer") keyword) :an-interviewer))
@@ -75,7 +75,7 @@
                 (px/submit! (fn [] ; surrogate responder...
                               (try
                                 (adb/query-agent surrogate-agent  ; This can timeout.
-                                                 (str question "\n\n" table-text)
+                                                 (str question "\n\n" table-html)
                                                  {:tries tries
                                                   :asking-role asking-role
                                                   :base-type pid
@@ -367,7 +367,7 @@
                  (cond (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l) res
                        (re-matches #"(?i)^\s*\#\+end_src\s*"          l) res
                        (not @in-table?) (update res :text       #(str % "\n" l))
-                       @in-table?       (update res :table-text #(str % "\n" l)))))))))
+                       @in-table?       (update res :table-html #(str % "\n" l)))))))))
 
 (defn separate-table
   "Arg may be (1) a string that might contain an embedded table, or (2) a context map that contains :question.
@@ -375,11 +375,11 @@
    Where :text is a substring of :full-text (argument text)."
   [arg]
   (let [text (if (string? arg) arg (:question arg))
-        {:keys [table-text] :as res} (separate-table-aux text)]
-    (if (not-empty table-text)
+        {:keys [table-html] :as res} (separate-table-aux text)]
+    (if (not-empty table-html)
       (try
         (as-> res ?r
-          (assoc ?r :table (-> ?r :table-text java.io.StringReader. xml/parse table-xml2clj table2obj))
+          (assoc ?r :table (-> ?r :table-html java.io.StringReader. xml/parse table-xml2clj table2obj))
           (assoc ?r :status :ok))
            (catch Throwable _e (assoc res :status :invalid-table)))
       res)))
