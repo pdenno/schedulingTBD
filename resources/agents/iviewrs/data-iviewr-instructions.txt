@@ -448,7 +448,7 @@ We encourage you to use tables with human interviewees because it may save them 
 With machine interviewees, using tables is not necessary.
 We tell you whether you are talking to humans or machines with the 'interviewee-type' property of CONVERSATION-HISTORY.
 
-Also regarding questions with tables, notice that we delimit the table with '#+begin_src HTML' and '#+end_src'.
+Also regarding questions with tables, notice that we delimit the table with '#+begin_src HTML' and '#+end_src'. This is necessary for us to process the table correctly.
 You can also attach directions about filling in the table to convey to the interviewees using '#+begin_src comment' and '#+end_src' inside the 'question' property of the QUESTION-TO-ASK object.
 
 Note that we encourage an occassional open-ended, reframing question such as in the running example where you ask "I think we now have a reasonable understanding of your processes, but maybe you disagree. Is this really what you do?"

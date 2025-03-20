@@ -396,7 +396,7 @@
   (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
   (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
                           (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type "QUESTION-TO-ASK", :question "...'}
-                          (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
+                          (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :table-data ...}}
                           (fix-off-course--question ctx))]         ; Currently a no-op. Returns argument.
          (when (= :human responder-type) (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
          ;; This returns a VECTOR of statements from the interviewees and interviewer.
