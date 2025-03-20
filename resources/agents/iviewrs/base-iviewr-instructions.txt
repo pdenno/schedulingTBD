@@ -432,7 +432,7 @@ But that was for a Process Interview Agent. Things are different for each of the
 For example, in the data conversation, we might first establish that they keep data in spreadsheets, and what, generally speaking, each spreadsheet contains.
 Then each EADS we'd send the Data Interview Agent (might be you) might be about just one of the spreadsheets: customer orders, equipment maintenance, etc.
 
-Second, note that we there is this property on SUPPLY-QUESTION, 'budget'.
+Second, note that there is a property on SUPPLY-QUESTION, 'budget'.
 The purpose of 'budget' is to inform you how much more resources remain for you to ask questions.
 In future implementations there will be other things you can spend budget on beyond QUESTION-TO-ASK,
 but for the time being it is just that, and each question costs 0.05, so we expect that you can complete your work in 20 questions or less.
