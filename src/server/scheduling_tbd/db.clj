@@ -157,7 +157,7 @@
 
    ;; ---------------------- conversation
    :conversation/active-EADS
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the EADS which is currently being pursued in conversation."}
    :conversation/done?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean

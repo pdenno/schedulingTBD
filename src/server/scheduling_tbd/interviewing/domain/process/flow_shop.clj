@@ -106,7 +106,9 @@
                                                :quantity {:units "liters", :value-string "100"}}],
                                     :resources ["mixer"],
                                     :duration  {:units "hours", :value-string "1"}
-                                    :subprocesses []},
+                                    :subprocesses {:val []
+                                                   :comment (str "We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\n"
+                                                                 "Of course, this could be updated later if subsequent discussion suggests we are wrong.")}}
 
                                    {:process-id "extrude-core",
                                     :inputs ["graphite-clay paste"],
@@ -138,6 +140,10 @@
                                     :outputs ["milled wood slats"],
                                     :resources ["milling machine"],
                                     :duration  {:units "hours", :value-string "2"}
+                                    :subprocess-flow {:val :individuals-from-batch,
+                                                      :comment (str "'sub-process-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\n"
+                                                                    "The string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\n"
+                                                                    "can start as soon as the first slat is available.")}
                                     :subprocesses []},
 
                                    {:process-id "cut-grooves-in-slats",
