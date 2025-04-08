@@ -120,7 +120,7 @@
                                    "INTERVIEWEES-RESPOND"              (s/valid? :iviewr/interviewees-respond msg)
                                    "DATA-STRUCTURE-REFINEMENT"         (s/valid? :iviewr/data-structure-refinement msg)
                                    "CONVERSATION-HISTORY"              (s/valid? :iviewr/conversation-history msg)
-                                   "EADS"                              (s/valid? :iviewr/eads-msg msg)
+                                   "EADS-INSTRUCTIONS"                 (s/valid? :iviewr/eads-instructions msg)
                                    "COURSE-CORRECTION"                 (s/valid? :iviewr/course-correction msg)
                                    "STATUS"                            #(string? (get % :status))))))
 
@@ -145,7 +145,7 @@
 (s/def :iviewr/data-structure map?)
 (s/def :iviewr/EADS map?) ; ToDo: Tie in the EADSs?
 
-(s/def :iviewr/eads-msg (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
+(s/def :iviewr/eads-instructions (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
 (s/def :iviewr/interview-objective string?)
 (s/def :iviewr/EADS string?)
 

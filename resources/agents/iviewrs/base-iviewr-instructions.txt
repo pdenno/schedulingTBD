@@ -31,7 +31,6 @@ EXAMPLE INTERACTIONS depicts the interaction of a Process Interviewer Agent; you
 As should be evident from this diversity, we value your ability to improvise!
 After the example, we will document the "message-types" used in the example.
 
-
 ========= EXAMPLE INTERACTIONS =====================================
 
    We: {"message-type": "CONVERSATION-HISTORY",
@@ -45,7 +44,7 @@ After the example, we will document the "message-types" used in the example.
 
   You: {"message-type": "STATUS", "status": "OK"}
 
-   We: {"message-type": "EADS",
+   We: {"message-type": "EADS-INSTRUCTIONS",
         "interview-objective": Using the three property types 'problem-type', 'continuous?', and 'cyclical?', determine the kind of production system and scheduling problem for which the interviewees seek a solution.
          For 'problem-type' you may only choose one of the following:
            1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for jobs that all execute the same sequence of production steps across multiple machines or workstations.
@@ -92,7 +91,7 @@ After the example, we will document the "message-types" used in the example.
                             "continuous?": false,
                             "cyclical?": false}}
 
-   We: {"message-type": "EADS",
+   We: {"message-type": "EADS-INSTRUCTIONS",
         "EADS-id": "flow-shop",
         "interview-objective":
         "Produce a data structure similar in form to the EADS provided, but describing the interviewees' production processes. This EADS views the interviewees' production as organized as a flow shop."
@@ -328,15 +327,15 @@ After the example, we will document the "message-types" used in the example.
                               "outputs": ["filling"]}
                              {"process-id": "load-cookie-depositor",
                               "duration": {"units": "minutes", "value-string": "10"},
-                               "inputs": [{"item-id": "wafer dough", "from": "mix-wafer-dough"}]
-                               "outputs": ["unbaked wafers"]},
+                              "inputs": [{"item-id": "wafer dough", "from": "mix-wafer-dough"}]
+                              "outputs": ["unbaked wafers"]},
                              {"process-id": "load-packaging",
                               "duration": {"units": "minutes", "value-string": "20"}
                               "inputs": ["retail cookie packaging"],
                               "outputs": ["retail cookie packaging"]}
                              {"process-id": "baking-and-assembly",
                               "duration": {"units": "minutes", "value-string": "30"},
-                              "inputs": [{"item-id": "unbaked-wafers", "from": load-cookie-depositor"},
+                              "inputs": [{"item-id": "unbaked-wafers", "from": "load-cookie-depositor"},
                                          {"item-id": "retail cookie packaging", "from": "load-packaging"}]
                               "outputs": ["packaged cookies"],
                               "subprocess-flow": "individuals-from-batch",
@@ -396,8 +395,8 @@ After the example, we will document the "message-types" used in the example.
                                                {"process-id": "place-filling",   "duration": {"value-string": "N/A"},
                                                                                               "optional?": true,
                                                                                               "invented": {"derive-value": "true only if the cookie is a sandwich cookie"}}
-                                                   {"process-id": "add-top-wafer",   "duration": {"value-string": "N/A"}, "optional?": true},
-                                                   {"process-id": "package-cookies", "duration": {"value-string": "N/A"}}]}
+                                               {"process-id": "add-top-wafer",   "duration": {"value-string": "N/A"}, "optional?": true},
+                                               {"process-id": "package-cookies", "duration": {"value-string": "N/A"}}]}
                              {"process-id": "load-cartons",
                               "inputs": [{"item-id": "packaged-cookies", "from": "baking-and-assembly"}]
                               "outputs": ["cookie cartons ready for shipping"]}]},
@@ -470,7 +469,7 @@ Minimally it has the properties, 'budget', 'Q-A-pairs' and 'interviewee-type' as
   1) 'data-structure' - the most refined EADS-like data structure from your prior DATA-STRUCTURE-REFINEMENT messages, and
   2) 'EADS' - The EADS from which you were refining a data structure.
 
-6) EADS :
+6) EADS-INSTRUCTIONS :
 This message-type has the property 'EADS' that provides the Example Annotated Data Structure (EADS) that helps you decide what to ask.
 The message also has the property "interview-objective" for that purpose.
 

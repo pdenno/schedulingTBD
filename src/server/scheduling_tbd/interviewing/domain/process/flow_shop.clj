@@ -1,18 +1,24 @@
 (ns scheduling-tbd.interviewing.domain.process.flow-shop
-  "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a flow-shop scheduling problem.
+  "(1) Define the example annotated data structure (EADS) interviewer will use for questioning about a flow-shop scheduling problem.
        As the case is with flow-shop problems, this structure defines the flow of work through resources.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
+   [clojure.data.json]
    [clojure.spec.alpha :as s]))
 
+;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
 
-(s/def :flow-shop/EADS-message (s/keys :req-un [::message-type ::interview-objective ::EADS]))
-(s/def ::message-type #(= % :EADS))
-(s/def ::interview-objective string?)
-(s/def ::comment string?)
+(def ^:diag diag (atom nil))
 
-(s/def ::EADS (s/keys :req-un [::message-type ::EADS-id ::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
+(s/def :flow-shop/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interview-context ::EADS]))
+(s/def ::message-type #(= % :EADS-INSTRUCTIONS))
+(s/def ::interview-objective string?)
+(s/def ::interview-context #(= % :process))
+
+(s/def ::comment string?) ; About annotations
+
+(s/def ::EADS (s/keys :req-un [::EADS-id ::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
 (s/def ::EADS-id #(= % :flow-shop))
 
 ;;; We use the 'trick' that :<some-property>/val can be used that to signify a non-namespaced attribute 'val' and a reference to a spec for value of 'val'.
@@ -71,11 +77,20 @@
 (s/def ::value-string string?)
 
 ;;; (s/valid? ::fshop/EADS (:EADS fshop/flow-shop))
+
+;;; ToDo: Write something about flow-shops being disjoint from the other four types. But also point out that part of their complete process could be flow shop....
+;;;       Come up with an example where work flows to a single-machine-scheduling problem.
 (def flow-shop
   "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of a flow-shop problem."
-  {:message-type :EADS
-   :interview-objective (str "Produce a data structure similar in form to the EADS in this object, but describing the interviewees' production processes.\n"
-                             "This EADS views the interviewees' production as organized as a flow shop.")
+  {:message-type :EADS-INSTRUCTIONS
+   :interview-context :process
+   :interview-objective (str "Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\n"
+                             "This EADS views the interviewees' production as organized as a flow shop.\n"
+                             "This portion of the interview will reveal the processes that the enterprise uses to run their flow shop.\n"
+                             "We might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\n"
+                             "For example, they might have in mind scheduling machine maintenance, not production.\n"
+                             "This fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\n"
+                             "Knowledge of the processes might prove useful later.")
    :EADS
    {:EADS-id :flow-shop
     :process-id {:val "pencil-manufacturing",
@@ -181,5 +196,7 @@
                                     :resources ["crimping tool"],
                                     :subprocesses []}]}]}})
 
-(when-not (s/valid? :flow-shop/EADS-message flow-shop)
-  (throw (ex-info "Invalid EADS message (flow-shop)" {})))
+(if (s/valid? :flow-shop/EADS-message flow-shop)
+  ;; Write the EADS to data/EADS/process
+  (->> (with-out-str (clojure.data.json/pprint flow-shop)) (spit "data/EADS/process/flow-shop.json"))
+  (throw (ex-info "Invalid EADS message (flow-shop)." {})))

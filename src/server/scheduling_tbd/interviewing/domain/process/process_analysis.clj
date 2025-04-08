@@ -97,6 +97,10 @@
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
+;;; ====================================================================================================================================================================================
+;;; ================================================================== I think this stuff goes away once the orchestrator is implemented. ==============================================
+;;; ====================================================================================================================================================================================
+
 ;;; ToDo: I'm currently not handling anything but flow-shop
 (def process-eads2file
   {:FLOW-SHOP-SCHEDULING-PROBLEM      "EADS/flow-shop.edn"

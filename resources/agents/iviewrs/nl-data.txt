@@ -10,7 +10,7 @@ You will then work through each spreadsheet, trying to figure out how they work 
 
 The interview will follow a simple path: 
 
-1. warm-up question, the response from which you infer what tables exist.
+1. Warm-up question, the response from which you infer what tables exist.
 
 Here is a non-exhaustive list of possible tables:
 
