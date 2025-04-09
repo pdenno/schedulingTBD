@@ -135,11 +135,11 @@
 (s/def :iviewr/commit-notes string?)
 (s/def :iviewr/data-structure map?)
 
-(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/budget :iviewr/Q-A-pairs :iviewr/interviewee-type] :opt-un [:iviewr/data-structure :iviewr/EADS]))
+(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/budget :iviewr/activity :iviewr/interviewee-type] :opt-un [:iviewr/data-structure :iviewr/EADS]))
 (s/def :iviewr/budget number?)
 (s/def :iviewr/interviewee-type #(#{:human :machine} %))
-(s/def :iviewr/Q-A-pairs (s/coll-of :iviewr/q-a-map :kind vector?))
-(s/def :iviewr/q-a-map (s/keys :req-un [:iviewr/question :iviewr/answer]))
+(s/def :iviewr/activity (s/coll-of :iviewr/activity-map :kind vector?))
+(s/def :iviewr/activity-map (s/keys :req-un [:iviewr/question :iviewr/answer]))
 (s/def :iviewr/question string?)
 (s/def :iviewr/answer string?)
 (s/def :iviewr/data-structure map?)
@@ -252,7 +252,7 @@
     (cond-> {:message-type "CONVERSATION-HISTORY"
              :interviewee-type (if (surrogate? pid) :machine :human)
              :budget (db/get-budget pid cid)
-             :Q-A-pairs (->> questions
+             :activity (->> questions
                              (map (fn [q]
                                     (let [next-id (inc (:message/id q))]
                                       (as-> {} ?pair
@@ -487,6 +487,8 @@
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
+;;; ToDo: Will need to keep track in the DB of the interviewer tid on which each element of conversation happened.
+;;;       Use this to decide what to put into CONVERSATION-HISTORY messages.
 (defn resume-conversation
   "Resume the interview loop for an established project and given cid."
   [{:keys [client-id pid cid] :as ctx}]

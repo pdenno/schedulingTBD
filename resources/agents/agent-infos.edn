@@ -3,6 +3,15 @@
 [
  ;; ---------- project-specific interview agents -------------------------
  ;; These are projections of information in agents/iviewrs/iviewr-infos.edn
+ ;; The pathnames here (for instructions and vector store) are relative to resources.
+
+ {:base-type :orchestrator-agent,
+  :tools [{:type "file_search"}],
+  :model-class :gpt,
+  :instruction-path "agents/orchestrator.txt",
+  :vector-store-paths ["EADS/process/flow-shop.edn"],
+  :agent-type :shared-assistant}
+
  {:base-type :process-interview-agent,
   :tools [{:type "file_search"}],
   :model-class :gpt,

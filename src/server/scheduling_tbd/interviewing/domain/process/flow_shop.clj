@@ -11,10 +11,10 @@
 
 (def ^:diag diag (atom nil))
 
-(s/def :flow-shop/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interview-context ::EADS]))
+(s/def :flow-shop/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
 (s/def ::interview-objective string?)
-(s/def ::interview-context #(= % :process))
+(s/def ::interviewer-agent #(= % :process))
 
 (s/def ::comment string?) ; About annotations
 
@@ -83,7 +83,7 @@
 (def flow-shop
   "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of a flow-shop problem."
   {:message-type :EADS-INSTRUCTIONS
-   :interview-context :process
+   :interviewer-agent :process
    :interview-objective (str "Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\n"
                              "This EADS views the interviewees' production as organized as a flow shop.\n"
                              "This portion of the interview will reveal the processes that the enterprise uses to run their flow shop.\n"
@@ -198,5 +198,5 @@
 
 (if (s/valid? :flow-shop/EADS-message flow-shop)
   ;; Write the EADS to data/EADS/process
-  (->> (with-out-str (clojure.data.json/pprint flow-shop)) (spit "data/EADS/process/flow-shop.json"))
+  (->> (with-out-str (clojure.data.json/pprint flow-shop)) (spit "resources/EADS/process/flow-shop.json"))
   (throw (ex-info "Invalid EADS message (flow-shop)." {})))

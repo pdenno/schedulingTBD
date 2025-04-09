@@ -34,7 +34,7 @@
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
   (safe-alias 'fshop  'scheduling-tbd.interviewing.domain.process.flow-shop)
   (safe-alias 'fshop  'scheduling-tbd.interviewing.domain.process.job-shop)
-  (safe-alias 'ptype  'scheduling-tbd.interviewing.domain.process.problem-type)
+  (safe-alias 'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type)
   (safe-alias 'pan    'scheduling-tbd.interviewing.domain.process.process-analysis)
   (safe-alias 'inv    'scheduling-tbd.interviewing.interviewers)
   (safe-alias 'ru     'scheduling-tbd.interviewing.response-utils)
