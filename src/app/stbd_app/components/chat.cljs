@@ -130,11 +130,13 @@
 (register-fn :interviewer-busy?     (fn [{:keys [value]}]
                                       ((lookup-fn :set-busy?) value)))
 
-(register-fn :iviewr-says           (fn [{:keys [p-key text table]}]
+(register-fn :iviewr-says           (fn [{:keys [p-key text table mermaid]}]
                                       (when p-key (remember-promise p-key))
                                       (add-msg text :system)
                                       (when table
-                                        ((lookup-fn :set-table) table))))
+                                        ((lookup-fn :set-table) table))
+                                      (when mermaid
+                                        ((lookup-fn :show-mermaid) mermaid))))
 
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))

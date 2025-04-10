@@ -1,4 +1,4 @@
-(ns excel-reader.eads-to-mermaid
+(ns scheduling-tbd.pg2mermaid
   (:require [clojure.data.json :as json]
             [clojure.core :as c]))
 
@@ -103,7 +103,7 @@
 (defn parse-eads [eads-str]
   (json/read-str eads-str :key-fn keyword))
 
-(defn eads-to-mermaid [eads-str]
+(defn pg2mermaid [eads-str]
   (let [eads (parse-eads eads-str)]
     (print (str "flowchart TD\n"
         (decompose-eads eads)))

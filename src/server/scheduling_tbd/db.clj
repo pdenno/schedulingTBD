@@ -156,8 +156,11 @@
         :doc "a number [0,1] expressing how strongly we believe the proposition ."}
 
    ;; ---------------------- conversation
+   :conversation/EADS
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "duplicate active EADS"}
    :conversation/active-EADS
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the EADS which is currently being pursued in conversation."}
    :conversation/done?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
