@@ -4,7 +4,9 @@
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
    [clojure.data.json]
-   [clojure.spec.alpha :as s]))
+   [clojure.spec.alpha    :as s]
+   [datahike.api          :as d]
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm]]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
@@ -81,7 +83,8 @@
 ;;; ToDo: Write something about flow-shops being disjoint from the other four types. But also point out that part of their complete process could be flow shop....
 ;;;       Come up with an example where work flows to a single-machine-scheduling problem.
 (def flow-shop
-  "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of a flow-shop problem."
+  "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of a flow-shop problem.
+   Like all EADS, it is also stored in the system DB. See how at the bottom of this file."
   {:message-type :EADS-INSTRUCTIONS
    :interviewer-agent :process
    :interview-objective (str "Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\n"
@@ -197,6 +200,13 @@
                                     :subprocesses []}]}]}})
 
 (if (s/valid? :flow-shop/EADS-message flow-shop)
-  ;; Write the EADS to data/EADS/process
-  (->> (with-out-str (clojure.data.json/pprint flow-shop)) (spit "resources/EADS/process/flow-shop.json"))
+  (let [db-obj {:EADS/id :process/flow-shop
+                :EADS/cid :process
+                :EADS/specs #:spec{:full :flow-shop/EADS-message}
+                :EADS/msg-str (str flow-shop)}
+        conn (connect-atm :system)
+        eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
+    ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
+    (->> (with-out-str (clojure.data.json/pprint flow-shop)) (spit "resources/EADS/process/flow-shop.json")))
   (throw (ex-info "Invalid EADS message (flow-shop)." {})))

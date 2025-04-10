@@ -31,7 +31,7 @@ Here you enumerate what among the list below, is evident in the user's text:
   12) bottleneck-processes : The pace of their production is throttled by just a few processes.
   13) process-variation : They have many different processes for making roughly the same class of products.
   14) product-variation : They have many different products to make.
-  15) mentions-KPIs : They mention key performance indicators (KPIs).
+  15) meeting-KPIs : They mention key performance indicators (KPIs) or difficulty performing to them.
 
 The only values permitted are the terms in the 15 challenges listed above.
 Continuing with the plate glass example above, you would recognize the following CHALLENGES cited in their text:

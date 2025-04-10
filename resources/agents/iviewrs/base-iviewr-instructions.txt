@@ -72,7 +72,7 @@ After the example, we will document the "message-types" used in the example.
         "question": "Do each of the cookie products you make follow the same production process?"}
 
    We: {"message-type": "INTERVIEWEES-RESPOND",
-        "response": "Yes, for the most part they all follow the same process. Mix ingredients, bake, assemble, package, etc."}
+        "response": "Yes, for the most part they all follow the same process. Mix ingredients, bake in conveyor oven, assemble, package, etc."}
 
   You: {"message-type": "DATA-STRUCTURE-REFINEMENT",
         "refinement-of-EADS": "scheduling-problem-type",

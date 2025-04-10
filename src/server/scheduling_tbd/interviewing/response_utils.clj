@@ -76,11 +76,6 @@
        (s/assert ::text-to-var res)
        (:CORRESPONDING-VAR res)))))
 
-(defn deep-keys [obj]
-  (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m (keyword k) (deep-keys v))) {} obj)
-        (vector? obj)   (mapv deep-keys obj)
-        :else           obj))
-
 ;(defn get-warm-up--dispatch [tag & _] tag)
 ;(defmulti get-warm-up #'get-warm-up--dispatch)
 
@@ -99,34 +94,3 @@
 
 ;;; The methods for this are in the interviewing/domain directory.
 (defmulti analyze-warm-up #'analyze-warm-up--dispatch)
-
-(defn eads-response--dispatch [tag & _] tag)
-
-;;; The methods for this are in the interviewing/domain directories.
-;;; Returns a PHASE-2-EADS message. (See for example the one for :process in process_analysis.clj.
-(defmulti eads-response! #'eads-response--dispatch)
-
-;;; The methods for this are in the interviewing/domain directories.
-(defn active-eads--dispatch [cid & _] cid)
-
-;;; The methods for this are in the interviewing/domain directory.
-(defmulti active-eads #'active-eads--dispatch)
-
-(defn active-eads
-  "Determine which EADS (if any) is being pursued.
-   If none is being pursued, determine which should be pursued."
-  [pid cid])
-
-;;; ================ Some utilities for analyzing interviewer
-(defn collect-keys [obj]
-  (let [okeys (atom #{})]
-    (letfn [(ck [obj]
-              (cond (map? obj)      (doseq [[k v] obj]
-                                      (swap! okeys conj k)
-                                      (ck v))
-                    (vector? obj)   (doseq [x obj] (ck x))))]
-      (ck obj)
-      (sort @okeys))))
-
-#_(defn extra-keys [obj]
-  (clojure.set/difference (-> obj collect-keys set) eads-keys))

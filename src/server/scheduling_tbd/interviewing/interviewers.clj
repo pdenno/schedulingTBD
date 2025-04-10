@@ -1,24 +1,25 @@
 (ns scheduling-tbd.interviewing.interviewers
     "Runs an interview using an interview agent."
     (:require
-     [clojure.core.unify            :as uni]
-     [clojure.data.xml              :as xml]
-     [clojure.edn                   :as edn]
-     [clojure.pprint                :refer [pprint cl-format]]
-     [clojure.java.io               :as io]
-     [clojure.spec.alpha            :as s]
-     [clojure.string                :as str]
-     [jsonista.core                 :as json]
-     [mount.core                    :as mount :refer [defstate]]
-     [promesa.core                  :as p]
-     [promesa.exec                  :as px]
-     [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
-     [scheduling-tbd.db             :as db]
-     [scheduling-tbd.llm            :as llm]
+     [clojure.core.unify              :as uni]
+     [clojure.data.xml                :as xml]
+     [clojure.edn                     :as edn]
+     [clojure.pprint                  :refer [pprint cl-format]]
+     [clojure.java.io                 :as io]
+     [clojure.spec.alpha              :as s]
+     [clojure.string                  :as str]
+     [jsonista.core                   :as json]
+     [mount.core                      :as mount :refer [defstate]]
+     [promesa.core                    :as p]
+     [promesa.exec                    :as px]
+     [scheduling-tbd.agent-db         :as adb :refer [agent-log ensure-agent!]]
+     [scheduling-tbd.db               :as db]
+     [scheduling-tbd.llm              :as llm]
+     [scheduling-tbd.interviewing.ork :as ork]
      [scheduling-tbd.interviewing.response-utils :as ru]
-     [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
-     [scheduling-tbd.web.websockets :as ws]
-     [taoensso.telemere             :as tel :refer [log!]]))
+     [scheduling-tbd.sutil            :as sutil :refer [elide output-struct2clj]]
+     [scheduling-tbd.web.websockets   :as ws]
+     [taoensso.telemere               :as tel :refer [log!]]))
 
 ;;; The usual way of interviews involves q-and-a called from resume-conversation.
 ;;; The alternative way, used only when the human or surrogate expert is starting, is to use get-an-answer.
@@ -442,6 +443,7 @@
         (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
                             :q-type :process/warm-up
                             :cid :process}))
+      (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid pid)))
       pid))
 
 (def iviewr-infos
@@ -465,7 +467,7 @@
     (log! :error (str "No conversation cid = " cid))))
 
 ;;; ToDo: Should we add a creation policy for interviewers? We need to force new ones whenever we are working on the system instructions.
-(defn ^:diag force-new-interviewer!
+(defn ^:admin force-new-interviewer!
   "As a matter of policy, shared-assistant type agents such as surrogates and interviewers don't update the assistant just because
    the instructions change. This is because we try to preserve the context already built up by the current agent.
    Therefore, if you don't care about that context but you do care about seeing the effect of new instructions, you should call this."
@@ -483,7 +485,7 @@
 
 (defn check-and-put-ds
   [iviewr-response {:keys [pid cid] :as _ctx}]
-  (db/put-ds! pid cid iviewr-response))
+  (db/put-EADS-ds! pid cid iviewr-response))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
@@ -510,10 +512,10 @@
                 (loop [cnt 0]
                   (if @active?
                     ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
-                    (let [active-eads (ru/active-eads cid pid)
+                    (let [active-eads (ork/active-EADS! cid pid)
                           conversation (q-and-a ctx)
                           expert-response (-> conversation last :full-text)] ; ToDo: This assumes the last is meaningful.
-                      (log! :info (str "Expert in resume-conversation-loop: " expert-response))
+                      (log! :info (str "Expert in resume-conversation-loop: (EADS: " active-eads ") response:(" expert-response) ")")
                       (doseq [msg conversation]
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))

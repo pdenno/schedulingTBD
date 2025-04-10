@@ -59,7 +59,7 @@
           :conversations
           [#:conversation{:active-EADS
                           "{:message-type :EADS, :EADS-id :flow-shop :EADS {:interview-objective \"Produce a data structure similar in form to the EADS in this object, but describing the interviewees' production processes.\", :EADS {:process-id {:val \"pencil-manufacturing\", :comment \"This is the top-level process. You can name it as you see fit; don't ask the interviewees.\"}, :inputs {:val [\"graphite\" \"clay\" \"water\" \"cedar wood\" \"metal\" \"eraser material\" \"paint\"], :comment \"These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes.\"}, :outputs {:val [{:item-id \"finished pencils\", :quantity {:units \"finished pencils\", :value-string \"100000\"}}], :comment \"inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.\"}, :resources {:val [\"extruder\" \"kiln\" \"milling machine\" \"glue applicator\" \"shaping machine\"], :comment \"Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer.\"}, :duration {:val {:units \"hours\", :value-string \"4\"}, :comment \"We use a string for 'value-string' in case interviewees answer it something like 'it varies'\"}, :subprocesses [{:process-id \"graphite-core-production\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite core\", :quantity {:units \"graphite cores\", :value-string \"100000\"}}], :resources [\"mixer\" \"extruder\" \"kiln\"], :subprocesses [{:process-id \"mix-graphite-and-clay\", :process-var {:val \"mix\", :comment \"Include a camelCase variable of less than 25 characters that describes the process. We'll use these in the translation to MiniZinc.\"}, :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite-clay paste\", :quantity {:units \"liters\", :value-string \"100\"}}], :resources [\"mixer\"], :duration {:units \"hours\", :value-string \"1\"}, :subprocesses []} {:process-id \"extrude-core\", :process-var \"extrude\", :inputs [\"graphite-clay paste\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"extruder\"], :duration {:units \"minutes\", :value-string \"20\"}, :subprocesses []} {:process-id \"dry-and-bake-core\", :process-var \"dryAndBakeCores\", :inputs [\"extruded graphite rods\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"kiln\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"wood-casing-production\", :inputs [\"cedar wood\"], :outputs [\"wood slats with grooves\"], :resources [\"milling machine\"], :subprocess-flow {:val \"individuals-from-batch\", :comment \"The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\\nyou can start 'cut-grooves-in-slats' as soon as the first slat is available.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses.\"}, :subprocesses [{:process-id \"mill-wood-slats\", :process-var \"millSlats\", :inputs [\"cedar wood\"], :outputs [\"milled wood slats\"], :resources [\"milling machine\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []} {:process-id \"cut-grooves-in-slats\", :process-var \"cutGrooves\", :inputs [\"milled wood slats\"], :outputs [\"wood slats with grooves\"], :resources [\"groove cutter\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"assembly\", :inputs {:val [{:item-id \"graphite core\", :from \"graphite-core-production\"} {:item-id \"wood slats with grooves\", :from \"wood-casing-production\"} \"metal\" \"erasers\" \"paint\"], :comment \"The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\\nThe 'from' property is essential to understanding process ordering and potential for concurrency.\"}, :outputs [\"finished pencil\"], :resources [\"glue applicator\" \"shaping machine\"], :subprocesses [{:process-id \"insert-core-into-slats\", :process-var \"insert-cores\", :inputs [\"graphite core\" \"wood slats with grooves\"], :outputs [\"pencil blanks\"], :resources [\"glue applicator\"], :subprocesses []} {:process-id \"shape-and-paint-pencil\", :process-var \"shapeAndPaint\", :inputs [\"pencil blanks\" \"paint\"], :outputs [\"shaped and painted pencils\"], :resources [\"shaping machine\" \"painting station\"], :subprocesses []} {:process-id \"attach-eraser\", :process-var \"attachErasers\", :optional? {:val true, :comment \"'optional?' means that the process does not occur for every product. Not every pencil has an eraser.\"}, :inputs [\"shaped and painted pencils\" \"metal\" \"erasers\"], :outputs [\"finished pencils\"], :resources [\"crimping tool\"], :subprocesses []}]}]}}}",
-                          :id :process,
+                          :id :optimality,
                           :interviewer-budget 0.39999999999999963,
                           :messages
                           [#:message{:content
@@ -68,21 +68,16 @@
                                      :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2025-03-05T12:30:24.668-00:00"}
-                           #:message{:content
+                                     #inst "2025-03-05T12:30:24.668-00:00"}]}
+           #:conversation{:id :data
+                          :messages
+                          [#:message{:content
                                      "\nCould you share some details about the data you use, such as its purpose and how you manage it? If possible, list the key areas or categories of data that are important to your operations, like customer orders, resource availability, production schedules, etc.",
                                      :from :system,
                                      :id 2,
                                      :tags [:query],
                                      :time
-                                     #inst "2025-03-06T20:50:42.886-00:00"}
-                           #:message{:content
-                                     "\nHere are the key areas of data and their purposes:\n\n1. <b>Customer Orders</b>: Includes product type, quantity, and delivery deadlines to prioritize and plan production runs.\n\n2. <b>Resource Availability</b>: Tracks the status and availability of raw materials, equipment, and labor to avoid delays.\n\n3. <b>Production Schedules</b>: Details the sequencing, timing, and progress of each step in the production process, helping to monitor and adjust workflows.\n\n4. <b>Equipment Performance</b>: Maintenance logs, downtime records, and operational metrics ensure equipment reliability and efficiency.\n\n5. <b>Quality Control Data</b>: Results from testing (e.g., attenuation and tensile strength) ensure product specifications are met.\n\n6. <b>Inventory Levels</b>: For both raw materials (e.g., silicon tetrachloride) and finished goods, aiding supply chain and warehousing decisions.\n\n7. <b>Historical Data</b>: Past production performance and trends are useful for demand forecasting and continuous improvement.\n\nWe manage this data using ERP systems integrated with production floor tools, ensuring real-time monitoring and effective decision-making.",
-                                     :from :surrogate,
-                                     :id 3,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2025-03-06T20:50:42.923-00:00"}
+                                     #inst "2025-03-06T20:50:42.886-00:00"}]}
                            #:message{:content
                                      "\nCould you upload the customer orders spreadsheet (or a redacted version of it) for discussion? Read about the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
                                      :from :system,
@@ -407,16 +402,6 @@
                                      :tags [:response],
                                      :time
                                      #inst "2025-03-06T20:52:47.398-00:00"}]}
-           #:conversation{:id :resources,
-                          :interviewer-budget 1.0,
-                          :messages
-                          [#:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
-                                     :from :system,
-                                     :id 1,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2025-03-05T12:30:24.668-00:00"}]}
            #:conversation{:id :optimality,
                           :interviewer-budget 1.0,
                           :messages

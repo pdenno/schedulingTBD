@@ -42,6 +42,8 @@
   (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
   (safe-alias 'ou     'scheduling-tbd.op-utils)
   (safe-alias 'opt    'scheduling-tbd.operators-test)
+  (safe-alias 'or     'scheduling-tbd.orchestrator)
+  (safe-alias 'ort    'scheduling-tbd.orchestrator-test)
   (safe-alias 'spec   'scheduling-tbd.specs)
   (safe-alias 'sutil  'scheduling-tbd.sutil)
   (safe-alias 'sur    'scheduling-tbd.surrogate)

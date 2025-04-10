@@ -58,6 +58,23 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Documentation about the file."}
 
+   ;; ------------------------------- EADS
+   :EADS/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "A unique ID for each EADS. Typically the namespace of the keyword is the cid, e.g. :process/flow-shop."}
+
+   :EADS/cid
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "A keyword naming a conversation, e.g. :process"}
+
+   :EADS/msg-str
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The stringified message object, it can be edn/read-string. It is the EDN version of the JSON in resources used by ork."}
+
+   :EADS/specs
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "An object where the keys name spec levels (e.g. full) and the values are keywords identifying the spec in the registry."}
+
    ;; ---------------------- project
    :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
@@ -69,6 +86,11 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string, same as the :project/name in the project's DB."}
 
+   ;; ------------------------- specs
+   :spec/full
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "a keyword identifying the full spec in the clojure spec registry. Used, for example, to check an EADS data structure."}
+
 ;;; ---------------------- system
    :system/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
@@ -76,12 +98,18 @@
    :system/default-project-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
         :doc "a keyword providing a project-id clients get when starting up."}
+   :system/EADS
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "EADS objects"}
    :system/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
         :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
    :system/projects
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "the projects known by the system."}
+   :system/specs
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "spec objects used for checking completion of EADS, etc."}
    :system/warm-ups
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "warm-up objects for various conversations."}})
@@ -143,8 +171,8 @@
    ;; ---------------------- claim (something believed owing to what users said in interviews)
    :claim/string
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.
-              For example, (:process/production-motivation make-to-stock)."}
+        :doc (str "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.\n"
+                  "For example, (:process/production-motivation make-to-stock).")}
    :claim/conversation-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The conversation from which this claim is founded. Currently a cid."}
@@ -157,8 +185,9 @@
 
    ;; ---------------------- conversation
    :conversation/active-EADS
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "the EADS which is currently being pursued in conversation."}
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc (str "The id of the EADS in the system DB which is currently being pursued in this conversation.\n"
+                  "If the conversation doesn't have one, functions such as ork/active-EADS can make one using the project's orchestrator agent.")}
    :conversation/done?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if we don't have more to add (though user might)."}
@@ -179,15 +208,15 @@
    :message/content
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string with optional html links."}
-   :message/data-structure
+   :message/EADS-data-structure
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string that can be edn/read-string into a data structure inferred from conversation so far."}
+        :doc "a string that can be edn/read-string into an EADS data structure inferred from conversation so far."}
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
    :message/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, "
+        :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts,\n"
                   "which aren't stored, some values can be skipped. Because these are not unique to the DB, they are not :db.unique/identity.")}
    :message/question-type
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
@@ -224,15 +253,13 @@
    :project/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a lowercase kebab-case keyword naming a project; unique to the project."}
-   :project/industry
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a short description of the industry in which we are doing scheduling."}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
-   :project/objective
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to the scheduling objective of the project."}
+   :project/ork-tid
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc (str "The thread-id of orchestrator agent.\n"
+                  "When this does not match the current ork-agent, the agent needs a more expansive CONVERSATION-HISTORY messagethe messages of the conversation.")}
    :project/processes
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the project's process objects; everything about processes in a complex structure."}
@@ -322,7 +349,7 @@
      (if-let [base-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
        (let [files (-> base-dir (str "/projects/") clojure.java.io/file .listFiles)]
          (mapv #(-> % .getName keyword) files))
-       (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases.") {})))
+       (throw (ex-info "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases." {})))
      ;; Otherwise we list using system db. These are the 'legitmate' projects in the project datebase
      (-> (d/q '[:find [?proj-id ...]
                 :where
@@ -332,8 +359,8 @@
          vec))))
 
 (def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/data-structure :conversation/EADS :conversation/id :conversation/interviewer-budget :conversation/messages
-    :message/content :message/from :message/id :message/question-type :message/tags :message/time})
+  #{:conversation/active-EADS :conversation/id :conversation/interviewer-budget :conversation/messages
+    :message/content :message/EADS-data-structure :message/from :message/id :message/question-type :message/tags :message/time})
 
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
@@ -630,22 +657,22 @@
       (d/transact conn-atm {:tx-data [{:db/id eid :conversation/EADS (str eads)}]})
       (log! :error (str "No such conversation: " cid)))))
 
-(defn get-ds
+(defn get-EADS-ds
   "Return a vector of maps of data structures where :message/id is where the :message/data-structure was created."
   [pid cid]
   (->> (d/q '[:find ?id ?ds
-              :keys message/id message/data-structure
+              :keys message/id message/EADS-data-structure
               :in $ ?cid
               :where
               [?e :conversation/id ?cid]
               [?conv :conversation/messages ?m]
-              [?m :message/data-structure ?ds]
+              [?m :message/EADS-data-structure ?ds]
               [?m :message/id ?id]]
             @(connect-atm pid) cid)
-       (mapv #(update % :message/data-structure edn/read-string))
+       (mapv #(update % :message/EADS-data-structure edn/read-string))
        not-empty))
 
-(defn put-ds!
+(defn put-EADS-ds!
   "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message."
   [pid cid ds]
   (let [max-id (max-msg-id pid cid)
@@ -657,7 +684,7 @@
                    [?conv :conversation/messages ?eid]
                    [?eid :message/id ?max-id]] @conn-atm cid max-id)]
     (if eid
-      (d/transact conn-atm {:tx-data [{:db/id eid :message/data-structure (str ds)}]})
+      (d/transact conn-atm {:tx-data [{:db/id eid :message/EADS-data-structure (str ds)}]})
       (log! :error (str "No such conversation: " cid)))))
 
 (defn add-project-to-system

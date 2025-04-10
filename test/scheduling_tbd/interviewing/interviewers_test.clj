@@ -9,6 +9,7 @@
    [scheduling-tbd.interviewing.interviewers   :as inv]
    [scheduling-tbd.llm            :as llm]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm]]
+   [scheduling-tbd.surrogate      :as sur]
    [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))

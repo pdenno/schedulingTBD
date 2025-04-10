@@ -9,7 +9,7 @@
   :tools [{:type "file_search"}],
   :model-class :gpt,
   :instruction-path "agents/orchestrator.txt",
-  :vector-store-paths ["EADS/process/flow-shop.edn"],
+  :vector-store-paths ["EADS/process/flow-shop.json", "EADS/process/scheduling-problem-type.json" ],
   :agent-type :shared-assistant}
 
  {:base-type :process-interview-agent,

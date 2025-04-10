@@ -224,16 +224,15 @@
    it won't be recreated, even if the assistant instructions are outdated relative to what the agent is using.
    This choice is to preserve the context already built up by the current agent.
    You can force a fresh instance in ensure-agent! with :force-new? = true. This is the default for surrogate experts."
-  [{:keys [base-type agent-type missing-here missing-at-provider outdated? substitute-aid] :as status}]
+  [{:keys [base-type agent-type missing-here missing-at-provider outdated? substitute-aid force-new?] :as status}]
   (let [missing? (or missing-here missing-at-provider)
         res (case agent-type
               (:project :system)    (cond-> status
-                                      (or missing? outdated?)           (-> (assoc :make-agent? true)
-                                                                            (assoc :make-thread? true)))
+                                      (or missing? outdated? force-new?)    (-> (assoc :make-agent? true) (assoc :make-thread? true)))
               :shared-assistant     (cond-> status
-                                      (:assistant missing-at-provider)  (-> (assoc :make-agent? true)
-                                                                            (assoc :make-thread? true))
-                                      (:thread missing-at-provider)     (assoc :make-thread? true)))]
+                                      force-new?                        (-> (assoc :make-agent? true)     (assoc :make-thread? true))
+                                      (:assistant missing-at-provider)  (-> (assoc :make-agent? true)     (assoc :make-thread? true))
+                                      (:thread missing-at-provider)         (assoc :make-thread? true)))]
     (when substitute-aid
       (log! :info (str "Agent " base-type " will use an updated assistant: " substitute-aid "."))
       (tel/with-kind-filter {:allow :agents}
@@ -272,7 +271,6 @@
         files-modify-date (newest-file-modification-date agent-info)
         outdated? (and files-modify-date (== 1 (compare files-modify-date (-> db-info :system :agent/timestamp))))
         system-aid  (-> db-info :system :agent/assistant-id)
-        ;; system-tid (-> db-info :system :agent/thread-id)
         project-aid (-> db-info :project :agent/assistant-id)
         project-tid (-> db-info :project :agent/thread-id)
         same-assistant? (= system-aid project-aid)
@@ -289,10 +287,10 @@
                            (and (not system-provider-aid?)
                                 (not project-provider-aid?)) (conj :assistant)
                            (and pid (not provider-tid?))     (conj :thread))
-        status (cond-> {:base-type base-type,
-                        :agent-type agent-type
-                        :same-assistant? same-assistant?
-                        :agent-date (-> db-info :system :agent/timestamp)}
+        status (cond-> (merge agent-info {:base-type base-type,
+                                          :agent-type agent-type
+                                          :same-assistant? same-assistant?
+                                          :agent-date (-> db-info :system :agent/timestamp)})
                  pid                                    (assoc :project-has-thread project-tid)
                  substitute-aid                         (assoc :substitute-aid substitute-aid)
                  (not pid)                              (assoc :project-has-thread :not-applicable)
@@ -305,7 +303,7 @@
 
 (defn agent-status-basic
   "Find the agent status information for :project and :system agents."
-  [{:keys [base-type agent-type llm-provider pid]
+  [{:keys [base-type llm-provider pid force-new?]
     :or {llm-provider @default-llm-provider} :as agent-info}]
   (let [files-modify-date (newest-file-modification-date agent-info)
         conn-atm (if pid (connect-atm pid) (connect-atm :system))
@@ -321,7 +319,7 @@
         missing-provider (cond-> #{}
                            (not provider-aid?)            (conj :assistant)
                            (and pid (not provider-tid?))  (conj :thread))
-        status (cond-> {:base-type base-type, :agent-type agent-type}
+        status (cond-> agent-info ; {:base-type base-type, :agent-type agent-type}
                  files-modify-date                      (assoc :files-data files-modify-date)
                  timestamp                              (assoc :agent-date timestamp)
                  outdated?                              (assoc :outdated? true)
@@ -386,10 +384,9 @@
      - For agents with agent-type = :system, it need only have :base-type.
      - For agents of type :project or :shared-assistant it should additional have the pid.
    The agent-info is 'enriched' here with information from the agent-infos map."
-  [& {:as agent-info}]
-  (let [{:keys [force-new?] :as info} (enrich-agent-info agent-info)
-        {:keys [make-agent? make-thread? substitute-aid] :as _status} (agent-status info)
-        agent (if (or force-new? make-agent?)
+  [info]
+  (let [{:keys [make-agent? make-thread? substitute-aid]} (-> info enrich-agent-info agent-status)
+        agent (if make-agent?
                 (-> info make-agent-assistant (put-agent! info))
                 (get-agent info))
         agent  (cond-> agent

@@ -82,6 +82,7 @@
           (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
                               :q-type :process/warm-up
                               :cid :process}))
+        (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid pid)))
         ;; This will cause a resume-conversation, which will start with a conversation-history, so the interviewer should see the warm-up question.
         (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
                           :new-proj-map {:project/name pname :project/id pid}}))
