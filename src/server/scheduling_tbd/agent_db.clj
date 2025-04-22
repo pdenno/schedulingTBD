@@ -385,7 +385,8 @@
      - For agents of type :project or :shared-assistant it should additional have the pid.
    The agent-info is 'enriched' here with information from the agent-infos map."
   [info]
-  (let [{:keys [make-agent? make-thread? substitute-aid]} (-> info enrich-agent-info agent-status)
+  (let [info (if (keyword? info) (get @agent-infos info) info)
+        {:keys [make-agent? make-thread? substitute-aid]} (-> info enrich-agent-info agent-status)
         agent (if make-agent?
                 (-> info make-agent-assistant (put-agent! info))
                 (get-agent info))

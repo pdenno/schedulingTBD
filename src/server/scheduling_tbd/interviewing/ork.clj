@@ -25,12 +25,11 @@
    We don't include all question/answer pairs, only those since our last C-H message to the orchestrator.
    (And we check that there isn't a new thread since that message.)
    Likewise, we only include the current data-structure if the orchestrator has been around for earlier C-H messages."
-  [& _]
-  :nyi)
+  [pid cid]
+  (-> {:message-type "CONVERSATION-HISTORY"}
+      (assoc :activity (
 
-;;; ToDo: Need to rethink how I'm handling EADS. I think they belong in the system DB, not resources.
-;;;       That way, I can search them, point to specs to test how far along things are, etc.
-(defn active-EADS!
+(defn active-EADS
   "Determine which EADS (if any) is being pursued for the given conversation.
    If none is being pursued, or what has been pursued is completed, determine which should be pursued next.
    This involves apprising the orchestrator of the current situation with the conversation using ork-conversation-history.
@@ -40,4 +39,42 @@
         max-msg (when (not-empty eads-maps)
                   (let [id (->> eads-maps (map :message/id) (apply max))]
                     (some #(when (= (:message/id %) id) %) eads-maps)))
-        ds (:message/EADS-data-structure max-msg)]))
+        ds (:message/EADS-data-structure max-msg)]
+    ds))
+
+(defn select-EADS
+  [pid cid]
+
+
+
+;;; ====================================================================================================================================================================================
+;;; ================================================================== I think this stuff goes away once the orchestrator is implemented. ==============================================
+;;; ====================================================================================================================================================================================
+
+;;; ToDo: I'm currently not handling anything but flow-shop
+#_(def process-eads2file
+  {:FLOW-SHOP-SCHEDULING-PROBLEM      "EADS/flow-shop.edn"
+   :RESOURCE-ASSIGNMENT-PROBLEM       nil
+   :PROJECT-SCHEDULING-PROBLEM        nil
+   :JOB-SHOP-SCHEDULING-PROBLEM       "EADS/flow-shop.edn"
+   :SINGLE-MACHINE-SCHEDULING-PROBLEM nil})
+
+
+#_(s/def :process/EADS-keyword (fn [key] (#{:FLOW-SHOP-SCHEDULING-PROBLEM
+                                            :RESOURCE-ASSIGNMENT-PROBLEM
+                                            :PROJECT-SCHEDULING-PROBLEM
+                                            :JOB-SHOP-SCHEDULING-PROBLEM
+                                            :SINGLE-MACHINE-SCHEDULING-PROBLEM}
+                                        key)))
+
+;;;  "Create a message of type EADS for the given PHASE-1-CONCLUSION"
+#_(defmethod eads-response!
+  :process [_tag pid cid {:keys [problem-type _cyclical?] :as _iviewr-response}]
+  (let [k (-> problem-type str/upper-case keyword)]
+    (s/assert :process/EADS-keyword k)
+    (if-let [resource (get process-eads2file k)]
+      (let [eads (-> resource io/resource slurp edn/read-string)]
+        (db/put-eads! pid cid (str eads))
+        {:message-type "EADS"
+         :EADS (with-out-str (clojure.data.json/pprint eads))})
+      (log! :error (str "No EADS for problem type " k)))))

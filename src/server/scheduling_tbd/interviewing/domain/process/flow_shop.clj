@@ -87,9 +87,8 @@
    Like all EADS, it is also stored in the system DB. See how at the bottom of this file."
   {:message-type :EADS-INSTRUCTIONS
    :interviewer-agent :process
-   :interview-objective (str "Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\n"
-                             "This EADS views the interviewees' production as organized as a flow shop.\n"
-                             "This portion of the interview will reveal the processes that the enterprise uses to run their flow shop.\n"
+   :interview-objective (str "This EADS assumes the interviewees' production processes are organized as a flow shop.\n"
+                             "Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\n"
                              "We might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\n"
                              "For example, they might have in mind scheduling machine maintenance, not production.\n"
                              "This fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\n"

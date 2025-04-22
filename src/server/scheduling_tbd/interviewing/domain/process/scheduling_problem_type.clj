@@ -15,7 +15,7 @@
 (s/def ::comment string?)
 
 (s/def ::EADS (s/keys :req-un [::EADS-id ::problem-type ::continuous? ::cyclical?]))
-(s/def ::EADS-id #(= % :scheduling-problem-type))
+(s/def ::EADS-id #(= % :process/scheduling-problem-type))
 
 ;;; We use the 'trick' that :<some-property>/val can be used to signify a non-namespaced attribute 'val' and a reference to a spec for value of 'val'.
 (s/def ::problem-type (s/or :normal :problem-type/val :annotated ::annotated-ptype))
@@ -43,8 +43,8 @@
                              "   3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within an undertaking.\n"
                              "   4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which the jobs visit machines or workstations may vary as determined by the job type.\n"
                              "   5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.")
-   :EADS {:EADS-id :scheduling-problem-type
-          :problem-type {:val :FLOW-SHOP-SCHEDULING-PROBLEM ; ToDo: On receiving this from interviewers, we'll have to remember to make it a keyword.
+   :EADS {:EADS-id :process/scheduling-problem-type
+          :problem-type {:val :FLOW-SHOP-SCHEDULING-PROBLEM ; On receiving this from interviewers, we'll make it a keyword using ru/ds2clj.
                          :comment "We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop."},
           :continuous? {:val false,
                         :comment (str "continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.\n"

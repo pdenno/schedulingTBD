@@ -1,0 +1,90 @@
+[
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_q1rJiz69z4FJfHRzmbc8bHY1",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_p9cnmj0rV7EYNMIeiqWm9ppf",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2025-03-05T15:05:59.648-00:00"}
+           #:agent{:base-type :sur-plate-glass,
+                   :agent-type :project,
+                   :thread-id "thread_WJlieqcmQCiois9mr58SqM5r",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_H2WCcMxVIcqJzo8JvHbwnMGS",
+                   :id :sur-plate-glass-openai,
+                   :expertise "plate glass",
+                   :timestamp #inst "2025-03-05T15:06:39.496-00:00"}],
+          :claims
+          [#:claim{:string "(project-id :sur-plate-glass)"}
+           #:claim{:string "(project-name :sur-plate-glass \"SUR Plate Glass\")"}
+           #:claim{:conversation-id :process, :string "(surrogate :sur-plate-glass)"}
+           #:claim{:conversation-id :process, :question-type :process/warm-up, :string "(scheduling-challenge :sur-plate-glass :delivery-schedules)"}
+           #:claim{:conversation-id :process, :question-type :process/warm-up, :string "(scheduling-challenge :sur-plate-glass :product-variation)"}
+           #:claim{:conversation-id :process, :question-type :process/warm-up, :string "(scheduling-challenge :sur-plate-glass :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process, :question-type :process/warm-up, :string "(principal-expertise  :sur-plate-glass \"Plate Glass\")"}
+           #:claim{:conversation-id :process, :question-type :process/warm-up, :string "(scheduling-challenge :sur-plate-glass :equipment-availability)"}
+           #:claim{:conversation-id :process, :question-type :process/warm-up, :string "(scheduling-challenge :sur-plate-glass :variation-in-demand)"}
+           #:claim{:conversation-id :process, :question-type :process/warm-up, :string "(scheduling-challenge :sur-plate-glass :process-variation)"}],
+          :conversations
+          [#:conversation{:id :process,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}
+                           #:message{:content
+                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:query :warm-up],
+                                     :time
+                                     #inst "2025-03-05T15:06:51.378-00:00"}
+                           #:message{:content
+                                     "\nWe produce plate glass, which includes standard, tempered, laminated, and specialty glass products. The scheduling challenge lies in coordinating production processes like glass melting, shaping, annealing, and finishing while ensuring supply chain alignment for raw materials and accommodating varying customer lead times. Demand variability and equipment availability add additional complexity to the process.",
+                                     :from :surrogate,
+                                     :id 3,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-03-05T15:06:51.397-00:00"}]}
+           #:conversation{:id :data,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}]}
+           #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}]}
+           #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}]}],
+          :current-conversation :process,
+          :id :plate-glass-ork,
+          :name "Plate Glass Ork"}
+]

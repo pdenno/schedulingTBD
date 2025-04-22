@@ -117,11 +117,10 @@
   (doseq [pid (db/list-projects)]
     (let [conn @(connect-atm pid)]
       (when-let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] conn)]
-        (let [{:agent/keys [system-instruction expertise]} (dp/pull conn '[*] eid)
+        (let [{:agent/keys [expertise]} (dp/pull conn '[*] eid)
               info {:base-type pid
                     :agent-type :project
                     :model-class :gpt
-                    :instruction-string (or system-instruction "++ elsewhere ++") ; ToDo: Investigate.
                     :surrogate? true
                     :expertise expertise}]
           (adb/put-agent-info! pid info))))))

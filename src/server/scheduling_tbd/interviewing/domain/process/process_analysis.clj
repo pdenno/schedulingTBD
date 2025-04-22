@@ -12,7 +12,7 @@
    [scheduling-tbd.agent-db            :as adb]
    [scheduling-tbd.db                  :as db]
    [scheduling-tbd.minizinc            :as mzn]
-   [scheduling-tbd.interviewing.response-utils :as ru :refer [eads-response! analyze-warm-up]]
+   [scheduling-tbd.interviewing.response-utils :as ru :refer [analyze-warm-up conversation-complete?]]
    [taoensso.telemere                  :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -84,7 +84,7 @@
 
 (defn ^:diag extreme-dur-span?
   "Return the vector of units used in the process if :qty/units span from from :minutes to :days or more or :hours to :weeks or more.
-   This always looks at :process/inverview-class = :initial-unordered."
+   This always looks at :process/interview-class = :initial-unordered." ; ToDo: Looks like code rot here! :initial-unordered?
   [pid]
   (let [units (atom #{})]
     (letfn [(get-units [obj]
@@ -97,34 +97,5 @@
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-;;; ====================================================================================================================================================================================
-;;; ================================================================== I think this stuff goes away once the orchestrator is implemented. ==============================================
-;;; ====================================================================================================================================================================================
-
-;;; ToDo: I'm currently not handling anything but flow-shop
-(def process-eads2file
-  {:FLOW-SHOP-SCHEDULING-PROBLEM      "EADS/flow-shop.edn"
-   :RESOURCE-ASSIGNMENT-PROBLEM       nil
-   :PROJECT-SCHEDULING-PROBLEM        nil
-   :JOB-SHOP-SCHEDULING-PROBLEM       "EADS/flow-shop.edn"
-   :SINGLE-MACHINE-SCHEDULING-PROBLEM nil})
-
-
-(s/def :process/EADS-keyword (fn [key] (#{:FLOW-SHOP-SCHEDULING-PROBLEM
-                                          :RESOURCE-ASSIGNMENT-PROBLEM
-                                          :PROJECT-SCHEDULING-PROBLEM
-                                          :JOB-SHOP-SCHEDULING-PROBLEM
-                                          :SINGLE-MACHINE-SCHEDULING-PROBLEM}
-                                        key)))
-
-;;;  "Create a message of type EADS for the given PHASE-1-CONCLUSION"
-(defmethod eads-response!
-  :process [_tag pid cid {:keys [problem-type _cyclical?] :as _iviewr-response}]
-  (let [k (-> problem-type str/upper-case keyword)]
-    (s/assert :process/EADS-keyword k)
-    (if-let [resource (get process-eads2file k)]
-      (let [eads (-> resource io/resource slurp edn/read-string)]
-        (db/put-eads! pid cid (str eads))
-        {:message-type "EADS"
-         :EADS (with-out-str (clojure.data.json/pprint eads))})
-      (log! :error (str "No EADS for problem type " k)))))
+(defmethod conversation-complete? :process [_tag pid]
+  (cond

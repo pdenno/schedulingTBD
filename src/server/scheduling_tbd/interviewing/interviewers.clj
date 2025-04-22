@@ -487,6 +487,25 @@
   [iviewr-response {:keys [pid cid] :as _ctx}]
   (db/put-EADS-ds! pid cid iviewr-response))
 
+;;; Right now it is inchoate, but it should take into account EADSs that have been completed,
+;;; conversations, scheduling challenges and reframing that took place."
+(defn continue-or-switch-and-continue?!
+  "Returns false if there is nothing more to pursue in this conversation.
+   Returns true if either there is more to pursue on the current EADS, or there is a new EADS to pursue.
+   Side effects occur in two cases:
+      1) In the case that there is nothing more to pursue in this conversation, we set :conversation/done? to true in the DB and
+         retract :conversation/active-EADS, return nil.
+      2) In the case that the current EADS is complete, what happens next depends on the orchestrator.
+         If it finds ..."
+  [pid cid ctx]
+  (cond (ru/conversation-complete? cid pid)    nil
+        (ru/EADS-complete? cid pid)            (let [EADS (ork/choose-EADS pid cid)]
+                                                 (agent-log "---- new EADS:\n" (with-out-str (pprint EADS)))
+                                                 (tell-interviewer EADS ctx)
+                                                 true)
+        :else                                  true))
+
+
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
 ;;; ToDo: Will need to keep track in the DB of the interviewer tid on which each element of conversation happened.
@@ -507,15 +526,14 @@
                     (assoc :asking-role asking-role))]
         (when-not (db/conversation-done? pid cid)
           (if @active?
-            (do (agent-log "resume " pid  " " cid)
+            (do (agent-log "resume-conversation: " pid  " " cid)
                 (-> (conversation-history pid cid) (tell-interviewer ctx))
                 (loop [cnt 0]
-                  (if @active?
+                  (if (and @active? (continue-or-switch-and-continue?! pid cid ctx))
                     ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
-                    (let [active-eads (ork/active-EADS! cid pid)
-                          conversation (q-and-a ctx)
+                    (let [conversation (q-and-a ctx)
                           expert-response (-> conversation last :full-text)] ; ToDo: This assumes the last is meaningful.
-                      (log! :info (str "Expert in resume-conversation-loop: (EADS: " active-eads ") response:(" expert-response) ")")
+                      (log! :info (str "Expert in resume-conversation-loop: (EADS: " active-eads ") response:(" expert-response ")"))
                       (doseq [msg conversation]
                         (db/add-msg (merge {:pid pid :cid cid} msg)))
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))

@@ -121,8 +121,8 @@
                       :up ($ Editor {:text code
                                      :name "code-editor"
                                      :height code-side-height})
-                      :dn ($ MermaidExample {:graph "graph TB\na-->b"})
-                          #_($ DataArea)
+                      :dn #_($ MermaidExample {:graph "graph TB\na-->b"})
+                          ($ DataArea)
                       :share-fns (:right-share top-share-fns)})
            :lf-pct 0.50
            :init-width width}))))

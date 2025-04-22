@@ -46,7 +46,6 @@ After the example, we will document the "message-types" used in the example.
   You: {"message-type": "STATUS", "status": "OK"}
 
    We: {"message-type": "EADS-INSTRUCTIONS",
-        "EADS-id": "flow-shop",
         "interview-objective": "Using the three property types 'problem-type', 'continuous?', and 'cyclical?', determine the kind of production system and scheduling problem for which the interviewees seek a solution.
          For 'problem-type' you may only choose one of the following:
            1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for jobs that all execute the same sequence of production steps across multiple machines or workstations.
@@ -62,7 +61,7 @@ After the example, we will document the "message-types" used in the example.
                                                This might be apparent from the answers that determined the value of problem-type. If not, then you can ask."},
                   "cyclical?": {"val": false,
                                 "comment": "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.
-                                            For example, if the made the same collection of products in the same order each week, cylical? would be true."}}}
+                                            For example, if the made the same collection of products in the same order each week, cyclical? would be true."}}}
 
   You: {"message-type": "STATUS", "status": "OK"}
 
@@ -78,7 +77,7 @@ After the example, we will document the "message-types" used in the example.
         "refinement-of-EADS": "scheduling-problem-type",
         "commit-notes": "First commit: determined problem-type; process is not continuous.",
         "data-structure": {"problem-type": "FLOW-SHOP-SCHEDULING-PROBLEM",
-                           "continous?": false}}
+                           "continuous?": false}}
 
    We: {"message-type": "SUPPLY-QUESTION", "budget": 0.95}
 
@@ -491,7 +490,7 @@ There were none of these in the EXAMPLE INTERACTIONS, but both "we" and "you" ca
 The message contains either an 'advice' or 'question' property.
 Examples:
         You: {"message-type": "COURSE-CORRECTION",
-              "question": "Why are you sending me a SUPPLY-QUESTION rather than the EADS? I don't have an EADS to direct questioning!"}
+              "question": "Why are you sending me a SUPPLY-QUESTION rather than EADS-INSTRUCTIONS? I don't have an EADS to direct questioning!"}
         We:  {"message-type": "COURSE-CORRECTION",
               "advice": "Ask (in your next response to SUPPLY-QUESTION) about the duration of the subprocesses of the testing process."}
 

@@ -6,7 +6,6 @@
            com.taoensso/timbre                 {:mvn/version "6.6.1"} ; Keep
            com.taoensso/telemere               {:mvn/version "1.0.0-RC5"}
            com.taoensso/telemere-slf4j         {:mvn/version "1.0.0-RC5"} ; Just adding it here initializes it; try (tel/check-interop).
-           com.wsscode/pathom3                 {:mvn/version "2025.01.16-alpha"}
            dk.ative/docjure                    {:mvn/version "1.21.0"}   ; spreadsheets
            io.github.paintparty/bling          {:mvn/version "0.5.2"}
            funcool/promesa                     {:mvn/version "11.0.678"}

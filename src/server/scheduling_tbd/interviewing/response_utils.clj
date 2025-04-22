@@ -76,9 +76,6 @@
        (s/assert ::text-to-var res)
        (:CORRESPONDING-VAR res)))))
 
-;(defn get-warm-up--dispatch [tag & _] tag)
-;(defmulti get-warm-up #'get-warm-up--dispatch)
-
 (defn get-iviewr-info [cid]
   (-> "agents/iviewrs/iviewr-infos.edn"
       io/resource
@@ -89,8 +86,45 @@
 (defn get-warm-up-q [cid]
   (-> cid get-iviewr-info :warm-up-question))
 
+(defn strip-annotations
+  "Remove the annotations from the EADS."
+  [obj]
+  (cond (and (map? obj) (contains? obj :val) (contains? obj :comment))  (:val obj)
+        (map? obj)                                                      (reduce-kv (fn [m k v] (assoc m k (strip-annotations v))) {} obj)
+        (vector? obj)                                                   (mapv strip-annotations obj)
+        :else                                                           obj))
+
+(defn key-vals
+  "Return a collection of keys for which the value is a key."
+  [m]
+  (let [res (atom #{})]
+    (letfn [(kv [obj]
+              (cond  (map? obj)     (doseq [[k v] obj] (if (keyword? v) (swap! res conj k) (kv v)))
+                     (vector? obj)  (doseq [v obj] (kv v))))]
+      (kv m)
+      @res)))
+
+;;; ToDo: Use of key-vals is questionable.
+(defn ds2clj
+  "Walk through the data structure, comparing it to the EADS and update map value strings to keywords where appropriate.
+   The term 'data structure' refers to the map structure interviewers create from an EADS."
+  [ds]
+  (let [msg (or (-> ds :EADS-used keyword db/get-eads not-empty)
+                (throw (ex-info "No such EADS:" {:name (:EADS-used ds)})))
+        key-val? (-> msg :EADS strip-annotations key-vals)]
+    (letfn [(ds2 [obj]
+              (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m k (if (key-val? k) (keyword v) (ds2 v)))) {} obj)
+                    (vector? obj)   (mapv ds2 obj)
+                    :else           obj))]
+      (ds2 ds))))
+
 ;;; ====================== Shared by use of tags :process :data :resources :optimality ====================
-(defn analyze-warm-up--dispatch [tag & _] tag)
+(defn dispatch-by-cid [tag & _]
+  (if (#{:process :data :resources :optimality} tag)
+    tag
+    (throw (ex-info "Bad tag" {:tag tag}))))
 
 ;;; The methods for this are in the interviewing/domain directory.
-(defmulti analyze-warm-up #'analyze-warm-up--dispatch)
+(defmulti analyze-warm-up        #'dispatch-by-cid)
+(defmulti conversation-complete? #'dispatch-by-cid)
+(defmulti EADS-complete?         #'dispatch-by-cid)

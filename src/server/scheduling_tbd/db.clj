@@ -72,7 +72,7 @@
         :doc "The stringified message object, it can be edn/read-string. It is the EDN version of the JSON in resources used by ork."}
 
    :EADS/specs
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "An object where the keys name spec levels (e.g. full) and the values are keywords identifying the spec in the registry."}
 
    ;; ---------------------- project
@@ -144,7 +144,8 @@
    :agent/surrogate?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "True if the agent is a human surrogate."}
-   :agent/system-instruction
+   ;; 2025-04-19 I don't see the point of this. See log.
+#_#_ :agent/system-instruction
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "This is only used with surrogates, it is the system instruction verbatim."}
    :agent/thread-id
@@ -191,18 +192,32 @@
    :conversation/done?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if we don't have more to add (though user might)."}
-   :conversation/EADSs-used
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
-        :doc "a string that can be edn/read-string into the Example Annotated Data Structure (EADS) for this conversation."}
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
+        :doc "a keyword uniquely identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
    :conversation/interviewer-budget
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
         :doc "the budget a number (0 <= budget <= 1) indicating how much more resources the interviewer is allowed to expend."}
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the messages of the conversation."}
+        :doc "the messages between the interviewer and interviewees of the conversation."}
+
+   ;; ---------------------- EADS data-structure (ds)
+   #_#_:ds/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "an identifier naming the EADS that is being worked."}
+   #_#_:ds/conversation
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "the conversation in which the data structure was developed."}
+   #_#_:ds/message-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/integer
+        :doc "a long corresponding to the :message/id that occurred prior to this ds commit."}
+   #_#_:ds/revision-number
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
+        :doc "a number 1,2,3... naming the revision of the data structure. :ds/id + :ds/revision-number is a concatenated key for the ds."}
+   #_#_:ds/str
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string,
+        :doc "the stringified data structure."}
 
    ;; ---------------------- message
    :message/content
@@ -310,7 +325,7 @@
          :where [?eid :conversation/id ?cid]]
        @(connect-atm pid) cid))
 
-(defn get-conversation-eids
+#_(defn get-conversation-eids
   "Return a vector of the EIDs of the argument conversation's messages."
   [pid cid]
   (when-let [eid (conversation-exists? pid cid)]
@@ -635,15 +650,17 @@
       (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
       (log! :error (str "No such conversation: " cid)))))
 
+;;; (db/get-eads :process/flow-shop)
+;;; (db/get-eads :process/scheduling-problem-type)
 (defn get-eads
-  "Return the :conversation/EADS."
-  [pid cid]
-  (when-let [s (d/q '[:find ?eads .
-                      :in $ ?cid
+  "Return from the system DB a complete EADS-INSTRUCTIONS message."
+  [eads-id]
+  (when-let [s (d/q '[:find ?msg-str .
+                      :in $ ?eads-id
                       :where
-                      [?e :conversation/id ?cid]
-                      [?e :conversation/EADS ?eads]]
-                    @(connect-atm pid) cid)]
+                      [?e :EADS/id ?eads-id]
+                      [?e :EADS/msg-str ?msg-str]]
+                    @(connect-atm :system) eads-id)]
     (edn/read-string s)))
 
 (defn put-eads!
