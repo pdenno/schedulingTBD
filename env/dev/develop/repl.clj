@@ -37,6 +37,7 @@
   (safe-alias 'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type)
   (safe-alias 'pan    'scheduling-tbd.interviewing.domain.process.process-analysis)
   (safe-alias 'inv    'scheduling-tbd.interviewing.interviewers)
+  (safe-alias 'ork    'scheduling-tbd.interviewing.ork)
   (safe-alias 'ru     'scheduling-tbd.interviewing.response-utils)
   (safe-alias 'mzn    'scheduling-tbd.minizinc)
   (safe-alias 'mznt   'scheduling-tbd.minizinc-test)

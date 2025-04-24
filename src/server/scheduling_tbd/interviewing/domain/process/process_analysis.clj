@@ -1,10 +1,7 @@
 (ns scheduling-tbd.interviewing.domain.process.process-analysis
   "Analysis of the process interview"
   (:require
-   [clojure.core.unify                 :as uni]
    [clojure.data.json]
-   [clojure.edn                        :as edn]
-   [clojure.java.io                    :as io]
    [clojure.pprint                     :refer [pprint]]
    [clojure.spec.alpha                 :as s]
    [clojure.string                     :as str]
@@ -97,5 +94,5 @@
         (cond (and (units :minutes) (or (units :days)  (units :weeks) (units :months)))   (vec units)
               (and (units :hours)   (or (units :weeks) (units (units :months))))          (vec units))))))
 
-(defmethod conversation-complete? :process [_tag pid]
-  (cond
+(defmethod conversation-complete? :process [_tag _pid]
+  nil) ; ToDo: Implement this!

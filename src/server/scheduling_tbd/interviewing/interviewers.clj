@@ -12,7 +12,7 @@
      [mount.core                      :as mount :refer [defstate]]
      [promesa.core                    :as p]
      [promesa.exec                    :as px]
-     [scheduling-tbd.agent-db         :as adb :refer [agent-log ensure-agent!]]
+     [scheduling-tbd.agent-db         :as adb :refer [agent-log]]
      [scheduling-tbd.db               :as db]
      [scheduling-tbd.llm              :as llm]
      [scheduling-tbd.interviewing.ork :as ork]
@@ -215,6 +215,7 @@
 (defn get-an-answer
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    Return a vector of the conversation (objects suitable for db/add-msg) terminating in an answer to the question.
+   Note that the first element of the conversation should be the question, and the last the answer.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
   [{:keys [question responder-type human-starting?] :as ctx}]
   (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
@@ -241,7 +242,7 @@
 (defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
 
 ;;; ToDo: It isn't obvious that the interview agent needs to see all this. Only useful when the thread was destroyed?
-;;;       It might be sufficient to explain the claims. ToDo: V4 doesn't have claims, but this still holds
+;;; ToDo: V4 instructions do not mention claims, but this still holds
 (defn conversation-history
   "Construct a conversation-history message structure for the argument project.
    This tells the interview agent what has already been asked. If the thread hasn't been deleted
@@ -249,21 +250,14 @@
    asked EXCEPT for the warm-up question (if any) which happens before the interview."
   [pid cid]
   (let [msgs (-> (db/get-conversation pid cid) :conversation/messages)
-        questions (filter #(= :system (:message/from %)) msgs)] ; Some aren't questions; we deal with it.
+        answers (filter #(contains? % :message/answers-question) msgs)]
     (cond-> {:message-type "CONVERSATION-HISTORY"
              :interviewee-type (if (surrogate? pid) :machine :human)
-             :budget (db/get-budget pid cid)
-             :activity (->> questions
-                             (map (fn [q]
-                                    (let [next-id (inc (:message/id q))]
-                                      (as-> {} ?pair
-                                        (assoc ?pair :question (:message/content q))
-                                        (if-let [response (when-let [resp (some #(when (= next-id (:message/id %)) %) msgs)]
-                                                            (when (#{:human :surrogate} (:message/from resp)) resp))]
-                                          (assoc ?pair :answer (:message/content response))
-                                          ?pair)))))
-                             (filter #(contains? % :answer))
-                             vec)})))
+             :budget (db/get-budget pid cid)}
+      (not-empty answers)   (assoc :activity (mapv (fn [answer]
+                                                     {:question (-> (db/get-msg pid cid (:message/answers-question answer)) :message/content)
+                                                      :answer  (-> answer :message/content)})
+                                                   answers)))))
 
 (defn make-supply-question-msg
   "Create a supply question message for the conversation."
@@ -368,7 +362,7 @@
 ;;; over and over and the interview will advance each time.
 (defn q-and-a
   "Call interviewer to supply a question; call get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
-   Returns a vector of message objects suitable for db/add-msg."
+   Returns a vector of message objects suitable for db/add-msg. The first of which should be the question, and the last the answer."
   [{:keys [client-id responder-type] :as ctx}]
   (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
   (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
@@ -497,13 +491,11 @@
          retract :conversation/active-EADS, return nil.
       2) In the case that the current EADS is complete, what happens next depends on the orchestrator.
          If it finds ..."
-  [pid cid ctx]
-  (cond (ru/conversation-complete? cid pid)    nil
-        (ru/EADS-complete? cid pid)            (let [EADS (ork/choose-EADS pid cid)]
-                                                 (agent-log "---- new EADS:\n" (with-out-str (pprint EADS)))
-                                                 (tell-interviewer EADS ctx)
-                                                 true)
-        :else                                  true))
+  [pid cid]
+  (let [eads-id (db/get-active-eads pid cid)
+        eads-complete? (and eads-id (ork/eads-complete? pid cid eads-id))]
+    (cond (and eads-id (not eads-complete?))               true
+          :else                                            (ork/get-new-eads! pid cid)))) ; Will return nil if no more EADS. ToDo: Then what? Change conversations?
 
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
@@ -529,13 +521,14 @@
             (do (agent-log "resume-conversation: " pid  " " cid)
                 (-> (conversation-history pid cid) (tell-interviewer ctx))
                 (loop [cnt 0]
-                  (if (and @active? (continue-or-switch-and-continue?! pid cid ctx))
+                  (if (and @active? (continue-or-switch-and-continue?! pid cid))
                     ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                     (let [conversation (q-and-a ctx)
-                          expert-response (-> conversation last :full-text)] ; ToDo: This assumes the last is meaningful.
-                      (log! :info (str "Expert in resume-conversation-loop: (EADS: " active-eads ") response:(" expert-response ")"))
+                          expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
+                          msg-ids (atom [])]
                       (doseq [msg conversation]
-                        (db/add-msg (merge {:pid pid :cid cid} msg)))
+                        (swap! msg-ids conj (db/add-msg (merge {:pid pid :cid cid} msg))))
+                      (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})
                       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
                       (cond
                         (> cnt 10)                                  :exceeded-questions-safety-stop
@@ -551,7 +544,7 @@
                           (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
                             (check-and-put-ds iviewr-response ctx))
                           (recur (inc cnt)))))
-                    (log! :warn "Exiting because active? atom is false."))))
+                    (log! :warn "Exiting because conversation is exhausted or active? atom is false."))))
             (log! :warn "Exiting because active? atom is false.")))))
     (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 

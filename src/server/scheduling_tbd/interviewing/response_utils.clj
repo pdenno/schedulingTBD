@@ -7,7 +7,6 @@
    [clojure.edn                   :as edn]
    [clojure.java.io               :as io]
    [clojure.pprint                :refer [pprint]]
-   [clojure.set]
    [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
    [jsonista.core                 :as json]
@@ -127,4 +126,3 @@
 ;;; The methods for this are in the interviewing/domain directory.
 (defmulti analyze-warm-up        #'dispatch-by-cid)
 (defmulti conversation-complete? #'dispatch-by-cid)
-(defmulti EADS-complete?         #'dispatch-by-cid)

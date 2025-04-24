@@ -53,7 +53,7 @@ After the example, we will document the "message-types" used in the example.
            3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within an undertaking.
            4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which jobs visit machines or workstations may vary among the jobs as determined by the job type.
            5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.",
-        "EADS":  {"EADS-id": "scheduling-problem-type",
+        "EADS":  {"EADS-id": "process/scheduling-problem-type",
                   "problem-type": {"val" : "FLOW-SHOP-SCHEDULING-PROBLEM",
                                    "comment" : "We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop."},
                   "continuous?": {"val" : false,
@@ -74,7 +74,7 @@ After the example, we will document the "message-types" used in the example.
         "response": "Yes, for the most part they all follow the same process. Mix ingredients, bake in conveyor oven, assemble, package, etc."}
 
   You: {"message-type": "DATA-STRUCTURE-REFINEMENT",
-        "refinement-of-EADS": "scheduling-problem-type",
+        "based-on-EADS": "process/scheduling-problem-type",
         "commit-notes": "First commit: determined problem-type; process is not continuous.",
         "data-structure": {"problem-type": "FLOW-SHOP-SCHEDULING-PROBLEM",
                            "continuous?": false}}
@@ -88,16 +88,15 @@ After the example, we will document the "message-types" used in the example.
         "response": "No, we study the demand, consider seasonality, and produce what we think we can sell. Our customers and our stores sell what we think will be popular."}
 
   You: {"message-type": "DATA-STRUCTURE-REFINEMENT",
-        "refinement-of-EADS": "scheduling-problem-type",
+        "based-on-EADS": "process/scheduling-problem-type",
         "commit-notes": "Scheduling is not cyclic",
         "data-structure": {"problem-type": "FLOW-SHOP-SCHEDULING-PROBLEM",
                            "continuous?": false,
                            "cyclical?": false}}
 
    We: {"message-type": "EADS-INSTRUCTIONS",
-        "EADS-id": "flow-shop",
-        "interview-objective":
-        "Produce a data structure similar in form to the EADS provided, but describing the interviewees' production processes. This EADS views the interviewees' production as organized as a flow shop."
+        "EADS-id": "process/flow-shop",
+        "interview-objective": "Produce a data structure similar in form to the EADS provided, but describing the interviewees' production processes. This EADS views the interviewees' production as organized as a flow shop."
         "EADS" :
 "{"process-id":
  {"val":"pencil-manufacturing",
@@ -209,7 +208,7 @@ After the example, we will document the "message-types" used in the example.
                        cool them, add the filling to one wafer and place another wafer on top. Package the cookies."}
 
    You: {"message-type": "DATA-STRUCTURE-REFINEMENT",
-         "refinement-of-EADS": "flow-shop",
+         "based-on-EADS": "process/flow-shop",
          "commit-notes": "First commit, process-ids.",
          "data-structure":
          {"process-id": "sandwich-cookie-manufacturing",
@@ -265,14 +264,13 @@ After the example, we will document the "message-types" used in the example.
        #+end_src"}
 
   You: {"message-type": "DATA-STRUCTURE-REFINEMENT",
-        "refinement-of-EADS": "flow-shop",  
+        "based-on-EADS": "process/flow-shop",  
         "commit-notes": "I did the following
                                1) added durations,
                                2) corrected processes (changed 'mold wafers' to 'load-cookie-depositor') and added 'load-packaging', and,
                                3) specified a 'subprocess-flow' value of 'individuals-from-batch' for the automated process.",
         "data-structure":
-        {"EADS-ref": "flow-shop",
-	 "process-id": "sandwich-cookie-manufacturing",
+        {"process-id": "sandwich-cookie-manufacturing",
          "subprocesses": [{"process-id": "mix-wafer-dough",        "duration": {"units": "hours",   "value-string": "1"}},
                           {"process-id": "mix-filling",            "duration": {"units": "hours",   "value-string": "1"}},
                           {"process-id": "load-cookie-depositor",  "duration": {"units": "minutes", "value-string": "10"}},
@@ -318,7 +316,7 @@ After the example, we will document the "message-types" used in the example.
                        #+begin_src comment That looks good 'as is'. #+end_src"}
 
     You: {"message-type": "DATA-STRUCTURE-REFINEMENT",
-          "refinement-of-EADS": "flow-shop",  
+          "based-on-EADS": "process/flow-shop",  
           "commit-notes": "Added process step inputs, outputs, and resources."
           "data-structure":
           {"process-id"   : "sandwich-cookie-manufacturing",
@@ -367,7 +365,7 @@ After the example, we will document the "message-types" used in the example.
                       Finally, we spend a lot of time checking on ingredient inventory (expected arrival dates of shipments, etc.) to plan what we can make next."}
 
    You: {"message-type": "DATA-STRUCTURE-REFINEMENT",
-         "refinement-of-EADS": "flow-shop",  
+         "based-on-EADS": "process/flow-shop",  
          "commit-notes": "Made 'place-filling' and 'add-top-wafer' optional. Added clean equipment as a top-level process."
          "data-structure":
           {"process-id": "sandwich-cookie-manufacturing",
@@ -421,7 +419,6 @@ After the example, we will document the "message-types" used in the example.
 
 ========= END EXAMPLE INTERACTIONS =================================
 
-
 Let's discuss the EXAMPLE INTERACTIONS.
 First, note that interviews typically iterate a sequence of four steps: (1) We: SUPPLY-QUESTION, (2) You: QUESTION-TO-ASK, (3) We: INTERVIEWEES-RESPOND, and (4) You: DATA-STRUCTURE-REFINEMENT.
 
@@ -449,7 +446,7 @@ Note that we encourage an occassional open-ended, reframing question such as in 
 These help us stay on the right path.
 
 Finally, let's look at the complete protocol by which we communicate with each other.
-It consists of 8 message types: SUPPLY-QUESTION, QUESTION-TO-ASK, INTERVIEWEES-RESPOND, DATA-STRUCTURE-REFINEMENT, CONVERSATION-HISTORY, EADS, COURSE-CORRECTION, and STATUS.
+It consists of 8 message types: SUPPLY-QUESTION, QUESTION-TO-ASK, INTERVIEWEES-RESPOND, DATA-STRUCTURE-REFINEMENT, CONVERSATION-HISTORY, EADS-INSTRUCTIONS, COURSE-CORRECTION, and STATUS.
 The EXAMPLE INTERACTIONS used all of these except COURSE-CORRECTION.
 
 1) SUPPLY-QUESTION :
@@ -463,7 +460,7 @@ This is notification from us to you about what the interviewees said in response
 
 4) DATA-STRUCTURE-REFINEMENT :
 This is the key response from you! Properties of this message are
-  'refinement-of-EADS' - which identifies the EADS being worked, the value is the same as the EADS-id in the EADS-INSTRUCTIONS message.
+  'based-on-EADS' - the value of which should be the EADS-id of the EADS being worked. The EADS-id is found in the EADS-INSTRUCTIONS message.
   'commit-notes' - Notes (like you might use with a git repository)  on how you changed the work-in-process data structure based on the response to your QUESTION-TO-ASK.
                    If the response does not seem to be responsive to your question, your response should be simply {"message-type": "DATA-STRUCTURE-REFINEMENT", "commit notes": "not responsive"} and
                    we will take care of handling their comments off-line from you.
@@ -481,9 +478,9 @@ Minimally it has the properties, 'budget', 'activity' and 'interviewee-type' as 
 6) EADS-INSTRUCTIONS :
 This is a message from us to you. It provides you with information describing the goal of the next period of your conversation with the interviewees.
 Properties of this message are
+ 'EADS-id' - which uniquely names the EADS, this id is copied to the property 'based-on-EADS' in DATA-STRUCTURE-REFINEMENT messages.
+ 'interview-objective' - which is text describing the overarching goal of the discussion that will spur your DATA-STRUCTURE-REFINEMENT messages to us. 
  'EADS' - which  provides the Example Annotated Data Structure (EADS) that helps you decide what to ask.
- 'EADS-id' - which uniquely names the EADS, this id is copied to the property 'refinement-of-EADS' in DATA-STRUCTURE-REFINEMENT messages.
- 'interview-objective' - which is text describing the overarching goal of the discussion that will spur your DATA-STRUCTURE-REFINEMENT messages to us.
 
 7) COURSE-CORRECTION :
 There were none of these in the EXAMPLE INTERACTIONS, but both "we" and "you" can use this message type to influence how the interview is running.
