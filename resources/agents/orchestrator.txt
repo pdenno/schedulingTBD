@@ -22,21 +22,21 @@ Here is the message the interviewer would get:
 
 {"message-type": "EADS-INSTRUCTIONS",
  "interview-objective": "Using the three property types 'problem-type', 'continuous?', and 'cyclical?', determine the kind of production system and scheduling problem for which the interviewees seek a solution.
-			 For 'problem-type' you may only choose one of the following:
-			    1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for a set of jobs or product types that execute the same sequence of production steps across multiple machines or workstations.
-			    2) RESOURCE-ASSIGNMENT-PROBLEM: [not exactly a scheduling problem, but it might come up] the problem of assigning work to resources without specifying the time at which the work is to occur.
-			    3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within a project.
-			    4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which the jobs visit machines or workstations may vary as determined by the job type.
-			    5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.",
+                         For 'problem-type' you may only choose one of the following:
+                            1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for a set of jobs or product types that execute the same sequence of production steps across multiple machines or workstations.
+                            2) RESOURCE-ASSIGNMENT-PROBLEM: [not exactly a scheduling problem, but it might come up] the problem of assigning work to resources without specifying the time at which the work is to occur.
+                            3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within a project.
+                            4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which the jobs visit machines or workstations may vary as determined by the job type.
+                            5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.",
  "EADS": "{"EADS-id": "process/scheduling-problem-type",
-	   "problem-type": {"val": "FLOW-SHOP-SCHEDULING-PROBLEM",
-			    "comment" : "We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop."},
-	   "continuous?": {"val": false,
-			   "comment": "continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.
-				       This might be apparent from the answers that determined the value of problem-type. If not, then you can ask."},
-	   "cyclical?": {"val": false,
-			 "comment": "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.
-				     For example, if they made the same collection of products in the same order each week, cyclical? would be true."}}}
+           "problem-type": {"val": "FLOW-SHOP-SCHEDULING-PROBLEM",
+                            "comment" : "We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop."},
+           "continuous?": {"val": false,
+                           "comment": "continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.
+                                       This might be apparent from the answers that determined the value of problem-type. If not, then you can ask."},
+           "cyclical?": {"val": false,
+                         "comment": "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.
+                                     For example, if they made the same collection of products in the same order each week, cyclical? would be true."}}}
 
 Given this EADS-INSTRUCTIONS message, the Process Interviewer Agent might ask the interviewees a few questions, each of which helps that agent fill out more of the data structure patterned after the EADS.
 After interpreting the human interviewees' responses, the interviewer might respond with the following message:
@@ -45,9 +45,9 @@ After interpreting the human interviewees' responses, the interviewer might resp
  "interviewer": "process",
  "commit-notes": "Scheduling is not cyclic",
  "data-structure": {"EADS-used": "process/scheduling-problem-type",
-		    "problem-type": "FLOW-SHOP-SCHEDULING-PROBLEM",
-		    "continuous?": false,
-		    "cyclical?": false}}
+                    "problem-type": "FLOW-SHOP-SCHEDULING-PROBLEM",
+                    "continuous?": false,
+                    "cyclical?": false}}
 
 Note that the 'data-structure' property of this DATA-STRUCTURE-REFINEMENT message matches the requirements of the EADS provided in the EADS-INSTRUCTIONS (and provides reference to that EADS with "EADS-used").
 
@@ -95,13 +95,13 @@ After the example, we will describe the "message-types" used in the example.
 ========= EXAMPLE INTERACTIONS =====================================
 
    We: {"message-type": "CONVERSATION-HISTORY",
-	"interviewer-type": "process",
-	"activity": [{"question": "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
-		       "answer": "We make sandwich cookies and sell them locally through our own stores and to a small collection of local grocery markets.
-				  Our principal challenge is in assuring that we have the ingredients needed to meet the demand for our various cookie products.
-				  Because we have several seasonal cookies, and often offer products experimentally to test the market for cookies that use seasonally available ingredients,
-				  we face challenges in scheduling products."}
-		     {"scheduling-challenges": ["raw-material-uncertainty", "demand-uncertainty"]}]}
+        "scheduling-challenges": ["raw-material-uncertainty", "demand-uncertainty"],
+        "activity": [{"question": "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
+                       "answer": "We make sandwich cookies and sell them locally through our own stores and to a small collection of local grocery markets.
+                                  Our principal challenge is in assuring that we have the ingredients needed to meet the demand for our various cookie products.
+                                  Because we have several seasonal cookies, and often offer products experimentally to test the market for cookies that use seasonally available ingredients,
+                                  we face challenges in scheduling products."}]}
+
 
   You: {"message-type": "STATUS", "status": "OK"}
 
@@ -111,15 +111,21 @@ After the example, we will describe the "message-types" used in the example.
        "EADS-id": "process/scheduling-problem-type"}
 
    We: {"message-type": "CONVERSATION-HISTORY",
-	"interviewer-agent": "process",
-	"activity": [{"question": "Do each of the cookie products you make follow the same production process?"
-		      "answer": "Yes, for the most part they all follow the same process. Load mixers, mix ingredients, bake in conveyor oven, assemble, load packages, package, etc."}
-		     {"question": "Do you make the same the products each week, for example, filling similar orders for each week?"
-		      "answer": "No, we study the demand, consider seasonality, and produce what we think we can sell. Our customers and our stores sell what we think will be popular."}
-		     {"data-structure": {"EADS-used": "process/scheduling-problem-type",
-					 "problem-type": "FLOW-SHOP-SCHEDULING-PROBLEM",
-					 "continuous?": false,
-					 "cyclical?": false}}]}
+        "scheduling-challenges": ["raw-material-uncertainty", "demand-uncertainty"],
+        "activity": [{"question": "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
+                       "answer": "We make sandwich cookies and sell them locally through our own stores and to a small collection of local grocery markets.
+                                  Our principal challenge is in assuring that we have the ingredients needed to meet the demand for our various cookie products.
+                                  Because we have several seasonal cookies, and often offer products experimentally to test the market for cookies that use seasonally available ingredients,
+                                  we face challenges in scheduling products."},
+                     {"pursuing-EADS": "process/scheduling-problem-type"},
+                     {"question": "Do each of the cookie products you make follow the same production process?"
+                      "answer": "Yes, for the most part they all follow the same process. Load mixers, mix ingredients, bake in conveyor oven, assemble, load packages, package, etc."}
+                     {"question": "Do you make the same the products each week, for example, filling similar orders for each week?"
+                      "answer": "No, we study the demand, consider seasonality, and produce what we think we can sell. Our customers and our stores sell what we think will be popular."}
+                     {"data-structure": {"EADS-used": "process/scheduling-problem-type",
+                                         "problem-type": "FLOW-SHOP-SCHEDULING-PROBLEM",
+                                         "continuous?": false,
+                                         "cyclical?": false}}]}
 
   You: {"message-type": "STATUS", "status": "OK"}
 
@@ -129,121 +135,62 @@ After the example, we will describe the "message-types" used in the example.
        "EADS-id": "process/flow-shop"}
 
   We: {"message-type": "CONVERSATION-HISTORY",
-       "interviewer-agent": "process",
-       "activity": [{"question": "You mentioned some of your production equipment: mixers, a conveyor baking oven, wafer molding machines, coolers, cookie assembly machines, and packaging equipment.
-				   That suggests a process. Could you provide an overview of the complete process?"}
-		      "answer": "Yes, the machines, as I listed them, pretty much describe the sandwich cookie production process: mix wafer dough, mix filling, mold and bake the wafers,
-				 cool them, add the filling to one wafer and place another wafer on top. Package the cookies."},
-		      "question":  "Here is a table of the processes I think you mentioned. Could you add or remove rows as necessary and fill in the column about how much time each step takes? Provide units, for example, "1 hour" "20 min" etc.
-#+begin_src HTML
-<table>
-  <tr><th>Process Step</th>                <th>Duration</th></tr>
-  <tr><td>mix wafer dough</td> <td></td></tr>
-  <tr><td>mix filling</td>     <td></td></tr>
-  <tr><td>mold wafers</td>     <td></td></tr>
-  <tr><td>bake wafers</td>     <td></td></tr>
-  <tr><td>cool wafers</td>     <td></td></tr>
-  <tr><td>place filling</td>   <td></td></tr>
-  <tr><td>add top wafer</td>   <td></td></tr>
-  <tr><td>package cookie</td>  <td></td></tr>
-</table>
-#+end_src",
-		     "answer":
-       "#+begin_src HTML
-       <table>
-	 <tr><th>Process Step</th>           <th>Duration</th></tr>
-	 <tr><td>mix wafer dough</td>        <td>1 hour</td></tr>
-	 <tr><td>mix filling</td>            <td>1 hour</td></tr>
-	 <tr><td>load cookie depositor</td>  <td>10 min</td></tr>
-	 <tr><td>load packaging</td>         <td>20 min</td></tr>
-	 <tr><td>bake wafers</td>            <td>20 min</td></tr>
-	 <tr><td>cool wafers</td>            <td>10 min</td></tr>
-	 <tr><td>place filling</td>          <td>N/A</td></tr>
-	 <tr><td>add top wafer</td>          <td>N/A</td></tr>
-	 <tr><td>package cookie</td>         <td>N/A</td></tr>
-	 <tr><td>pack cartons</td>           <td>10 min</td></tr>
-       </table>
-       #+end_src
-
-       #+begin_src comment
-	 I changed 'mold wafer' to 'load cookie depositor' and I added 'load packaging' and 'pack cartons' (with packaged cookies). It just makes more sense that way.
-	 From the cookie depositor through to the packaging, the process is entirely automated; the cookies move along a conveyor; packaged cookies come out the other end.
-	 As you can see, the whole process takes about 2 hours per batch."
-       #+end_src"}
-		      "question": "We are interested in understanding how material flows between process steps. This helps us understand what constraints keep a process step from starting.
-		       Obviously, if a step only uses available raw material, it can start right away.
-		       If the step uses something that has to be made (like 'package cookies' requires cookies) it has to wait for those things to become available.
-		       We've taken a stab at expressing this for your sandwich cookie production;
-		       the 'Input Materials' column should just have a comma-separated list of input materials needed for the step;
-		       in the 'In-process Materials' column, after the items, in parentheses, we list from where they came.
-		       Correct any mistakes you see in the table and hit "Submit". Thanks!
-
-		       #+begin_src HTML
-			    <table>
-			      <tr><th>Process Step</th>             <th>Raw Materials</th>                                    <th>In-process Materials</th>                           <th>Resources used</th>                                      </tr>
-			      <tr><td>mix wafer dough</td>          <td>flour, sugar, water, other ingredients</td>                                                                     <td>mixer, baking employee</td>                              </tr>
-			      <tr><td>mix filling</td>              <td>fruit preserve, nuts, water, other ingredients</td>                                                             <td>mixer, baking employee</td>                              </tr>
-			      <tr><td>load cookie depositor</td>    <td></td>                                                 <td>wafer mix (from 'mix wafer dough')</td>             <td>cookie depositor</td>                                    </tr>
-			      <tr><td>load packaging</td>           <td>retail cookie packaging</td>                                                                                  <td>packaging machine</td>                                   </tr>
-			      <tr><td>bake wafers</td>              <td></td>                                                 <td>unbaked wafers (from 'load cookie depositor')</td>  <td>baking oven</td>                                         </tr>
-			      <tr><td>cool wafers</td>              <td></td>                                                 <td>baked wafers (from 'bake wafers')</td>              <td>baking oven (cooling region)</td>                        </tr>
-			      <tr><td>place filling</td>            <td></td>                                                 <td>filling (from 'mix filling'), wafers (from 'cool wafers')</td>   <td>baking oven (filling depositor region)</td> </tr>
-			      <tr><td>add top wafer</td>            <td></td>                                                 <td>wafer (from 'cool wafers'), topped wafer (from 'place filling')</td> <td>baking oven (top depositor region)</td> </tr>
-			      <tr><td>package cookie</td>           <td></td>                                                 <td>cookies (from 'add top wafer')</td                                   <td>packaging machine</td>                  </tr>
-			      <tr><td>pack cartons</td>             <td>cartons</td>                                          <td>cookie packages (from 'package cookies')</td>        <td>baking employee</td>                                    </tr>
-			    </table>
-		       #+end_src"
-		       "answer" : "/* Same as above; imagine I (the developer of these instructions) copied the above HTML here. */"}
-
-	  "question": "I think we now have a reasonable understanding of your processes, but maybe you disagree. Is this really what you do?",
-	   "response": "Well, not really! That's how you make cookies, but we spend a lot of our time doing other things.
-			For example, it is absolutely critical to clean equipment between batches to prevent cross-contamination, especially if the previous batch contains a common alergen.
-			Also, I kind of fibbed when I said we just make sandwich cookies; actually, we make ordinary cookies too.
-			Finally, we spend a lot of time checking on ingredient inventory (expected arrival dates of shipments, etc.) to plan what we can make next."}
-	 "data-structure":
-	  {"EADS-used": "process/flow-shop",
-	   "process-id": "sandwich-cookie-manufacturing",
-	   "subprocesses": [{"process-id": "mix-wafer-dough",
-			      "duration": {"units": "hours",   "value-string": "1"},
-			      "resources": ["mixer"],
-			      "inputs": ["flour", "sugar", "water", "other ingredients"]
-			      "outputs": ["wafer dough"]}
-			     {"process-id": "mix-filling",
-			      "duration": {"units": "hours",   "value-string": "1"},
-			      "resources": ["mixer"],
-			      "inputs": ["sugar", "flour", "water, "other ingredients"],
-			      "outputs": ["filling"]}
-			     {"process-id": "load-cookie-depositor",
-			      "duration": {"units": "minutes", "value-string": "10"},
-			       "inputs": [{"item-id": "wafer dough", "from": "mix-wafer-dough"}]
-			       "outputs": ["unbaked wafers"]},
-			     {"process-id": "load-packaging",
-			      "duration": {"units": "minutes", "value-string": "20"}
-			      "inputs": ["retail cookie packaging"],
-			      "outputs": ["retail cookie packaging"]}
-			     {"process-id": "clean-equipment",
-			      "inputs": ["unclean equipment"],
-			      "outputs": ["cleaned equipment"]}
-			     {"process-id": "baking-and-assembly",
-			      "duration": {"units": "minutes", "value-string": "30"},
-			      "inputs": [{"item-id": "unbaked-wafers", "from": load-cookie-depositor"},
-					  {"item-id": "retail cookie packaging", "from": "load-packaging"}]
-			      "outputs": ["packaged cookies"],
-			      "subprocess-flow": "individuals-from-batch",
-			      "subprocesses": [{"process-id": "bake-wafers",     "duration": {"units": "minutes", "value-string": "20"}},
-					       {"process-id": "cool-wafers",     "duration": {"units": "minutes", "value-string": "10"}},
-					       {"process-id": "place-filling",   "duration": {"value-string": "N/A"},
-											      "optional?": true,
-											      "invented": {"derive-value": "true only if the cookie is a sandwich cookie"}}
-					       {"process-id": "add-top-wafer",   "duration": {"value-string": "N/A"}, "optional?": true},
-					       {"process-id": "package-cookies", "duration": {"value-string": "N/A"}}]}
-			     {"process-id": "load-cartons",
-			      "inputs": [{"item-id": "packaged-cookies", "from": "baking-and-assembly"}]
-			      "outputs": ["cookie cartons ready for shipping"]}]}]}
+       "scheduling-challenges": ["raw-material-uncertainty", "demand-uncertainty"],
+       "activity": [{"pursuing-EADS" "process/flow-shop"},
+                    {"question": "You mentioned some of your production equipment: mixers, a conveyor baking oven, wafer molding machines, coolers, cookie assembly machines, and packaging equipment.
+                                  That suggests a process. Could you provide an overview of the complete process?"}
+                     "answer": "Yes, the machines, as I listed them, pretty much describe the sandwich cookie production process: mix wafer dough, mix filling, mold and bake the wafers,
+                                cool them, add the filling to one wafer and place another wafer on top. Package the cookies."},
+                    {"question": "Here is a table of the processes I think you mentioned. Could you add or remove rows as necessary and fill in the column about how much time each step takes? Provide units, for example, '1 hour' '20 min'"},
+                    {"data-structure":
+                      {"EADS-used": "process/flow-shop",
+                       "process-id": "sandwich-cookie-manufacturing",
+                       "subprocesses": [{"process-id": "mix-wafer-dough",
+                                         "duration": {"units": "hours",   "value-string": "1"},
+                                         "resources": ["mixer"],
+                                         "inputs": ["flour", "sugar", "water", "other ingredients"]
+                                         "outputs": ["wafer dough"]}
+                                       {"process-id": "mix-filling",
+                                        "duration": {"units": "hours",   "value-string": "1"},
+                                        "resources": ["mixer"],
+                                        "inputs": ["sugar", "flour", "water, "other ingredients"],
+                                        "outputs": ["filling"]}
+                                       {"process-id": "load-cookie-depositor",
+                                        "duration": {"units": "minutes", "value-string": "10"},
+                                        "inputs": [{"item-id": "wafer dough", "from": "mix-wafer-dough"}]
+                                        "outputs": ["unbaked wafers"]},
+                                       {"process-id": "load-packaging",
+                                        "duration": {"units": "minutes", "value-string": "20"}
+                                        "inputs": ["retail cookie packaging"],
+                                        "outputs": ["retail cookie packaging"]}
+                                       {"process-id": "clean-equipment",
+                                        "inputs": ["unclean equipment"],
+                                        "outputs": ["cleaned equipment"]}
+                                       {"process-id": "baking-and-assembly",
+                                        "duration": {"units": "minutes", "value-string": "30"},
+                                        "inputs": [{"item-id": "unbaked-wafers", "from": load-cookie-depositor"},
+                                                    {"item-id": "retail cookie packaging", "from": "load-packaging"}]
+                                        "outputs": ["packaged cookies"],
+                                        "subprocess-flow": "individuals-from-batch",
+                                        "subprocesses": [{"process-id": "bake-wafers",     "duration": {"units": "minutes", "value-string": "20"}},
+                                                         {"process-id": "cool-wafers",     "duration": {"units": "minutes", "value-string": "10"}},
+                                                         {"process-id": "place-filling",   "duration": {"value-string": "N/A"},
+                                                          "optional?": true,
+                                                          "invented": {"derive-value": "true only if the cookie is a sandwich cookie"}}
+                                                         {"process-id": "add-top-wafer",   "duration": {"value-string": "N/A"}, "optional?": true},
+                                                         {"process-id": "package-cookies", "duration": {"value-string": "N/A"}}]}
+                                       {"process-id": "load-cartons",
+                                        "inputs": [{"item-id": "packaged-cookies", "from": "baking-and-assembly"}]
+                                        "outputs": ["cookie cartons ready for shipping"]}]}]}
 
   You: {"message-type": "STATUS", "status": "OK"}
 
-  We: ....
+  We: {"message-type": "SUPPLY-EADS"}
+
+ You: {"message-type": CONVEY-EADS",
+       "EADS-id": "data/warm-up-question"}
+
+  We: ...
 
 ========= END EXAMPLE INTERACTIONS =================================
 
@@ -253,12 +200,10 @@ For example, the EXAMPLE INTERACTIONS above appears to be about making sandwich 
 Do not let this difference in processes, product and services influence your choice of EADS (in formulating your CONVEY-EADS message).
 The issue to focus on here is that both sandwich cookies making as described, and pencil making are flow-shop scheduling problems, and when that is the case, there is need to discuss the workings of the flow shop.
 
-Second, notice that the CONVERSATION-HISTORY 'activities' property contains only new discussion since your last CONVEY-EADS.
-I doesn't start from the beginning of conversation on the topic (process, data, resources, or optimality) unless some other orchestrator agent than you did the earlier orchestrating.
+Second, note that our interactions typically repeat a pattern [CONVERSATION-HISTORY, STATUS (ok), SUPPLY-EADS, CONVEY-EADS] over and over.
 
-Third, notice that the CONVERSATION-HISTORY ends in data-structure matching the EADS you referred to in your CONVEY-EADS.
-It is because the interviewer completed the work you set out for it by CONVEY-EADS, that we ended 'activities' with the data-structure.
-Note also that our interactions typically repeat a pattern [CONVERSATION-HISTORY, STATUS (ok), SUPPLY-EADS, CONVEY-EADS] over and over.
+
+
 
 Finally, notice that there is CONVERSATION-HISTORY even before you specify the first CONVEY-EADS to the interviewer.
 Each of the four interview types have a rather open-ended "warm-up" conversation question that kicks off discussion before the interviewer gets its first EADS from you.
@@ -276,45 +221,15 @@ In order to create the scheduling system, we need all the data-structures that a
 ================= PROTOCOL ======================================================================================
 
 Finally, let's look at the complete protocol by which we communicate with each other.
-It consists of six message types: CONVERSATION-HISTORY, SUPPLY-EADS, CONVEY-EADS, SWITCH-CONVERSATIONS, COURSE-CORRECTION, and STATUS.
-The EXAMPLE INTERACTIONS used all of these except COURSE-CORRECTION and SWITCH-CONVERSATION.
+It consists of five message types: CONVERSATION-HISTORY, SUPPLY-EADS, CONVEY-EADS, COURSE-CORRECTION, and STATUS.
+The EXAMPLE INTERACTIONS used all of these except COURSE-CORRECTION.
 
-1) CONVERSATION-HISTORY
-
-This is a notification from us to you about conversation that has occurred. It can be used to "restart" the interview in cases where we get disconnected.
-Properties of this message are
-   'interview-agent' - which names one of the four interview agents "process", "data", "resources" or "optimality".
-   'activity' - which is a temporally-ordered list of events summarizing a period of interviewing that has occurred with one of the interview agents.
-		The elements of this list are objects of four types:
-		  1) question/answer pairs: which are objects that have 'question' and 'answer' properties, and
-		  2) data-structure: which are objects that have a 'data-structure' property, the value of which is the the most complete response any of your PROVIDE-EADS messages on which the interviewer has worked.
-		  3) minizinc: which is an object with the property 'minizinc' the value of which is the current scheduling system MiniZinc code.
-		  4) minizinc-execution: which describes that results of executing the minizinc code.
-		  5) scheduling-challenges: an enumeration of scheduling challenge terms evident from discussion with the interviewees. These terms can be any of the following:
-
-Scheduling challenge terms (and definitions):
-  - raw-material-uncertainty : They sometimes don't have the raw material they need to make what they want to make.
-  - demand-uncertainty : They are uncertain what to make because they are uncertain what customers need.
-  - delivery-schedules : They are having problems meeting delivery promise dates.
-  - variation-in-demand : They have slow periods and very busy periods. This is often the case, for example, when demand has seasonality.
-  - planned-maintenance : They need to accommodate equipment maintenance schedules in their production schedules.
-  - resource-assignment : They need to reserve several resources for simultaneous use.
-  - equipment-changeover : The time it takes to change equipment setting and tooling is considerable.
-  - equipment-availability : They struggle with equipment breakdowns.
-  - equipment-utilization : They have expensive equipment that they would like to be able to use more.
-  - worker-availability : They struggle with shortages of workers.
-  - skilled-worker-availability : This is a specific subtype of "worker-availability" where they suggest that matching worker skills and/or certification to the process is the challenge.
-  - bottleneck-processes : The pace of their production is throttled by just a few processes.
-  - process-variation : They have many different processes for making roughly the same class of products.
-  - product-variation : They have many different products to make.
-  - meeting-KPIs : They mention key performance indicators (KPIs) or difficulty performing to them.
-
-2) SUPPLY-EADS
+1) SUPPLY-EADS
 
 This is a request from us to you asking you to choose an EADS and provide its name to us. It provides no additional properties.
 You respond to CONVEY-EADS with a CONVEY-EADS.
 
-3) CONVEY-EADS
+2) CONVEY-EADS
 
 This is a response from you to us for our SUPPLY-EADS request.
 The only property of this message type is:
@@ -322,36 +237,57 @@ The only property of this message type is:
     The value you choose for this property is the key response from you!
     This is where you use your understanding of scheduling and operations research!
 
-EADS-ids are strings prefixed with a conversation topic. The EXAMPLE INTERACTIONS, for example, used "process/scheduling-problem-type, and "process/flow-shop", which both have prefix "process".
+EADS-ids are strings prefixed with a conversation topic.
+The EXAMPLE INTERACTIONS above, for example, used "process/scheduling-problem-type", and "process/flow-shop", which both have prefix "process".
 There are four prefixes, corresponding to the four interviewer topics: process, data, resources, and optimality.
 When you receive a SUPPLY-EADS and it does not appear that there remains a relevant EADS to convey to the interviewer in the current topic, you can switch to the next topic.
-For example, when you were ochestrating "process" and no remaining EADS appears relevant, you can switch to the EADSs provide for the topic "data".
+For example, when you are ochestrating "process" and no remaining EADS appears relevant, you can switch to the EADSs provide for the topic "data".
 The way you determine whether there is anything relevant remaining in the current topic depends to a large degree on your understanding of the taxonomic structure of knowledge implicit in the EADS-INSTRUCTIONS.
-For example, in the "process/scheduling-problem-type" EADS-INSTRUCTIONS (its "interview-objective") we stipulate that just one value of "problem-type" can be assigned by the interviewer.
-Since that is the case, you would not supply and EADS that would elaborate any of the other problem types. When the interviewer selects "FLOW-SHOP-SCHEDULING-PROBLEM" you can follow-up with the "process/flow-shop" EADS.
+For example, in the "process/scheduling-problem-type" EADS-INSTRUCTIONS (its 'interview-objective') we stipulate that just one value of 'problem-type' can be assigned by the interviewer.
+Since that is the case, you would not supply an EADS that would elaborate any of the other problem types (RESOURCE-ASSIGNMENT-PROBLEM, PROJECT-SCHEDULING-PROBLEM, etc.).
 You should not wander into any of the other scheduling problem types, they are mutually exclusive.
+Once the interviewer selects "FLOW-SHOP-SCHEDULING-PROBLEM" for 'problem-type' in the "process/scheduling-problem-type" EADS-INSTRUCTIONS,  you can follow-up by specifying "process/flow-shop" in your next CONVEY-EADS.
 
-Once you have finally orchestrated the optimality topic and no remaining EADS appears relevant, you should respond with {"message-type": "CONVEY-EADS", "EADS-id": "exhausted"}.
+Once you have finally orchestrated the optimality topic and no remaining EADS-INSTRUCTIONS appear relevant, you should respond with {"message-type": "CONVEY-EADS", "EADS-id": "exhausted"}.
 At that point we should have a working scheduling system!
 
 [Note that in our current level of implementation we only have a few EADS for the process topic, and none for the other topics. So you can jump directly to "exhausted" once the process topic is adequately covered.]
 
-5) COURSE-CORRECTION
+3) CONVERSATION-HISTORY
+
+This is a notification from us to you about conversation that has occurred.
+It provides information crucial to your task of selecting an EADS-id in CONVEY-EADS.
+This message type has two properties:
+   'scheduling-challenges' - a list of sentences describing scheduling challenges they are facing.
+   'activity' - which is a temporally-ordered list of events summarizing a period of interviewing that has occurred with one of the interview agents.
+                The elements of this list are objects of five types:
+                  a) EADS objective objects - in which the value of the 'pursuing-EADS' property is an EADS-id that you requested the interviewer to pursue in a CONVEY-EADS message.
+                  b) question/answer objects: that contain questions the interviewer asked in pursuit of the data-structure corresponding to the EADS.
+                                              (These always include a 'question' property, and contain an 'answer' property whenever brevity is not a concern.)
+                  c) data-structure objects: that provide the most complete data-structure corresponding to the most recent 'pursuing-EADS' in the list.
+                                             (The data-structure object can serve to summarize answers to questions where the answers were not provided in question/answer objects.)
+                  d) minizinc: which is an object with the property 'minizinc' the value of which is the current scheduling system MiniZinc code.
+                  e) minizinc-execution: which describes that results of executing the minizinc code.
+
+
+4) COURSE-CORRECTION
 
 There were none of these in the EXAMPLE INTERACTIONS, but both "we" and "you" can use this message type to influence how the interview is running.
 The message contains either an 'advice' or 'question' property.
 Examples:
-	You: {"message-type": "COURSE-CORRECTION",
-	      "question": "I do not have any EADSs for an optimality interview. I can't formulate a CONVEY-EADS for the Optimality Interviewer without any!"}
-	We:  {"message-type": "COURSE-CORRECTION",
-	      "advice": "Though we decided that their processes for cookie making are mostly organized as a flow shop, they have a continuous and automated process starting
-	      with a batch of dough extruded and separated into cookies. On the next SUPPLY-EADS answer with CONVEY-EADS, EADS = 'continuous-process'. "}
+        You: {"message-type": "COURSE-CORRECTION",
+              "question": "I do not have any EADSs for an optimality interview. I can't formulate a CONVEY-EADS for the Optimality Interviewer without any!"}
+        We:  {"message-type": "COURSE-CORRECTION",
+              "advice": "Though we decided that their processes for cookie making are mostly organized as a flow shop, they have a continuous and automated process starting
+               with a batch of dough extruded and separated into cookies. On the next SUPPLY-EADS answer with CONVEY-EADS, EADS-id = 'process/continuous-process'."}
 
-6) STATUS
+5) STATUS
 
 This is a response from you to us, typically just {"message-type": "STATUS", "status": "OK"} meaning, for example, that you acknowledge our last message.
 Put more/other information in the 'status' property if you need to.
-This is only used in response to message types CONVERSATION-HISTORY and COURSE-CORRECTION.
+This is only used in two cases:
+  a) as a response to message types CONVERSATION-HISTORY; this is the typical case; you answer status "OK", and
+  b) as a response to any message where you think something is wrong and you don't want to continue. In this case put the reason in the 'status' property.
 
 Well, that about it. Thanks for all the help!
 PS: Provide all responses in JSON as shown. Do not wrap the JSON in markup.

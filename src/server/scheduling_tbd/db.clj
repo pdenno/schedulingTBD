@@ -188,6 +188,9 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts,\n"
                   "which aren't stored, some values can be skipped. Because these are not unique to the DB, they are not :db.unique/identity.")}
+   :message/pursuing-EADS
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The EADS being pursued by this question or answer, if any."}
    :message/question-type
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "A label (from interview instructions) associated with this question or answer."}
@@ -560,19 +563,20 @@
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
   "Create a message object and add it to current conversation of the database with :project/id = id.
-   Return the :message/id."
-  [{:keys [pid cid from text table tags question-type]}]
+   Return the :message/id.
+   Note that this doesn't handle :message/answers-question. That is typically done with update-msg."
+  [{:keys [pid cid from text table tags question-type pursuing-EADS]}]
   (assert (keyword? cid))
   (assert (#{:system :human :surrogate :developer-injected} from))
   (assert (string? text))
-  (log! :debug (str "add-msg: pid = " pid "text = " text))
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid cid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
                                                             table            (assoc :message/table table)
                                                             (not-empty tags) (assoc :message/tags tags)
-                                                            question-type    (assoc :message/question-type question-type))}]})
+                                                            question-type    (assoc :message/question-type question-type)
+                                                            pursuing-EADS    (assoc :message/pursuing-EADS pursuing-EADS))}]})
       msg-id)
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
@@ -617,6 +621,7 @@
       (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
       (log! :error (str "No such conversation: " cid)))))
 
+;;; ToDo: I think maybe this isn't needed.
 (defn get-EADS-dstructs
   "Return a vector of maps of data structures where :message/id is where the :message/data-structure was created."
   [pid cid]

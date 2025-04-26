@@ -362,7 +362,8 @@
 ;;; over and over and the interview will advance each time.
 (defn q-and-a
   "Call interviewer to supply a question; call get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
-   Returns a vector of message objects suitable for db/add-msg. The first of which should be the question, and the last the answer."
+   Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :text :table...).
+   The first element in the vector should be the question object, and the last the answer object."
   [{:keys [client-id responder-type] :as ctx}]
   (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
   (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
@@ -475,7 +476,7 @@
                                         pid  (assoc :pid pid))]
      (write-agent-instructions! cid)
      (swap! adb/agent-infos #(assoc % base-type (dissoc info :pid)))
-     (adb/ensure-agent! info))))
+     (when pid (adb/ensure-agent! info)))))
 
 (defn check-and-put-ds
   [iviewr-response {:keys [pid cid] :as _ctx}]
@@ -497,6 +498,16 @@
     (cond (and eads-id (not eads-complete?))               true
           :else                                            (ork/get-new-eads! pid cid)))) ; Will return nil if no more EADS. ToDo: Then what? Change conversations?
 
+(defn update-db-conversation
+  "Write to the DB conversation messages that occurred inclusive of a q/a pair."
+  [pid cid conversation]
+  (let [msg-ids (atom [])
+        EADS-id (db/get-active-eads pid cid)]
+    (doseq [msg conversation]
+      (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
+                                        EADS-id  (assoc :pursuing-EADS EADS-id))))
+      (db/update-msg pid cid (last @msg-ids) {:answers-question (first @msg-ids)})
+      (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05)))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
@@ -524,12 +535,8 @@
                   (if (and @active? (continue-or-switch-and-continue?! pid cid))
                     ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                     (let [conversation (q-and-a ctx)
-                          expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
-                          msg-ids (atom [])]
-                      (doseq [msg conversation]
-                        (swap! msg-ids conj (db/add-msg (merge {:pid pid :cid cid} msg))))
-                      (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})
-                      (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
+                          expert-response (-> conversation last :full-text)] ; ToDo: This assumes the last is meaningful.
+                      (update-db-conversation pid cid conversation)
                       (cond
                         (> cnt 10)                                  :exceeded-questions-safety-stop
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.

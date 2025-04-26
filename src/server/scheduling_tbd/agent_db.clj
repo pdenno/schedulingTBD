@@ -143,7 +143,7 @@
   "Return the agent map in db attributes. If there is no eid, even though the pid is provided,
    then it pulls from the system DB, if it is not there also, then it returns nil."
   [{:keys [pid] :as agent-info}]
-  (let [{:keys [base-type llm-provider pid]
+  (let [{:keys [base-type llm-provider]
          :or {llm-provider @default-llm-provider}} (enrich-agent-info agent-info)
         eid (and pid (agent-eid base-type llm-provider (connect-atm pid)))
         agent (or (and eid (not-empty (dp/pull @(connect-atm pid) '[*] eid)))
@@ -152,8 +152,7 @@
       (when agent ; ToDo: This should probably be temporary, while migrating to projects with timestamps.
         (cond-> agent
           true                               (dissoc :db/id)
-          (-> agent :agent/timestamp not)    (assoc :agent/timestamp #inst "2024-12-08T16:12:48.505-00:00")
-          pid                                (assoc :pid pid)))))
+          (-> agent :agent/timestamp not)    (assoc :agent/timestamp #inst "2024-12-08T16:12:48.505-00:00")))))
 
 (def agent-db-info? (->> db/db-schema-agent+ keys (filter #(= "agent" (namespace %))) set))
 
@@ -163,7 +162,8 @@
   (let [agent-map (reduce-kv (fn [m k v] (if (agent-db-info? k) (assoc m k v) m)) {} agent-map)
         eid-sys (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @(connect-atm :system))
         eid-pid (when pid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid)))]
-    (log! :info (str "put-agent! agent-map = " agent-map))
+    (when (and (= agent-type :shared-assistant) (not pid))
+      (throw (ex-info "Cannot put-agent! shared-assistant without providing a PID." {:agent-map agent-map})))
     (when (#{:shared-assistant :system} agent-type)
       (d/transact (connect-atm :system)
                   {:tx-data [{:db/id eid-sys :system/agents agent-map}]}))
@@ -174,10 +174,9 @@
 
 (defn make-agent-assistant
   "Create an agent sans :agent/thread-id (even if this will eventually be needed, (#{:project :system} agent-type).
-
    Returns the object in DB attributes."
   [{:keys [base-type agent-type llm-provider model-class surrogate? expertise instruction-path instruction-string
-           response-format-path vector-store-paths tools pid]
+           response-format-path vector-store-paths tools]
     :or {llm-provider @default-llm-provider
          model-class :gpt} :as agent-info}]
   (log! :info (str "Creating agent: " base-type))
@@ -309,7 +308,7 @@
 
 (defn agent-status-basic
   "Find the agent status information for :project and :system agents."
-  [{:keys [base-type llm-provider pid force-new?]
+  [{:keys [base-type llm-provider pid]
     :or {llm-provider @default-llm-provider} :as agent-info}]
   (let [files-modify-date (newest-file-modification-date agent-info)
         conn-atm (if pid (connect-atm pid) (connect-atm :system))
@@ -384,10 +383,11 @@
    The agent-info is 'enriched' here with information from the agent-infos map."
   [info]
   (let [info (if (keyword? info) (get @agent-infos info) info)
-        {:keys [make-agent? make-thread? substitute-aid]} (-> info enrich-agent-info agent-status)
+        {:keys [make-agent? make-thread? substitute-aid] :as info} (-> info enrich-agent-info agent-status)
         agent (if make-agent?
-                (make-agent-assistant info)
-                (get-agent info))
+                (make-agent-assistant info) ; Returns agent in DB attributes.
+                (get-agent info))           ; Returns agent in DB attributes.
+        agent  (merge info agent)           ; Gets pid, at least.
         agent  (cond-> agent
                  substitute-aid   (assoc :agent/assistant-id substitute-aid)
                  make-thread?     (assoc :agent/thread-id (make-agent-thread info)))]
