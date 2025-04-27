@@ -1,7 +1,7 @@
 {"message-type":"EADS-INSTRUCTIONS",
  "interviewer-agent":"process",
  "interview-objective":
- "Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\nThis EADS views the interviewees' production as organized as a flow shop.\nThis portion of the interview will reveal the processes that the enterprise uses to run their flow shop.\nWe might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\nFor example, they might have in mind scheduling machine maintenance, not production.\nThis fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\nKnowledge of the processes might prove useful later.",
+ "This EADS assumes the interviewees' production processes are organized as a flow shop.\nLearn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\nWe might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\nFor example, they might have in mind scheduling machine maintenance, not production.\nThis fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\nKnowledge of the processes might prove useful later.",
  "EADS":
  {"EADS-id":"flow-shop",
   "process-id":

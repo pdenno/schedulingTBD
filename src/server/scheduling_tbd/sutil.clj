@@ -1,6 +1,7 @@
 (ns scheduling-tbd.sutil
   "Server utilities."
   (:require
+   [clojure.data.json]
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
@@ -246,3 +247,8 @@
       (update-keys (json/read-value s) keyword))
     (catch Exception _e
       (throw (ex-info  "Could not read object returned from OpenAI (should be a string):" {:s-in s-in })))))
+
+(defn clj2json-pretty
+  "Return a pprinted string for given clojure object."
+  [obj]
+  (with-out-str (clojure.data.json/pprint obj)))

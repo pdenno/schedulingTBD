@@ -496,7 +496,7 @@
   (let [eads-id (db/get-active-eads pid cid)
         eads-complete? (and eads-id (ork/eads-complete? pid cid eads-id))]
     (cond (and eads-id (not eads-complete?))               true
-          :else                                            (ork/get-new-eads! pid cid)))) ; Will return nil if no more EADS. ToDo: Then what? Change conversations?
+          :else                                            (ork/get-new-EADS pid)))) ; Will return nil if no more EADS. ToDo: Then what? Change conversations?
 
 (defn update-db-conversation
   "Write to the DB conversation messages that occurred inclusive of a q/a pair."

@@ -3,14 +3,16 @@
   (:require
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
+   [clojure.pprint                :refer [pprint]]
    [clojure.set                   :as set]
+   [clojure.spec.alpha            :as s]
    [datahike.api                  :as d]
-   [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
+   [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
-   [scheduling-tbd.sutil          :refer [connect-atm]]
+   [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide output-struct2clj]]
    [taoensso.telemere             :as tel :refer [log!]]))
 
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
 (defn ensure-ork
   "Create a orchstrator using ordinary rules for shared-assistant agents.
@@ -38,16 +40,12 @@
    :product-variation "They have many different products to make."
    :meeting-KPIs "They mention key performance indicators (KPIs) or difficulty performing to them."})
 
-(if (= cid :all)
-  (reduce (fn [res cid] (into res (-> cid (db/get-conversation pid) :conversation/messages))) [] [:process :data :resources :optimality])
-
-
 ;;; ToDo: Check the :conversation/ork-tid versus the actual (once this doesn't provide the whole thing; so that you don't have to provide the whole thing to same ork.)
 ;;; ToDo: Currently this is very similar to inv/conversation-history.
 ;;; ToDo: Needs minizinc execution
 (defn conversation-history
-  "Return a CONVERSATION-HISTORY message for use with the orchestrator.
-   The
+  "Return a CONVERSATION-HISTORY message for use with the orchestrator with values translated to JSON.
+
    There are potentially five kinds of information in the 'activity' property of this message:
         1) a list of all EADS (their EADS-id) that have been completely discussed,
         2) question/answer pairs: which are objects that have 'question' and 'answer' properties, and
@@ -63,17 +61,31 @@
   ([pid cid]
    (assert (#{:all :process :data :resources :optimality} cid))
    (letfn [(c-h-cid [cid]
-             (let [msgs (->> cid (db/get-conversation pid) :conversation/messages)
-                   msgs-ds      (filter #(contains? % :message/data-structure) msgs)
-                   msgs-eads-id (filter #(contains? % :message/pursuing-EADS) msgs)
-                   msgs-code    (filter #(contains? % :message/code) msgs)
-                   msgs-answers (filter #(contains? % :message/answers-question) msgs)
-                   q-a-pairs    (mapv (fn [answer]
-                                        {:question (-> (db/get-msg pid cid (:message/answers-question answer)) :message/content)
-                                         :answer  (-> answer :message/content)})
-                                      msgs-answers)]
-
-               ))]
+             (let [msgs (->> cid
+                             (db/get-conversation pid)
+                             :conversation/messages
+                             (sort-by :message/id)
+                             (mapv #(if-let [q-id (:message/answers-question %)]
+                                      (assoc % :message/q-a-pair
+                                             (let [q-msg (db/get-msg pid cid q-id)]
+                                               {:question (:message/content q-msg)
+                                                :answer   (:message/content %)})) ; ToDo: Might want to skip the answer if it is long.
+                                      %)))
+                   current-eads (atom nil)
+                   result (atom [])]
+               (doseq [m msgs]
+                 (let [{:message/keys [id pursuing-EADS EADS-data-structure code code-execution q-a-pair]} m]
+                   (when (and pursuing-EADS (not= pursuing-EADS @current-eads))
+                     (reset! current-eads pursuing-EADS)
+                     (swap! result conj {:pursuing-EADS (name pursuing-EADS)}))
+                   (when q-a-pair (swap! result conj q-a-pair))
+                   ;; We only want the last d-s for this pursuing-EADS.
+                   (when (and EADS-data-structure
+                              (= id (:message/id (apply max-key :message/id (filter #(= pursuing-EADS (:message/pursuing-EADS %)) msgs)))))
+                     (swap! result conj {:data-structure (clj2json-pretty EADS-data-structure)}))
+                   (when code           (swap! result conj {:code code}))
+                   (when code-execution (swap! result conj {:code-execution code}))))
+               @result))]
      (let [challenges (->> (db/get-claims pid)
                            (filter #(uni/unify '(scheduling-challenge ?pid ?challenge) %))
                            (mapv #(nth % 2))
@@ -82,22 +94,20 @@
                         (reduce (fn [res cid] (into res (c-h-cid cid))) [] [:process :data :resources :optimality])
                         (c-h-cid cid))]
        (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
-       (cond-> {:message-type "CONVERSATION-HISTORY"
-              :scheduling-challenges challenges
-              (not-empty answers)             (assoc :activity
-       ds                              (update :activity conj {:data-structure ds})
-       (not-empty code)                (update :activity conj {:minizinc code}))))
+       (cond-> {:message-type "CONVERSATION-HISTORY"}
+         challenges              (assoc :scheduling-challenges challenges)
+         (not-empty activities)  (assoc :activity activities))))))
 
-  (defn collect-keys
-    [obj]
-    (let [result-atm (atom #{})]
-      (letfn [(ck [obj]
-                (cond (map? obj)            (doseq [[k v] obj]
-                                              (swap! result-atm conj k)
-                                              (ck v))
-                      (vector? obj)         (doseq [o obj] (ck o))))]
-        (ck obj))
-      @result-atm)))
+(defn collect-keys
+  [obj]
+  (let [result-atm (atom #{})]
+    (letfn [(ck [obj]
+              (cond (map? obj)            (doseq [[k v] obj]
+                                            (swap! result-atm conj k)
+                                            (ck v))
+                    (vector? obj)         (doseq [o obj] (ck o))))]
+      (ck obj))
+    @result-atm))
 
 (def EADS-ignore-keys "Ignore these in comparing EADS to a data structure"  #{:comment :val :EADS-id})
 
@@ -125,17 +135,50 @@
         (set/difference EADS-ignore-keys)
         empty?)))
 
+(s/def ::ork-msg map?) ; ToDo: Write specs for ork messages.
+
+(defn tell-ork
+  "Send a message to an interviewer agent and wait for response; translate it.
+   :aid and :tid in the ctx should be for the interviewer agent."
+  [msg {:keys [ork-agent] :as ctx}]
+  (when-not (s/valid? ::ork-msg msg) ; We don't s/assert here because old project might not be up-to-date.
+    (log! :warn (str "Invalid ork msg: " (with-out-str (pprint msg)))))
+  (log! :info (-> (str "Ork told: " msg) (elide 150)))
+  (let [msg-string (clj2json-pretty msg)
+        res (-> (adb/query-agent ork-agent msg-string ctx) output-struct2clj)]
+    (log! :info (-> (str "Ork returns: " res) (elide 150)))
+    res))
+
+
+
+
+
+(defn known-eads?
+  "Return a set of known eads strings."
+  []
+  (->> (d/q '[:find [?eads-id ...]
+             :where [_ :EADS/id ?eads-id]]
+            @(connect-atm :system))
+       (map #(str (namespace %) "/" (name %)))
+       set))
+
+(s/def ::convey-eads (s/keys :req-un [::message-type ::EADS-id]))
+(s/def ::message-type #(= % "CONVEY-EADS"))
+(s/def ::EADS-id #((known-eads?) %))
+
 (defn get-new-EADS
   "Update the project's orchestrator with CONVERSATION-HISTORY and do a SUPPLY-EADS request to the ork.
-   If the ork returns {CONVEY-EDS :exhausted} return nil to the caller."
-  [pid cid]
-  (let [old-tid (d/q '[:find ?tid .
+   If the ork returns {:message-type 'CONVEY-EDS', :EADS-id 'exhausted'} return nil to the caller."
+  [pid]
+  (let [ork (ensure-ork pid)
+        old-tid (d/q '[:find ?tid .
                        :where
                        [?e :agent/base-type :orchestrator-agent]
                        [?e :agent/thread-id ?tid]]
-                     @(connect-atm pid))
-        [{:keys [aid tid]} (ensure-ork pid)]]
-    (when-not (= old-tid tid)
+                     @(connect-atm pid))]
+    (when-not (= old-tid (:tid ork))
       (log! :warn "Project's ork thread has been updated; provide comprehensive history."))
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
     ;;       'comprehensive history' probably covers all conversations.
+    (tell-ork (conversation-history pid) {:ork-agent ork})
+    (let [eads (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})]

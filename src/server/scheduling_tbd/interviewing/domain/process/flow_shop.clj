@@ -3,10 +3,9 @@
        As the case is with flow-shop problems, this structure defines the flow of work through resources.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
-   [clojure.data.json]
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm]]))
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
@@ -207,5 +206,5 @@
         eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
     (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
     ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-    (->> (with-out-str (clojure.data.json/pprint flow-shop)) (spit "resources/EADS/process/flow-shop.json")))
+    (->> flow-shop clj2json-pretty (spit "resources/EADS/process/flow-shop.json")))
   (throw (ex-info "Invalid EADS message (flow-shop)." {})))

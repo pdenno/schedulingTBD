@@ -71,6 +71,14 @@
                                     :project          (s/and #(= (:agent-type %) :project)          #(-> % :pid keyword?))
                                     :shared-assistant (s/and #(= (:agent-type %) :shared-assistant) #(-> % :pid keyword?)))))
 
+(defn agent-log
+  "Log info-string to agent log"
+  [& args]
+  (let [date (str (java.util.Date.))]
+    (tel/with-kind-filter {:allow :agents}
+      (tel/signal!
+       {:kind :agents, :level :info, :msg (str "===== " date " " (apply str args))}))))
+
 ;;; This might better be called agent-type-infos.
 ;;;  "This is a map, indexed by base-type with values being maps providing information sufficient to create/recreate agents.
 ;;;   In addition to those found in agents/agent-infos.edn, we add to this surrogate domain experts when they are started."
@@ -203,9 +211,7 @@
                        :agent/assistant-id aid}
                 surrogate?     (assoc :agent/surrogate? true)
                 expertise      (assoc :agent/expertise expertise))]
-    (tel/with-kind-filter {:allow :agents}
-      (tel/signal! {:kind :agents :level :info
-                    :msg (str "\n\n Creating agent (no thread yet) " base-type ":\n" (with-out-str agent))}))
+    (agent-log "\n\n Creating agent (no thread yet) " base-type ":\n" (with-out-str (pprint agent)))
     agent))
 
 (defn newest-file-modification-date
@@ -240,18 +246,13 @@
                                       (:thread missing-at-provider)         (assoc :make-thread? true)))]
     (when substitute-aid
       (log! :info (str "Agent " base-type " will use an updated assistant: " substitute-aid "."))
-      (tel/with-kind-filter {:allow :agents}
-        (tel/signal! {:kind :agents :level :info :msg
-                      (str "Agent " base-type " will use an updated assistant: " substitute-aid ".")})))
+      (agent-log "Agent " base-type " will use an updated assistant: " substitute-aid "."))
     (when (:make-agent? res)
       (log! :info (str "Agent " base-type " will be created."))
-      (tel/with-kind-filter {:allow :agents}
-        (tel/signal! {:kind :agents :level :info :msg (str "\n Agent " base-type " will be recreated.")})))
+      (agent-log "\n Agent " base-type " will be recreated."))
     (when (:make-thread? res) ; ToDo: Could pass in PID here and mention it.
       (log! :info (str "A thread will be made for agent " base-type " agent-type " agent-type "."))
-      (tel/with-kind-filter {:allow :agents}
-        (tel/signal! {:kind :agents :level :info :msg
-                      (str "\n\n A thread will be made for agent " base-type " agent type " agent-type ".")})))
+      (agent-log "\n\n A thread will be made for agent " base-type " agent type " agent-type "."))
     res))
 
 (defn db-agents
@@ -361,15 +362,11 @@
 
       :system
       (do (log! :info (str "Adding thread " tid " to system DB.\n" (with-out-str (pprint agent))))
-          (tel/with-kind-filter {:allow :agents}
-            (tel/signal! {:kind :agents :level :info
-                          :msg (str "\n\n Adding thread " tid " to system DB\n" (with-out-str (pprint agent)))})))
+          (agent-log "\n\n Adding thread " tid " to system DB\n" (with-out-str (pprint agent))))
 
       (:project :shared-assistant)
       (log! :debug (str "Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
-        (tel/with-kind-filter {:allow :agents}
-          (tel/signal! {:kind :agents :level :info
-                        :msg (str "\n\n Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent)))})))
+      (agent-log "\n\n Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
     tid))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
@@ -478,12 +475,10 @@
     (assert (< (:tries obj) 10))
     (if (> (:tries obj) 0)
       (try
-        (tel/with-kind-filter {:allow :agents}
-          (tel/signal! {:kind :agents :level :info :msg (str "\n\n" (name asking-role) " ===> " query-text)}))
+        (agent-log "\n\n" (name asking-role) " ===> " query-text)
         (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
               res (preprocess-fn raw)]
-          (tel/with-kind-filter {:allow :agents}
-            (tel/signal! {:kind :agents :level :info :msg (str "\n" (name asked-role) " <=== " raw)}))
+          (agent-log "\n" (name asked-role) " <=== " raw)
           (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
         (catch Exception e
           (let [d-e (datafy e)]
@@ -519,15 +514,6 @@
                                          :asked-role (or asked-role base-type)})))
      (catch Exception e
        (log! :error (str "query-agent failed: " e))))))
-
-(defn agent-log
-  "Log info-string to agent log"
-  [& args]
-  (let [date (str (java.util.Date.))]
-    (tel/with-kind-filter {:allow :agents}
-      (tel/signal!
-       {:kind :agents :level :info
-        :msg (str "===== " date " " (apply str args))}))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-agents!

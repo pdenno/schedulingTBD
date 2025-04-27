@@ -175,12 +175,15 @@
    :message/code
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "Code produced at this point in the conversation."}
+   :message/code-execution
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Result of running code produced at this point in the conversation."}
    :message/content
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string with optional html links."}
    :message/EADS-data-structure
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string that can be edn/read-string into an EADS data structure (not EADS-INSTRUCTIONS message) inferred from conversation so far."}
+        :doc "a string that can be edn/read-string into an EADS data structure inferred from conversation so far."}
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}

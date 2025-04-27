@@ -4,7 +4,7 @@
    [clojure.data.json]
    [clojure.spec.alpha :as s]
    [datahike.api          :as d]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm]]))
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 ;;; ToDo: Because we use a central spec registry, the specs defined with short namespaces (e.g. :problem-type/val) might collide with specs from other domains.
 ;;;       The best solution might be not to use a central repository. These things won't be needed outside this file.
@@ -63,5 +63,5 @@
         eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
     (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
     ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-    (->> (with-out-str (clojure.data.json/pprint scheduling-problem-type)) (spit "resources/EADS/process/scheduling-problem-type.json")))
+    (->> scheduling-problem-type clj2json-pretty (spit "resources/EADS/process/scheduling-problem-type.json")))
   (throw (ex-info "Invalid EADS message (scheduling-problem-type)." {})))

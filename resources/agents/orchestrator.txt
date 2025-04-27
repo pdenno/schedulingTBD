@@ -267,7 +267,7 @@ This message type has two properties:
                   c) data-structure objects: that provide the most complete data-structure corresponding to the most recent 'pursuing-EADS' in the list.
                                              (The data-structure object can serve to summarize answers to questions where the answers were not provided in question/answer objects.)
                   d) minizinc: which is an object with the property 'minizinc' the value of which is the current scheduling system MiniZinc code.
-                  e) minizinc-execution: which describes that results of executing the minizinc code.
+                  e) minizinc-execution: which is an object with property 'execution' that describes that results of executing the minizinc code.
 
 
 4) COURSE-CORRECTION
