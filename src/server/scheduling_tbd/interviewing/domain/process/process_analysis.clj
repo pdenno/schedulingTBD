@@ -1,11 +1,10 @@
 (ns scheduling-tbd.interviewing.domain.process.process-analysis
   "Analysis of the process interview"
   (:require
-   [clojure.data.json]
+   [cheshire.core                      :as ches]
    [clojure.pprint                     :refer [pprint]]
    [clojure.spec.alpha                 :as s]
    [clojure.string                     :as str]
-   [jsonista.core                      :as json]
    [scheduling-tbd.agent-db            :as adb]
    [scheduling-tbd.db                  :as db]
    [scheduling-tbd.minizinc            :as mzn]
@@ -27,7 +26,7 @@
    Returns a map {:project-or-service-name, :challenge <keywords naming challenges> :one-more-thing <a string>}."
   [response]
   (let [{:keys [one-more-thing] :as res}  (-> (adb/query-agent :scheduling-challenges-agent response {:tries 2 :asking-role :process-analysis})
-                                              json/read-value
+                                              ches/parse-string
                                               (update-keys str/lower-case)
                                               (update-keys keyword)
                                               (update :challenges #(mapv keyword %)))]

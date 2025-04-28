@@ -1,6 +1,7 @@
 (ns scheduling-tbd.interviewing.interviewers
     "Runs an interview using an interview agent."
     (:require
+     [cheshire.core                   :as ches]
      [clojure.core.unify              :as uni]
      [clojure.data.xml                :as xml]
      [clojure.edn                     :as edn]
@@ -8,7 +9,6 @@
      [clojure.java.io                 :as io]
      [clojure.spec.alpha              :as s]
      [clojure.string                  :as str]
-     [jsonista.core                   :as json]
      [mount.core                      :as mount :refer [defstate]]
      [promesa.core                    :as p]
      [promesa.exec                    :as px]
@@ -170,7 +170,7 @@
   (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid interviewer-msg: " (with-out-str (pprint msg)))))
   (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
-  (let [msg-string (json/write-value-as-string msg)
+  (let [msg-string (ches/generate-string msg {:pretty true})
         res (-> (adb/query-agent interviewer-agent msg-string ctx) output-struct2clj)]
     (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
     res))
@@ -184,7 +184,7 @@
   (assert (string? q-txt))
   (assert (string? a-txt))
   (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt) ctx)
-      json/read-value
+      ches/parse-string
       (update-keys str/lower-case)
       (update-keys keyword)
       (update-vals #(if (empty? %) false %))))
@@ -506,7 +506,7 @@
     (doseq [msg conversation]
       (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
                                         EADS-id  (assoc :pursuing-EADS EADS-id))))
-      (db/update-msg pid cid (last @msg-ids) {:answers-question (first @msg-ids)})
+      (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})
       (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05)))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.

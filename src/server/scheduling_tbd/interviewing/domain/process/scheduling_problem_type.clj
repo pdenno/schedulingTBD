@@ -1,7 +1,6 @@
 (ns scheduling-tbd.interviewing.domain.process.scheduling-problem-type
   "Define a EADS to elicit general information about the scheduling problem the interviewees are interested in solving."
   (:require
-   [clojure.data.json]
    [clojure.spec.alpha :as s]
    [datahike.api          :as d]
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))

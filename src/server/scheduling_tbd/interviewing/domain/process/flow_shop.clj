@@ -20,7 +20,7 @@
 (s/def ::comment string?) ; About annotations
 
 (s/def ::EADS (s/keys :req-un [::EADS-id ::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
-(s/def ::EADS-id #(= % :flow-shop))
+(s/def ::EADS-id #(= % :process/flow-shop))
 
 ;;; We use the 'trick' that :<some-property>/val can be used that to signify a non-namespaced attribute 'val' and a reference to a spec for value of 'val'.
 (s/def ::process (s/keys :req-un [::process-id ::subprocesses] :opt-un [::duration ::inputs ::outputs ::resources]))
@@ -93,7 +93,7 @@
                              "This fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\n"
                              "Knowledge of the processes might prove useful later.")
    :EADS
-   {:EADS-id :flow-shop
+   {:EADS-id :process/flow-shop
     :process-id {:val "pencil-manufacturing",
                  :comment "This is the top-level process. You can name it as you see fit; don't ask the interviewees."}
 

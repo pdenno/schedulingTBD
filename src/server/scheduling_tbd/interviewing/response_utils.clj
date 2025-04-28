@@ -2,6 +2,7 @@
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:refer-clojure :exclude [send])
   (:require
+   [cheshire.core                 :as ches]
    [clojure.datafy                :refer [datafy]]
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
@@ -9,7 +10,6 @@
    [clojure.pprint                :refer [pprint]]
    [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
-   [jsonista.core                 :as json]
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.web.websockets :as ws]
@@ -64,7 +64,7 @@
      (let [res (try (-> (adb/query-agent :text-to-var
                                          (format "{\"INPUT-TEXT\" : \"%s\"}" text)
                                          (when asking-role {:asking-role asking-role}))
-                        json/read-value
+                        ches/parse-string
                         (update-keys keyword))
                     (catch Exception e
                       (let [d-e (datafy e)]

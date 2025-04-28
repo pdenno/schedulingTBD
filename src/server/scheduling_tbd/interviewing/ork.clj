@@ -18,8 +18,14 @@
   "Create a orchstrator using ordinary rules for shared-assistant agents.
    This is typically called when the project starts. It updates :project/agents in the project DB."
   [pid]
-  (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid #_#_:force-new? true})) ; <===================================== :force-new? is temporary.
+  (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid}))
 
+(defn ^:diag ensure-ork-diag
+  "It is necessary to get a new orchestrartor thread for the project if you haven't changed the ork but want to start from scratch on the project."
+  [pid]
+  (adb/ensure-agent! {:base-type :orchestrator-agent
+                      :pid pid
+                      :make-thread? true}))
 
 ;;; ToDo: Find a better home for this.
 (def scheduling-challenge2-description
@@ -149,10 +155,6 @@
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
     res))
 
-
-
-
-
 (defn known-eads?
   "Return a set of known eads strings."
   []
@@ -182,3 +184,14 @@
     ;;       'comprehensive history' probably covers all conversations.
     (tell-ork (conversation-history pid) {:ork-agent ork})
     (let [eads (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})]
+      (if (s/valid? ::convey-eads eads)
+        (if-let [eads-instructions (d/q '[:find ?msg-str .
+                                          :in $ ?eid-id
+                                          :where
+                                          [?e :EADS/id ?eid-id]
+                                          [?e :EADS/msg-str ?msg-str]]
+                                        @(connect-atm :system)
+                                        (-> eads :EADS-id keyword))]
+          (edn/read-string eads-instructions)
+          (log! :error (str "No EADS-instructions found for " eads)))
+        (log! :error (str "Invalid CONVEY-EADS message: " eads))))))

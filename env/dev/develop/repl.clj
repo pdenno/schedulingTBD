@@ -15,6 +15,7 @@
   "Use this to setup useful aliases for working in this NS."
   []
   (reset! alias? (-> (ns-aliases *ns*) keys set))
+  (safe-alias 'ches   'cheshire.core)
   (safe-alias 'io     'clojure.java.io)
   (safe-alias 's      'clojure.spec.alpha)
   (safe-alias 'uni    'clojure.core.unify)
@@ -33,7 +34,7 @@
   (safe-alias 'llm    'scheduling-tbd.llm)
   (safe-alias 'llmt   'scheduling-tbd.llm-test)
   (safe-alias 'fshop  'scheduling-tbd.interviewing.domain.process.flow-shop)
-  (safe-alias 'fshop  'scheduling-tbd.interviewing.domain.process.job-shop)
+  (safe-alias 'jshop  'scheduling-tbd.interviewing.domain.process.job-shop)
   (safe-alias 'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type)
   (safe-alias 'pan    'scheduling-tbd.interviewing.domain.process.process-analysis)
   (safe-alias 'inv    'scheduling-tbd.interviewing.interviewers)
