@@ -68,7 +68,7 @@
       (content-type "text/html; charset=utf-8")))
 
 (defn home [{:keys [flash] :as request}]
-  (render request "home.html" {:errors (:errors flash)}))
+  (render request #_"tryme.html" "home.html" {:errors (:errors flash)}))
 ;;;====================================================
 
 (s/def ::client-id (st/spec {:spec string? ; ToDo: Switch to bare uuid when switch to transit.

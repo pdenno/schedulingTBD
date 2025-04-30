@@ -11,50 +11,63 @@
              (find-ns ns-sym))
     (alias al ns-sym)))
 
+(def alias-map
+  {'ches   'cheshire.core
+   'io     'clojure.java.io
+   's      'clojure.spec.alpha
+   'uni    'clojure.core.unify
+   'edn    'clojure.edn
+   'str    'clojure.string
+   'd      'datahike.api
+   'dp     'datahike.pull-api
+   'mount  'mount.core
+   'p      'promesa.core
+   'px     'promesa.exec
+   'adb    'scheduling-tbd.agent-db
+   'core   'scheduling-tbd.core
+   'db     'scheduling-tbd.db
+   'how    'scheduling-tbd.how-made
+   'llm    'scheduling-tbd.llm
+   'llmt   'scheduling-tbd.llm-test
+   'fshop  'scheduling-tbd.interviewing.domain.process.flow-shop
+   'jshop  'scheduling-tbd.interviewing.domain.process.job-shop
+   'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type
+   'pan    'scheduling-tbd.interviewing.domain.process.process-analysis
+   'inv    'scheduling-tbd.interviewing.interviewers
+   'ork    'scheduling-tbd.interviewing.ork
+   'orkt   'scheduling-tbd.interviewing.ork_test
+   'ru     'scheduling-tbd.interviewing.response-utils
+   'mzn    'scheduling-tbd.minizinc
+   'mznt   'scheduling-tbd.minizinc-test
+   'ou     'scheduling-tbd.op-utils
+   'opt    'scheduling-tbd.operators-test
+   'or     'scheduling-tbd.orchestrator
+   'ort    'scheduling-tbd.orchestrator-test
+   'spec   'scheduling-tbd.specs
+   'sutil  'scheduling-tbd.sutil
+   'sur    'scheduling-tbd.surrogate
+   'surt   'scheduling-tbd.surrogate-test
+   'util   'scheduling-tbd.util
+   'resp   'scheduling-tbd.web.controllers.respond
+   'ws     'scheduling-tbd.web.websockets
+   'tel    'taoensso.telemere
+   'openai 'wkok.openai-clojure.api})
+
+
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
   []
   (reset! alias? (-> (ns-aliases *ns*) keys set))
-  (safe-alias 'ches   'cheshire.core)
-  (safe-alias 'io     'clojure.java.io)
-  (safe-alias 's      'clojure.spec.alpha)
-  (safe-alias 'uni    'clojure.core.unify)
-  (safe-alias 'edn    'clojure.edn)
-  (safe-alias 'io     'clojure.java.io)
-  (safe-alias 'str    'clojure.string)
-  (safe-alias 'd      'datahike.api)
-  (safe-alias 'dp     'datahike.pull-api)
-  (safe-alias 'json   'jsonista.core)
-  (safe-alias 'mount  'mount.core)
-  (safe-alias 'p      'promesa.core)
-  (safe-alias 'px     'promesa.exec)
-  (safe-alias 'core   'scheduling-tbd.core)
-  (safe-alias 'db     'scheduling-tbd.db)
-  (safe-alias 'how    'scheduling-tbd.how-made)
-  (safe-alias 'llm    'scheduling-tbd.llm)
-  (safe-alias 'llmt   'scheduling-tbd.llm-test)
-  (safe-alias 'fshop  'scheduling-tbd.interviewing.domain.process.flow-shop)
-  (safe-alias 'jshop  'scheduling-tbd.interviewing.domain.process.job-shop)
-  (safe-alias 'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type)
-  (safe-alias 'pan    'scheduling-tbd.interviewing.domain.process.process-analysis)
-  (safe-alias 'inv    'scheduling-tbd.interviewing.interviewers)
-  (safe-alias 'ork    'scheduling-tbd.interviewing.ork)
-  (safe-alias 'ru     'scheduling-tbd.interviewing.response-utils)
-  (safe-alias 'mzn    'scheduling-tbd.minizinc)
-  (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
-  (safe-alias 'ou     'scheduling-tbd.op-utils)
-  (safe-alias 'opt    'scheduling-tbd.operators-test)
-  (safe-alias 'or     'scheduling-tbd.orchestrator)
-  (safe-alias 'ort    'scheduling-tbd.orchestrator-test)
-  (safe-alias 'spec   'scheduling-tbd.specs)
-  (safe-alias 'sutil  'scheduling-tbd.sutil)
-  (safe-alias 'sur    'scheduling-tbd.surrogate)
-  (safe-alias 'surt   'scheduling-tbd.surrogate-test)
-  (safe-alias 'util   'scheduling-tbd.util)
-  (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
-  (safe-alias 'ws     'scheduling-tbd.web.websockets)
-  (safe-alias 'tel    'taoensso.telemere)
-  (safe-alias 'openai 'wkok.openai-clojure.api))
+  (doseq [[a nspace] alias-map]
+    (safe-alias a nspace)))
+
+(defn ^:diag ns-fix-setup!
+  "Remove all the namespace aliases from the argument namespace. Then you can recompile it."
+  [ns-sym]
+  (when-let [tns (find-ns ns-sym)]
+    (binding [*ns* tns]
+      (doseq [a (keys alias-map)]
+        (ns-unalias *ns* a)))))
 
 (defn clean-form
   "Replace some namespaces with aliases"

@@ -5,7 +5,7 @@
    [clojure.spec.alpha            :as s]
    [clojure.test                  :refer [deftest is testing]]
    [datahike.api                  :as d]
-   [develop.repl                  :refer [ns-setup!]]
+   [develop.repl                  :refer [ns-setup! ns-fix-setup!]]
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm]

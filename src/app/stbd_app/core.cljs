@@ -88,7 +88,6 @@
   {:right-share  {:on-resize-up    (partial editor/resize "code-editor")
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")}})
 
-
 (defnc Top [{:keys [width height]}]
   (let [banner-height 58 ; was 42 hmmm...
         [proj _set-proj]                      (hooks/use-state nil) ; Same structure as a proj-info element.
@@ -121,8 +120,7 @@
                       :up ($ Editor {:text code
                                      :name "code-editor"
                                      :height code-side-height})
-                      :dn #_($ MermaidExample {:graph "graph TB\na-->b"})
-                          ($ DataArea)
+                      :dn ($ MermaidExample {:graph "graph TD\nA[Client] --> B[Load Balancer]\nB --> C[Server01]\nB --> D[Server02]"}) #_($ DataArea)
                       :share-fns (:right-share top-share-fns)})
            :lf-pct 0.50
            :init-width width}))))

@@ -104,7 +104,7 @@
       @res)))
 
 ;;; ToDo: Use of key-vals is questionable.
-(defn ds2clj
+#_(defn ds2clj
   "Walk through the data structure, comparing it to the EADS and update map value strings to keywords where appropriate.
    The term 'data structure' refers to the map structure interviewers create from an EADS."
   [ds]

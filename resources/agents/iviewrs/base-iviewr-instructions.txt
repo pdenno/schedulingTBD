@@ -45,6 +45,30 @@ After the example, we will document the "message-types" used in the example.
 
   You: {"message-type": "STATUS", "status": "OK"}
 
+  We: {"message-type": "EADS-INSTRUCTIONS",
+       "interview-objective": "Using the four property types 'problem-type', 'problem-components', 'continuous?', and 'cyclical?', determine the kind of production system and scheduling problem for which the interviewees seek a solution.
+                                For 'problem-type' you may only choose one of the following:
+                                   1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for jobs that all execute the same sequence of production steps across multiple machines or workstations.
+                                   2) TIMETABLING-PROBLEM: the problem of assigning collections of resources to event time slots, ensuring that all the resources required for each event are available in its time slot.
+                                   3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within an undertaking.
+                                   4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which the jobs visit machines or workstations may vary as determined by the job type.
+                                   5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.",
+      "EADS": {"EADS-id": "process/scheduling-problem-type",
+                "principal-problem-type": {"val": "FLOW-SHOP-SCHEDULING-PROBLEM",
+                                            "comment": "The value here should be the problem-type that best characterizes the problem and system architecture.
+                                                         We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop."},
+                "problem-components": {"val": [ "FLOW-SHOP-SCHEDULING-PROBLEM", "TIMETABLING-PROBLEM" ],
+                                       "comment": "This should be a list of problem-type values that include all the problem types that seem relevant given your conversation so far.
+                                                   For example, whereas in this example the principal-problem-type is a flow-shop, conversation suggests that work might queue for a task the presents a timetabling problem."},
+                "continuous?": {"val": false,
+                                "comment": "continuous? refers to whether or not, in the principle-problem-type, product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.
+                                 This might be apparent from the answers that determined the value of problem-type. If not, then you can ask."},
+    "cyclical?": {"val": false,
+                  "comment": "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.
+                              For example, if the made the same collection of products in the same order each week, cylical? would be true."}
+             }
+}
+
    We: {"message-type": "EADS-INSTRUCTIONS",
         "interview-objective": "Using the three property types 'problem-type', 'continuous?', and 'cyclical?', determine the kind of production system and scheduling problem for which the interviewees seek a solution.
          For 'problem-type' you may only choose one of the following:
@@ -54,10 +78,10 @@ After the example, we will document the "message-types" used in the example.
            4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which jobs visit machines or workstations may vary among the jobs as determined by the job type.
            5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.",
         "EADS":  {"EADS-id": "process/scheduling-problem-type",
-                  "problem-type": {"val" : "FLOW-SHOP-SCHEDULING-PROBLEM",
-                                   "comment" : "We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop."},
-                  "continuous?": {"val" : false,
-                                  "comment" : "continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.
+                  "problem-type": {"val": "FLOW-SHOP-SCHEDULING-PROBLEM",
+                                   "comment": "We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop."},
+                  "continuous?": {"val": false,
+                                  "comment": "continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.
                                                This might be apparent from the answers that determined the value of problem-type. If not, then you can ask."},
                   "cyclical?": {"val": false,
                                 "comment": "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.
@@ -97,7 +121,7 @@ After the example, we will document the "message-types" used in the example.
    We: {"message-type": "EADS-INSTRUCTIONS",
         "EADS-id": "process/flow-shop",
         "interview-objective": "Produce a data structure similar in form to the EADS provided, but describing the interviewees' production processes. This EADS views the interviewees' production as organized as a flow shop."
-        "EADS" :
+        "EADS":
 "{"process-id":
  {"val":"pencil-manufacturing",
   "comment": "This is the name we gave to the top-level process. You can name processes as you see fit; don"t ask the interviewees."},
@@ -319,7 +343,7 @@ After the example, we will document the "message-types" used in the example.
           "based-on-EADS": "process/flow-shop",  
           "commit-notes": "Added process step inputs, outputs, and resources."
           "data-structure":
-          {"process-id"   : "sandwich-cookie-manufacturing",
+          {"process-id"  : "sandwich-cookie-manufacturing",
            "subprocesses": [{"process-id": "mix-wafer-dough",
                               "duration": {"units": "hours",   "value-string": "1"},
                               "resources": ["mixer", "baking employee"],
