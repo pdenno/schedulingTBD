@@ -17,8 +17,8 @@
    [stbd-app.components.graph   :refer [GraphPane]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareLeftRight ShareUpDown]]
-   [stbd-app.components.tables  :as tables :refer [DataArea]]
-   [stbd-app.util      :as util :refer [register-fn]]
+   [stbd-app.components.table   :as table :refer [TablePane]]
+   [stbd-app.util      :as util :refer [register-fn lookup-fn common-info]]
    [stbd-app.ws        :as ws]
    [taoensso.telemere  :refer [log!]]))
 
@@ -87,16 +87,22 @@
   {:right-share  {:on-resize-up    (partial editor/resize "code-editor")
                   :on-stop-drag-up (partial editor/resize-finish "code-editor")}})
 
-(defnc Top [{:keys [width height]}]
+(defnc Top [{:keys [width height graph table rhs-pane]}]
   (let [banner-height 58 ; was 42 hmmm...
         [proj _set-proj]                      (hooks/use-state nil) ; Same structure as a proj-info element.
         [code set-code]                       (hooks/use-state "")
+        [graph set-graph]                     (hooks/use-state graph)
+        [table set-table]                     (hooks/use-state table)
+        [rhs-pane set-rhs-pane]               (hooks/use-state rhs-pane)
         useful-height (int (- height banner-height))
         chat-side-height useful-height
         code-side-height useful-height]
     (hooks/use-effect :once
       (log! :debug "ONCE")
       (editor/resize-finish "code-editor" nil code-side-height) ; Need to set :max-height of resizable editors after everything is created.
+      (register-fn :set-graph set-graph)
+      (register-fn :set-table set-table)
+      (register-fn :set-rhs-pane set-rhs-pane)
       (register-fn :set-code set-code))
     ;; ------- component (end of use-effect :once)
     ($ Stack {:direction "column" :height useful-height}
@@ -119,7 +125,10 @@
                       :up ($ Editor {:text code
                                      :name "code-editor"
                                      :height code-side-height})
-                      :dn ($ GraphPane {:init-graph "graph TD\nA[Client] --> B[Load Balancer]\nB --> C[Server01]\nB --> D[Server02]"}) #_($ DataArea)
+                      :dn (case rhs-pane
+                            :graph ($ GraphPane {:init-graph graph})
+                            :table ($ TablePane {:init-table table})
+                                   ($ Box {}))
                       :share-fns (:right-share top-share-fns)})
            :lf-pct 0.50
            :init-width width}))))

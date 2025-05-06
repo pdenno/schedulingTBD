@@ -14,11 +14,11 @@
   (let [graph-ref (hooks/use-ref nil)
         [graph-cmd set-graph-cmd] (hooks/use-state init-graph)]
     (hooks/use-effect :once
-      (register-fn :set-graph-cmd set-graph-cmd)
+      (register-fn :set-graph-pane set-graph-cmd)
       (initialize (clj->js {:startOnLoad false, :securityLevel "loose"})))
     (hooks/use-effect [graph-cmd]
       (when-let [gdiv (j/get graph-ref :current)]
-        (-> (render "graph-svg-id" graph-cmd) ; This is the svg id, not the dom/div id.
+        (-> (render "graph-svg-id" graph-cmd) ; "graph-svg-id" is the svg id, not the dom/div id. It isn't used.
             (p/then (fn [svg] (j/assoc! gdiv :innerHTML (j/get svg :svg))))
             (p/catch (fn [error] (log! :error (str "Error in Mermaid: " error)))))))
     ($ Box {:sx #js {:display "flex", :flexDirection "column" :height "100%" :width "100%" :alignItems "stretch" :overflowY "auto"}}

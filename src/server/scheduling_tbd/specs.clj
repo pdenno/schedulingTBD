@@ -31,6 +31,7 @@
                                     :clear-promise-keys        ; Server tells you to forget a promise.
                                     :alive?                    ; Server is asking whether you are alive.
                                     :load-graph                ; Load a graph into the 4th quadrant.
+                                    :load-table                ; Load a table into the 4th quadrant.
                                     :load-proj                 ; Make a request to restart the project, including doing a resume-conversation
                                     :update-conversation-text  ; Like :load-proj but don't do a resume-conversation.
                                     :ping-confirm              ; Server confirms your ping.

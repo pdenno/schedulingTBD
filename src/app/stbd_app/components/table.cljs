@@ -1,4 +1,4 @@
-(ns stbd-app.components.tables
+(ns stbd-app.components.table
   "A React component to display tables."
   (:require
    [applied-science.js-interop :as j]
@@ -21,22 +21,23 @@
    ["@mui/material/TableHead$default" :as TableHead]
    ["@mui/material/TableRow$default" :as TableRow]
    ["@mui/material/TextField$default" :as TextField]
-   [stbd-app.util       :as util :refer [lookup-fn register-fn update-common-info!]]
+   [stbd-app.util       :as util :refer [register-fn]]
    [stbd-app.ws         :as ws]
    [taoensso.telemere  :refer [log!]]))
 
-(def diag (atom nil))
+(def ^:diag diag (atom nil))
 
-(defnc RowButtons [{:keys [add-fn remove-fn up-fn down-fn]}]
-  ($ ButtonGroup {}
-     ($ IconButton {:onClick (fn [_] (add-fn)) :key "add"}
-        ($ Add))
-     ($ IconButton {:onClick (fn [_] (remove-fn)) :key "remove"}
-        ($ Remove))
-     ($ IconButton {:onClick (fn [_] (up-fn)) :key "up" }
-        ($ Up))
-     ($ IconButton {:onClick (fn [_] (down-fn)) :key "down" }
-        ($ Down))))
+(defnc RowButtons [{:keys [add-fn remove-fn up-fn down-fn index-id]}]
+ ($ TableCell {:key (str "tc-" index-id) :sx #js {:padding "0"}}  ; Otherwise gets an error: <div> cannot appear as a child of <tr>.
+    ($ ButtonGroup {:key (str "bg-" index-id)}
+       ($ IconButton {:onClick (fn [_] (add-fn))    :key (str "add-" index-id)}
+          ($ Add))
+       ($ IconButton {:onClick (fn [_] (remove-fn)) :key (str "remove-" index-id)}
+          ($ Remove))
+       ($ IconButton {:onClick (fn [_] (up-fn))     :key (str "up-" index-id)}
+          ($ Up))
+       ($ IconButton {:onClick (fn [_] (down-fn))   :key (str "down-" index-id)}
+          ($ Down)))))
 
 (defn set-row-ids [table]
   (when-not table (log! :error "Null table in set-row-ids."))
@@ -60,16 +61,20 @@
                                    (assoc-in table [:table-body row-id cell-id] val))))})))
 
 (defnc BodyRows [{:keys [table set-table-fn]}]
-  (let [table (set-row-ids table)]
+  (let [index-id (atom 0)
+        table (set-row-ids table)]
     (for [table-row (:table-body table)]
-      (let [row-id (:internal/id table-row)
+      (let [ix (swap! index-id inc)
+            row-id (:internal/id table-row)
             column-keys  (->> table :table-headings (mapv :key))]
-        ($ TableRow {:key row-id :editMode "row" :editable true :sx #js {:padding "0 0 0 0"}}
+        ($ TableRow {:key row-id #_#_:editMode "row" :editable true :sx #js {:padding "0 0 0 0"}}
            (-> (for [k column-keys]
                  ($ EditCell {:key (name k) :text (get table-row k) :row-id row-id :cell-id k :table table :set-table-fn set-table-fn}))
                vec
                (conj
-                ($ RowButtons {:add-fn    (fn [] (set-table-fn
+                ($ RowButtons {:key (str "rb-" ix)
+                               :index-id ix
+                               :add-fn    (fn [] (set-table-fn
                                                   (-> (update table :table-body
                                                               #(-> (subvec % 0 (inc row-id))
                                                                    (conj (reduce (fn [res attr] (assoc res attr "")) {} column-keys))
@@ -103,34 +108,23 @@
 
 (def original-table "Used by the 'Reset' button." (atom nil))
 
-(def example-table
- {:table-headings [{:title "Dessert (100g serving)" :key :name},
-                   {:title "Calories" :key :calories},
-                   {:title "Fat (g)" :key :fat}
-                   {:title "Carbs (g)" :key :carbs},
-                   {:title "Protein (g)" :key :protein}]
-  :table-body [{:name "Frozen yogurt", :calories 159, :fat 6.0, :carbs 24, :protein 4.0}
-               {:name "Ice cream sandwich" :calories 237, :fat  9.0, :carbs 37, :protein 4.3}
-               {:name "Eclair", :calories 262, :fat 16.0, :carbs 24, :protein 6.0}
-               {:name "Cupcake", :calories 305, :fat 3.7, :carbs 67, :protein 4.3}
-               {:name "Gingerbread", :calories 356, :fat 16.0, :carbs 49, :protein 3.9}]})
-
 ;;; table is a map with keys :table-headings and :table-body.
-(defnc DataArea [{:keys [table-in]}]
-  (let [[table set-table] (hooks/use-state (set-row-ids table-in))
+(defnc TablePane [{:keys [init-table]}]
+  (let [[table set-table] (hooks/use-state (set-row-ids init-table))
         table-headings (:table-headings table)]
-    (register-fn :set-table (fn [x] (set-table x)))
     (letfn [(submit-table [_] (ws/send-msg {:dispatch-key :domain-expert-says
                                             :table table
                                             :promise-keys @ws/pending-promise-keys})) ; ToDo: investigate pending-promise-keys.
             (reset-table [_] (set-table @original-table))]
-      ;; :once won't work here since table-in is usually nil and I make things happen with the registered :set-table function.
-      (hooks/use-effect [table]
-        (when (and (not @original-table)
-                   (-> table :table-body not-empty))
-          (reset! original-table (set-row-ids table))))
+      (hooks/use-effect :once
+        (register-fn :set-table-pane set-table))
+        ;; :once won't work here since init-table is usually nil and I make things happen with the registered :set-table-pane function.
+        (hooks/use-effect [table]
+          (when (and (not @original-table) (-> table :table-body not-empty))
+             (reset! original-table (set-row-ids table))))
       (if table-headings
-        ($ Stack {:id "data-area" :direction "column" :spacing "0px"}
+        ($ Stack {:sx #js {:display "flex", :flexDirection "column" :height "100%" :width "100%" :alignItems "stretch" :overflowY "auto" :overflowX "auto"}
+                  :id "data-area" :direction "column" :spacing "0px"}
            ($ TableContainer {:component Paper}
               ($ Table {:size "small"}
                  ($ TableHead {}
@@ -141,4 +135,4 @@
            ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
               ($ Button {:onClick submit-table  :width "50px"} "Submit")
               ($ Button {:onClick reset-table  :width "50px"} "Reset")))
-        ($ Box {:id "data-area"})))))
+        ($ Box {:id "data-area-null"})))))
