@@ -17,11 +17,13 @@
 (s/def ::comment string?) ; About annotations
 
 (s/def ::EADS (s/keys :req-un [::EADS-id ::multiple-production-lines? ::job-level-processes]))
-(s/def ::EADS-id #(= % :process/job-shop-c))
+(s/def ::EADS-id #(= % :process/job-shop--classifiable))
 (s/def ::multiple-production-lines? (s/or :normal :multiple-production-lines?/val :annotated ::annotated-multiple-production-lines?))
 (s/def :multiple-production-lines?/val boolean?)
 (s/def ::annotated-multiple-production-lines? (s/keys :req-un [:multiple-production-lines?/val ::comment]))
-(s/def ::job-level-processes (s/coll-of ::process))
+(s/def ::job-level-processes (s/or :normal :job-level-processes/val :annotated ::annotated-job-level-processes))
+(s/def :job-level-processes/val  (s/coll-of ::process :kind vector?))
+(s/def ::annotated-job-level-processes (s/keys :req-un [:job-level-processes/val ::comment]))
 
 ;;; --------------------------------- This is all borrowed from flow_shop.clj
 (s/def ::process (s/keys :req-un [::process-id ::subprocesses] :opt-un [::duration ::inputs ::outputs ::resources]))
@@ -78,7 +80,7 @@
 (s/def ::units string?)
 (s/def ::value-string string?)
 
-;;; (s/valid? ::fshop/EADS (:EADS fshop/job-shop-c))
+;;; (s/explain :job-shop-c/EADS-message jshopc/job-shop-c)
 (def job-shop-c
   "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of Phase 2 of a job-shop-c problem."
   {:message-type :EADS-INSTRUCTIONS
@@ -110,112 +112,111 @@
                                                "appropriate for only some jobs.")}
     :job-level-processes {:comment (str "This is a list of flow-shop-like processes as described in the interview-objectives above.\n"
                                         "The list only has one job-level process in it, but in your interveiw you can define many as described in the interview-objectives.")
-                          :val [:process-id {:val "pencil-manufacturing",
-                                             :comment "This is the top-level process. You can name it as you see fit; don't ask the interviewees."}
+                          :val [{:process-id {:val "pencil-manufacturing",
+                                              :comment "This is the top-level process. You can name it as you see fit; don't ask the interviewees."}
 
-                                :inputs {:val ["graphite", "clay", "water", "cedar wood", "metal", "eraser material", "paint"],
-                                         :comment "These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes."}
+                                 :inputs {:val ["graphite", "clay", "water", "cedar wood", "metal", "eraser material", "paint"],
+                                          :comment "These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes."}
 
-                                :outputs {:val [{:item-id "finished pencils",
-                                                 :quantity {:units "finished pencils" :value-string "100000"}}]
-                                          :comment (str "inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\n"
-                                                        "Use disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.")}
+                                 :outputs {:val [{:item-id "finished pencils",
+                                                  :quantity {:units "finished pencils" :value-string "100000"}}]
+                                           :comment (str "inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\n"
+                                                         "Use disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.")}
 
                                 :resources {:val ["extruder", "kiln", "milling machine", "glue applicator", "shaping machine"],
                                             :comment "Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer."},
 
-                                :duration {:val {:units "hours", :value-string "4"},
-                                           :comment "We use a string for 'value-string' in case interviewees answer it something like 'it varies'"}
+                                 :duration {:val {:units "hours", :value-string "4"},
+                                            :comment "We use a string for 'value-string' in case interviewees answer it something like 'it varies'"}
 
-                                :subprocesses [{:process-id "graphite-core-production",
-                                                :inputs ["graphite", "clay", "water"],
-                                                :outputs [{:item-id "graphite core"
-                                                           :quantity {:units "graphite cores" :value-string "100000"}}],
-                                                :resources ["mixer", "extruder", "kiln"],
-                                                :subprocesses [{:process-id "mix-graphite-and-clay",
-                                                                :inputs ["graphite", "clay", "water"],
-                                                                :outputs [{:item-id "graphite-clay paste",
-                                                                           :quantity {:units "liters", :value-string "100"}}],
-                                                                :resources ["mixer"],
-                                                                :duration  {:units "hours", :value-string "1"}
-                                                                :subprocesses {:val []
-                                                                               :comment (str "We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\n"
-                                                                                             "of course, this could be updated later if subsequent discussion suggests we are wrong.")}}
+                                 :subprocesses [{:process-id "graphite-core-production",
+                                                 :inputs ["graphite", "clay", "water"],
+                                                 :outputs [{:item-id "graphite core"
+                                                            :quantity {:units "graphite cores" :value-string "100000"}}],
+                                                 :resources ["mixer", "extruder", "kiln"],
+                                                 :subprocesses [{:process-id "mix-graphite-and-clay",
+                                                                 :inputs ["graphite", "clay", "water"],
+                                                                 :outputs [{:item-id "graphite-clay paste",
+                                                                            :quantity {:units "liters", :value-string "100"}}],
+                                                                 :resources ["mixer"],
+                                                                 :duration  {:units "hours", :value-string "1"}
+                                                                 :subprocesses {:val []
+                                                                                :comment (str "We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\n"
+                                                                                              "Of course, this could be updated later if subsequent discussion suggests we are wrong.")}}
 
-                                                               {:process-id "extrude-core",
-                                                                :inputs ["graphite-clay paste"],
-                                                                :outputs [{:item-id "extruded graphite rods",
-                                                                           :quantity {:units "extruded graphite core", :value-string "100000"}}],
-                                                                :resources ["extruder"],
-                                                                :duration  {:units "minutes", :value-string "20"}
-                                                                :subprocesses []},
+                                                                {:process-id "extrude-core",
+                                                                 :inputs ["graphite-clay paste"],
+                                                                 :outputs [{:item-id "extruded graphite rods",
+                                                                            :quantity {:units "extruded graphite core", :value-string "100000"}}],
+                                                                 :resources ["extruder"],
+                                                                 :duration  {:units "minutes", :value-string "20"}
+                                                                 :subprocesses []},
 
-                                                               {:process-id "dry-and-bake-core",
-                                                                :inputs ["extruded graphite rods"],
-                                                                :outputs [{:item-id "extruded graphite rods",
-                                                                           :quantity {:units "extruded graphite core", :value-string "100000"}}],
-                                                                :resources ["kiln"],
-                                                                :duration  {:units "hours", :value-string "2"}
-                                                                :subprocesses []}]}
+                                                                {:process-id "dry-and-bake-core",
+                                                                 :inputs ["extruded graphite rods"],
+                                                                 :outputs [{:item-id "extruded graphite rods",
+                                                                            :quantity {:units "extruded graphite core", :value-string "100000"}}],
+                                                                 :resources ["kiln"],
+                                                                 :duration  {:units "hours", :value-string "2"}
+                                                                 :subprocesses []}]}
 
-                                               {:process-id "wood-casing-production",
-                                                :inputs ["cedar wood"],
-                                                :outputs ["wood slats with grooves"],
-                                                :resources ["milling machine"],
-                    :subprocess-flow {:val "individuals-from-batch",
-                                      :comment (str "The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\n"
-                                                    "you can start 'cut-grooves-in-slats' as soon as the first slat is available.")}
-                                                :duration  {:val  {:units "hours", :value-string "2"} ; ToDo: Review this comment. Improve it.
-                                                            :comment "Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses."}
-                                                :subprocesses [{:process-id "mill-wood-slats",
-                                                                :inputs ["cedar wood"],
-                                                                :outputs ["milled wood slats"],
-                                                                :resources ["milling machine"],
-                                                                :duration  {:units "hours", :value-string "2"}
-                                                                :subprocess-flow {:val :individuals-from-batch,
-                                                                                  :comment (str "'sub-process-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\n"
-                                                                                                "The string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\n"
-                                                                                                "can start as soon as the first slat is available.")}
-                                                                :subprocesses []},
+                                                {:process-id "wood-casing-production",
+                                                 :inputs ["cedar wood"],
+                                                 :outputs ["wood slats with grooves"],
+                                                 :resources ["milling machine"],
+                                                 :subprocess-flow {:val "individuals-from-batch",
+                                                                   :comment (str "The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\n"
+                                                                                 "you can start 'cut-grooves-in-slats' as soon as the first slat is available.")}
+                                                 :duration  {:val  {:units "hours", :value-string "2"} ; ToDo: Review this comment. Improve it.
+                                                             :comment "Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses."}
+                                                 :subprocesses [{:process-id "mill-wood-slats",
+                                                                 :inputs ["cedar wood"],
+                                                                 :outputs ["milled wood slats"],
+                                                                 :resources ["milling machine"],
+                                                                 :duration  {:units "hours", :value-string "2"}
+                                                                 :subprocess-flow {:val :individuals-from-batch,
+                                                                                   :comment (str "'sub-process-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\n"
+                                                                                                 "The string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\n"
+                                                                                                 "can start as soon as the first slat is available.")}
+                                                                 :subprocesses []},
 
-                                                               {:process-id "cut-grooves-in-slats",
-                                                                :inputs ["milled wood slats"],
-                                                                :outputs ["wood slats with grooves"],
-                                                                :resources ["groove cutter"],
-                                                                :duration  {:units "hours", :value-string "2"}
-                                                                :subprocesses []}]},
+                                                                {:process-id "cut-grooves-in-slats",
+                                                                 :inputs ["milled wood slats"],
+                                                                 :outputs ["wood slats with grooves"],
+                                                                 :resources ["groove cutter"],
+                                                                 :duration  {:units "hours", :value-string "2"}
+                                                                 :subprocesses []}]},
 
-                                               {:process-id "assembly",
-                                                :inputs  {:val [{:item-id "graphite core", :from "graphite-core-production"},
-                                                                {:item-id "wood slats with grooves", :from "wood-casing-production"}
-                                                                "metal", "erasers", "paint"]
-                                                          :comment (str "The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\n"
-                                                                        "The 'from' property is essential to understanding process ordering and potential for concurrency.")}
-                                                :outputs ["finished pencil"],
-                                                :resources ["glue applicator", "shaping machine"],
-                                                :subprocesses [{:process-id "insert-core-into-slats",
-                                                                :inputs ["graphite core", "wood slats with grooves"],
-                                                                :outputs ["pencil blanks"],
-                                                                :resources ["glue applicator"],
-                                                                :subprocesses []},
+                                                {:process-id "assembly",
+                                                 :inputs  {:val [{:item-id "graphite core", :from "graphite-core-production"},
+                                                                 {:item-id "wood slats with grooves", :from "wood-casing-production"}
+                                                                 "metal", "erasers", "paint"]
+                                                           :comment (str "The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\n"
+                                                                         "The 'from' property is essential to understanding process ordering and potential for concurrency.")}
+                                                 :outputs ["finished pencil"],
+                                                 :resources ["glue applicator", "shaping machine"],
+                                                 :subprocesses [{:process-id "insert-core-into-slats",
+                                                                 :inputs ["graphite core", "wood slats with grooves"],
+                                                                 :outputs ["pencil blanks"],
+                                                                 :resources ["glue applicator"],
+                                                                 :subprocesses []},
 
-                                                               {:process-id "shape-and-paint-pencil",
-                                                                :inputs ["pencil blanks", "paint"],
-                                                                :outputs ["shaped and painted pencils"],
-                                                                :resources ["shaping machine", "painting station"],
-                                                                :subprocesses []},
+                                                                {:process-id "shape-and-paint-pencil",
+                                                                 :inputs ["pencil blanks", "paint"],
+                                                                 :outputs ["shaped and painted pencils"],
+                                                                 :resources ["shaping machine", "painting station"],
+                                                                 :subprocesses []},
 
-                                                               {:process-id "attach-eraser",
-                                                                :optional?  {:val true,
-                                                                             :comment "'optional?' means that the process does not occur for every product. Not every pencil has an eraser."}
-                                                                :inputs ["shaped and painted pencils", "metal", "erasers"],
-                                                                :outputs ["finished pencils"],
-                                                                :resources ["crimping tool"],
-                                                                :subprocesses []}]}]]}}})
-
+                                                                {:process-id "attach-eraser",
+                                                                 :optional?  {:val true,
+                                                                              :comment "'optional?' means that the process does not occur for every product. Not every pencil has an eraser."}
+                                                                 :inputs ["shaped and painted pencils", "metal", "erasers"],
+                                                                 :outputs ["finished pencils"],
+                                                                 :resources ["crimping tool"],
+                                                                 :subprocesses []}]}]}]}}})
 
 (if (s/valid? :job-shop-c/EADS-message job-shop-c)
-  (let [db-obj {:EADS/id :process/job-shop-c
+  (let [db-obj {:EADS/id :process/job-shop--classifiable
                 :EADS/cid :process
                 :EADS/specs #:spec{:full :job-shop-c/EADS-message}
                 :EADS/msg-str (str job-shop-c)}

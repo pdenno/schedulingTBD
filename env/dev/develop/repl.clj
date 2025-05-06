@@ -31,6 +31,8 @@
    'llmt   'scheduling-tbd.llm-test
    'fshop  'scheduling-tbd.interviewing.domain.process.flow-shop
    'jshop  'scheduling-tbd.interviewing.domain.process.job-shop
+   'jshopc 'scheduling-tbd.interviewing.domain.process.job-shop-c
+   'jshopu 'scheduling-tbd.interviewing.domain.process.job-shop-u
    'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type
    'pan    'scheduling-tbd.interviewing.domain.process.process-analysis
    'inv    'scheduling-tbd.interviewing.interviewers

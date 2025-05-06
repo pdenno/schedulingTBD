@@ -123,7 +123,7 @@
                                     :resources ["mixer"],
                                     :duration  {:units "hours", :value-string "1"}
                                     :subprocesses {:val []
-                                                   :comment (str "We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\n"
+                                                    :comment (str "We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\n"
                                                                  "Of course, this could be updated later if subsequent discussion suggests we are wrong.")}}
 
                                    {:process-id "extrude-core",
