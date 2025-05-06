@@ -45,5 +45,5 @@
         eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
     (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
     ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-    (->> job-shop-u clj2json-pretty (spit "resources/EADS/process/job-shop-u.json")))
+    (->> job-shop-u clj2json-pretty (spit "resources/EADS/process/job-shop--unique-order.json")))
   (throw (ex-info "Invalid EADS message (job-shop-u)." {})))

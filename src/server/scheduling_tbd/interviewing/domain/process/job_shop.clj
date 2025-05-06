@@ -24,19 +24,21 @@
 
 ;;; (s/valid? ::fshop/EADS (:EADS fshop/job-shop))
 (def job-shop
-  "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of Phase 2 of a job-shop problem."
+  "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of a job-shop problem."
   {:message-type :EADS-INSTRUCTIONS
    :interviewer-agent :process
    :interview-objective (str "These EADS-INSTRUCTIONS assumes the interviewees' production processes are organized as a job shop.\n"
                              "We have two separate approaches to model job shop scheduling problems: in one of these, the jobs are classified to match a small (less than a dozen or so)\n"
                              "different process plans; in the other, a process plans will need to be specified for each job.\n"
                              "The purpose of these EADS-INSTRUCTIONS is only to determine which of these two subclasses of job shop models should be pursued.\n"
-                             "Once this is determined, the orchestrator will likely then choose either 'process/job-shop--classified' or 'process/job-shop--unique' corresponding\n"
+                             "Once this is determined, the orchestrator will likely then choose either EADS 'process/job-shop--classifiable' or 'process/job-shop--unique-order' corresponding\n"
                              "respectively to the two separate approaches just described.")
    :EADS
    {:EADS-id :process/job-shop
     :classifiable-jobs? {:val true,
-                         :comment "This property is true only in the case that it seems reasonable to classify jobs to corresponding to a small collection (a dozen or so) process plans."}}})
+                         :comment (str "This property is true only in the case that it seems reasonable to pre-classify jobs as corresponding to a small collection (a dozen or so) process plans.\n"
+                                       "If, in contrast, it seems more reasonable for the the firm to define a (possibly unique) production process for each job, classifiable-jobs? should be false.\n"
+                                       "It is reasonable to ask whether defining a process plan for each job is part of their workflow.")}}})
 
 (if (s/valid? :job-shop/EADS-message job-shop)
   (let [db-obj {:EADS/id :process/job-shop
