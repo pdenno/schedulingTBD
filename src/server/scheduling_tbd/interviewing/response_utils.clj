@@ -27,12 +27,12 @@
   Typically done with surrogate or starting a new project."
   [client-id pid cid]
   (assert (string? client-id))
-  (ws/send-to-chat {:promise? false
-                    :client-id client-id
-                    :dispatch-key :update-conversation-text
-                    :pname (db/get-project-name pid)
-                    :pid pid
-                    :cid cid}))
+  (ws/send-to-client {:promise? false
+                      :client-id client-id
+                      :dispatch-key :update-conversation-text
+                      :pname (db/get-project-name pid)
+                      :pid pid
+                      :cid cid}))
 
 (s/def ::text-to-var (s/keys :req-un [::INPUT-TEXT ::CORRESPONDING-VAR]))
 (s/def ::INPUT-TEXT string?)

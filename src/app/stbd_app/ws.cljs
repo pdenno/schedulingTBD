@@ -45,8 +45,8 @@
 (declare send-msg)
 (defn recv-msg-type? [k] (contains? @dispatch-table k))
 
-;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, and maybe other places.
-;;; The ones here correspond to dispatch keys, but other are used to break-out React hooks or avoid namespace cycles.
+;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, graph.cljs and maybe other places.
+;;; The ones here correspond to dispatch keys, but other might be used to break-out React hooks or avoid namespace cycles.
 (register-fn :clear-promise-keys    (fn [obj] (-> obj :promise-keys clear-promise-keys!)))
 
 (register-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
@@ -62,6 +62,8 @@
 (register-fn :domain-expert-submits-table (fn [table]
                                             (send-msg {:dispatch-key :domain-expert-says
                                                        :table-string (str table)})))
+
+(register-fn :load-graph (fn [{:keys [graph]}] ((lookup-fn :set-graph-cmd) graph)))
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."

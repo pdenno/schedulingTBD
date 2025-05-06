@@ -27,7 +27,7 @@
 ;;; The difference being that these two already know what the question is; it is the warm-up question of whatever
 ;;; conversation is running. The call to q-and-a, in contrast, uses SUPPLY-QUESTION to the interviewer.
 ;;;
-;;; [resume-conversation] -> q-and-a -> get-an-answer -> chat-pair -> send-to-chat or query-agent (sur).
+;;; [resume-conversation] -> q-and-a -> get-an-answer -> chat-pair -> send-to-client or query-agent (sur).
 ;;; [start-up]                       -> get-an-answer -> ...
 
 (def ^:diag diag (atom nil))
@@ -72,7 +72,7 @@
   (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
    (let [asking-role (or asking-role (if cid (-> (str cid "-interviewer") keyword) :an-interviewer))
          prom (if (= :human responder-type)
-                (ws/send-to-chat (-> ctx                        ; This cannot timeout.
+                (ws/send-to-client (-> ctx                        ; This cannot timeout.
                                      (assoc :text question)
                                      (assoc :table table)
                                      (assoc :promise? true)
@@ -100,7 +100,7 @@
    If response is immoderate returns {:msg-type :immoderate}"
   [{:keys [responder-type client-id] :as ctx}]
   (let [response (chat-pair-aux ctx)]
-    (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
+    (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})
     (case responder-type
       :human (if (-> response :text llm/immoderate?)
                {:msg-type :immoderate}
@@ -365,17 +365,17 @@
    Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :text :table...).
    The first element in the vector should be the question object, and the last the answer object."
   [{:keys [client-id responder-type] :as ctx}]
-  (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+  (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
   (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
                           (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type "QUESTION-TO-ASK", :question "...'}
                           (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
                           (fix-off-course--question ctx))]         ; Currently a no-op. Returns argument.
-         (when (= :human responder-type) (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
+         (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
          ;; This returns a VECTOR of statements from the interviewees and interviewer.
          (get-an-answer (cond-> ctx
                           true                                (assoc :question (:text iviewr-q))
                           (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q)))))
-       (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+       (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
@@ -395,7 +395,7 @@
               (format "Could you pop over to the %s discussion (menu on left, 'Process', 'Data' etc.) and chat more with that agent?"
                       (name recommended-chat)))]
     ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
-    (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :text text})))
+    (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :text text})))
 
 (defn ctx-surrogate
   "Return context updated with surrogate info."
@@ -553,7 +553,7 @@
                           (recur (inc cnt)))))
                     (log! :warn "Exiting because conversation is exhausted or active? atom is false."))))
             (log! :warn "Exiting because active? atom is false.")))))
-    (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+    (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 ;;; The equivalent for surrogates is start-surrogate. It also asks the first question.
 (defn start-conversation
@@ -561,7 +561,7 @@
    :start-conversation is a dispatch-key from the client, providing, perhaps only the client-id."
   [{:keys [client-id cid] :as ctx}]
   (assert (= :process cid)) ; Conversation always starts with the :process conversation.
-  (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :promise? true
+  (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :promise? true
                     :text (str "You want to start a new project? This is the right place! "
                                (db/conversation-intros :process))})
   (try
@@ -572,7 +572,7 @@
           response (-> conversation last :text)
           pid (start-human-project! response)
           [_ _ pname] (ru/find-claim '(project-name ?pid ?pname) (db/get-claims pid))]
-      (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+      (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
       (doseq [{:keys [from text table tags]} conversation]
         (db/add-msg {:pid pid :cid :process :from from :tags tags :text text :table table}))
       (db/add-msg {:pid pid
@@ -581,10 +581,10 @@
                    :text (str "Great, we'll call your project " pname ".")
                    :tags [:process/warm-up :name-project :informative]})
       ;; This will cause a resume-conversation:
-      (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
+      (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
                         :new-proj-map {:project/name pname :project/id pid}}))
     (finally
-      (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+      (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 ;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-iviewers!

@@ -64,7 +64,7 @@
     (agent-log "============= Start surrogate " pid " :process  =========================")
     (adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
-    (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+    (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
     (try ;; Now do the warm-up question.
       (let [ctx (inv/ctx-surrogate {:pid pid
                                     :cid :process
@@ -84,12 +84,12 @@
                               :cid :process}))
         (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid pid)))
         ;; This will cause a resume-conversation, which will start with a conversation-history, so the interviewer should see the warm-up question.
-        (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
-                          :new-proj-map {:project/name pname :project/id pid}}))
+        (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
+                            :new-proj-map {:project/name pname :project/id pid}}))
       (catch Exception e
         (log! :error (str "Error starting surrogate:\n" e)))
       (finally ; ToDo: Not sure this is needed.
-        (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})))))
+        (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))))
 
 (defn surrogate-follow-up
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."
@@ -100,12 +100,12 @@
     (try (when-let [answer (adb/query-agent pid question {:asking-role :surrogate-follow-up})]
            (log! :info (str "SUR's answer:" answer))
            (when (string? answer)
-             (ws/send-to-chat (assoc chat-args :text answer))
+             (ws/send-to-client (assoc chat-args :text answer))
              (db/add-msg {:pid pid :cid cid :from :system :text question})
              (db/add-msg {:pid pid :cid cid :from :surrogate :text answer})))
          (catch Exception e
            (log! :error (str "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message)))
-           (ws/send-to-chat (assoc chat-args :text "We had a problem answering this questions."))))))
+           (ws/send-to-client (assoc chat-args :text "We had a problem answering this questions."))))))
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 (defn add-surrogate-agent-infos

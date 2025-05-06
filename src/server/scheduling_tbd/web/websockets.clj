@@ -16,7 +16,7 @@
 
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique client-id provided by the client." (atom {}))
-(declare domain-expert-says send-to-chat dispatch)
+(declare domain-expert-says send-to-client dispatch)
 
 (defn make-ws-channels
   "Create channels and store them keyed by the unique ID provided by the client."
@@ -103,7 +103,7 @@
   (let [clients (keys @socket-channels)]
     (doseq [client-id clients]
       (swap! socket-channels #(assoc-in % [client-id :alive?] false))
-      (send-to-chat {:client-id client-id :dispatch-key :alive?}))
+      (send-to-client {:client-id client-id :dispatch-key :alive?}))
     (Thread/sleep 300000) ; 5 minutes to respond.
     (doseq [client-id clients]
       (when-not (get-in @socket-channels [client-id :alive?])
@@ -268,8 +268,8 @@
         (clear-keys client-id [(:p-key prom-obj)]))
     (log! :error "domain-expert-says: no p-key (e.g. no question in play)")))
 
-;;;-------------------- Sending questions etc. to a client --------------------------
-(defn send-to-chat
+;;;-------------------- Sending questions, tables, and graphs etc. to a client --------------------------
+(defn send-to-client
   "Send the argument structure to the client.
    If :promise?=true, return a promise that is resolved when the domain-expert responds to the message.
    The only keys of the argument map that are required are :client-id. and :dispatch-key.
@@ -283,7 +283,7 @@
                     p-key               (assoc :p-key p-key)
                     true                (assoc :timestamp (now)))]
       (when-not (= :alive? dispatch-key)
-        (log! :debug (elide (str "send-to-chat: msg-obj =" msg-obj) 130)))
+        (log! :debug (elide (str "send-to-client: msg-obj =" msg-obj) 130)))
       (go (>! out (str msg-obj)))
       prom)
     (log! :error (str "Could not find out async channel for client " client-id))))

@@ -63,7 +63,7 @@
 ;;; (ws/register-ws-dispatch  :ask-llm llm/llm-directly)
 (defn llm-directly
   "User can ask anything outside of session by starting the text with 'LLM:.
-   This is a blocking call since the caller is a websocket thread and it responds with ws/send-to-chat."
+   This is a blocking call since the caller is a websocket thread and it responds with ws/send-to-client."
   [{:keys [client-id question]}]
   (assert (string? client-id))
   (assert (string? question))
@@ -75,12 +75,12 @@
                     markdown2html)]
         (if (nil? res)
           (throw (ex-info "Timeout or other exception." {}))
-          (ws/send-to-chat (-> chat-args
-                               (assoc :text res)
-                               (assoc :time (now))))))
+          (ws/send-to-client (-> chat-args
+                                 (assoc :text res)
+                                 (assoc :time (now))))))
       (catch Exception e
         (log! :error (str "Failure in llm-directly: " e))
-        (ws/send-to-chat (assoc chat-args :text "There was a problem answering that."))))))
+        (ws/send-to-client (assoc chat-args :text "There was a problem answering that."))))))
 
 (defn list-openai-models
   "List id and create date of all available models.
