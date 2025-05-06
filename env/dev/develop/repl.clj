@@ -1,9 +1,73 @@
-(ns develop.dutil
+(ns develop.repl
   "Tools for repl-based exploration of SchedulingTBD code"
   (:require
-   [ajax.core :refer [GET POST]]
-   [clojure.pprint :refer [pprint]]
-   [promesa.core   :as p]))
+   [clojure.pprint :refer [pprint]]))
+
+(def alias? (atom (-> (ns-aliases *ns*) keys set)))
+
+(defn safe-alias
+  [al ns-sym]
+  (when (and (not (@alias? al))
+             (find-ns ns-sym))
+    (alias al ns-sym)))
+
+(def alias-map
+  {'ches   'cheshire.core
+   'io     'clojure.java.io
+   's      'clojure.spec.alpha
+   'uni    'clojure.core.unify
+   'edn    'clojure.edn
+   'str    'clojure.string
+   'd      'datahike.api
+   'dp     'datahike.pull-api
+   'mount  'mount.core
+   'p      'promesa.core
+   'px     'promesa.exec
+   'adb    'scheduling-tbd.agent-db
+   'core   'scheduling-tbd.core
+   'db     'scheduling-tbd.db
+   'how    'scheduling-tbd.how-made
+   'llm    'scheduling-tbd.llm
+   'llmt   'scheduling-tbd.llm-test
+   'fshop  'scheduling-tbd.interviewing.domain.process.flow-shop
+   'jshop  'scheduling-tbd.interviewing.domain.process.job-shop
+   'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type
+   'pan    'scheduling-tbd.interviewing.domain.process.process-analysis
+   'inv    'scheduling-tbd.interviewing.interviewers
+   'ork    'scheduling-tbd.interviewing.ork
+   'orkt   'scheduling-tbd.interviewing.ork_test
+   'ru     'scheduling-tbd.interviewing.response-utils
+   'mzn    'scheduling-tbd.minizinc
+   'mznt   'scheduling-tbd.minizinc-test
+   'ou     'scheduling-tbd.op-utils
+   'opt    'scheduling-tbd.operators-test
+   'or     'scheduling-tbd.orchestrator
+   'ort    'scheduling-tbd.orchestrator-test
+   'spec   'scheduling-tbd.specs
+   'sutil  'scheduling-tbd.sutil
+   'sur    'scheduling-tbd.surrogate
+   'surt   'scheduling-tbd.surrogate-test
+   'util   'scheduling-tbd.util
+   'resp   'scheduling-tbd.web.controllers.respond
+   'ws     'scheduling-tbd.web.websockets
+   'tel    'taoensso.telemere
+   'openai 'wkok.openai-clojure.api})
+
+
+(defn ^:diag ns-setup!
+  "Use this to setup useful aliases for working in this NS."
+  []
+  (reset! alias? (-> (ns-aliases *ns*) keys set))
+  (doseq [[a nspace] alias-map]
+    (safe-alias a nspace)))
+
+(defn ^:diag ns-fix-setup!
+  "Remove all the namespace aliases from the argument namespace. Then you can recompile it."
+  [ns-sym]
+  (when-let [tns (find-ns ns-sym)]
+    (binding [*ns* tns]
+      (doseq [a (keys alias-map)]
+        (ns-unalias *ns* a)))))
 
 (defn clean-form
   "Replace some namespaces with aliases"
@@ -55,19 +119,3 @@
    This takes away those namespace prefixes."
   [form]
   (clean-form form))
-
-(defmacro ajax-test
-  "Test an HTTP request, returning the response.
-   Example usage:
-       (require '[develop.dutil :as devl])
-       (devl/ajax-test \"/api/get-conversation\" {:client-id \"8d0e3fdc-b4bf-446e-b4bf-0568aee96af0\"})."
-  [uri params & {:keys [method] :or {method 'ajax.core/GET}}]
-  `(let [prom# (promesa.core/deferred)
-         req-data# {:params ~params
-                    :handler (fn [resp#] (promesa.core/resolve! prom# resp#))
-                    :error-handler (fn [{:keys [status# status-text#]}]
-                                     (promesa.core/reject! prom# (ex-info ~(str "CLJS-AJAX error on " uri)
-                                                                          {:status status# :status-text status-text#})))
-                    :timeout 2000}]
-     (~method ~(str "http://localhost:3300" uri) req-data#)
-     (promesa.core/await prom# 2500)))

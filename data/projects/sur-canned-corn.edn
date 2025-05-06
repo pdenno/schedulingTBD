@@ -218,9 +218,5 @@
                                      #inst "2024-11-20T13:32:53.034-00:00"}]}],
           :current-conversation :process,
           :id :sur-canned-corn,
-          :name "SUR Canned Corn",
-          :processes
-          [#:process{:desc
-                     "1. Receiving and Inspection (30 minutes)\n2. Husking (15 minutes)\n3. Cleaning (10 minutes)\n4. Blanching (5 minutes)\n5. Cutting (20 minutes)\n6. Filling (15 minutes)\n7. Sealing and Sterilizing (25 minutes)\n8. Labeling and Packaging (10 minutes)",
-                     :id :sur-canned-corn}]}
+          :name "SUR Canned Corn"}
 ]

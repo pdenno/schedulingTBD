@@ -1,10 +1,10 @@
 (ns scheduling-tbd.sutil
   "Server utilities."
   (:require
+   [cheshire.core            :as ches]
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
-   [jsonista.core            :as json]
    [taoensso.telemere        :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -243,6 +243,11 @@
   [s-in]
   (try
     (let [s (remove-preamble s-in)]
-      (update-keys (json/read-value s) keyword))
+      (update-keys (ches/parse-string s) keyword))
     (catch Exception _e
       (throw (ex-info  "Could not read object returned from OpenAI (should be a string):" {:s-in s-in })))))
+
+(defn clj2json-pretty
+  "Return a pprinted string for given clojure object."
+  [obj]
+  (ches/generate-string obj {:pretty true}))

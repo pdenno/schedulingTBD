@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.data-analysis
+(ns scheduling-tbd.interviewing.domain.data.data-analysis
   "Planning operators for the data interview"
   (:require
    [clojure.spec.alpha                        :as s]

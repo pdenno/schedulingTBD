@@ -31,7 +31,7 @@ Feel free to contact us if this work interests you!
   * Similarly, `export SCHEDULING_TBD_DB=/opt/scheduling` (or wherever you intend to store databases for the application).
 
 ### The server
-  * Install install a Java JDK and [Clojure](https://clojure.org/).
+  * Install a Java JDK and [Clojure](https://clojure.org/).
   * Start a server REPL by starting Clojure in your editor from anywhere in the repository and running `(start)` in the `user` namespace.
   * If you are starting from scratch (no databases under the `SCHEDULING_TBD_DB` directory), you'll need to create the system and projects databases.
 	The backup files for these are `data/system-db.edn` and the edn files in `data/projects`. Do the following:

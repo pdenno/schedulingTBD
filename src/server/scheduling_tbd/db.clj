@@ -17,80 +17,10 @@
    [scheduling-tbd.util     :as util :refer [now]]
    [taoensso.telemere       :refer [log!]])) ; Here only
 
-(def db-schema-sys+
-  "Defines content that manages project DBs and their analysis including:
-     - The project's name and db directory
-     - system-level agents"
-  {;; ---------------------- agent (system agents shared by projects)
-   :agent/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A unique ID for each agent to ensure only one of each type is available."}
-   :agent/agent-type
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "Currently one of #{:system :project :shared-assistant}."}
-   :agent/assistant-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant id (a string) associated with this surrogate."}
-   :agent/base-type
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "Indicates the purpose and instructions given."}
-   :agent/llm-provider
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "Currently either :openai or :azure."}
-   :agent/model-class
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "One of the classes of LLM model defined in the system. See llm.clj."}
-   :agent/thread-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
-   :agent/timestamp
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "The time at which the agent was created."}
-
-   ;; ---------------------- agent-files files that assistants can use
-   :agent-file/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A unique ID for each agent to ensure only one of each type is available."}
-   :agent-file/file-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An ID to the file provided by the LLM provider."}
-   :agent-file/doc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "Documentation about the file."}
-
-   ;; ---------------------- project
-   :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
-        :doc "a string naming a subdirectory containing a project."}
-   :project/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
-        :doc "a keyword matching the one in the same named property of a project database"}
-   :project/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string, same as the :project/name in the project's DB."}
-
-;;; ---------------------- system
-   :system/agents
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}
-   :system/default-project-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
-        :doc "a keyword providing a project-id clients get when starting up."}
-   :system/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
-        :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
-   :system/projects
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "the projects known by the system."}
-})
-
-
-;;;========================================================== Project DBs ==========================================
-(def db-schema-proj+
-  "Defines schema for a project plus metadata :mm/info.
-   To eliminate confusion and need for back pointers, each project has its own db."
-  {;; ---------------------- agent
-   :agent/id
+(def db-schema-agent+
+  "Defines properties that can be used for agents, which can be stored either in the system DB or a project DB.
+   This common information is merged into other system and project schema."
+  {:agent/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A unique ID for each agent to ensure only one of each type is available."}
    :agent/agent-type
@@ -116,15 +46,82 @@
         :doc "True if the agent is a human surrogate."}
    :agent/system-instruction
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "This is only used with surrogates, it is the system instruction verbatim."}
+        :doc "This is only used with surrogates, it is the system instruction verbatim. Idea is I can't run SUR: for things like a music school."}
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
    :agent/timestamp
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "The time at which the agent was created."}
+        :doc "The time at which the agent was created."}})
 
-   ;; ---------------------- box
+(def db-schema-sys+
+  "Defines content that manages project DBs and their analysis including:
+     - The project's name and db directory
+     - system-level agents
+     - See also db-schema-agent+ which gets merged into this."
+  {;; ------------------------------- EADS
+   :EADS/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "A unique ID for each EADS. Typically the namespace of the keyword is the cid, e.g. :process/flow-shop."}
+
+   :EADS/cid
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "A keyword naming a conversation, e.g. :process"}
+
+   :EADS/msg-str
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The stringified message object, it can be edn/read-string. It is the EDN version of the JSON in resources used by ork."}
+
+   :EADS/specs
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
+        :doc "An object where the keys name spec levels (e.g. full) and the values are keywords identifying the spec in the registry."}
+
+   ;; ---------------------- project
+   :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
+        :doc "a string naming a subdirectory containing a project."}
+   :project/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
+        :doc "a keyword matching the one in the same named property of a project database"}
+   :project/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string, same as the :project/name in the project's DB."}
+
+   ;; ------------------------- specs
+   :spec/full
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "a keyword identifying the full spec in the clojure spec registry. Used, for example, to check an EADS data structure."}
+
+;;; ---------------------- system
+   :system/agents
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}
+   :system/default-project-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
+        :doc "a keyword providing a project-id clients get when starting up."}
+   :system/EADS
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "EADS objects"}
+   :system/name
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
+        :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
+   :system/projects
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "the projects known by the system."}
+   :system/specs
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "spec objects used for checking completion of EADS, etc."}
+   :system/warm-ups
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
+        :doc "warm-up objects for various conversations."}})
+
+
+;;;========================================================== Project DBs ==========================================
+(def db-schema-proj+
+  "Defines schema for a project plus metadata :mm/info.
+   To eliminate confusion and need for back pointers, each project has its own db.
+   See also db-schema-agent+ which gets merged into this."
+  {;; ---------------------- box
    :box/string-val
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "boxed value"}
@@ -141,8 +138,8 @@
    ;; ---------------------- claim (something believed owing to what users said in interviews)
    :claim/string
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.
-              For example, (:process/production-motivation make-to-stock)."}
+        :doc (str "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.\n"
+                  "For example, (:process/production-motivation make-to-stock).")}
    :claim/conversation-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The conversation from which this claim is founded. Currently a cid."}
@@ -154,41 +151,49 @@
         :doc "a number [0,1] expressing how strongly we believe the proposition ."}
 
    ;; ---------------------- conversation
+   :conversation/active-EADS
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc (str "The id of the EADS in the system DB which is currently being pursued in this conversation.\n"
+                  "If the conversation doesn't have one, functions such as ork/active-EADS can make one using the project's orchestrator agent.")}
    :conversation/done?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if we don't have more to add (though user might)."}
-   :conversation/EADS
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string that can be edn/read-string into the Example Annotated Data Structure (EADS) for this conversation."}
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
+        :doc "a keyword uniquely identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
    :conversation/interviewer-budget
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
         :doc "the budget a number (0 <= budget <= 1) indicating how much more resources the interviewer is allowed to expend."}
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the messages of the conversation."}
-
-   ;; ---------------------- duration
-   :duration/value
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to map describing a quantity of time."}
+        :doc "the messages between the interviewer and interviewees of the conversation."}
 
    ;; ---------------------- message
+   :message/answers-question
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
+        :doc "an optional property that refers to a :message/id of a question for which this response is deemed to be a answer."}
+   :message/code
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Code produced at this point in the conversation."}
+   :message/code-execution
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Result of running code produced at this point in the conversation."}
    :message/content
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string with optional html links."}
-   :message/data-structure
+   :message/EADS-data-structure
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string that can be edn/read-string into a data structure inferred from conversation so far."}
+        :doc "a string that can be edn/read-string into an EADS data structure inferred from conversation so far."}
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
    :message/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long :unique :db.unique/identity
-        :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts, "
-                  "which aren't stored, some values can be skipped.")}
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
+        :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts,\n"
+                  "which aren't stored, some values can be skipped. Because these are not unique to the DB, they are not :db.unique/identity.")}
+   :message/pursuing-EADS
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The EADS being pursued by this question or answer, if any."}
    :message/question-type
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "A label (from interview instructions) associated with this question or answer."}
@@ -202,82 +207,6 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
 
-   ;; ---------------------- objective (about a scheduling objective)
-   :objective/code
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "MiniZinc expressing the scheduling object."}
-   :objective/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming something to be accomplished."}
-   :objective/text
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
-        :doc "strings expressing the scheduling objective."}
-
-   ;; ---------------------- process (about production process types)
-   :process/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this this process; perhaps stated in an interview."}
-   :process/duration
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to a duration (dur) object; typically an estimate"}
-   :process/duration-comment
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a comment about the duration of a process."}
-   :process/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc (str "A string, perhaps from an interview uniquely identifying the process."
-                  "The top-level production process will have a process-type/id = :project/id.")}
-   :process/interview-class
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a keyword identifying what sort of conversation lead to this process description, for example :initial-unordered for early in the interview."}
-   :process/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "original text naming the process."}
-   :process/pre-processes
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a process/id identifying a process that must occur before this task "}
-   :process/resource
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a keyword naming a resource (type or instance) used in this task"}
-   :process/step-number
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc "a positive integer indicating the order of the process step in the :process/sub-processes vector."}
-   :process/sub-processes
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "process objects that occur within the scope of this project object"}
-   :process/supply-chain?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "true if the process in a supply chain process, rather than production process"}
-   :process/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this process type (e.g. in an ontology)."}
-   :process/var-name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a camelCase string naming the process that can be used in MiniZinc code."}
-
-   ;; ---------------------- process-instance (about actual process that have occurred or will occur).
-   :process-instance/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the task; unique to the project."}
-   :process-instance/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this task; unique to the project."}
-   :process-instance/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a description of this this task; unique to the project."}
-   :process-instance/pre-task
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a task/name identifying a task that must occur before this task "}
-   :process-instance/resource-inst
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "a keyword naming a :res-t/id or :res-i/id (type or instance) used in this task"}
-   :process-instance/start
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "a instant object indicating when the process started."}
-   :process-instance/end
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "a instant object indicating when the process ended."}
-
    ;; ---------------------- project
    :project/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
@@ -285,9 +214,6 @@
    :project/claims
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the collection of things we believe about the project as logical statements."}
-   :project/code
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "Code associated with the project."}
    :project/conversations
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "The conversations of this project."}
@@ -300,15 +226,13 @@
    :project/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a lowercase kebab-case keyword naming a project; unique to the project."}
-   :project/industry
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a short description of the industry in which we are doing scheduling."}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
-   :project/objective
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a reference to the scheduling objective of the project."}
+   :project/ork-tid
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc (str "The thread-id of orchestrator agent.\n"
+                  "When this does not match the current ork-agent, the agent needs a more expansive CONVERSATION-HISTORY messagethe messages of the conversation.")}
    :project/processes
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the project's process objects; everything about processes in a complex structure."}
@@ -320,102 +244,12 @@
         :doc "true if domain expertise is provided by an artificial agent."}
    :project/tables
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "true if domain expertise is provided by an artificial agent."}
-
-   ;; ---------------------- quantity (an amount of something)
-   :quantity/value-string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string on which edn/read-string can be applied to produce a number or term like :several."}
-   :quantity/units
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a keyword identifying the units of measure, :weeks, :months, :meters, etc."}
-
-   ;; ---------------------- quantity-range (a map with two properties low and high, the values of which are quantities.
-   :quantity-range/low
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a quantity value expressing the low end of a range of values."}
-
-   :quantity-range/high
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "a quantity value expressing the high end of a range of values."}
-
-   ;; ---------------------- resource type
-   :resource-type/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the resource type; unique to the project."}
-   :resource-type/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this resource; unique to the project."}
-   :resource-type/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this this resource; unique to the project."}
-   :resource-type/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this type (e.g. in an ontology)."}
-
-   ;; ---------------------- resource instance
-   :resource/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword naming the resource; unique to the project."}
-   :resource/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a name for conversation about this resource"}
-   :resource/desc
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of this resource"}
-   :resource/uri
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc "a URI pointing to information about this instance (e.g. in an ontology)."}
-
-   ;; ------------------------ table
-   :table/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "The ID of a table, unique in the context of this project DB."}
-   :table/purpose
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The purpose of this table, on of the enumeration #{:customer orders}"}
-   :table/filename
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The filename as it appears in the project directory}"}
-   :table/identity-condition ; ToDo: we expect more cardinality :many, but not yet.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "The subset of column names (:object/attribute-name) that identify objects."}
-   :table/attributes
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "Attribute objects for the tableThe subset of column names (:object/attribute-name) that identify objects."}
-   :table/data
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "A vector of :object objects."}
-   :attribute/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The name of the attribute, often based on the column name."}
-   :attribute/description
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "A description of the purpose of the attribute."}
-   :attribute/cardinality
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "#{:one :many}"}
-   :attribute/datatype
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "#{:string :number, etc.}"}
-   :object/row
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc "Row that realized this object."}
-   :object/attribute-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "Name of the column (or generated name) for tRow that realized this object."}
-   :object/attribute-value
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "Name of the column (or generated name) for tRow that realized this object."}
-   :object/attribute-value-pairs
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref}
-   :column/tuple
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword}})
+        :doc "true if domain expertise is provided by an artificial agent."}})
 
 (def ^:diag diag (atom nil))
-(def db-schema-sys  (datahike-schema db-schema-sys+))
-(def db-schema-proj (datahike-schema db-schema-proj+))
-(def project-schema-key? (-> db-schema-proj+ keys set))
+(def db-schema-sys  (-> db-schema-sys+   (merge db-schema-agent+) datahike-schema))
+(def db-schema-proj (-> db-schema-proj+  (merge db-schema-agent+) datahike-schema))
+(def project-schema-key? (-> db-schema-proj+ (merge db-schema-agent+) keys set))
 
 ;;; ------------------------------------------------- projects and system db generally ----------------------
 (defn project-exists?
@@ -449,7 +283,7 @@
          :where [?eid :conversation/id ?cid]]
        @(connect-atm pid) cid))
 
-(defn get-conversation-eids
+#_(defn get-conversation-eids
   "Return a vector of the EIDs of the argument conversation's messages."
   [pid cid]
   (when-let [eid (conversation-exists? pid cid)]
@@ -488,7 +322,7 @@
      (if-let [base-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
        (let [files (-> base-dir (str "/projects/") clojure.java.io/file .listFiles)]
          (mapv #(-> % .getName keyword) files))
-       (throw (ex-info (str "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases.") {})))
+       (throw (ex-info "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases." {})))
      ;; Otherwise we list using system db. These are the 'legitmate' projects in the project datebase
      (-> (d/q '[:find [?proj-id ...]
                 :where
@@ -497,42 +331,34 @@
          sort
          vec))))
 
-(def message-keep-set "A set of properties with root :conversation/messages used to retrieve typically relevant message content."
-  #{:conversation/data-structure :conversation/EADS :conversation/id :conversation/interviewer-budget :conversation/messages
-    :message/content :message/from :message/id :message/question-type :message/tags :message/time})
-
 (defn get-conversation
   "For the argument project (pid) return a vector of messages sorted by their :message/id."
   [pid cid]
   (assert (#{:process :data :resources :optimality} cid))
   (if-let [eid (conversation-exists? pid cid)]
-    (-> (resolve-db-id {:db/id eid}
-                        (connect-atm pid)
-                        :keep-set message-keep-set)
+    (-> (resolve-db-id {:db/id eid} (connect-atm pid))
          (update :conversation/messages #(->> % (sort-by :message/id) vec)))
     {}))
 
 (defn get-code
-  "Return the code string for the argument project (or an empty string if it does not exist)."
-  [pid]
-  (or (d/q '[:find ?t .
-             :in $ ?pid
-             :where
-             [?e :project/id ?pid]
-             [?e :project/code ?t]]
-           @(connect-atm pid) pid)
-      ""))
-
-;;; ToDo: For the time being, code is replaced as a whole.
-;;;       For purposes of backtracking more capability might be useful.
-(defn put-code
-  "Save the argument MiniZinc code to the project's database.
-   The code is written as a whole; editing happens elsewhere."
-  [pid code-text]
-  (assert (string? code-text))
-  (let [conn (connect-atm pid)
-        eid (project-exists? pid)]
-    (d/transact conn {:tx-data [[:db/add eid :project/code code-text]]})))
+  "Return the most recent code string from messages in the argument conversation, or any conversation if CID is not specified.
+   Return null string if no code found."
+  ([pid] (get-code pid :all))
+  ([pid cid]
+   (let [conn @(connect-atm pid)
+         eids (if (= cid :all)
+                (d/q '[:find [?eid ...] :where [?eid :message/code]] conn)
+                (d/q '[:find [?eid ...]
+                       :in $ ?cid
+                       :where
+                       [?c-eid :conversation/id ?cid]
+                       [?c-eid :conversation/messages ?eid]
+                       [?eid :message/code]]
+                     conn cid))
+         code-msgs (dp/pull-many conn '[*] eids)]
+     (if (not-empty code-msgs)
+       (-> (apply max-key #(-> % :message/time inst-ms) code-msgs) :message/code)
+       ""))))
 
 (defn get-claims
   "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
@@ -739,20 +565,44 @@
 ;;; You specify that as the :db/id and then just add whatever you want for the properties.
 ;;; If the property is cardinality many, it will add values, not overwrite them.
 (defn add-msg
-  "Create a message object and add it to current conversation of the database with :project/id = id."
-  [{:keys [pid cid from text table tags question-type]}]
+  "Create a message object and add it to current conversation of the database with :project/id = id.
+   Return the :message/id.
+   Note that this doesn't handle :message/answers-question. That is typically done with update-msg."
+  [{:keys [pid cid from text table tags question-type pursuing-EADS]}]
   (assert (keyword? cid))
   (assert (#{:system :human :surrogate :developer-injected} from))
   (assert (string? text))
-  (log! :debug (str "add-msg: pid = " pid "text = " text))
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid cid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
                                                             table            (assoc :message/table table)
                                                             (not-empty tags) (assoc :message/tags tags)
-                                                            question-type    (assoc :message/question-type question-type))}]}))
+                                                            question-type    (assoc :message/question-type question-type)
+                                                            pursuing-EADS    (assoc :message/pursuing-EADS pursuing-EADS))}]})
+      msg-id)
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
+
+(defn get-msg
+  "Return the complete message specified by the arguments."
+  [pid cid mid]
+  (let [conn @(connect-atm pid)
+        eid (d/q '[:find ?m-ent .
+                   :in $ ?cid ?mid
+                   :where
+                   [?c-ent :conversation/id ?cid]
+                   [?c-ent :conversation/messages ?m-ent]
+                   [?m-ent :message/id ?mid]]
+                 conn cid mid)]
+    (dp/pull conn '[*] eid)))
+
+(defn update-msg
+  "Update the message with given info (a merge)."
+  [pid cid mid info]
+  (let [msg (get-msg pid cid mid)]
+    (if (not-empty msg)
+      (d/transact (connect-atm pid) {:tx-data [(merge msg info)]})
+      (log! :warn (str "Could not find msg for update-msg: pid = " pid " cid = " cid " mid = " mid)))))
 
 (defn get-budget
   "Return the :conversation/interviewer-budget."
@@ -774,46 +624,23 @@
       (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
       (log! :error (str "No such conversation: " cid)))))
 
-(defn get-eads
-  "Return the :conversation/EADS."
-  [pid cid]
-  (when-let [s (d/q '[:find ?eads .
-                      :in $ ?cid
-                      :where
-                      [?e :conversation/id ?cid]
-                      [?e :conversation/EADS ?eads]]
-                    @(connect-atm pid) cid)]
-    (edn/read-string s)))
-
-(defn put-eads!
-  "Put a stringified representation of the EADS (edn, not JSON) argument in the project's argument conversation."
-  [pid cid eads]
-    (let [conn-atm (connect-atm pid)
-        eid (d/q '[:find ?eid .
-                   :in $ ?cid
-                   :where [?eid :conversation/id ?cid]] @conn-atm cid)]
-    (if eid
-      (d/transact conn-atm {:tx-data [{:db/id eid :conversation/EADS (str eads)}]})
-      (log! :error (str "No such conversation: " cid)))))
-
-(defn get-ds
+;;; ToDo: I think maybe this isn't needed.
+(defn get-EADS-dstructs
   "Return a vector of maps of data structures where :message/id is where the :message/data-structure was created."
   [pid cid]
   (->> (d/q '[:find ?id ?ds
-              :keys message/id message/data-structure
+              :keys message/id message/EADS-data-structure
               :in $ ?cid
               :where
               [?e :conversation/id ?cid]
               [?conv :conversation/messages ?m]
-              [?m :message/data-structure ?ds]
+              [?m :message/EADS-data-structure ?ds]
               [?m :message/id ?id]]
             @(connect-atm pid) cid)
-       (mapv #(update % :message/data-structure edn/read-string))
+       (mapv #(update % :message/EADS-data-structure edn/read-string))
        not-empty))
 
-;;; ToDo: latest :human/surrogate message might be better?
-;;; (db/backup-proj-db :sur-optical-fiber)
-(defn put-ds!
+(defn put-EADS-ds!
   "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message."
   [pid cid ds]
   (let [max-id (max-msg-id pid cid)
@@ -825,7 +652,7 @@
                    [?conv :conversation/messages ?eid]
                    [?eid :message/id ?max-id]] @conn-atm cid max-id)]
     (if eid
-      (d/transact conn-atm {:tx-data [{:db/id eid :message/data-structure (str ds)}]})
+      (d/transact conn-atm {:tx-data [{:db/id eid :message/EADS-data-structure (str ds)}]})
       (log! :error (str "No such conversation: " cid)))))
 
 (defn add-project-to-system
@@ -869,7 +696,7 @@
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
-;;; (db/create-proj-db! {:project/id :remove-me :project/name "remove me"} {} {:force? true})
+;;; (db/create-proj-db! {:project/id :test :project/name "Test Project"} {} {:force-this-name? true})
 (defn create-proj-db!
   "Create a project database for the argument project.
    The project-info map must include :project/id and :project/name.
@@ -916,6 +743,16 @@
      ;; Add knowledge of this project to the system db.
      (log! :info (str "Created project database for " id))
      id)))
+
+(defn get-active-eads
+  "Return the EADS-id (keyword) for whatever EADS is active in the given project and conversation."
+  [pid cid]
+  (d/q '[:find ?eads-id .
+         :in $ ?cid
+         :where
+         [?e :conversation/id ?cid]
+         [?e :conversation/active-EADS ?eads-id]]
+       @(connect-atm pid) cid))
 
 (defn ^:diag delete-project!
   "Remove project from the system."

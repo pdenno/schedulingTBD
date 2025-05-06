@@ -7,7 +7,15 @@
                    :llm-provider :openai,
                    :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
                    :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-03-03T12:35:41.989-00:00"}],
+                   :timestamp #inst "2025-03-03T12:35:41.989-00:00"}
+           #:agent{:base-type :data-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_gE04PAvZZoFnbIvS3S6aijNY",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_KpRIbqEZFNfRBVwiN79QTrh2",
+                   :id :data-interview-agent-openai,
+                   :timestamp #inst "2025-03-06T20:34:20.249-00:00"}],
           :claims
           [#:claim{:string "(project-id :blank-project)"}
            #:claim{:string

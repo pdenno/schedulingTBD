@@ -1,14 +1,18 @@
 [
-#:system{:agents
-         [#:agent{:base-type :process-dur-agent,
-                  :agent-type :system,
-                  :thread-id "thread_gD1kN7QoWVMkLG0mvV62vMWx",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_WDjZC9jQ8tYarHuzKHLMfHvK",
-                  :id :process-dur-agent-openai,
-                  :timestamp #inst "2024-12-18T01:39:12.245-00:00"}
-          #:agent{:base-type :text-function-agent,
+#:system{:EADS
+         [#:EADS{:cid :process,
+                 :id :process/flow-shop,
+                 :msg-str
+                 "{:message-type :EADS-INSTRUCTIONS, :interviewer-agent :process, :interview-objective \"Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\\nThis EADS views the interviewees' production as organized as a flow shop.\\nThis portion of the interview will reveal the processes that the enterprise uses to run their flow shop.\\nWe might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\\nFor example, they might have in mind scheduling machine maintenance, not production.\\nThis fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\\nKnowledge of the processes might prove useful later.\", :EADS {:EADS-id :flow-shop, :process-id {:val \"pencil-manufacturing\", :comment \"This is the top-level process. You can name it as you see fit; don't ask the interviewees.\"}, :inputs {:val [\"graphite\" \"clay\" \"water\" \"cedar wood\" \"metal\" \"eraser material\" \"paint\"], :comment \"These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes.\"}, :outputs {:val [{:item-id \"finished pencils\", :quantity {:units \"finished pencils\", :value-string \"100000\"}}], :comment \"inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.\"}, :resources {:val [\"extruder\" \"kiln\" \"milling machine\" \"glue applicator\" \"shaping machine\"], :comment \"Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer.\"}, :duration {:val {:units \"hours\", :value-string \"4\"}, :comment \"We use a string for 'value-string' in case interviewees answer it something like 'it varies'\"}, :subprocesses [{:process-id \"graphite-core-production\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite core\", :quantity {:units \"graphite cores\", :value-string \"100000\"}}], :resources [\"mixer\" \"extruder\" \"kiln\"], :subprocesses [{:process-id \"mix-graphite-and-clay\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite-clay paste\", :quantity {:units \"liters\", :value-string \"100\"}}], :resources [\"mixer\"], :duration {:units \"hours\", :value-string \"1\"}, :subprocesses {:val [], :comment \"We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\\nOf course, this could be updated later if subsequent discussion suggests we are wrong.\"}} {:process-id \"extrude-core\", :inputs [\"graphite-clay paste\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"extruder\"], :duration {:units \"minutes\", :value-string \"20\"}, :subprocesses []} {:process-id \"dry-and-bake-core\", :inputs [\"extruded graphite rods\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"kiln\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"wood-casing-production\", :inputs [\"cedar wood\"], :outputs [\"wood slats with grooves\"], :resources [\"milling machine\"], :subprocess-flow {:val \"individuals-from-batch\", :comment \"The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\\nyou can start 'cut-grooves-in-slats' as soon as the first slat is available.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses.\"}, :subprocesses [{:process-id \"mill-wood-slats\", :inputs [\"cedar wood\"], :outputs [\"milled wood slats\"], :resources [\"milling machine\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocess-flow {:val :individuals-from-batch, :comment \"'sub-process-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\\nThe string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\\ncan start as soon as the first slat is available.\"}, :subprocesses []} {:process-id \"cut-grooves-in-slats\", :inputs [\"milled wood slats\"], :outputs [\"wood slats with grooves\"], :resources [\"groove cutter\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"assembly\", :inputs {:val [{:item-id \"graphite core\", :from \"graphite-core-production\"} {:item-id \"wood slats with grooves\", :from \"wood-casing-production\"} \"metal\" \"erasers\" \"paint\"], :comment \"The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\\nThe 'from' property is essential to understanding process ordering and potential for concurrency.\"}, :outputs [\"finished pencil\"], :resources [\"glue applicator\" \"shaping machine\"], :subprocesses [{:process-id \"insert-core-into-slats\", :inputs [\"graphite core\" \"wood slats with grooves\"], :outputs [\"pencil blanks\"], :resources [\"glue applicator\"], :subprocesses []} {:process-id \"shape-and-paint-pencil\", :inputs [\"pencil blanks\" \"paint\"], :outputs [\"shaped and painted pencils\"], :resources [\"shaping machine\" \"painting station\"], :subprocesses []} {:process-id \"attach-eraser\", :optional? {:val true, :comment \"'optional?' means that the process does not occur for every product. Not every pencil has an eraser.\"}, :inputs [\"shaped and painted pencils\" \"metal\" \"erasers\"], :outputs [\"finished pencils\"], :resources [\"crimping tool\"], :subprocesses []}]}]}}",
+                 :specs #:spec{:full :flow-shop/EADS-message}}
+          #:EADS{:cid :process,
+                 :id :process/scheduling-problem-type,
+                 :msg-str
+                 "{:message-type :EADS-INSTRUCTIONS, :interview-objective \"Using the three property types 'problem-type', 'continuous?', and 'cyclical?', determine the kind of production system and scheduling problem for which the interviewees seek a solution.\\nFor 'problem-type' you may only choose one of the following:\\n   1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for jobs that all execute the same sequence of production steps across multiple machines or workstations.\\n   2) RESOURCE-ASSIGNMENT-PROBLEM: [not exactly a scheduling problem, but it might come up] the problem of assigning work to resources without necessarily specifying the time at which the work is to occur.\\n   3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within an undertaking.\\n   4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which the jobs visit machines or workstations may vary as determined by the job type.\\n   5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.\", :EADS {:EADS-id :process/scheduling-problem-type, :problem-type {:val :FLOW-SHOP-SCHEDULING-PROBLEM, :comment \"We asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop.\"}, :continuous? {:val false, :comment \"continuous? refers to whether or not product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.\\nThis might be apparent from the answers that determined the value of problem-type. If not, then you can ask.\"}, :cyclical? {:val false, :comment \"cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.\\nFor example, if the made the same collection of products in the same order each week, cylical? would be true.\"}}}",
+                 :specs
+                 #:spec{:full :scheduling-problem-type/EADS-message}}],
+         :agents
+         [#:agent{:base-type :text-function-agent,
                   :agent-type :system,
                   :thread-id "thread_sLkB7PdJlAgKzcD1keSEY7rB",
                   :model-class :gpt,
@@ -16,21 +20,13 @@
                   :assistant-id "asst_goTNbqcqjK78EPbRMtNwL50S",
                   :id :text-function-agent-openai,
                   :timestamp #inst "2024-12-05T21:39:38.200-00:00"}
-          #:agent{:base-type :process-ordering-agent,
-                  :agent-type :system,
-                  :thread-id "thread_1kgHH7xN613JxIvT4BZm4Hj8",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_5eDrNKn7FlQpaGfWGrZYl6EV",
-                  :id :process-ordering-agent-openai,
-                  :timestamp #inst "2024-12-05T21:39:37.396-00:00"}
           #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_p9cnmj0rV7EYNMIeiqWm9ppf",
+                  :assistant-id "asst_2QErW3cf91GcIX95z0IfQtqJ",
                   :base-type :process-interview-agent,
                   :id :process-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2025-03-05T15:05:59.648-00:00"}
+                  :timestamp #inst "2025-03-13T15:26:51.344-00:00"}
           #:agent{:agent-type :system,
                   :assistant-id "asst_eaxRDWsEwmdWHObw5MjTiPQP",
                   :base-type :answers-the-question?,
@@ -39,34 +35,34 @@
                   :model-class :gpt,
                   :thread-id "thread_2vhjT8fIazLPDOmTqD2Qc4Dj"}
           #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_wQtaRFA9jHBBxfRZHbca1mqN",
+                  :assistant-id "asst_vSisM8SZE7GGQT4bV1SFecJo",
                   :base-type :data-interview-agent,
                   :id :data-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2024-12-05T21:39:34.070-00:00"}
+                  :timestamp #inst "2025-03-13T15:30:33.782-00:00"}
           #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_aaDLAj0gxcfigOPWPrO5dUrE",
+                  :assistant-id "asst_LxGBspt7smk2HdE4lWjv6SGa",
                   :base-type :resources-interview-agent,
                   :id :resources-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2024-12-05T21:39:34.439-00:00"}
+                  :timestamp #inst "2025-03-10T19:02:33.209-00:00"}
           #:agent{:base-type :scheduling-challenges-agent,
                   :agent-type :system,
-                  :thread-id "thread_S4WYlV1EKLnWPmJRqPg0XQYc",
+                  :thread-id "thread_lMfK0aSAlKC353YOUuao1HzS",
                   :model-class :gpt,
                   :llm-provider :openai,
-                  :assistant-id "asst_lVdN6WQ66CukxXI1vlXlBRmD",
+                  :assistant-id "asst_lK2bL9w4pGxxNtvAVob139Zy",
                   :id :scheduling-challenges-agent-openai,
-                  :timestamp #inst "2025-03-03T15:43:49.498-00:00"}
+                  :timestamp #inst "2025-04-19T14:15:02.496-00:00"}
           #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_IQJUvMRB9Mf911ZK1wXwIlJN",
+                  :assistant-id "asst_lpV7K13oZU2B5YfSyDLh0elm",
                   :base-type :optimality-interview-agent,
                   :id :optimality-interview-agent-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
-                  :timestamp #inst "2025-03-05T15:11:11.228-00:00"}
+                  :timestamp #inst "2025-03-10T19:03:22.239-00:00"}
           #:agent{:base-type :response-analysis-agent,
                   :agent-type :system,
                   :thread-id "thread_wDcvDiGb8ZbRrVANUuTLLCmk",
@@ -75,21 +71,6 @@
                   :assistant-id "asst_VaeePwn9LHgSwQsh1gDgoNB4",
                   :id :response-analysis-agent-openai,
                   :timestamp #inst "2024-12-13T21:09:08.701-00:00"}
-          #:agent{:agent-type :system,
-                  :assistant-id "asst_a0lK1BYchdZUN7oza6sU68AP",
-                  :base-type :helpful,
-                  :id :helpful-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2024-12-12T12:46:06.528-00:00"}
-          #:agent{:base-type :helpful-1,
-                  :agent-type :system,
-                  :thread-id "thread_xOlazp212KfATPwJZ2LAc7tM",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_WlPVzM82mT0IgMATtsnWHnx4",
-                  :id :helpful-1-openai,
-                  :timestamp #inst "2024-12-12T13:23:51.572-00:00"}
           #:agent{:base-type :text-to-var,
                   :agent-type :system,
                   :thread-id "thread_GngjkcPOZH4prj4I08VyaBqF",
@@ -97,7 +78,14 @@
                   :llm-provider :openai,
                   :assistant-id "asst_jD6xz9YjfzqeDWnZAKTJgZvX",
                   :id :text-to-var-openai,
-                  :timestamp #inst "2025-02-21T13:19:00.143-00:00"}],
+                  :timestamp #inst "2025-02-21T13:19:00.143-00:00"}
+          #:agent{:agent-type :shared-assistant,
+                  :assistant-id "asst_nPIdvlmvxiuVDVQGHTYOfdhc",
+                  :base-type :orchestrator-agent,
+                  :id :orchestrator-agent-openai,
+                  :llm-provider :openai,
+                  :model-class :gpt,
+                  :timestamp #inst "2025-04-23T17:38:29.773-00:00"}],
          :default-project-id :blank-project,
          :name "SYSTEM",
          :projects
@@ -162,10 +150,9 @@
           #:project{:dir "/opt/scheduling/projects/sur-carpet/db/",
                     :id :sur-carpet,
                     :name "SUR Carpet"}
-          #:project{:dir
-                    "/opt/scheduling/projects/sur-plate-glass/db/",
-                    :id :sur-plate-glass,
-                    :name "SUR Plate Glass"}
+          #:project{:dir "/opt/scheduling/projects/ice-cream/db/",
+                    :id :ice-cream,
+                    :name "Ice Cream"}
           #:project{:dir "/opt/scheduling/projects/sur-key-blanks/db/",
                     :id :sur-key-blanks,
                     :name "SUR Key Blanks"}
@@ -195,9 +182,20 @@
           #:project{:dir "/opt/scheduling/projects/sur-brake-pads/db/",
                     :id :sur-brake-pads,
                     :name "SUR Brake Pads"}
+          #:project{:dir "/opt/scheduling/projects/sur-ice-melt/db/",
+                    :id :sur-ice-melt,
+                    :name "SUR Ice Melt"}
           #:project{:dir
-                    "/opt/scheduling/projects/sur-optical-fiber/db/",
-                    :id :sur-optical-fiber,
-                    :name "SUR Optical Fiber"}]}
+                    "/opt/scheduling/projects/plate-glass-ork/db/",
+                    :id :plate-glass-ork,
+                    :name "Plate Glass Ork"}
+          #:project{:dir
+                    "/opt/scheduling/projects/sur-plate-glass/db/",
+                    :id :sur-plate-glass,
+                    :name "SUR Plate Glass"}
+          #:project{:dir
+                    "/opt/scheduling/projects/sur-commemorative-coins/db/",
+                    :id :sur-commemorative-coins,
+                    :name "SUR Commemorative Coins"}]}
 
 ]

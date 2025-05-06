@@ -31,14 +31,13 @@
   (log! :debug (str "Registered function for websocket: " k)))
 
 (def common-info "Map tracking current project/id and :conversation/id."
-  (atom {:cid :process
-         :table :removed}))
+  (atom {:cid :process}))
 
 (defn update-common-info!
   "Update the common-info atom from an app action or server response.
    Returns the value of the common-info atom."
-  [{:keys [current-project project-id cid] :as resp}]
-  (log! :info (str "update-common-info: resp = " resp))
+  [{:keys [current-project project-id cid lower-rhs-pane] :as resp}]
+  ;(log! :info (str "update-common-info: resp = " resp))
   (swap! common-info
          (fn [info]
            (let [pid (or (:project/id resp) (:pid resp))]

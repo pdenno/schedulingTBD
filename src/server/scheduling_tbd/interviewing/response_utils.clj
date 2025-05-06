@@ -2,12 +2,14 @@
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:refer-clojure :exclude [send])
   (:require
+   [cheshire.core                 :as ches]
    [clojure.datafy                :refer [datafy]]
    [clojure.core.unify            :as uni]
-   [clojure.pprint                :refer [cl-format pprint]]
+   [clojure.edn                   :as edn]
+   [clojure.java.io               :as io]
+   [clojure.pprint                :refer [pprint]]
    [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
-   [jsonista.core                 :as json]
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.web.websockets :as ws]
@@ -25,12 +27,12 @@
   Typically done with surrogate or starting a new project."
   [client-id pid cid]
   (assert (string? client-id))
-  (ws/send-to-chat {:promise? false
-                    :client-id client-id
-                    :dispatch-key :update-conversation-text
-                    :pname (db/get-project-name pid)
-                    :pid pid
-                    :cid cid}))
+  (ws/send-to-client {:promise? false
+                      :client-id client-id
+                      :dispatch-key :update-conversation-text
+                      :pname (db/get-project-name pid)
+                      :pid pid
+                      :cid cid}))
 
 (s/def ::text-to-var (s/keys :req-un [::INPUT-TEXT ::CORRESPONDING-VAR]))
 (s/def ::INPUT-TEXT string?)
@@ -62,7 +64,7 @@
      (let [res (try (-> (adb/query-agent :text-to-var
                                          (format "{\"INPUT-TEXT\" : \"%s\"}" text)
                                          (when asking-role {:asking-role asking-role}))
-                        json/read-value
+                        ches/parse-string
                         (update-keys keyword))
                     (catch Exception e
                       (let [d-e (datafy e)]
@@ -73,19 +75,54 @@
        (s/assert ::text-to-var res)
        (:CORRESPONDING-VAR res)))))
 
-(defn deep-keys [obj]
-  (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m (keyword k) (deep-keys v))) {} obj)
-        (vector? obj)   (mapv deep-keys obj)
-        :else           obj))
+(defn get-iviewr-info [cid]
+  (-> "agents/iviewrs/iviewr-infos.edn"
+      io/resource
+      slurp
+      edn/read-string
+      (get cid)))
+
+(defn get-warm-up-q [cid]
+  (-> cid get-iviewr-info :warm-up-question))
+
+(defn strip-annotations
+  "Remove the annotations from the EADS."
+  [obj]
+  (cond (and (map? obj) (contains? obj :val) (contains? obj :comment))  (:val obj)
+        (map? obj)                                                      (reduce-kv (fn [m k v] (assoc m k (strip-annotations v))) {} obj)
+        (vector? obj)                                                   (mapv strip-annotations obj)
+        :else                                                           obj))
+
+(defn key-vals
+  "Return a collection of keys for which the value is a key."
+  [m]
+  (let [res (atom #{})]
+    (letfn [(kv [obj]
+              (cond  (map? obj)     (doseq [[k v] obj] (if (keyword? v) (swap! res conj k) (kv v)))
+                     (vector? obj)  (doseq [v obj] (kv v))))]
+      (kv m)
+      @res)))
+
+;;; ToDo: Use of key-vals is questionable.
+#_(defn ds2clj
+  "Walk through the data structure, comparing it to the EADS and update map value strings to keywords where appropriate.
+   The term 'data structure' refers to the map structure interviewers create from an EADS."
+  [ds]
+  (let [msg (or (-> ds :EADS-used keyword db/get-eads not-empty)
+                (throw (ex-info "No such EADS:" {:name (:EADS-used ds)})))
+        key-val? (-> msg :EADS strip-annotations key-vals)]
+    (letfn [(ds2 [obj]
+              (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m k (if (key-val? k) (keyword v) (ds2 v)))) {} obj)
+                    (vector? obj)   (mapv ds2 obj)
+                    :else           obj))]
+      (ds2 ds))))
 
 ;;; ====================== Shared by use of tags :process :data :resources :optimality ====================
-(defn analyze-warm-up--dispatch [tag & _] tag)
+(defn dispatch-by-cid [tag & _]
+  (if (#{:process :data :resources :optimality} tag)
+    tag
+    (throw (ex-info "Bad tag" {:tag tag}))))
 
 ;;; The methods for this are in the interviewing/domain directory.
-(defmulti analyze-warm-up #'analyze-warm-up--dispatch)
-
-(defn eads-response--dispatch [tag & _] tag)
-
-;;; The methods for this are in the interviewing/domain directories.
-;;; Returns a PHASE-2-EADS message. (See for example the one for :process in process_analysis.clj.
-(defmulti eads-response! #'eads-response--dispatch)
+(defmulti analyze-warm-up        #'dispatch-by-cid)
+(defmulti conversation-complete? #'dispatch-by-cid)

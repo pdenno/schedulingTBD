@@ -1,23 +1,29 @@
-(ns scheduling-tbd.interviewing.EADS.job-shop
-  "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a flow-shop scheduling problem.
-       As the case is with job-shop problems, this structure defines work to be performed in typical job.
-   (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer.
-
-   Note: We don't load this code at system startup. When you compile it, it writes the EADS to resources/EADS/flow-shop.txt"
+(ns scheduling-tbd.interviewing.domain.process.flow-shop
+  "(1) Define the example annotated data structure (EADS) interviewer will use for questioning about a flow-shop scheduling problem.
+       As the case is with flow-shop problems, this structure defines the flow of work through resources.
+   (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
-   [clojure.data.json]
-   [clojure.pprint             :refer [pprint]]
-   [clojure.spec.alpha         :as s]
-   [taoensso.telemere          :as tel :refer [log!]]))
+   [clojure.spec.alpha    :as s]
+   [datahike.api          :as d]
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
+;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
-(s/def ::data-structure (s/keys :req-un [::notes-on-data-structure ::annotated-data-structure]))
-(s/def ::EADS (s/keys :req-un [::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::process-var ::duration]))
-(s/def ::notes-on-data-structure string?)
-(s/def ::process (s/keys :req-un [::process-id ::subprocesses] :opt-un [::process-var ::duration ::inputs ::outputs ::resources]))
-(s/def ::annotated-data-structure ::process) ; Interesting that forward reference of ::process does not work.
-(s/def ::comment string?)
 
+(def ^:diag diag (atom nil))
+
+(s/def :flow-shop/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
+(s/def ::message-type #(= % :EADS-INSTRUCTIONS))
+(s/def ::interview-objective string?)
+(s/def ::interviewer-agent #(= % :process))
+
+(s/def ::comment string?) ; About annotations
+
+(s/def ::EADS (s/keys :req-un [::EADS-id ::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
+(s/def ::EADS-id #(= % :process/flow-shop))
+
+;;; We use the 'trick' that :<some-property>/val can be used that to signify a non-namespaced attribute 'val' and a reference to a spec for value of 'val'.
+(s/def ::process (s/keys :req-un [::process-id ::subprocesses] :opt-un [::duration ::inputs ::outputs ::resources]))
 (s/def ::process-id (s/or :normal :process-id/val :annotated ::annotated-process-id))
 (s/def ::annotated-process-id (s/keys :req-un [:process-id/val ::comment]))
 (s/def :process-id/val string?)
@@ -66,23 +72,29 @@
 (s/def :subprocesses/val (s/coll-of ::process :kind vector?))
 (s/def ::annotated-subprocesses (s/keys :req-un [:subprocesses/val ::comment]))
 
-(s/def ::process-var (s/or :normal :process-var/val :annotated ::annotated-process-var))
-(s/def ::annotated-process-var (s/keys :req-un [:process-var/val ::comment]))
-(s/def :process-var/val string?)
-
-;;; <=============================== Start here. outputs, resources, duration, subprocesses, subprocess-flow, process-var
-
-(s/def ::quantified-thing (s/keys :req-un [::item-id ::quantity]))
 (s/def ::item-id string?)
 (s/def ::quantity (s/keys :req-un [::units ::value-string]))
 (s/def ::units string?)
 (s/def ::value-string string?)
 
 ;;; (s/valid? ::fshop/EADS (:EADS fshop/flow-shop))
-(def job-shop
-  "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of Phase 2 of a flow-shop problem."
-  {:EADS
-   {:process-id {:val "pencil-manufacturing",
+
+;;; ToDo: Write something about flow-shops being disjoint from the other four types. But also point out that part of their complete process could be flow shop....
+;;;       Come up with an example where work flows to a single-machine-scheduling problem.
+(def flow-shop
+  "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of a flow-shop problem.
+   Like all EADS, it is also stored in the system DB. See how at the bottom of this file."
+  {:message-type :EADS-INSTRUCTIONS
+   :interviewer-agent :process
+   :interview-objective (str "This EADS assumes the interviewees' production processes are organized as a flow shop.\n"
+                             "Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\n"
+                             "We might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\n"
+                             "For example, they might have in mind scheduling machine maintenance, not production.\n"
+                             "This fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\n"
+                             "Knowledge of the processes might prove useful later.")
+   :EADS
+   {:EADS-id :process/flow-shop
+    :process-id {:val "pencil-manufacturing",
                  :comment "This is the top-level process. You can name it as you see fit; don't ask the interviewees."}
 
     :inputs {:val ["graphite", "clay", "water", "cedar wood", "metal", "eraser material", "paint"],
@@ -105,17 +117,16 @@
                                :quantity {:units "graphite cores" :value-string "100000"}}],
                     :resources ["mixer", "extruder", "kiln"],
                     :subprocesses [{:process-id "mix-graphite-and-clay",
-                                    :process-var {:val "mix"
-                                                  :comment "Include a camelCase variable of less than 25 characters that describes the process. We'll use these in the translation to MiniZinc."}
                                     :inputs ["graphite", "clay", "water"],
                                     :outputs [{:item-id "graphite-clay paste",
                                                :quantity {:units "liters", :value-string "100"}}],
                                     :resources ["mixer"],
                                     :duration  {:units "hours", :value-string "1"}
-                                    :subprocesses []},
+                                    :subprocesses {:val []
+                                                   :comment (str "We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\n"
+                                                                 "Of course, this could be updated later if subsequent discussion suggests we are wrong.")}}
 
                                    {:process-id "extrude-core",
-                                    :process-var "extrude"
                                     :inputs ["graphite-clay paste"],
                                     :outputs [{:item-id "extruded graphite rods",
                                                :quantity {:units "extruded graphite core", :value-string "100000"}}],
@@ -124,7 +135,6 @@
                                     :subprocesses []},
 
                                    {:process-id "dry-and-bake-core",
-                                    :process-var "dryAndBakeCores"
                                     :inputs ["extruded graphite rods"],
                                     :outputs [{:item-id "extruded graphite rods",
                                                :quantity {:units "extruded graphite core", :value-string "100000"}}],
@@ -142,15 +152,17 @@
                     :duration  {:val  {:units "hours", :value-string "2"} ; ToDo: Review this comment. Improve it.
                                 :comment "Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses."}
                     :subprocesses [{:process-id "mill-wood-slats",
-                                    :process-var "millSlats",
                                     :inputs ["cedar wood"],
                                     :outputs ["milled wood slats"],
                                     :resources ["milling machine"],
                                     :duration  {:units "hours", :value-string "2"}
+                                    :subprocess-flow {:val :individuals-from-batch,
+                                                      :comment (str "'sub-process-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\n"
+                                                                    "The string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\n"
+                                                                    "can start as soon as the first slat is available.")}
                                     :subprocesses []},
 
                                    {:process-id "cut-grooves-in-slats",
-                                    :process-var "cutGrooves",
                                     :inputs ["milled wood slats"],
                                     :outputs ["wood slats with grooves"],
                                     :resources ["groove cutter"],
@@ -166,21 +178,18 @@
                     :outputs ["finished pencil"],
                     :resources ["glue applicator", "shaping machine"],
                     :subprocesses [{:process-id "insert-core-into-slats",
-                                    :process-var "insert-cores"
                                     :inputs ["graphite core", "wood slats with grooves"],
                                     :outputs ["pencil blanks"],
                                     :resources ["glue applicator"],
                                     :subprocesses []},
 
                                    {:process-id "shape-and-paint-pencil",
-                                    :process-var "shapeAndPaint",
                                     :inputs ["pencil blanks", "paint"],
                                     :outputs ["shaped and painted pencils"],
                                     :resources ["shaping machine", "painting station"],
                                     :subprocesses []},
 
                                    {:process-id "attach-eraser",
-                                    :process-var "attachErasers",
                                     :optional?  {:val true,
                                                  :comment "'optional?' means that the process does not occur for every product. Not every pencil has an eraser."}
                                     :inputs ["shaped and painted pencils", "metal", "erasers"],
@@ -188,14 +197,14 @@
                                     :resources ["crimping tool"],
                                     :subprocesses []}]}]}})
 
-(def interview-objective
-
-(if (s/valid? ::EADS (:EADS job-shop))
-  (spit "resources/EADS/flow-shop.edn"
-        (with-out-str
-          (pprint
-           {:message-type :PHASE-2-EADS
-            :interview-objective "Produce a data structure similar in form to the EADS in this object, but describing the interviewees' production processes."
-            :EADS (with-out-str (clojure.data.json/pprint (:EADS job-shop)))})))
-  (do (log! :error "job-shop EADS does not pass specs.")
-      {:invalid-EADS-spec :job-shop}))
+(if (s/valid? :flow-shop/EADS-message flow-shop)
+  (let [db-obj {:EADS/id :process/flow-shop
+                :EADS/cid :process
+                :EADS/specs #:spec{:full :flow-shop/EADS-message}
+                :EADS/msg-str (str flow-shop)}
+        conn (connect-atm :system)
+        eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
+    ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
+    (->> flow-shop clj2json-pretty (spit "resources/EADS/process/flow-shop.json")))
+  (throw (ex-info "Invalid EADS message (flow-shop)." {})))

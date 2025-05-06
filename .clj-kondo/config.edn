@@ -30,7 +30,7 @@
                                            taoensso.telemere/set-ctx!
                                            taoensso.telemere/set-middleware!
                                            taoensso.telemere/stop-handlers!]}
-           :clj-kondo/unused-public-var {:exclude-when-contains-meta #{:diag}}
+           :clj-kondo/unused-public-var {:exclude-when-contains-meta #{:diag :admin}}
 
            ;; :exclude-patterns is for bindings, not vars. See https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md
            #_#_:unused-binding {:exclude-patterns ["^recreate.*" "^unknown-projects" "^backup.*"]}
@@ -47,7 +47,7 @@
                                                       scheduling-tbd.db/retract-conversation-done!
                                                       scheduling-tbd.db/update-all-projects-for-schema!
                                                       scheduling-tbd.db/unknown-projects}
-                                           :exclude-when-contains-meta #{:diag}}} ; This works again [2024-05-18 Sat] ; And it stopped again [2025-03-04]
+                                           :exclude-when-contains-meta #{:diag :admin}}} ; This works again [2024-05-18 Sat] ; And it stopped again [2025-03-04]
 
 
  ;; Gist for defstate: https://gist.github.com/ethpran/e1741a5c408aec831b5e3a7e24f40fea

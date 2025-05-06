@@ -2,40 +2,39 @@
 ;;; "The actual agent :base-type is the one provided here with -<llm-provider> added."
 [
  ;; ---------- project-specific interview agents -------------------------
- {:base-type :process-interview-agent
-  :agent-type :shared-assistant
-  :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
-  :tools [{:type "file_search"}]
-  :instruction-path "agents/interviewers/process-v4.txt"
-  ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
-  #_#_:response-format-path "agents/interviewers/response-format-path.edn"}
+ ;; These are projections of information in agents/iviewrs/iviewr-infos.edn
+ ;; The pathnames here (for instructions and vector store) are relative to resources.
 
- #_{:base-type :process-interview-agent
-  :agent-type :shared-assistant
-  :model-class :gpt ; :analysis is o1-preview, and it cannot be used with the Assistants API.
-  :tools [{:type "file_search"}]
-  :vector-store-paths ["agents/interviewers/process-interview-flowchart.pdf"]
-  :instruction-path "agents/interviewers/process.txt"
-  ;; I chose not to uses response format: "Invalid tools: all tools must be of type `function` when `response_format` is of type `json_schema`
-  #_#_:response-format-path "agents/interviewers/response-format-path.edn"}
+ {:base-type :orchestrator-agent,
+  :tools [{:type "file_search"}],
+  :model-class :gpt,
+  :instruction-path "agents/orchestrator.txt",
+  :vector-store-paths ["EADS/process/flow-shop.json", "EADS/process/scheduling-problem-type.json" ],
+  :agent-type :shared-assistant}
 
- {:base-type :data-interview-agent
-  :agent-type :shared-assistant
-  :model-class :gpt
-  :tools [{:type "file_search"}]
-  :instruction-path "agents/interviewers/data.txt"}
+ {:base-type :process-interview-agent,
+  :tools [{:type "file_search"}],
+  :model-class :gpt,
+  :instruction-path "agents/iviewrs/process-iviewr-instructions.txt",
+  :agent-type :shared-assistant}
 
- {:base-type :resources-interview-agent
-  :agent-type :shared-assistant
-  :model-class :gpt
-  :tools [{:type "file_search"}]
-  :instruction-path "agents/interviewers/resources.txt"}
+  {:base-type :data-interview-agent,
+   :tools [{:type "file_search"}],
+   :model-class :gpt,
+   :instruction-path "agents/iviewrs/data-iviewr-instructions.txt",
+   :agent-type :shared-assistant}
 
- {:base-type :optimality-interview-agent
-  :agent-type :shared-assistant
-  :model-class :gpt
-  :tools [{:type "file_search"}]
-  :instruction-path "agents/interviewers/optimality.txt"}
+ {:base-type :resources-interview-agent,
+  :tools [{:type "file_search"}],
+  :model-class :gpt,
+  :instruction-path "agents/iviewrs/resources-iviewr-instructions.txt",
+  :agent-type :shared-assistant}
+
+ {:base-type :optimality-interview-agent,
+  :tools [{:type "file_search"}],
+  :model-class :gpt,
+  :instruction-path "agents/iviewrs/optimality-iviewr-instructions.txt",
+  :agent-type :shared-assistant}
 
  ;; ----------------- more generic system agents ---------------------------------
  {:base-type :response-analysis-agent

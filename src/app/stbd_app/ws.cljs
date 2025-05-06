@@ -45,8 +45,8 @@
 (declare send-msg)
 (defn recv-msg-type? [k] (contains? @dispatch-table k))
 
-;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, and maybe other places.
-;;; The ones here correspond to dispatch keys, but other are used to break-out React hooks or avoid namespace cycles.
+;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, graph.cljs and maybe other places.
+;;; The ones here correspond to dispatch keys, but other might be used to break-out React hooks or avoid namespace cycles.
 (register-fn :clear-promise-keys    (fn [obj] (-> obj :promise-keys clear-promise-keys!)))
 
 (register-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
@@ -56,12 +56,27 @@
 ;;; The server uses this one after the client sends it :start-surrogate (which creates the surrogate's DB).
 (register-fn :load-proj             (fn [{:keys [new-proj-map]}] ; New projects start on :process
                                       (update-common-info! (assoc new-proj-map :cid :process))
-                                      ((lookup-fn :set-current-project) new-proj-map)
-                                      ((lookup-fn :get-conversation) (:project/id new-proj-map))))
+                                      (when-let [f (lookup-fn :set-current-project)] (f new-proj-map))
+                                      (when-let [f (lookup-fn :get-conversation)]    (f :project/id new-proj-map))))
 
 (register-fn :domain-expert-submits-table (fn [table]
                                             (send-msg {:dispatch-key :domain-expert-says
                                                        :table-string (str table)})))
+
+;;; GraphPane/:set-graph-cmd might not be set, in which case we go through core/set-graph. Ditto for load-table.
+(register-fn :load-graph
+             (fn [{:keys [graph]}]
+               ;;(log! :info (str "ws: Call to :load-graph: graph = " graph))
+               (when-let [f (lookup-fn :set-rhs-pane)] (f :graph))
+               (when-let [f (or (lookup-fn :set-graph-pane) (lookup-fn :set-graph))]
+                 (f graph))))
+
+(register-fn :load-table
+             (fn [{:keys [table]}]
+               ;;(log! :info (str "ws: Call to :load-table: table = " table))
+               (when-let [f (lookup-fn :set-rhs-pane)] (f :table))
+               (when-let [f (or (lookup-fn :set-table-pane) (lookup-fn :set-table))]
+                 (f table))))
 
 (defn dispatch-msg
   "Call a function depending on the value of :dispatch-key in the message."

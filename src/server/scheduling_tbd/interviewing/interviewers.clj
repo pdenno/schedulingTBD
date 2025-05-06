@@ -1,29 +1,36 @@
 (ns scheduling-tbd.interviewing.interviewers
-    "Runs an interview uing an interview agent."
+    "Runs an interview using an interview agent."
     (:require
-     [clojure.core.unify            :as uni]
-     [clojure.data.xml              :as xml]
-     [clojure.pprint                :refer [pprint]]
-     [clojure.spec.alpha            :as s]
-     [clojure.string                :as str]
-     [jsonista.core                 :as json]
-     [mount.core                    :as mount :refer [defstate]]
-     [promesa.core                  :as p]
-     [promesa.exec                  :as px]
-     [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
-     [scheduling-tbd.db             :as db]
-     [scheduling-tbd.interviewing.domain.data-analysis :as dan]
-     [scheduling-tbd.interviewing.domain.process-analysis :as pan :refer [the-warm-up-type-question]]
-     [scheduling-tbd.interviewing.domain.optimality-analysis]
-     [scheduling-tbd.interviewing.domain.resources-analysis]
-     [scheduling-tbd.llm            :as llm]
-     [scheduling-tbd.interviewing.response-utils :as ru :refer [find-claim  text-to-var]]
-     [scheduling-tbd.sutil          :as sutil :refer [elide output-struct2clj]]
-     [scheduling-tbd.web.websockets :as ws]
-     [taoensso.telemere             :as tel :refer [log!]]))
+     [cheshire.core                   :as ches]
+     [clojure.core.unify              :as uni]
+     [clojure.data.xml                :as xml]
+     [clojure.edn                     :as edn]
+     [clojure.pprint                  :refer [pprint cl-format]]
+     [clojure.java.io                 :as io]
+     [clojure.spec.alpha              :as s]
+     [clojure.string                  :as str]
+     [mount.core                      :as mount :refer [defstate]]
+     [promesa.core                    :as p]
+     [promesa.exec                    :as px]
+     [scheduling-tbd.agent-db         :as adb :refer [agent-log]]
+     [scheduling-tbd.db               :as db]
+     [scheduling-tbd.llm              :as llm]
+     [scheduling-tbd.interviewing.ork :as ork]
+     [scheduling-tbd.interviewing.response-utils :as ru]
+     [scheduling-tbd.sutil            :as sutil :refer [elide output-struct2clj]]
+     [scheduling-tbd.web.websockets   :as ws]
+     [taoensso.telemere               :as tel :refer [log!]]))
+
+;;; The usual way of interviews involves q-and-a called from resume-conversation.
+;;; The alternative way, used only when the human or surrogate expert is starting, is to use get-an-answer.
+;;; get-an-answer is called by q-and-a but is also is directly called by surrogate and human conversations on startup.
+;;; The difference being that these two already know what the question is; it is the warm-up question of whatever
+;;; conversation is running. The call to q-and-a, in contrast, uses SUPPLY-QUESTION to the interviewer.
+;;;
+;;; [resume-conversation] -> q-and-a -> get-an-answer -> chat-pair -> send-to-client or query-agent (sur).
+;;; [start-up]                       -> get-an-answer -> ...
 
 (def ^:diag diag (atom nil))
-(s/def ::pid keyword?)
 (s/def ::cid #(#{:process :data :resources :optimality} %))
 
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
@@ -51,8 +58,6 @@
 (s/def ::question string?)
 
 ;;; Optional
-(s/def ::tags (s/coll-of keyword?))
-
 (s/def ::expert-response (s/keys :req-un [:expert/msg-type] :opt-un [:expert/text :expert/table :expert/table-html]))
 (s/def :expert/msg-type #(= % :expert-response))
 (s/def :expert/table map?)
@@ -67,7 +72,7 @@
   (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
    (let [asking-role (or asking-role (if cid (-> (str cid "-interviewer") keyword) :an-interviewer))
          prom (if (= :human responder-type)
-                (ws/send-to-chat (-> ctx                        ; This cannot timeout.
+                (ws/send-to-client (-> ctx                        ; This cannot timeout.
                                      (assoc :text question)
                                      (assoc :table table)
                                      (assoc :promise? true)
@@ -95,11 +100,12 @@
    If response is immoderate returns {:msg-type :immoderate}"
   [{:keys [responder-type client-id] :as ctx}]
   (let [response (chat-pair-aux ctx)]
-    (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id})
+    (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})
     (case responder-type
       :human (if (-> response :text llm/immoderate?)
                {:msg-type :immoderate}
                response)
+      ;; ToDo: Move the let up so can capture tables correctly with human too.
       :surrogate (let [{:keys [full-text text table-html table]} (separate-table response)]
                    (cond-> {:msg-type :expert-response :full-text full-text}
                      text  (assoc :text text)
@@ -115,8 +121,7 @@
                                    "INTERVIEWEES-RESPOND"              (s/valid? :iviewr/interviewees-respond msg)
                                    "DATA-STRUCTURE-REFINEMENT"         (s/valid? :iviewr/data-structure-refinement msg)
                                    "CONVERSATION-HISTORY"              (s/valid? :iviewr/conversation-history msg)
-                                   "PHASE-1-CONCLUSION"                (s/valid? :iviewr/phase-1-conclusion msg)
-                                   "PHASE-2-EADS"                      (s/valid? :iviewr/phase-2-eads msg)
+                                   "EADS-INSTRUCTIONS"                 (s/valid? :iviewr/eads-instructions msg)
                                    "COURSE-CORRECTION"                 (s/valid? :iviewr/course-correction msg)
                                    "STATUS"                            #(string? (get % :status))))))
 
@@ -131,21 +136,17 @@
 (s/def :iviewr/commit-notes string?)
 (s/def :iviewr/data-structure map?)
 
-(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/budget :iviewr/Q-A-pairs :iviewr/interviewee-type] :opt-un [:iviewr/data-structure :iviewr/EADS]))
+(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/budget :iviewr/activity :iviewr/interviewee-type] :opt-un [:iviewr/data-structure :iviewr/EADS]))
 (s/def :iviewr/budget number?)
 (s/def :iviewr/interviewee-type #(#{:human :machine} %))
-(s/def :iviewr/Q-A-pairs (s/coll-of :iviewr/q-a-map :kind vector?))
-(s/def :iviewr/q-a-map (s/keys :req-un [:iviewr/question :iviewr/answer]))
+(s/def :iviewr/activity (s/coll-of :iviewr/activity-map :kind vector?))
+(s/def :iviewr/activity-map (s/keys :req-un [:iviewr/question :iviewr/answer]))
 (s/def :iviewr/question string?)
 (s/def :iviewr/answer string?)
 (s/def :iviewr/data-structure map?)
 (s/def :iviewr/EADS map?) ; ToDo: Tie in the EADSs?
 
-(s/def :iviewr/phase-1-conclusion (s/keys :req-un [:iviewr/problem-type] :opt-un [:iviewr/cyclical?]))
-(s/def :iviewr/problem-type string?)
-(s/def :iviewr/cyclical? boolean?)
-
-(s/def :iviewr/phase-2-eads (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
+(s/def :iviewr/eads-instructions (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
 (s/def :iviewr/interview-objective string?)
 (s/def :iviewr/EADS string?)
 
@@ -169,7 +170,7 @@
   (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid interviewer-msg: " (with-out-str (pprint msg)))))
   (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
-  (let [msg-string (json/write-value-as-string msg)
+  (let [msg-string (ches/generate-string msg {:pretty true})
         res (-> (adb/query-agent interviewer-agent msg-string ctx) output-struct2clj)]
     (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
     res))
@@ -183,7 +184,7 @@
   (assert (string? q-txt))
   (assert (string? a-txt))
   (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt) ctx)
-      json/read-value
+      ches/parse-string
       (update-keys str/lower-case)
       (update-keys keyword)
       (update-vals #(if (empty? %) false %))))
@@ -211,11 +212,10 @@
   (let [repeat-blurb "Okay, but we are still interested in this: "]
     (if (str/starts-with? question repeat-blurb) question (str repeat-blurb question))))
 
-;;; ToDo: The design question I still have here is how to get back on track when the user's response doesn't answer the question.
-;;;       This is mostly a matter for handle-raises-a-question ...(Thread/sleep 20000).
 (defn get-an-answer
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    Return a vector of the conversation (objects suitable for db/add-msg) terminating in an answer to the question.
+   Note that the first element of the conversation should be the question, and the last the answer.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
   [{:keys [question responder-type human-starting?] :as ctx}]
   (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
@@ -242,7 +242,7 @@
 (defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
 
 ;;; ToDo: It isn't obvious that the interview agent needs to see all this. Only useful when the thread was destroyed?
-;;;       It might be sufficient to explain the claims. ToDo: V4 doesn't have claims, but this still holds
+;;; ToDo: V4 instructions do not mention claims, but this still holds
 (defn conversation-history
   "Construct a conversation-history message structure for the argument project.
    This tells the interview agent what has already been asked. If the thread hasn't been deleted
@@ -250,21 +250,14 @@
    asked EXCEPT for the warm-up question (if any) which happens before the interview."
   [pid cid]
   (let [msgs (-> (db/get-conversation pid cid) :conversation/messages)
-        questions (filter #(= :system (:message/from %)) msgs)] ; Some aren't questions; we deal with it.
+        answers (filter #(contains? % :message/answers-question) msgs)]
     (cond-> {:message-type "CONVERSATION-HISTORY"
              :interviewee-type (if (surrogate? pid) :machine :human)
-             :budget (db/get-budget pid cid)
-             :Q-A-pairs (->> questions
-                             (map (fn [q]
-                                    (let [next-id (inc (:message/id q))]
-                                      (as-> {} ?pair
-                                        (assoc ?pair :question (:message/content q))
-                                        (if-let [response (when-let [resp (some #(when (= next-id (:message/id %)) %) msgs)]
-                                                            (when (#{:human :surrogate} (:message/from resp)) resp))]
-                                          (assoc ?pair :answer (:message/content response))
-                                          ?pair)))))
-                             (filter #(contains? % :answer))
-                             vec)})))
+             :budget (db/get-budget pid cid)}
+      (not-empty answers)   (assoc :activity (mapv (fn [answer]
+                                                     {:question (-> (db/get-msg pid cid (:message/answers-question answer)) :message/content)
+                                                      :answer  (-> answer :message/content)})
+                                                   answers)))))
 
 (defn make-supply-question-msg
   "Create a supply question message for the conversation."
@@ -369,31 +362,20 @@
 ;;; over and over and the interview will advance each time.
 (defn q-and-a
   "Call interviewer to supply a question; call get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
-   Returns a vector of message objects suitable for db/add-msg."
+   Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :text :table...).
+   The first element in the vector should be the question object, and the last the answer object."
   [{:keys [client-id responder-type] :as ctx}]
-  (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+  (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
   (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
                           (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type "QUESTION-TO-ASK", :question "...'}
                           (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
                           (fix-off-course--question ctx))]         ; Currently a no-op. Returns argument.
-         (when (= :human responder-type) (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
+         (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
          ;; This returns a VECTOR of statements from the interviewees and interviewer.
          (get-an-answer (cond-> ctx
                           true                                (assoc :question (:text iviewr-q))
                           (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q)))))
-       (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
-
-;TODO: add for other interviews
-(defn analyze-response
-  "Analyze the response from the expert (human or surrogate)."
-  [pid cid response]
-  (assert (s/valid? ::cid cid))
-  (cond
-    (= :process cid) (log! :info (str "process analysis " pid ": " response))
-    (= :data cid) (dan/analyze-response pid response)
-    (= :resources cid) (log! :info (str "resources analysis " pid ": " response))
-    (= :optimality cid) (log! :info (str "optimality analysis" pid ": " response)))
-  )
+       (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
@@ -401,7 +383,7 @@
   [pid cid]
   (case cid
     ;; ToDo: Someday we will be able to do better than this!
-    (:resources :optimality) (find-claim '(flow-shop ?x) (db/get-claims pid))
+    (:resources :optimality) (ru/find-claim '(flow-shop ?x) (db/get-claims pid))
     (:process :data) true))
 
 (defn redirect-user-to-discussion
@@ -413,7 +395,7 @@
               (format "Could you pop over to the %s discussion (menu on left, 'Process', 'Data' etc.) and chat more with that agent?"
                       (name recommended-chat)))]
     ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
-    (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :text text})))
+    (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :text text})))
 
 (defn ctx-surrogate
   "Return context updated with surrogate info."
@@ -456,25 +438,81 @@
         (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
                             :q-type :process/warm-up
                             :cid :process}))
+      (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid pid)))
       pid))
 
+(def iviewr-infos
+  "These have all the info of agent-db/agent-infos entries and additional information for making instructions.
+   To add these to agent-db/agent-infos, use force-new-interviewer!."
+  (-> "agents/iviewrs/iviewr-infos.edn" io/resource slurp edn/read-string))
+
+(defn write-agent-instructions!
+  "Write the agent instructions to resources/agents/iviewrs/<cid>-iviewr-instructions.txt."
+  [cid]
+  (if-let [info (not-empty (get iviewr-infos cid))]
+    (let [{:keys [iviewr-name focus]} info
+          others (reduce (fn [r x] (if (= (:id x) cid) r (into r [(:iviewr-name x) (:focus x)]))) [] (vals iviewr-infos))
+          instructions (str "You are one of four interviewers engaging humans in conversations to elicit from them requirements for a scheduling system we humans and AI agents will be creating together using MiniZinc.\n"
+                            (format "You are the %s Agent; you ask questions about %s\n" iviewr-name focus)
+                            "The other three agents are:"
+                            (cl-format nil "~{~%     - a ~A Agent: that interviews about ~A~}" others)
+                            "\nIn as far as it is practical, you should avoid asking questions in the areas that are the responsibility of these other agents.\n\n"
+                            (-> "agents/iviewrs/base-iviewr-instructions.txt" io/resource slurp))]
+      (spit (str "resources/agents/iviewrs/" (name cid) "-iviewr-instructions.txt") instructions))
+    (log! :error (str "No conversation cid = " cid))))
+
 ;;; ToDo: Should we add a creation policy for interviewers? We need to force new ones whenever we are working on the system instructions.
-(defn ^:diag force-new-interviewer
+(defn ^:admin force-new-interviewer!
   "As a matter of policy, shared-assistant type agents such as surrogates and interviewers don't update the assistant just because
    the instructions change. This is because we try to preserve the context already built up by the current agent.
    Therefore, if you don't care about that context but you do care about seeing the effect of new instructions, you should call this."
-  [pid cid]
-  (adb/ensure-agent!
-   (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
-       (assoc :pid pid)
-       (assoc :force-new? true))))
+  ([cid] (force-new-interviewer! cid nil))
+  ([cid pid]
+   (assert (#{:process :data :resources :optimality} cid))
+   (let [iviewr-info (not-empty (get iviewr-infos cid))
+         {:keys [base-type] :as info} (cond-> (dissoc iviewr-info :iviewr-name :focus :id :warm-up-question)
+                                        true (assoc :base-type (-> cid name (str "-interview-agent") keyword))
+                                        true (assoc :force-new? true)
+                                        pid  (assoc :pid pid))]
+     (write-agent-instructions! cid)
+     (swap! adb/agent-infos #(assoc % base-type (dissoc info :pid)))
+     (when pid (adb/ensure-agent! info)))))
 
 (defn check-and-put-ds
   [iviewr-response {:keys [pid cid] :as _ctx}]
-  (db/put-ds! pid cid iviewr-response))
+  (db/put-EADS-ds! pid cid iviewr-response))
+
+;;; Right now it is inchoate, but it should take into account EADSs that have been completed,
+;;; conversations, scheduling challenges and reframing that took place."
+(defn continue-or-switch-and-continue?!
+  "Returns false if there is nothing more to pursue in this conversation.
+   Returns true if either there is more to pursue on the current EADS, or there is a new EADS to pursue.
+   Side effects occur in two cases:
+      1) In the case that there is nothing more to pursue in this conversation, we set :conversation/done? to true in the DB and
+         retract :conversation/active-EADS, return nil.
+      2) In the case that the current EADS is complete, what happens next depends on the orchestrator.
+         If it finds ..."
+  [pid cid]
+  (let [eads-id (db/get-active-eads pid cid)
+        eads-complete? (and eads-id (ork/eads-complete? pid cid eads-id))]
+    (cond (and eads-id (not eads-complete?))               true
+          :else                                            (ork/get-new-EADS pid)))) ; Will return nil if no more EADS. ToDo: Then what? Change conversations?
+
+(defn update-db-conversation
+  "Write to the DB conversation messages that occurred inclusive of a q/a pair."
+  [pid cid conversation]
+  (let [msg-ids (atom [])
+        EADS-id (db/get-active-eads pid cid)]
+    (doseq [msg conversation]
+      (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
+                                        EADS-id  (assoc :pursuing-EADS EADS-id))))
+      (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})
+      (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05)))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
+;;; ToDo: Will need to keep track in the DB of the interviewer tid on which each element of conversation happened.
+;;;       Use this to decide what to put into CONVERSATION-HISTORY messages.
 (defn resume-conversation
   "Resume the interview loop for an established project and given cid."
   [{:keys [client-id pid cid] :as ctx}]
@@ -491,18 +529,14 @@
                     (assoc :asking-role asking-role))]
         (when-not (db/conversation-done? pid cid)
           (if @active?
-            (do (agent-log "resume " pid  " " cid)
+            (do (agent-log "resume-conversation: " pid  " " cid)
                 (-> (conversation-history pid cid) (tell-interviewer ctx))
                 (loop [cnt 0]
-                  (if @active?
+                  (if (and @active? (continue-or-switch-and-continue?! pid cid))
                     ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                     (let [conversation (q-and-a ctx)
                           expert-response (-> conversation last :full-text)] ; ToDo: This assumes the last is meaningful.
-                      (log! :info (str "Expert in resume-conversation-loop: " expert-response))
-                      (doseq [msg conversation]
-                        (db/add-msg (merge {:pid pid :cid cid} msg)))
-                      (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
-                      (analyze-response pid cid expert-response) ; <================================ NL add
+                      (update-db-conversation pid cid conversation)
                       (cond
                         (> cnt 10)                                  :exceeded-questions-safety-stop
                         ;; ToDo: Write some utility to "re-fund and re-open" conversations.
@@ -514,33 +548,31 @@
                                                                 ctx)]
                           (log! :info (str "Interviewer in resume-conversation-loop: " iviewr-response))
                           (when (surrogate? pid) (ru/refresh-client client-id pid cid))
-                          (case (:message-type iviewr-response)
-                            "PHASE-1-CONCLUSION"          (tell-interviewer (ru/eads-response! :process pid cid iviewr-response) ctx)
-                            "DATA-STRUCTURE-REFINEMENT"   (check-and-put-ds iviewr-response ctx)
-                            nil)
+                          (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
+                            (check-and-put-ds iviewr-response ctx))
                           (recur (inc cnt)))))
-                    (log! :warn "Exiting because active? atom is false."))))
+                    (log! :warn "Exiting because conversation is exhausted or active? atom is false."))))
             (log! :warn "Exiting because active? atom is false.")))))
-    (finally (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+    (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 ;;; The equivalent for surrogates is start-surrogate. It also asks the first question.
 (defn start-conversation
   "Ask a human the first question (a warm-up question), create a project and call resume-conversation.
    :start-conversation is a dispatch-key from the client, providing, perhaps only the client-id."
-  [{:keys [client-id] :as ctx}]
-  (ws/send-to-chat {:dispatch-key :iviewr-says :client-id client-id :promise? true
+  [{:keys [client-id cid] :as ctx}]
+  (assert (= :process cid)) ; Conversation always starts with the :process conversation.
+  (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :promise? true
                     :text (str "You want to start a new project? This is the right place! "
                                (db/conversation-intros :process))})
   (try
     (let [ctx (merge ctx {:responder-type :human
                           :human-starting? true
-                          :question the-warm-up-type-question})
-          _effect! (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-          conversation (get-an-answer ctx)
-          response (-> conversation last :text) ; ToDo: Could be more to it...wants-a-break?.
+                          :question (ru/get-warm-up-q cid)})
+          conversation (get-an-answer ctx) ; get-an-answer also used by q-and-a, but here we have the q.
+          response (-> conversation last :text)
           pid (start-human-project! response)
           [_ _ pname] (ru/find-claim '(project-name ?pid ?pname) (db/get-claims pid))]
-      (ws/send-to-chat {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+      (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
       (doseq [{:keys [from text table tags]} conversation]
         (db/add-msg {:pid pid :cid :process :from from :tags tags :text text :table table}))
       (db/add-msg {:pid pid
@@ -549,10 +581,10 @@
                    :text (str "Great, we'll call your project " pname ".")
                    :tags [:process/warm-up :name-project :informative]})
       ;; This will cause a resume-conversation:
-      (ws/send-to-chat {:dispatch-key :load-proj :client-id client-id  :promise? false
+      (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
                         :new-proj-map {:project/name pname :project/id pid}}))
     (finally
-      (ws/send-to-chat {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+      (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 ;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-iviewers!
