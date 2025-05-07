@@ -73,9 +73,6 @@
 (s/def ::annotated-subprocesses (s/keys :req-un [:subprocesses/val ::comment]))
 
 (s/def ::item-id string?)
-(s/def ::quantity (s/keys :req-un [::units ::value-string]))
-(s/def ::units string?)
-(s/def ::value-string string?)
 
 ;;; (s/valid? ::fshop/EADS (:EADS fshop/flow-shop))
 
@@ -98,7 +95,7 @@
                  :comment "This is the top-level process. You can name it as you see fit; don't ask the interviewees."}
 
     :inputs {:val ["graphite", "clay", "water", "cedar wood", "metal", "eraser material", "paint"],
-              :comment "These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes."}
+              :comment "These are all the raw materials used to make the product. It is a collection of all the raw materials in subprocesses."}
 
     :outputs {:val [{:item-id "finished pencils",
                      :quantity {:units "finished pencils" :value-string "100000"}}]
@@ -123,7 +120,7 @@
                                     :resources ["mixer"],
                                     :duration  {:units "hours", :value-string "1"}
                                     :subprocesses {:val []
-                                                    :comment (str "We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\n"
+                                                   :comment (str "We use empty array val values to signify that we don't think there are any interesting subprocess from the standpoint of scheduling.\n"
                                                                  "Of course, this could be updated later if subsequent discussion suggests we are wrong.")}}
 
                                    {:process-id "extrude-core",
@@ -157,7 +154,7 @@
                                     :resources ["milling machine"],
                                     :duration  {:units "hours", :value-string "2"}
                                     :subprocess-flow {:val :individuals-from-batch,
-                                                      :comment (str "'sub-process-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\n"
+                                                      :comment (str "'subprocess-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\n"
                                                                     "The string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\n"
                                                                     "can start as soon as the first slat is available.")}
                                     :subprocesses []},

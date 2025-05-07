@@ -61,7 +61,7 @@
         },
         "subprocesses" : {
           "val" : [ ],
-          "comment" : "We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\nOf course, this could be updated later if subsequent discussion suggests we are wrong."
+          "comment" : "We use empty array val values to signify that we don't think there are any interesting subprocess from the standpoint of scheduling.\nOf course, this could be updated later if subsequent discussion suggests we are wrong."
         }
       }, {
         "process-id" : "extrude-core",
@@ -123,7 +123,7 @@
         },
         "subprocess-flow" : {
           "val" : "individuals-from-batch",
-          "comment" : "'sub-process-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\nThe string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\ncan start as soon as the first slat is available."
+          "comment" : "'subprocess-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\nThe string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\ncan start as soon as the first slat is available."
         },
         "subprocesses" : [ ]
       }, {

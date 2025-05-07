@@ -1,5 +1,5 @@
 (ns scheduling-tbd.interviewing.domain.process.job-shop-c
-  "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a job-shop scheduling problem.
+  "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a job-shop scheduling problem with classifable job types.
        As the case is with job-shop problems, this structure defines work to be performed in typical job.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer.
 
@@ -76,9 +76,6 @@
 (s/def ::annotated-subprocesses (s/keys :req-un [:subprocesses/val ::comment]))
 
 (s/def ::item-id string?)
-(s/def ::quantity (s/keys :req-un [::units ::value-string]))
-(s/def ::units string?)
-(s/def ::value-string string?)
 
 ;;; (s/explain :job-shop-c/EADS-message jshopc/job-shop-c)
 (def job-shop-c

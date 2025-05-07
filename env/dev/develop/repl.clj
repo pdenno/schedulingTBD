@@ -33,8 +33,9 @@
    'jshop  'scheduling-tbd.interviewing.domain.process.job-shop
    'jshopc 'scheduling-tbd.interviewing.domain.process.job-shop-c
    'jshopu 'scheduling-tbd.interviewing.domain.process.job-shop-u
-   'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type
    'pan    'scheduling-tbd.interviewing.domain.process.process-analysis
+   'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type
+   'ttable 'scheduling-tbd.interviewing.domain.process.timetabling
    'inv    'scheduling-tbd.interviewing.interviewers
    'ork    'scheduling-tbd.interviewing.ork
    'orkt   'scheduling-tbd.interviewing.ork_test
