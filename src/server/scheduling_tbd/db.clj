@@ -15,7 +15,7 @@
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
    [scheduling-tbd.util     :as util :refer [now]]
-   [taoensso.telemere       :refer [log!]])) ; Here only
+   [taoensso.telemere       :refer [log!]]))
 
 (def db-schema-agent+
   "Defines properties that can be used for agents, which can be stored either in the system DB or a project DB.
@@ -670,7 +670,10 @@
    (str "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. "
         "It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) "
         "through which together we design a solution to your scheduling problem. "
-        "You can read more about <a href=\"about/process-conversation\">how this works</a>.")
+        "You can read more about <a href=\"about/process-conversation\">how this works</a>.
+<svg width=\"300\" height=\"130\" xmlns=\"http://www.w3.org/2000/svg\">
+  <rect width=\"200\" height=\"100\" x=\"10\" y=\"10\" rx=\"20\" ry=\"20\" fill=\"blue\" />
+</svg>")
    :data
    (str "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). "
         "Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and "

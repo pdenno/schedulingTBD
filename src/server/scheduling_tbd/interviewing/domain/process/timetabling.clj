@@ -17,41 +17,76 @@
 (s/def ::event-types (s/coll-of ::event-type :kind vector?))
 (s/def ::event-type (s/or :normal :event-type/val :annotated ::annotated-event-type))
 (s/def :event-type/val (s/keys :req-un [::event-type-name ::occurrence-assignment] :opt-un [::periodicity ::event-resources]))
-(s/def ::annotated-event-type (s/keys :req-un [::comment ::event-type/val]))
+(s/def ::annotated-event-type (s/keys :req-un [::comment :event-type/val]))
 
-(s/def ::event-name (s/or :normal :event-name/val :annotated ::annotated-event-name))
-(s/def :event-name/val string?)
+(s/def ::event-type-name (s/or :normal :event-type-name/val :annotated ::annotated-event-type-name))
+(s/def :event-type-name/val string?)
+(s/def ::annotated-event-type-name (s/keys :req-un [::comment :event-name/val]))
+
+(s/def ::occurrence-assignment (s/or :normal :occurrence-assignment/val :annotated ::annotated-occurrence-assignment))
+(s/def :occurrence-assignment/val (s/keys :opt-un [::timeslot-refs ::constraints ::opportunistic?]))
+(s/def ::annotated-occurrence-assignment (s/keys :req-un [::comment :occurrance-assignment/val]))
+(s/def ::timeslot-refs (s/or :normal :timeslot-refs/val :annotated ::annotated-timeslots-ref))
+(s/def :timeslot-refs/val (s/coll-of ::timeslot-ref :kind vector?))
+(s/def ::timeslot-ref string?)
+(s/def ::annotated-timeslots-ref (s/keys :opt-un [::comment :timeslots-ref/val]))
+(s/def :constraints (s/or :normal :constraints/val :annotated ::annotated-constraints))
+(s/def :constraints/val (s/coll-of ::constraint :kind vector?))
+(s/def ::constraint string?)
+(s/def ::opportunistic? (s/or :normal :opportunistic/val :annotated ::annotated-opportunistic?))
+(s/def :opportunistic?/val  boolean?)
+(s/def ::annotated-opportunistic? (s/keys :req-un [::comment :opportunistic?/val]))
+
+
+(s/def ::periodicity (s/or :normal :periodicity/val :annotated ::annotated-periodicity))
+(s/def :periodicity/val (s/keys :req-un [::interval ::occurrences]))
+(s/def ::interval (s/or :normal :interval/val :annotated ::annotated-interval))
+(s/def :interval/val (s/keys :req-un [::units ::value-string]))
+(s/def ::annotated-interval (s/keys :req-un [::comment :interval/val]))
+(s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
+(s/def :units/val string?)
+(s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
+
+(s/def ::value-string (s/or...))
+
+
+;;; Promises and Pitfalls: Using LLMs to Generate Visualization Items (Fumeng Yang et al. (fy@umg.edu)
+;;; How High School Teachers Develop Tests and How AI Could Help.    (Fumeng Yang et al.) (Maybe not published yet.)
+;;; There was 1 quick slide on decision-making; she has one grad student working on it.
+;;; https://news.northwestern.edu/stories/2020/10/presidential-plinko-visualizes-data-uncertainty/
+
 
 ;;; ToDo: add a timetabled? property to flow and job shop EADS processes ????
 ;;; ToDo: Define the enumerations that are being used!
 (def timetabling
     {:message-type :EADS-INSTRUCTIONS
      :interviewer-agent :process
-     :interview-objective (str "Whereas most other EADS-INSTRUCTIONS in the process interview focus on characterizing the processes by which the interviewees' enterprise produces product or delivers a service,\n"
-                               "process/timetabling does not. Timetabling is about assigning limited resources, such as classrooms, teachers, or machinery, to events that will occur in timeslots identified in the interview.\n"
-                               "Timetabling interviews are about the timetabling scheduling problem the interviewees are trying to solve, not how they make product or deliver services.\n"
-                               "A timetabling discussion mediated by these EADS-INSTRUCTIONS can occur as a focused examination of some subprocess of a larger process for which you have already had some discussion.\n"
-                               "For example, you might have pursued the process/flow-shop EADS, and learned that a particular subprocess in the flow uses timetabling.\n"
-                               "\n"
-                               "The specifics of timetablings problems can vary widely depending on the enterprises's goals and circumstances.\n"
-                               "For example, in some cases, the time at which the event occurs can be chosen in light of opportunity.\n"
-                               "For example, one could timetable the use of a heat-treat oven based on having available a sufficient number of parts needing the same heat treat process.\n"
-                               "Likewise one might timetable equipment maintenance opportunistically.\n"
-                               "Another opportunistic timetabling problem might involve perishable raw materials, such as food ingredients.\n"
-                               "Many timetabling problems are not opportunistic; scheduling classes in a university, for example.\n"
-                               "\n"
-                               "There are three kinds of event types in our formulation of timetabling:\n"
-                               "    (1) regularly scheduled: they have property named 'periodicity',\n"
-                               "    (2) one-time: their 'occurrence-assigment' property defines when they occur using a date, and,\n"
-                               "    (3) opportunistic: their 'occurrence-assigment' property defines 'opportunistic? = true' and conditions (possibly including periodicity) in which they occur.\n"
-                               "\n"
-                               "You can think of the information you are trying to capture in the interview as including descriptions of\n"
-                               "   (1) a Cartesian product of resources needed for the event type to occur,\n"
-                               "   (2) rules for what resources can, must, or must not occur together in instances of the Cartesian product, and\n"
-                               "   (3) how instances of the Cartesian product can be assigned to timeslots.\n"
-                               "\n"
-                               "Finally, we must confess to not knowing too much about what to expected from timetabling interviews; we haven't studied this area as much as some of the others.\n"      ; <=== Probably temporary.
-                               "With this in mind, feel free to use the 'invented' property discussed in the interviewer instructions whenever you think the EADS isn't capturing something important.") ; <=== Probably temporary.
+     :interview-objective
+     (str "Whereas most other EADS-INSTRUCTIONS in the process interview focus on characterizing the processes by which the interviewees' enterprise produces product or delivers a service,\n"
+          "process/timetabling does not. Timetabling is about assigning limited resources, such as classrooms, teachers, or machinery, to events that will occur in timeslots identified in the interview.\n"
+          "Timetabling interviews are about the timetabling scheduling problem the interviewees are trying to solve, not how they make product or deliver services.\n"
+          "A timetabling discussion mediated by these EADS-INSTRUCTIONS can occur as a focused examination of some subprocess of a larger process for which you have already had some discussion.\n"
+          "For example, you might have pursued the process/flow-shop EADS, and learned that a particular subprocess in the flow uses timetabling.\n"
+          "\n"
+          "The specifics of timetablings problems can vary widely depending on the enterprises's goals and circumstances.\n"
+          "For example, in some cases, the time at which the event occurs can be chosen in light of opportunity.\n"
+          "For example, one could timetable the use of a heat-treat oven based on having available a sufficient number of parts needing the same heat treat process.\n"
+          "Likewise one might timetable equipment maintenance opportunistically.\n"
+          "Another opportunistic timetabling problem might involve perishable raw materials, such as food ingredients.\n"
+          "Many timetabling problems are not opportunistic; scheduling classes in a university, for example.\n"
+          "\n"
+          "There are three kinds of event types in our formulation of timetabling:\n"
+          "    (1) regularly scheduled: they have property named 'periodicity',\n"
+          "    (2) one-time: their 'occurrence-assigment' property defines when they occur using a date, and,\n"
+          "    (3) opportunistic: their 'occurrence-assigment' property defines 'opportunistic? = true' and conditions (possibly including periodicity) in which they occur.\n"
+          "\n"
+          "You can think of the information you are trying to capture in the interview as including descriptions of\n"
+          "   (1) a Cartesian product of resources needed for the event type to occur,\n"
+          "   (2) rules for what resources can, must, or must not occur together in instances of the Cartesian product, and\n"
+          "   (3) how instances of the Cartesian product can be assigned to timeslots.\n"
+          "\n"
+          "Finally, we must confess to not knowing too much about what to expected from timetabling interviews; we haven't studied this area as much as some of the others.\n"      ; <=== Probably temporary.
+          "With this in mind, feel free to use the 'invented' property discussed in the interviewer instructions whenever you think the EADS isn't capturing something important.") ; <=== Probably temporary.
      :EADS
      {:EADS-id :process/timetabling
       :event-types {:comment (str "The event-types property is a list of objects, that captures\n"

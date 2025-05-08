@@ -5,7 +5,8 @@
   (:require
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]
+   [taoensso.telemere       :refer [log!]])) ; Here only
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
@@ -74,13 +75,60 @@
 
 (s/def ::item-id string?)
 
-;;; (s/valid? ::fshop/EADS (:EADS fshop/flow-shop))
+(defn find-process
+  "Return the process with the given process id."
+  [graph process-id]
+  (let [found? (atom nil)]
+    (letfn [(fp [obj]
+              (when-not @found?
+                (cond (map? obj) (if (= process-id (:process-id obj))
+                                   (reset! found? obj)
+                                   (doseq [[_ v] obj] (fp v)))
+                      (vector? obj) (doseq [x obj] (fp x)))))]
+      (fp graph)
+      @found?)))
+
+(defn process-produces-output?
+  "EADS process graphs generated through conversation can use an object with :item-id and :from to indicate
+   a relationship between processes. For example, {:item-id 'graphite core', :from 'graphite-core-production'}.
+   This function returns true if :from process does, in fact, list the :item-id as an :output."
+  [graph {:keys [item-id from]}]
+  (if-let [process (find-process graph from)]
+    (if (some #(= item-id %) (->> process :outputs (map #(if (map? %) (:item-id %) %))))
+      true
+      (log! :error (str "Process " (:process-id process) " exists but does not have " item-id " as an output.")))
+    (log! :error (str "No process " from " found."))))
+
+(defn graph-inputs-from-outputs
+  "Return a vector of all the graph maps containing both :item-id and :from."
+  [graph]
+  (let [coll (atom #{})]
+    (letfn [(fp [obj]
+              (cond (map? obj) (if (and (contains? obj :item-id) (contains? obj :from))
+                                 (swap! coll conj obj)
+                                 (doseq [[_ v] obj] (fp v)))
+                    (vector? obj) (doseq [x obj] (fp x))))]
+      (fp graph)
+      (-> coll deref vec))))
+
+(defn outputs-exist-where-inputs-claim?
+  "Return true if for every process that claims to get an input from a certain process, that certain process in fact produces the item as output.
+   Error messages are generated wherever this is not true."
+  [graph]
+  (every? #(process-produces-output? graph %) (graph-inputs-from-outputs graph)))
 
 ;;; ToDo: Write something about flow-shops being disjoint from the other four types. But also point out that part of their complete process could be flow shop....
 ;;;       Come up with an example where work flows to a single-machine-scheduling problem.
+
+;;; (s/valid? ::fshop/EADS (:EADS fshop/flow-shop))
 (def flow-shop
   "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of a flow-shop problem.
-   Like all EADS, it is also stored in the system DB. See how at the bottom of this file."
+   Like all EADS, it is also stored in the system DB. See how at the bottom of this file.
+   We use the data structure created by this EADS to create something like functional flow block diagrams (FFBDs).
+   In our notation, we infer concurrency by looking at relationships between inputs of one process and output of another.
+   For the time being however, if the adjacent processes in the :subprocesses vector have the same inputs and outputs, we assume the are sequential.
+   We aren't sure this makes sense, and it is likely that there are shortcomings in using matching on inputs and outputs to decide concurrency/sequentiality.
+   For the time being we'll live with it. Maybe the ability to edit charts with help from an AI agent can be used to fix bugs."
   {:message-type :EADS-INSTRUCTIONS
    :interviewer-agent :process
    :interview-objective (str "This EADS assumes the interviewees' production processes are organized as a flow shop.\n"
@@ -115,7 +163,7 @@
                     :resources ["mixer", "extruder", "kiln"],
                     :subprocesses [{:process-id "mix-graphite-and-clay",
                                     :inputs ["graphite", "clay", "water"],
-                                    :outputs [{:item-id "graphite-clay paste",
+                                    :outputs [{:item-id "graphite clay paste",
                                                :quantity {:units "liters", :value-string "100"}}],
                                     :resources ["mixer"],
                                     :duration  {:units "hours", :value-string "1"}
@@ -124,7 +172,7 @@
                                                                  "Of course, this could be updated later if subsequent discussion suggests we are wrong.")}}
 
                                    {:process-id "extrude-core",
-                                    :inputs ["graphite-clay paste"],
+                                    :inputs ["graphite clay paste"],
                                     :outputs [{:item-id "extruded graphite rods",
                                                :quantity {:units "extruded graphite core", :value-string "100000"}}],
                                     :resources ["extruder"],
