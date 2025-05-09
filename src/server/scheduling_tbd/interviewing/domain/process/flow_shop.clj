@@ -6,7 +6,7 @@
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]
-   [taoensso.telemere       :refer [log!]])) ; Here only
+   [taoensso.telemere       :refer [log!]]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
@@ -21,6 +21,7 @@
 (s/def ::comment string?) ; About annotations
 
 (s/def ::EADS (s/keys :req-un [::EADS-id ::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
+(s/def :flow-shop/graph (s/keys :req-un [::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
 (s/def ::EADS-id #(= % :process/flow-shop))
 
 ;;; We use the 'trick' that :<some-property>/val can be used that to signify a non-namespaced attribute 'val' and a reference to a spec for value of 'val'.
@@ -75,48 +76,6 @@
 
 (s/def ::item-id string?)
 
-(defn find-process
-  "Return the process with the given process id."
-  [graph process-id]
-  (let [found? (atom nil)]
-    (letfn [(fp [obj]
-              (when-not @found?
-                (cond (map? obj) (if (= process-id (:process-id obj))
-                                   (reset! found? obj)
-                                   (doseq [[_ v] obj] (fp v)))
-                      (vector? obj) (doseq [x obj] (fp x)))))]
-      (fp graph)
-      @found?)))
-
-(defn process-produces-output?
-  "EADS process graphs generated through conversation can use an object with :item-id and :from to indicate
-   a relationship between processes. For example, {:item-id 'graphite core', :from 'graphite-core-production'}.
-   This function returns true if :from process does, in fact, list the :item-id as an :output."
-  [graph {:keys [item-id from]}]
-  (if-let [process (find-process graph from)]
-    (if (some #(= item-id %) (->> process :outputs (map #(if (map? %) (:item-id %) %))))
-      true
-      (log! :error (str "Process " (:process-id process) " exists but does not have " item-id " as an output.")))
-    (log! :error (str "No process " from " found."))))
-
-(defn graph-inputs-from-outputs
-  "Return a vector of all the graph maps containing both :item-id and :from."
-  [graph]
-  (let [coll (atom #{})]
-    (letfn [(fp [obj]
-              (cond (map? obj) (if (and (contains? obj :item-id) (contains? obj :from))
-                                 (swap! coll conj obj)
-                                 (doseq [[_ v] obj] (fp v)))
-                    (vector? obj) (doseq [x obj] (fp x))))]
-      (fp graph)
-      (-> coll deref vec))))
-
-(defn outputs-exist-where-inputs-claim?
-  "Return true if for every process that claims to get an input from a certain process, that certain process in fact produces the item as output.
-   Error messages are generated wherever this is not true."
-  [graph]
-  (every? #(process-produces-output? graph %) (graph-inputs-from-outputs graph)))
-
 ;;; ToDo: Write something about flow-shops being disjoint from the other four types. But also point out that part of their complete process could be flow shop....
 ;;;       Come up with an example where work flows to a single-machine-scheduling problem.
 
@@ -158,7 +117,7 @@
 
     :subprocesses [{:process-id "graphite-core-production",
                     :inputs ["graphite", "clay", "water"],
-                    :outputs [{:item-id "graphite core"
+                    :outputs [{:item-id "finished graphite rods"
                                :quantity {:units "graphite cores" :value-string "100000"}}],
                     :resources ["mixer", "extruder", "kiln"],
                     :subprocesses [{:process-id "mix-graphite-and-clay",
@@ -181,7 +140,7 @@
 
                                    {:process-id "dry-and-bake-core",
                                     :inputs ["extruded graphite rods"],
-                                    :outputs [{:item-id "extruded graphite rods",
+                                    :outputs [{:item-id "finished graphite rods",
                                                :quantity {:units "extruded graphite core", :value-string "100000"}}],
                                     :resources ["kiln"],
                                     :duration  {:units "hours", :value-string "2"}
@@ -214,8 +173,8 @@
                                     :duration  {:units "hours", :value-string "2"}
                                     :subprocesses []}]},
 
-                   {:process-id "assembly",
-                    :inputs  {:val [{:item-id "graphite core", :from "graphite-core-production"},
+                   {:process-id "assemble",
+                    :inputs  {:val [{:item-id "finished graphite rods", :from "graphite-core-production"},
                                     {:item-id "wood slats with grooves", :from "wood-casing-production"}
                                     "metal", "erasers", "paint"]
                               :comment (str "The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\n"

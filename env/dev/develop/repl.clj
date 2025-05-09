@@ -36,6 +36,7 @@
    'pan    'scheduling-tbd.interviewing.domain.process.process-analysis
    'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type
    'ttable 'scheduling-tbd.interviewing.domain.process.timetabling
+   'eadsu  'scheduling-tbd.interviewing.eads-util
    'inv    'scheduling-tbd.interviewing.interviewers
    'ork    'scheduling-tbd.interviewing.ork
    'orkt   'scheduling-tbd.interviewing.ork_test
