@@ -20,6 +20,7 @@
    'str    'clojure.string
    'd      'datahike.api
    'dp     'datahike.pull-api
+   'dutil  'develop
    'mount  'mount.core
    'p      'promesa.core
    'px     'promesa.exec

@@ -25,7 +25,7 @@
 
 (s/def ::occurrence-assignment (s/or :normal :occurrence-assignment/val :annotated ::annotated-occurrence-assignment))
 (s/def :occurrence-assignment/val (s/keys :opt-un [::timeslot-refs ::constraints ::opportunistic?]))
-(s/def ::annotated-occurrence-assignment (s/keys :req-un [::comment :occurrance-assignment/val]))
+(s/def ::annotated-occurrence-assignment (s/keys :req-un [::comment :occurrence-assignment/val]))
 (s/def ::timeslot-refs (s/or :normal :timeslot-refs/val :annotated ::annotated-timeslots-ref))
 (s/def :timeslot-refs/val (s/coll-of ::timeslot-ref :kind vector?))
 (s/def ::timeslot-ref string?)
@@ -40,14 +40,19 @@
 
 (s/def ::periodicity (s/or :normal :periodicity/val :annotated ::annotated-periodicity))
 (s/def :periodicity/val (s/keys :req-un [::interval ::occurrences]))
+(s/def ::annotated-periodicity (s/keys :req-un [::comment :periodicity/val]))
 (s/def ::interval (s/or :normal :interval/val :annotated ::annotated-interval))
 (s/def :interval/val (s/keys :req-un [::units ::value-string]))
 (s/def ::annotated-interval (s/keys :req-un [::comment :interval/val]))
+(s/def ::occurrences (s/or :normal :occurrences/val :annotated ::annotated-occurrences))
+(s/def :occurrences/val (s/keys :req-un [::value-string]))
+(s/def ::annotated-occurrences (s/keys :req-un [::comment :occurrences/val]))
 (s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
 (s/def :units/val string?)
 (s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
-
-(s/def ::value-string (s/or...))
+(s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
+(s/def :value-string/val string?)
+(s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
 
 
 ;;; Promises and Pitfalls: Using LLMs to Generate Visualization Items (Fumeng Yang et al. (fy@umg.edu)
@@ -63,8 +68,8 @@
      :interviewer-agent :process
      :interview-objective
      (str "Whereas most other EADS-INSTRUCTIONS in the process interview focus on characterizing the processes by which the interviewees' enterprise produces product or delivers a service,\n"
-          "process/timetabling does not. Timetabling is about assigning limited resources, such as classrooms, teachers, or machinery, to events that will occur in timeslots identified in the interview.\n"
-          "Timetabling interviews are about the timetabling scheduling problem the interviewees are trying to solve, not how they make product or deliver services.\n"
+          "process/timetabling does not. Timetabling is about assigning limited resources, such as classrooms, teachers, or machinery, to events types that will occur in timeslots.\n"
+          "Timetabling interviews are about characterizing the resources, event types, and timeslots, not how enterprise makes product or delivers a service.\n"
           "A timetabling discussion mediated by these EADS-INSTRUCTIONS can occur as a focused examination of some subprocess of a larger process for which you have already had some discussion.\n"
           "For example, you might have pursued the process/flow-shop EADS, and learned that a particular subprocess in the flow uses timetabling.\n"
           "\n"
@@ -73,7 +78,7 @@
           "For example, one could timetable the use of a heat-treat oven based on having available a sufficient number of parts needing the same heat treat process.\n"
           "Likewise one might timetable equipment maintenance opportunistically.\n"
           "Another opportunistic timetabling problem might involve perishable raw materials, such as food ingredients.\n"
-          "Many timetabling problems are not opportunistic; scheduling classes in a university, for example.\n"
+          "Many timetabling problems are not opportunistic, scheduling classes in a university, for example.\n"
           "\n"
           "There are three kinds of event types in our formulation of timetabling:\n"
           "    (1) regularly scheduled: they have property named 'periodicity',\n"
@@ -89,10 +94,10 @@
           "With this in mind, feel free to use the 'invented' property discussed in the interviewer instructions whenever you think the EADS isn't capturing something important.") ; <=== Probably temporary.
      :EADS
      {:EADS-id :process/timetabling
-      :event-types {:comment (str "The event-types property is a list of objects, that captures\n"
-                                  "     'event-resources'        : a Cartesian product of resources in the sense described in the interview objectives, and\n"
-                                  "     'periodicity'            : (optional) the interval and number of instances in which periodic events of this event type occur.\n"
-                                  "     'occurrence-assignment'  : the timeslots in which this event type are allowed to occur.\n"
+      :event-types {:comment (str "The event-types property is a list of objects that capture\n"
+                                  "   *  'event-resources'        : a Cartesian product of resources in the sense described in the interview objectives, and\n"
+                                  "   *  'periodicity'            : (optional) the interval and number of instances in which periodic events of this event type occur.\n"
+                                  "   *  'occurrence-assignment'  : the timeslots in which this event type are allowed to occur.\n"
                                   "This example is about timetabling classes at a community college for one semester.")
                     :val [{:event-type-name {:val "lecture-class-30-90min-type"
                                              :comment (str "Note that we used the suffix '-type' in the name to emphasize that this defines the general form for instances of this class, not an instance occurrence.\n"
@@ -100,11 +105,11 @@
                                                            "You, the interviewer, decided on this naming convention in light of the conversation you had with interviewees.")}
                            :event-resources {:comment "These are the elements of the Cartesian product. When no quantity is specified, we assume exactly one is required."
                                              :val [{:resource-type {:val "room-type-30"
-                                                                    :comment (str "Note the -30  suffix here is because (as shown below) the room should have capacity for 30 people and the event is '-30-90min-type'.\n"
+                                                                    :comment (str "Note the -30 suffix here is because (as shown below) the room should have capacity for 30 people and the event is '-30-90min-type'.\n"
                                                                                   "Similar to 'event-type-name', you devised this naming convention.\n"
                                                                                   "The meaning of room-type-30 will be made clear in the resources interview, not here.")}
                                                     :base-type {:val "place" :comment "Possible values for this property are 'human', 'place', and 'equipment'."}}
-                                                   {:resource-type "student-type"    :base-type "human"}
+                                                   {:resource-type "student-type"    :base-type "human" :quantity {:units "person" :value-string "30" :modifier "up to"}}
                                                    {:resource-type "instructor-type" :base-type "human"}]}
                            :periodicity {:val {:interval {:units "week" :value-string "1"}
                                                :occurrences {:value-string "2"}}
@@ -142,10 +147,10 @@
                                                   :constraints {:val ["every-day", "once"]
                                                                 :comment (str "The purpose of this event type is to ensure the no instructor has to work every timeslot.\n"
                                                                               "Interviewees stipulated this in the conversation.")}
-                                                  :timeslots-ref ["Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab"]}}
+                                                  :timeslot-refs ["Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab"]}}
 
                           {:event-type-name {:val "spring-break" :comment "This is an example of a one-time event. It has no 'event-resources'; in this sense, it is a non-event!"}
-                           :occurrence-assigment {:constraints {:val ["2025-03-17" "2025-03-18" "2025-03-19" "2025-03-20" "2025-03-21"]
+                           :occurrence-assigment {:timeslot-refs {:val ["2025-03-17" "2025-03-18" "2025-03-19" "2025-03-20" "2025-03-21"]
                                                                 :comment "Instead of enumeration values, we put dates here."}}}]}
 
       :timeslots [{:timeslot-id "Mon-Wed-Fri-60min"
@@ -166,7 +171,6 @@
                                    {:day "Wednesday" :periods  ["9:00-11:50" "13:00-15:50"]}
                                    {:day "Thursday"  :periods  ["9:00-11:50" "13:00-15:50"]}
                                    {:day "Friday"    :periods  ["9:00-11:50" "13:00-15:50"]}]}]}})
-
 
 (if (s/valid? :timetabling/EADS-message timetabling)
   (let [db-obj {:EADS/id :process/timetabling
