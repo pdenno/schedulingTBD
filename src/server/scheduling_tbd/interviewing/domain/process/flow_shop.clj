@@ -5,8 +5,7 @@
   (:require
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]
-   [taoensso.telemere       :refer [log!]]))
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
