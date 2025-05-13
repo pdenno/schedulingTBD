@@ -21,7 +21,6 @@
            org.clj-commons/hickory             {:mvn/version "0.7.7"}
            org.clojure/clojure                 {:mvn/version "1.12.0"}
            org.clojure/core.unify              {:mvn/version "0.7.0"}
-           #_#_org.clojure/data.json               {:mvn/version "2.5.1"}    ; So far, this is only used to pprint for EADS. ToDo: This, jsonista, or both?
            org.clojure/data.xml                {:mvn/version "0.0.8"}
            org.clojure/tools.logging           {:mvn/version "1.3.0"}
            org.ring-clojure/ring-websocket-async {:mvn/version "0.2.0"}
@@ -44,8 +43,9 @@
                                            com.lambdaisland/classpath      {:mvn/version "0.6.58"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
                                            lilactown/helix                 {:mvn/version "0.2.1"}
-                                           org.clojure/java.classpath      {:mvn/version "1.1.0"}
+                                           ;no.cjohansen/replicant          {:mvn/version "2025.03.27"} ; exploring this for debugging
                                            nrepl/nrepl                     {:mvn/version "1.3.1"}
+                                           org.clojure/java.classpath      {:mvn/version "1.1.0"}
                                            org.clojure/tools.namespace     {:mvn/version "1.5.0"}}}
 
            :test       {:extra-paths    ["src/server" "test" "env/dev"]

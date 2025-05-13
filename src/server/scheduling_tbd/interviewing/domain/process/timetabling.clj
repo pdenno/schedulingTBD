@@ -14,7 +14,9 @@
 (s/def ::EADS (s/keys :req-un [::EADS-id ::event-types ::timeslots]))
 (s/def ::EADS-id #(= % :process/timetabling))
 
-(s/def ::event-types (s/coll-of ::event-type :kind vector?))
+(s/def ::event-types (s/or :normal :event-types/val :annotated ::annotated-event-types))
+(s/def :event-types/val (s/coll-of ::event-type :kind vector?))
+(s/def ::annotated-event-types (s/keys :req-un [::comment :event-types/val]))
 (s/def ::event-type (s/or :normal :event-type/val :annotated ::annotated-event-type))
 (s/def :event-type/val (s/keys :req-un [::event-type-name ::occurrence-assignment] :opt-un [::periodicity ::event-resources]))
 (s/def ::annotated-event-type (s/keys :req-un [::comment :event-type/val]))
@@ -30,13 +32,17 @@
 (s/def :timeslot-refs/val (s/coll-of ::timeslot-ref :kind vector?))
 (s/def ::timeslot-ref string?)
 (s/def ::annotated-timeslots-ref (s/keys :opt-un [::comment :timeslots-ref/val]))
-(s/def :constraints (s/or :normal :constraints/val :annotated ::annotated-constraints))
+(s/def ::constraints (s/or :normal :constraints/val :annotated ::annotated-constraints))
 (s/def :constraints/val (s/coll-of ::constraint :kind vector?))
-(s/def ::constraint string?)
+(s/def ::annotated-constraints (s/keys :req-un [::comment :constraints/val]))
+
+(s/def ::constraint (s/or :normal :constraint/val :annotated ::annotated-constraint))
+(s/def :constraint/val string?)
+(s/def ::annotated-constraint (s/keys :req-un [::comment :constraint/val]))
+
 (s/def ::opportunistic? (s/or :normal :opportunistic/val :annotated ::annotated-opportunistic?))
 (s/def :opportunistic?/val  boolean?)
 (s/def ::annotated-opportunistic? (s/keys :req-un [::comment :opportunistic?/val]))
-
 
 (s/def ::periodicity (s/or :normal :periodicity/val :annotated ::annotated-periodicity))
 (s/def :periodicity/val (s/keys :req-un [::interval ::occurrences]))
@@ -63,13 +69,14 @@
 
 ;;; ToDo: add a timetabled? property to flow and job shop EADS processes ????
 ;;; ToDo: Define the enumerations that are being used!
+;;; (s/explain :timetabling/EADS-message ttable/timetabling)
 (def timetabling
     {:message-type :EADS-INSTRUCTIONS
      :interviewer-agent :process
      :interview-objective
      (str "Whereas most other EADS-INSTRUCTIONS in the process interview focus on characterizing the processes by which the interviewees' enterprise produces product or delivers a service,\n"
           "process/timetabling does not. Timetabling is about assigning limited resources, such as classrooms, teachers, or machinery, to events types that will occur in timeslots.\n"
-          "Timetabling interviews are about characterizing the resources, event types, and timeslots, not how enterprise makes product or delivers a service.\n"
+          "Timetabling interviews are about characterizing the resources, event types, and timeslots (ts), not how enterprise makes product or delivers a service.\n"
           "A timetabling discussion mediated by these EADS-INSTRUCTIONS can occur as a focused examination of some subprocess of a larger process for which you have already had some discussion.\n"
           "For example, you might have pursued the process/flow-shop EADS, and learned that a particular subprocess in the flow uses timetabling.\n"
           "\n"
@@ -115,22 +122,22 @@
                                                :occurrences {:value-string "2"}}
                                          :comment (str "This periodicity object describes the event type as (being periodic and) having two occurrence per week.\n"
                                                        "For example, in this case, the interviewees suggested that many courses are taught as two 90-minute lectures per week.")}
-                           :occurrence-assignment [{:val {:timeslot-refs ["Tu-Th-90min"]
+                           :occurrence-assignment {:val {:ts-type-ref ["Tu-Th-90min"]
                                                           :constraints  ["same-time", "different-days"]}
                                                     :comment (str "'occurrence-assignment objects define a disjunction of possibilities of where in time the event can be assigned.\n"
-                                                                  "The 'timeslot-refs' property is a list referring to timeslots. (These are defined below.)\n"
+                                                                  "The 'ts-type-ref' property is a list referring to timeslots. (These are defined below.)\n"
                                                                   "The 'constraints' property is a list of enumeration values. These define where in time these events can be assigned to occur.\n"
                                                                   "same-time indicates that events must be in the same periodicity interval must occur at the same time of day.\n"
                                                                   "different-days indicates that events in the same periodicity interval must be assigned to different days.\n"
                                                                   "Because there are only two days, Tuesday and Thursday, in the 'Tu-Th-90min' timeslot class, and the periodicity is 2 occurences per week,\n"
-                                                                  "it must be the case that one event occurs on Tuesday and the other on Thursday each week (and at the same time of day).")}]}
+                                                                  "it must be the case that one event occurs on Tuesday and the other on Thursday each week (and at the same time of day).")}}
 
                           {:event-type-name "lecture-class-30-60min-type"
                            :event-resources [{:resource-type "room-type-30",   :base-type "place"}
                                              {:resource-type "student-type",   :base-type "human"}
                                              {:resource-type "instructor-type" :base-type "human"}]
                            :periodicity {:interval {:units "week" :value-string "1"} :occurrences {:value-string "3"}}
-                           :occurrence-assignment {:timeslot-refs ["Mon-Wed-Fri-90min"]
+                           :occurrence-assignment {:ts-type-ref ["Mon-Wed-Fri-90min"]
                                                    :constraints  ["same-time", "different-days"]}}
 
                           {:event-type-name "lab-class"
@@ -138,7 +145,7 @@
                                              {:resource-type "student-type"       :base-type "human"}
                                              {:resource-type "lab-assistant-type" :base-type "human" :quantity {:units "person" :value-string "2"}}]
                            :periodicity {:interval {:units "week" :value-string "1"} :occurrences {:value-string "1"}}
-                           :occurrence-assignment {:timeslot-refs ["Three-hour-lab"]}}
+                           :occurrence-assignment {:ts-type-ref ["Three-hour-lab"]}}
 
                           {:event-type-name {:val "instructor-break" :comment "This is an example of an opportunistic event with periodicity."}
                            :event-resources [{:resource-type "instructor-type" :base-type "human"}]
@@ -147,30 +154,30 @@
                                                   :constraints {:val ["every-day", "once"]
                                                                 :comment (str "The purpose of this event type is to ensure the no instructor has to work every timeslot.\n"
                                                                               "Interviewees stipulated this in the conversation.")}
-                                                  :timeslot-refs ["Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab"]}}
+                                                  :ts-type-ref ["Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab"]}}
 
                           {:event-type-name {:val "spring-break" :comment "This is an example of a one-time event. It has no 'event-resources'; in this sense, it is a non-event!"}
-                           :occurrence-assigment {:timeslot-refs {:val ["2025-03-17" "2025-03-18" "2025-03-19" "2025-03-20" "2025-03-21"]
+                           :occurrence-assigment {:ts-type-ref {:val ["2025-03-17" "2025-03-18" "2025-03-19" "2025-03-20" "2025-03-21"]
                                                                 :comment "Instead of enumeration values, we put dates here."}}}]}
 
-      :timeslots [{:timeslot-id "Mon-Wed-Fri-60min"
-                   :period-values [{:day "Monday"    :periods  ["9:00-9:50" "10:00-10:50" "11:00-11:50" "13:00-13:50" "14:00-14:50" "15:00-15:50" "16:00-16:50"]}
-                                   {:day "Wednesday" :periods  ["9:00-9:50" "10:00-10:50" "11:00-11:50" "13:00-13:50" "14:00-14:50" "15:00-15:50" "16:00-16:50"]}
-                                   {:day "Friday"    :periods  ["9:00-9:50" "10:00-10:50" "11:00-11:50" "13:00-13:50" "14:00-14:50" "15:00-15:50" "16:00-16:50"]}]}
+      :timeslots [{:ts-type-id "Mon-Wed-Fri-60min"
+                   :spans [{:span-id "Monday"    :periods  ["9:00-9:50" "10:00-10:50" "11:00-11:50" "13:00-13:50" "14:00-14:50" "15:00-15:50" "16:00-16:50"]}
+                           {:span-id "Wednesday" :periods  ["9:00-9:50" "10:00-10:50" "11:00-11:50" "13:00-13:50" "14:00-14:50" "15:00-15:50" "16:00-16:50"]}
+                           {:span-id "Friday"    :periods  ["9:00-9:50" "10:00-10:50" "11:00-11:50" "13:00-13:50" "14:00-14:50" "15:00-15:50" "16:00-16:50"]}]}
 
-                  {:timeslot-id "Tu-Th-90min"
-                   :period-values [{:day "Tuesday"   :periods {:val ["9:00-10:20" "10:30-11:50" "13:00-14:20" "14:30-15:50" "16:00-17:20"]
-                                                               :comment (str "We asked the interviewees about the regularity of class events and came up with this formulation.\n"
-                                                                             "Try to stick to a common syntax for 'period' for all values in the 'period-values' property.\n"
-                                                                             "Note that our '90 minute' periods actually run 80 minutes to give people time to get to their next class, etc.\n")}}
-                                   {:day "Thursday" :periods  ["9:00-10:20" "10:30-11:50" "13:00-14:20" "14:30-15:50" "16:00-17:20"]}]}
+                  {:ts-type-id "Tu-Th-90min"
+                   :spans [{:span-id "Tuesday"   :periods {:val ["9:00-10:20" "10:30-11:50" "13:00-14:20" "14:30-15:50" "16:00-17:20"]
+                                                           :comment (str "We asked the interviewees about the regularity of class events and came up with this formulation.\n"
+                                                                         "Try to stick to a common syntax for 'period' for all values in the 'period-values' property.\n"
+                                                                         "Note that our '90 minute' periods actually run 80 minutes to give people time to get to their next class, etc.\n")}}
+                           {:span-id "Thursday" :periods  ["9:00-10:20" "10:30-11:50" "13:00-14:20" "14:30-15:50" "16:00-17:20"]}]}
 
-                  {:timeslot-id "Three-hour-lab"
-                   :period-values [{:day "Monday"    :periods  ["9:00-11:50" "13:00-15:50"]}
-                                   {:day "Tuesday"   :periods  ["9:00-11:50" "13:00-15:50"]}
-                                   {:day "Wednesday" :periods  ["9:00-11:50" "13:00-15:50"]}
-                                   {:day "Thursday"  :periods  ["9:00-11:50" "13:00-15:50"]}
-                                   {:day "Friday"    :periods  ["9:00-11:50" "13:00-15:50"]}]}]}})
+                  {:ts-type-id "Three-hour-lab"
+                   :spans [{:span-id "Monday"    :periods  ["9:00-11:50" "13:00-15:50"]}
+                           {:span-id "Tuesday"   :periods  ["9:00-11:50" "13:00-15:50"]}
+                           {:span-id "Wednesday" :periods  ["9:00-11:50" "13:00-15:50"]}
+                           {:span-id "Thursday"  :periods  ["9:00-11:50" "13:00-15:50"]}
+                           {:span-id "Friday"    :periods  ["9:00-11:50" "13:00-15:50"]}]}]}})
 
 (if (s/valid? :timetabling/EADS-message timetabling)
   (let [db-obj {:EADS/id :process/timetabling

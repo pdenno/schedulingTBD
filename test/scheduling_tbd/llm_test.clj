@@ -1,15 +1,15 @@
 (ns scheduling-tbd.llm-test
   (:require
-   [clojure.string        :as str]
-   [clojure.test          :refer [deftest is testing]]
-   [jsonista.core         :as json]
-   [scheduling-tbd.llm    :as llm]))
+   [clojure.string           :as str]
+   [clojure.test             :refer [deftest is testing]]
+   [jsonista.core            :as json]
+   [scheduling-tbd.agent-db  :as adb]))
 
 (def ^:diag diag (atom nil))
 
 (deftest testing-query-agent
   (testing "the function llm/query-agent"
-    (let [res (-> (llm/query-agent :response-analysis-agent
+    (let [res (-> (adb/query-agent :response-analysis-agent
                                    (str "QUESTION: Would you characterize some process as being a relatively persistent bottleneck? "
                                         "RESPONSE: Yes, sewing is typically the bottleneck."))
                   json/read-value

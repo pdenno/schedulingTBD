@@ -10,7 +10,7 @@
     },
     "inputs" : {
       "val" : [ "graphite", "clay", "water", "cedar wood", "metal", "eraser material", "paint" ],
-      "comment" : "These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes."
+      "comment" : "These are all the raw materials used to make the product. It is a collection of all the raw materials in subprocesses."
     },
     "outputs" : {
       "val" : [ {
@@ -37,7 +37,7 @@
       "process-id" : "graphite-core-production",
       "inputs" : [ "graphite", "clay", "water" ],
       "outputs" : [ {
-        "item-id" : "graphite core",
+        "item-id" : "finished graphite rods",
         "quantity" : {
           "units" : "graphite cores",
           "value-string" : "100000"
@@ -48,7 +48,7 @@
         "process-id" : "mix-graphite-and-clay",
         "inputs" : [ "graphite", "clay", "water" ],
         "outputs" : [ {
-          "item-id" : "graphite-clay paste",
+          "item-id" : "graphite clay paste",
           "quantity" : {
             "units" : "liters",
             "value-string" : "100"
@@ -65,7 +65,7 @@
         }
       }, {
         "process-id" : "extrude-core",
-        "inputs" : [ "graphite-clay paste" ],
+        "inputs" : [ "graphite clay paste" ],
         "outputs" : [ {
           "item-id" : "extruded graphite rods",
           "quantity" : {
@@ -83,7 +83,7 @@
         "process-id" : "dry-and-bake-core",
         "inputs" : [ "extruded graphite rods" ],
         "outputs" : [ {
-          "item-id" : "extruded graphite rods",
+          "item-id" : "finished graphite rods",
           "quantity" : {
             "units" : "extruded graphite core",
             "value-string" : "100000"
@@ -138,10 +138,10 @@
         "subprocesses" : [ ]
       } ]
     }, {
-      "process-id" : "assembly",
+      "process-id" : "assemble",
       "inputs" : {
         "val" : [ {
-          "item-id" : "graphite core",
+          "item-id" : "finished graphite rods",
           "from" : "graphite-core-production"
         }, {
           "item-id" : "wood slats with grooves",

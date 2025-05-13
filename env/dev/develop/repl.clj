@@ -1,15 +1,26 @@
 (ns develop.repl
   "Tools for repl-based exploration of SchedulingTBD code"
   (:require
-   [clojure.pprint :refer [pprint]]))
+   [clojure.pprint :refer [pprint]]
+   ;; require the -test.clj files and eads files to make ns-setup! work.
+   [scheduling-tbd.interviewing.domain.process.flow-shop]
+   [scheduling-tbd.interviewing.domain.process.job-shop]
+   [scheduling-tbd.interviewing.domain.process.job-shop-c]
+   [scheduling-tbd.interviewing.domain.process.job-shop-u]
+   [scheduling-tbd.interviewing.domain.process.scheduling-problem-type]
+   [scheduling-tbd.interviewing.domain.process.timetabling]
+   [scheduling-tbd.llm-test]
+   [scheduling-tbd.minizinc-test]
+   [scheduling-tbd.interviewing.ork-test]
+   [scheduling-tbd.surrogate-test]))
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
 
 (defn safe-alias
   [al ns-sym]
-  (when (and (not (@alias? al))
-             (find-ns ns-sym))
-    (alias al ns-sym)))
+;;  (when (and (not (@alias? al))
+;;             (find-ns ns-sym))
+    (alias al ns-sym))
 
 (def alias-map
   {'ches   'cheshire.core
@@ -20,7 +31,8 @@
    'str    'clojure.string
    'd      'datahike.api
    'dp     'datahike.pull-api
-   'dutil  'develop
+   'dutil  'develop.dutil
+   'repl   'develop.repl
    'mount  'mount.core
    'p      'promesa.core
    'px     'promesa.exec
@@ -40,14 +52,10 @@
    'eadsu  'scheduling-tbd.interviewing.eads-util
    'inv    'scheduling-tbd.interviewing.interviewers
    'ork    'scheduling-tbd.interviewing.ork
-   'orkt   'scheduling-tbd.interviewing.ork_test
+   'orkt   'scheduling-tbd.interviewing.ork-test
    'ru     'scheduling-tbd.interviewing.response-utils
    'mzn    'scheduling-tbd.minizinc
    'mznt   'scheduling-tbd.minizinc-test
-   'ou     'scheduling-tbd.op-utils
-   'opt    'scheduling-tbd.operators-test
-   'or     'scheduling-tbd.orchestrator
-   'ort    'scheduling-tbd.orchestrator-test
    'spec   'scheduling-tbd.specs
    'sutil  'scheduling-tbd.sutil
    'sur    'scheduling-tbd.surrogate
@@ -57,7 +65,6 @@
    'ws     'scheduling-tbd.web.websockets
    'tel    'taoensso.telemere
    'openai 'wkok.openai-clojure.api})
-
 
 (defn ^:diag ns-setup!
   "Use this to setup useful aliases for working in this NS."
