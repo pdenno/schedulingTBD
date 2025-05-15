@@ -5,6 +5,9 @@
   (:require
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
+   [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.db] ;for mount
+   [scheduling-tbd.interviewing.eads-util :refer [graph-semantics-ok?]]
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
@@ -20,7 +23,7 @@
 (s/def ::comment string?) ; About annotations
 
 (s/def ::EADS (s/keys :req-un [::EADS-id ::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
-(s/def :flow-shop/graph (s/keys :req-un [::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
+(s/def :flow-shop/graph (s/and graph-semantics-ok? (s/keys :req-un [::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration])))
 (s/def ::EADS-id #(= % :process/flow-shop))
 
 ;;; We use the 'trick' that :<some-property>/val can be used that to signify a non-namespaced attribute 'val' and a reference to a spec for value of 'val'.
@@ -200,14 +203,22 @@
                                     :resources ["crimping tool"],
                                     :subprocesses []}]}]}})
 
-(if (s/valid? :flow-shop/EADS-message flow-shop)
-  (let [db-obj {:EADS/id :process/flow-shop
-                :EADS/cid :process
-                :EADS/specs #:spec{:full :flow-shop/EADS-message}
-                :EADS/msg-str (str flow-shop)}
-        conn (connect-atm :system)
-        eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-    ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-    (->> flow-shop clj2json-pretty (spit "resources/EADS/process/flow-shop.json")))
-  (throw (ex-info "Invalid EADS message (flow-shop)." {})))
+;;; -------------------- Starting and stopping -------------------------
+(defn init-flow-shop
+  []
+  (if (s/valid? :flow-shop/EADS-message flow-shop)
+    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/flow-shop.json"))
+          db-obj {:EADS/id :process/flow-shop
+                  :EADS/cid :process
+                  :EADS/specs #:spec{:full :flow-shop/EADS-message}
+                  :EADS/can-produce-visuals [:flow-shop/graph]
+                  :EADS/msg-str (str flow-shop)}
+          conn (connect-atm :system)
+          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
+      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
+      (->> flow-shop clj2json-pretty (spit eads-json-fname)))
+    (throw (ex-info "Invalid EADS message (flow-shop)." {}))))
+
+(defstate flow-shop-eads
+  :start (init-flow-shop))

@@ -2,64 +2,93 @@
   (:require
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
+   [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.db] ;for mount
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
-(s/def :timetabling/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
-(s/def ::message-type #(= % :EADS-INSTRUCTIONS))
-(s/def ::interview-objective string?)
-(s/def ::interviewer-agent #(= % :process))
-
-(s/def ::comment string?) ; About annotations
-
-(s/def ::EADS (s/keys :req-un [::EADS-id ::event-types ::timeslots]))
-(s/def ::EADS-id #(= % :process/timetabling))
-
-(s/def ::event-types (s/or :normal :event-types/val :annotated ::annotated-event-types))
-(s/def :event-types/val (s/coll-of ::event-type :kind vector?))
-(s/def ::annotated-event-types (s/keys :req-un [::comment :event-types/val]))
-(s/def ::event-type (s/or :normal :event-type/val :annotated ::annotated-event-type))
-(s/def :event-type/val (s/keys :req-un [::event-type-name ::occurrence-assignment] :opt-un [::periodicity ::event-resources]))
-(s/def ::annotated-event-type (s/keys :req-un [::comment :event-type/val]))
-
-(s/def ::event-type-name (s/or :normal :event-type-name/val :annotated ::annotated-event-type-name))
-(s/def :event-type-name/val string?)
-(s/def ::annotated-event-type-name (s/keys :req-un [::comment :event-name/val]))
-
-(s/def ::occurrence-assignment (s/or :normal :occurrence-assignment/val :annotated ::annotated-occurrence-assignment))
-(s/def :occurrence-assignment/val (s/keys :opt-un [::timeslot-refs ::constraints ::opportunistic?]))
-(s/def ::annotated-occurrence-assignment (s/keys :req-un [::comment :occurrence-assignment/val]))
-(s/def ::timeslot-refs (s/or :normal :timeslot-refs/val :annotated ::annotated-timeslots-ref))
-(s/def :timeslot-refs/val (s/coll-of ::timeslot-ref :kind vector?))
-(s/def ::timeslot-ref string?)
-(s/def ::annotated-timeslots-ref (s/keys :opt-un [::comment :timeslots-ref/val]))
-(s/def ::constraints (s/or :normal :constraints/val :annotated ::annotated-constraints))
-(s/def :constraints/val (s/coll-of ::constraint :kind vector?))
-(s/def ::annotated-constraints (s/keys :req-un [::comment :constraints/val]))
-
-(s/def ::constraint (s/or :normal :constraint/val :annotated ::annotated-constraint))
-(s/def :constraint/val string?)
-(s/def ::annotated-constraint (s/keys :req-un [::comment :constraint/val]))
-
-(s/def ::opportunistic? (s/or :normal :opportunistic/val :annotated ::annotated-opportunistic?))
-(s/def :opportunistic?/val  boolean?)
-(s/def ::annotated-opportunistic? (s/keys :req-un [::comment :opportunistic?/val]))
-
-(s/def ::periodicity (s/or :normal :periodicity/val :annotated ::annotated-periodicity))
-(s/def :periodicity/val (s/keys :req-un [::interval ::occurrences]))
-(s/def ::annotated-periodicity (s/keys :req-un [::comment :periodicity/val]))
-(s/def ::interval (s/or :normal :interval/val :annotated ::annotated-interval))
-(s/def :interval/val (s/keys :req-un [::units ::value-string]))
-(s/def ::annotated-interval (s/keys :req-un [::comment :interval/val]))
-(s/def ::occurrences (s/or :normal :occurrences/val :annotated ::annotated-occurrences))
-(s/def :occurrences/val (s/keys :req-un [::value-string]))
-(s/def ::annotated-occurrences (s/keys :req-un [::comment :occurrences/val]))
-(s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
-(s/def :units/val string?)
-(s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
-(s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
-(s/def :value-string/val string?)
-(s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
-
+;;; Created Thu May 15 17:32:47 EDT 2025 using develop.dutil/make-spec."
+ (s/def :timetabling/EADS-message (s/keys :req-un [::interview-objective ::interviewer-agent ::EADS ::message-type]))
+ (s/def ::EADS (s/or :normal :EADS/val :annotated ::annotated-EADS))
+ (s/def :EADS/val (s/keys :req-un [::timeslots ::event-types ::EADS-id]))
+ (s/def ::annotated-EADS (s/keys :req-un [::comment :EADS/val]))
+ (s/def ::interview-objective (s/or :normal :interview-objective/val :annotated ::annotated-interview-objective))
+ (s/def :interview-objective/val string?)
+ (s/def ::annotated-interview-objective (s/keys :req-un [::comment :interview-objective/val]))
+ (s/def ::interviewer-agent (s/or :normal :interviewer-agent/val :annotated ::annotated-interviewer-agent))
+ (s/def :interviewer-agent/val keyword?)
+ (s/def ::annotated-interviewer-agent (s/keys :req-un [::comment :interviewer-agent/val]))
+ (s/def ::message-type (s/or :normal :message-type/val :annotated ::annotated-message-type))
+ (s/def :message-type/val keyword?)
+ (s/def ::annotated-message-type (s/keys :req-un [::comment :message-type/val]))
+ (s/def ::EADS-id (s/or :normal :EADS-id/val :annotated ::annotated-EADS-id))
+ (s/def :EADS-id/val keyword?)
+ (s/def ::annotated-EADS-id (s/keys :req-un [::comment :EADS-id/val]))
+ (s/def ::event-types (s/or :normal :event-types/val :annotated ::annotated-event-types))
+ (s/def :event-types/val (s/coll-of ::event-type :kind vector?))
+ (s/def ::event-type (s/keys :req-un [::periodicity ::event-type-name ::event-resources ::occurrence-assigment]))
+ (s/def ::annotated-event-types (s/keys :req-un [::comment :event-types/val]))
+ (s/def ::timeslots (s/or :normal :timeslots/val :annotated ::annotated-timeslots))
+ (s/def :timeslots/val (s/coll-of ::timeslot :kind vector?))
+ (s/def ::timeslot (s/keys :req-un [::spans ::ts-type-id]))
+ (s/def ::annotated-timeslots (s/keys :req-un [::comment :timeslots/val]))
+ (s/def ::event-resources (s/or :normal :event-resources/val :annotated ::annotated-event-resources))
+ (s/def :event-resources/val (s/coll-of ::event-resource :kind vector?))
+ (s/def ::event-resource (s/keys :req-un [] :opt-un [::base-type ::resource-type ::quantity]))
+ (s/def ::annotated-event-resources (s/keys :req-un [::comment :event-resources/val]))
+ (s/def ::event-type-name (s/or :normal :event-type-name/val :annotated ::annotated-event-type-name))
+ (s/def :event-type-name/val string?)
+ (s/def ::annotated-event-type-name (s/keys :req-un [::comment :event-type-name/val]))
+ (s/def ::occurrence-assigment (s/or :normal :occurrence-assigment/val :annotated ::annotated-occurrence-assigment))
+ (s/def :occurrence-assigment/val (s/keys :req-un [] :opt-un [::constraints ::opportunistic?]))
+ (s/def ::annotated-occurrence-assigment (s/keys :req-un [::comment :occurrence-assigment/val]))
+ (s/def ::periodicity (s/or :normal :periodicity/val :annotated ::annotated-periodicity))
+ (s/def :periodicity/val (s/keys :req-un [::occurrences ::interval] :opt-un []))
+ (s/def ::annotated-periodicity (s/keys :req-un [::comment :periodicity/val]))
+ (s/def ::spans (s/or :normal :spans/val :annotated ::annotated-spans))
+ (s/def :spans/val (s/coll-of ::span :kind vector?))
+ (s/def ::span (s/keys :req-un [::periods ::span-id] :opt-un []))
+ (s/def ::annotated-spans (s/keys :req-un [::comment :spans/val]))
+ (s/def ::ts-type-id (s/or :normal :ts-type-id/val :annotated ::annotated-ts-type-id))
+ (s/def :ts-type-id/val string?)
+ (s/def ::annotated-ts-type-id (s/keys :req-un [::comment :ts-type-id/val]))
+ (s/def ::base-type (s/or :normal :base-type/val :annotated ::annotated-base-type))
+ (s/def :base-type/val string?)
+ (s/def ::annotated-base-type (s/keys :req-un [::comment :base-type/val]))
+ (s/def ::quantity (s/or :normal :quantity/val :annotated ::annotated-quantity))
+ (s/def :quantity/val (s/keys :req-un [] :opt-un [::modifier]))
+ (s/def ::annotated-quantity (s/keys :req-un [::comment :quantity/val]))
+ (s/def ::resource-type (s/or :normal :resource-type/val :annotated ::annotated-resource-type))
+ (s/def :resource-type/val string?)
+ (s/def ::annotated-resource-type (s/keys :req-un [::comment :resource-type/val]))
+ (s/def ::constraints (s/or :normal :constraints/val :annotated ::annotated-constraints))
+ (s/def :constraints/val (s/coll-of ::constraint :kind vector?))
+ (s/def ::constraint string?)
+ (s/def ::annotated-constraints (s/keys :req-un [::comment :constraints/val]))
+ (s/def ::opportunistic? (s/or :normal :opportunistic?/val :annotated ::annotated-opportunistic?))
+ (s/def :opportunistic?/val boolean?)
+ (s/def ::annotated-opportunistic? (s/keys :req-un [::comment :opportunistic?/val]))
+ (s/def ::interval (s/or :normal :interval/val :annotated ::annotated-interval))
+ (s/def :interval/val (s/keys :req-un [::value-string ::units] :opt-un []))
+ (s/def ::annotated-interval (s/keys :req-un [::comment :interval/val]))
+ (s/def ::occurrences (s/or :normal :occurrences/val :annotated ::annotated-occurrences))
+ (s/def :occurrences/val (s/keys :req-un [::value-string] :opt-un []))
+ (s/def ::annotated-occurrences (s/keys :req-un [::comment :occurrences/val]))
+ (s/def ::periods (s/or :normal :periods/val :annotated ::annotated-periods))
+ (s/def :periods/val (s/coll-of ::period :kind vector?))
+ (s/def ::period string?)
+ (s/def ::annotated-periods (s/keys :req-un [::comment :periods/val]))
+ (s/def ::span-id (s/or :normal :span-id/val :annotated ::annotated-span-id))
+ (s/def :span-id/val string?)
+ (s/def ::annotated-span-id (s/keys :req-un [::comment :span-id/val]))
+ (s/def ::modifier (s/or :normal :modifier/val :annotated ::annotated-modifier))
+ (s/def :modifier/val string?)
+ (s/def ::annotated-modifier (s/keys :req-un [::comment :modifier/val]))
+ (s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
+ (s/def :units/val string?)
+ (s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
+ (s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
+ (s/def :value-string/val string?)
+ (s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
 
 ;;; Promises and Pitfalls: Using LLMs to Generate Visualization Items (Fumeng Yang et al. (fy@umg.edu)
 ;;; How High School Teachers Develop Tests and How AI Could Help.    (Fumeng Yang et al.) (Maybe not published yet.)
@@ -179,14 +208,21 @@
                            {:span-id "Thursday"  :periods  ["9:00-11:50" "13:00-15:50"]}
                            {:span-id "Friday"    :periods  ["9:00-11:50" "13:00-15:50"]}]}]}})
 
-(if (s/valid? :timetabling/EADS-message timetabling)
-  (let [db-obj {:EADS/id :process/timetabling
-                :EADS/cid :process
-                :EADS/specs #:spec{:full :timetabling/EADS-message}
-                :EADS/msg-str (str timetabling)}
-        conn (connect-atm :system)
-        eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-    ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-    (->> timetabling clj2json-pretty (spit "resources/EADS/process/timetabling.json")))
-  (throw (ex-info "Invalid EADS message (timetabling)." {})))
+;;; -------------------- Starting and stopping -------------------------
+(defn init-timetabling
+  []
+  (if (s/valid? :timetabling/EADS-message timetabling)
+    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/timetabling.json"))
+          db-obj {:EADS/id :process/timetabling
+                  :EADS/cid :process
+                  :EADS/specs #:spec{:full :timetabling/EADS-message}
+                  :EADS/msg-str (str timetabling)}
+          conn (connect-atm :system)
+          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
+      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
+      (->> timetabling clj2json-pretty (spit eads-json-fname)))
+    (throw (ex-info "Invalid EADS message (timetabling)." {}))))
+
+(defstate timetabling-eads
+  :start (init-timetabling))

@@ -63,15 +63,15 @@
    :EADS/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A unique ID for each EADS. Typically the namespace of the keyword is the cid, e.g. :process/flow-shop."}
-
    :EADS/cid
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "A keyword naming a conversation, e.g. :process"}
-
    :EADS/msg-str
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The stringified message object, it can be edn/read-string. It is the EDN version of the JSON in resources used by ork."}
-
+   :EADS/can-produce-visuals
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
+        :doc "Indicates the purpose and instructions given."}
    :EADS/specs
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "An object where the keys name spec levels (e.g. full) and the values are keywords identifying the spec in the registry."}
@@ -810,11 +810,22 @@
   (doseq [id (list-projects {:from-storage? true})]
     (register-db id (db-cfg-map {:type :project :id id}))))
 
+(defn make-etc-dirs
+  "Temporary directories are rooted in a directory 'tmp' below $SCHEDULING_TBD_DB (environment variable)."
+  []
+  (if-let [root (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
+    (let [etc-root (str root "/etc/EADS")]
+      (when-not (.isDirectory (io/file etc-root))
+        (io/make-parents etc-root)
+        (-> etc-root io/as-file .mkdir)))
+    (log! :error "Set the SCHEDULING_TBD_DB environment variable.")))
+
 (defn init-dbs
   "Register DBs using "
   []
   (register-project-dbs)
   (register-db :system (db-cfg-map {:type :system}))
+  (make-etc-dirs)
   {:sys-cfg (db-cfg-map {:type :system})})
 
 (defstate sys&proj-database-cfgs

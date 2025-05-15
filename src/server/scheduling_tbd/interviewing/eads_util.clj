@@ -72,3 +72,9 @@
             (do (log! :error (str "Could not find process " from " using " input))
                 (reset! ok? false))))))
     @ok?))
+
+(defn graph-semantics-ok?
+  "This is used in spec testing of :flow-shop/graph. (See flow_shop.clj)."
+  [graph]
+  (and (outputs-exist-where-inputs-claim? graph)
+       (inputs-match-in-hierarchy? graph)))

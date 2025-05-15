@@ -4,6 +4,8 @@
   (:require
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
+   [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.db] ;for mount
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 (s/def :job-shop-u/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
@@ -108,15 +110,20 @@
                                   :comment "We might have learned in the interview that they use a milling machine for resurfacing aluminum heads and a grinding machine for cast iron heads."}
                       :duration {:val {:units "hours", :value-string "2"},
                                  :comment "The value here does not include leak testing, which is treated as a separate unit process that usually follows resurfacing."}}]}})
+(defn init-job-shop-u
+  []
+  (if (s/valid? :job-shop-u/EADS-message job-shop-u)
+    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/job-shop--unique-order.json"))
+          db-obj {:EADS/id :process/job-shop-unique
+                  :EADS/cid :process
+                  :EADS/specs #:spec{:full :job-shop-u/EADS-message}
+                  :EADS/msg-str (str job-shop-u)}
+          conn (connect-atm :system)
+          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
+      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
+      (->> job-shop-u clj2json-pretty (spit eads-json-fname)))
+    (throw (ex-info "Invalid EADS message (job-shop-u)." {}))))
 
-(if (s/valid? :job-shop-u/EADS-message job-shop-u)
-  (let [db-obj {:EADS/id :process/job-shop-unique
-                :EADS/cid :process
-                :EADS/specs #:spec{:full :job-shop-u/EADS-message}
-                :EADS/msg-str (str job-shop-u)}
-        conn (connect-atm :system)
-        eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-    ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-    (->> job-shop-u clj2json-pretty (spit "resources/EADS/process/job-shop--unique-order.json")))
-  (throw (ex-info "Invalid EADS message (job-shop-u)." {})))
+(defstate job-shop-u-eads
+  :start (init-job-shop-u))

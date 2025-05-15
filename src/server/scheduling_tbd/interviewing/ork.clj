@@ -9,6 +9,13 @@
    [datahike.api                  :as d]
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
+   ;; EADS. These might be temporary
+   [scheduling-tbd.interviewing.domain.process.flow-shop] ; for mount
+   [scheduling-tbd.interviewing.domain.process.job-shop-c]
+   [scheduling-tbd.interviewing.domain.process.job-shop-u]
+   [scheduling-tbd.interviewing.domain.process.scheduling-problem-type]
+   ;;[scheduling-tbd.interviewing.domain.process.timetabling]
+
    [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide output-struct2clj]]
    [taoensso.telemere             :as tel :refer [log!]]))
 

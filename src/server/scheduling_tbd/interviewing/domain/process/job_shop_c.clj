@@ -7,6 +7,8 @@
   (:require
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
+   [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.db] ;for mount
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 (s/def :job-shop-c/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
@@ -211,15 +213,21 @@
                                                                  :outputs ["finished pencils"],
                                                                  :resources ["crimping tool"],
                                                                  :subprocesses []}]}]}]}}})
+;;; -------------------- Starting and stopping -------------------------
+(defn init-job-shop-c
+  []
+  (if (s/valid? :job-shop-c/EADS-message job-shop-c)
+    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/job-shop--classified.json"))
+          db-obj {:EADS/id :process/job-shop--classifiable
+                  :EADS/cid :process
+                  :EADS/specs #:spec{:full :job-shop-c/EADS-message}
+                  :EADS/msg-str (str job-shop-c)}
+          conn (connect-atm :system)
+          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
+      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
+      (->> job-shop-c clj2json-pretty (spit eads-json-fname)))
+    (throw (ex-info "Invalid EADS message (job-shop-c)." {}))))
 
-(if (s/valid? :job-shop-c/EADS-message job-shop-c)
-  (let [db-obj {:EADS/id :process/job-shop--classifiable
-                :EADS/cid :process
-                :EADS/specs #:spec{:full :job-shop-c/EADS-message}
-                :EADS/msg-str (str job-shop-c)}
-        conn (connect-atm :system)
-        eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-    ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-    (->> job-shop-c clj2json-pretty (spit "resources/EADS/process/job-shop--classifiable.json")))
-  (throw (ex-info "Invalid EADS message (job-shop-c)." {})))
+(defstate job-shop-c-eads
+  :start (init-job-shop-c))

@@ -3,6 +3,8 @@
   (:require
    [clojure.spec.alpha :as s]
    [datahike.api          :as d]
+   [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.db] ;for mount
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 ;;; ToDo: Because we use a central spec registry, the specs defined with short namespaces (e.g. :problem-type/val) might collide with specs from other domains.
@@ -60,15 +62,21 @@
                       :comment  (str "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.\n"
                                      "For example, if the made the same collection of products in the same order each week, cylical? would be true.")}}})
 
-(if (s/valid? :scheduling-problem-type/EADS-message scheduling-problem-type)
-  ;; Write the EADS to data/EADS/process
-  (let [db-obj {:EADS/id :process/scheduling-problem-type
+(defn init-scheduling-problem-type
+  []
+  (if (s/valid? :scheduling-problem-type/EADS-message scheduling-problem-type)
+    ;; Write the EADS to data/EADS/process
+    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/scheduling-problem-type.json"))
+          db-obj {:EADS/id :process/scheduling-problem-type
                 :EADS/cid :process
-                :EADS/specs #:spec{:full :scheduling-problem-type/EADS-message}
-                :EADS/msg-str (str scheduling-problem-type)}
-        conn (connect-atm :system)
-        eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-    ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-    (->> scheduling-problem-type clj2json-pretty (spit "resources/EADS/process/scheduling-problem-type.json")))
-  (throw (ex-info "Invalid EADS message (scheduling-problem-type)." {})))
+                  :EADS/specs #:spec{:full :scheduling-problem-type/EADS-message}
+                  :EADS/msg-str (str scheduling-problem-type)}
+          conn (connect-atm :system)
+          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
+      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
+      (->> scheduling-problem-type clj2json-pretty (spit eads-json-fname)))
+    (throw (ex-info "Invalid EADS message (scheduling-problem-type)." {}))))
+
+(defstate init-scheduling-problem-type-eads
+  :start (init-scheduling-problem-type))
