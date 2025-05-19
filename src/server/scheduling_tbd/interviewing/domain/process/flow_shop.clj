@@ -83,7 +83,7 @@
 
 ;;; (s/valid? ::fshop/EADS (:EADS fshop/flow-shop))
 (def flow-shop
-  "A pprinted (JSON?) version of this is what we'll provide to the interviewer at the start of a flow-shop problem.
+  "A pprinted JSON version of this is what we'll provide to the interviewer at the start of a flow-shop problem.
    Like all EADS, it is also stored in the system DB. See how at the bottom of this file.
    We use the data structure created by this EADS to create something like functional flow block diagrams (FFBDs).
    In our notation, we infer concurrency by looking at relationships between inputs of one process and output of another.

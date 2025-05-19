@@ -6,26 +6,17 @@
    [scheduling-tbd.db] ;for mount
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
-;;; Created Thu May 15 17:32:47 EDT 2025 using develop.dutil/make-spec."
- (s/def :timetabling/EADS-message (s/keys :req-un [::interview-objective ::interviewer-agent ::EADS ::message-type]))
- (s/def ::EADS (s/or :normal :EADS/val :annotated ::annotated-EADS))
- (s/def :EADS/val (s/keys :req-un [::timeslots ::event-types ::EADS-id]))
- (s/def ::annotated-EADS (s/keys :req-un [::comment :EADS/val]))
- (s/def ::interview-objective (s/or :normal :interview-objective/val :annotated ::annotated-interview-objective))
- (s/def :interview-objective/val string?)
- (s/def ::annotated-interview-objective (s/keys :req-un [::comment :interview-objective/val]))
- (s/def ::interviewer-agent (s/or :normal :interviewer-agent/val :annotated ::annotated-interviewer-agent))
- (s/def :interviewer-agent/val keyword?)
- (s/def ::annotated-interviewer-agent (s/keys :req-un [::comment :interviewer-agent/val]))
- (s/def ::message-type (s/or :normal :message-type/val :annotated ::annotated-message-type))
- (s/def :message-type/val keyword?)
- (s/def ::annotated-message-type (s/keys :req-un [::comment :message-type/val]))
- (s/def ::EADS-id (s/or :normal :EADS-id/val :annotated ::annotated-EADS-id))
- (s/def :EADS-id/val keyword?)
- (s/def ::annotated-EADS-id (s/keys :req-un [::comment :EADS-id/val]))
+(s/def :timetabling/EADS-message (s/keys :req-un [::interview-objective ::interviewer-agent ::EADS ::message-type]))
+(s/def ::EADS (s/keys :req-un [::EADS-id ::event-types ::timeslots]))
+(s/def ::interview-objective string?)
+(s/def ::interviewer-agent keyword?)
+(s/def ::message-type  keyword?)
+(s/def ::EADS-id keyword?)
+
+;;; Created Sat May 17 18:55:10 EDT 2025 using develop.dutil/make-spec."
  (s/def ::event-types (s/or :normal :event-types/val :annotated ::annotated-event-types))
  (s/def :event-types/val (s/coll-of ::event-type :kind vector?))
- (s/def ::event-type (s/keys :req-un [::periodicity ::event-type-name ::event-resources ::occurrence-assigment]))
+ (s/def ::event-type (s/keys :req-un [::occurrence-assignment ::event-type-name] :opt-un [::periodicity ::event-resources]))
  (s/def ::annotated-event-types (s/keys :req-un [::comment :event-types/val]))
  (s/def ::timeslots (s/or :normal :timeslots/val :annotated ::annotated-timeslots))
  (s/def :timeslots/val (s/coll-of ::timeslot :kind vector?))
@@ -33,20 +24,20 @@
  (s/def ::annotated-timeslots (s/keys :req-un [::comment :timeslots/val]))
  (s/def ::event-resources (s/or :normal :event-resources/val :annotated ::annotated-event-resources))
  (s/def :event-resources/val (s/coll-of ::event-resource :kind vector?))
- (s/def ::event-resource (s/keys :req-un [] :opt-un [::base-type ::resource-type ::quantity]))
+ (s/def ::event-resource (s/keys :req-un [::base-type ::resource-type] :opt-un [::quantity]))
  (s/def ::annotated-event-resources (s/keys :req-un [::comment :event-resources/val]))
  (s/def ::event-type-name (s/or :normal :event-type-name/val :annotated ::annotated-event-type-name))
  (s/def :event-type-name/val string?)
  (s/def ::annotated-event-type-name (s/keys :req-un [::comment :event-type-name/val]))
- (s/def ::occurrence-assigment (s/or :normal :occurrence-assigment/val :annotated ::annotated-occurrence-assigment))
- (s/def :occurrence-assigment/val (s/keys :req-un [] :opt-un [::constraints ::opportunistic?]))
- (s/def ::annotated-occurrence-assigment (s/keys :req-un [::comment :occurrence-assigment/val]))
+ (s/def ::occurrence-assignment (s/or :normal :occurrence-assignment/val :annotated ::annotated-occurrence-assignment))
+ (s/def :occurrence-assignment/val (s/keys :req-un [::ts-type-refs]))
+ (s/def ::annotated-occurrence-assignment (s/keys :req-un [::comment :occurrence-assignment/val]))
  (s/def ::periodicity (s/or :normal :periodicity/val :annotated ::annotated-periodicity))
- (s/def :periodicity/val (s/keys :req-un [::occurrences ::interval] :opt-un []))
+ (s/def :periodicity/val (s/keys :req-un [::occurrences ::interval]))
  (s/def ::annotated-periodicity (s/keys :req-un [::comment :periodicity/val]))
  (s/def ::spans (s/or :normal :spans/val :annotated ::annotated-spans))
  (s/def :spans/val (s/coll-of ::span :kind vector?))
- (s/def ::span (s/keys :req-un [::periods ::span-id] :opt-un []))
+ (s/def ::span (s/keys :req-un [::periods ::span-id]))
  (s/def ::annotated-spans (s/keys :req-un [::comment :spans/val]))
  (s/def ::ts-type-id (s/or :normal :ts-type-id/val :annotated ::annotated-ts-type-id))
  (s/def :ts-type-id/val string?)
@@ -55,23 +46,20 @@
  (s/def :base-type/val string?)
  (s/def ::annotated-base-type (s/keys :req-un [::comment :base-type/val]))
  (s/def ::quantity (s/or :normal :quantity/val :annotated ::annotated-quantity))
- (s/def :quantity/val (s/keys :req-un [] :opt-un [::modifier]))
+ (s/def :quantity/val (s/keys :req-un [::value-string ::units]))
  (s/def ::annotated-quantity (s/keys :req-un [::comment :quantity/val]))
  (s/def ::resource-type (s/or :normal :resource-type/val :annotated ::annotated-resource-type))
  (s/def :resource-type/val string?)
  (s/def ::annotated-resource-type (s/keys :req-un [::comment :resource-type/val]))
- (s/def ::constraints (s/or :normal :constraints/val :annotated ::annotated-constraints))
- (s/def :constraints/val (s/coll-of ::constraint :kind vector?))
- (s/def ::constraint string?)
- (s/def ::annotated-constraints (s/keys :req-un [::comment :constraints/val]))
- (s/def ::opportunistic? (s/or :normal :opportunistic?/val :annotated ::annotated-opportunistic?))
- (s/def :opportunistic?/val boolean?)
- (s/def ::annotated-opportunistic? (s/keys :req-un [::comment :opportunistic?/val]))
+ (s/def ::ts-type-refs (s/or :normal :ts-type-refs/val :annotated ::annotated-ts-type-refs))
+ (s/def :ts-type-refs/val (s/coll-of ::ts-type-ref :kind vector?))
+ (s/def ::ts-type-ref string?)
+ (s/def ::annotated-ts-type-refs (s/keys :req-un [::comment :ts-type-refs/val]))
  (s/def ::interval (s/or :normal :interval/val :annotated ::annotated-interval))
- (s/def :interval/val (s/keys :req-un [::value-string ::units] :opt-un []))
+ (s/def :interval/val (s/keys :req-un [::value-string ::units]))
  (s/def ::annotated-interval (s/keys :req-un [::comment :interval/val]))
  (s/def ::occurrences (s/or :normal :occurrences/val :annotated ::annotated-occurrences))
- (s/def :occurrences/val (s/keys :req-un [::value-string] :opt-un []))
+ (s/def :occurrences/val (s/keys :req-un [::value-string]))
  (s/def ::annotated-occurrences (s/keys :req-un [::comment :occurrences/val]))
  (s/def ::periods (s/or :normal :periods/val :annotated ::annotated-periods))
  (s/def :periods/val (s/coll-of ::period :kind vector?))
@@ -80,21 +68,27 @@
  (s/def ::span-id (s/or :normal :span-id/val :annotated ::annotated-span-id))
  (s/def :span-id/val string?)
  (s/def ::annotated-span-id (s/keys :req-un [::comment :span-id/val]))
- (s/def ::modifier (s/or :normal :modifier/val :annotated ::annotated-modifier))
- (s/def :modifier/val string?)
- (s/def ::annotated-modifier (s/keys :req-un [::comment :modifier/val]))
  (s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
  (s/def :units/val string?)
  (s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
  (s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
  (s/def :value-string/val string?)
  (s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
+ (s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
+ (s/def :units/val string?)
+ (s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
+ (s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
+ (s/def :value-string/val string?)
+ (s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
+ (s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
+ (s/def :value-string/val string?)
+ (s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
+
 
 ;;; Promises and Pitfalls: Using LLMs to Generate Visualization Items (Fumeng Yang et al. (fy@umg.edu)
 ;;; How High School Teachers Develop Tests and How AI Could Help.    (Fumeng Yang et al.) (Maybe not published yet.)
 ;;; There was 1 quick slide on decision-making; she has one grad student working on it.
 ;;; https://news.northwestern.edu/stories/2020/10/presidential-plinko-visualizes-data-uncertainty/
-
 
 ;;; ToDo: add a timetabled? property to flow and job shop EADS processes ????
 ;;; ToDo: Define the enumerations that are being used!
@@ -118,8 +112,8 @@
           "\n"
           "There are three kinds of event types in our formulation of timetabling:\n"
           "    (1) regularly scheduled: they have property named 'periodicity',\n"
-          "    (2) one-time: their 'occurrence-assigment' property defines when they occur using a date, and,\n"
-          "    (3) opportunistic: their 'occurrence-assigment' property defines 'opportunistic? = true' and conditions (possibly including periodicity) in which they occur.\n"
+          "    (2) one-time: their 'occurrence-assignment' property defines when they occur using a date, and,\n"
+          "    (3) opportunistic: their 'occurrence-assignment' property defines 'opportunistic? = true' and conditions (possibly including periodicity) in which they occur.\n"
           "\n"
           "You can think of the information you are trying to capture in the interview as including descriptions of\n"
           "   (1) a Cartesian product of resources needed for the event type to occur,\n"
@@ -151,10 +145,10 @@
                                                :occurrences {:value-string "2"}}
                                          :comment (str "This periodicity object describes the event type as (being periodic and) having two occurrence per week.\n"
                                                        "For example, in this case, the interviewees suggested that many courses are taught as two 90-minute lectures per week.")}
-                           :occurrence-assignment {:val {:ts-type-ref ["Tu-Th-90min"]
+                           :occurrence-assignment {:val {:ts-type-refs ["Tu-Th-90min"]
                                                           :constraints  ["same-time", "different-days"]}
                                                     :comment (str "'occurrence-assignment objects define a disjunction of possibilities of where in time the event can be assigned.\n"
-                                                                  "The 'ts-type-ref' property is a list referring to timeslots. (These are defined below.)\n"
+                                                                  "The 'ts-type-refs' property is a list referring to timeslots. (These are defined below.)\n"
                                                                   "The 'constraints' property is a list of enumeration values. These define where in time these events can be assigned to occur.\n"
                                                                   "same-time indicates that events must be in the same periodicity interval must occur at the same time of day.\n"
                                                                   "different-days indicates that events in the same periodicity interval must be assigned to different days.\n"
@@ -166,7 +160,7 @@
                                              {:resource-type "student-type",   :base-type "human"}
                                              {:resource-type "instructor-type" :base-type "human"}]
                            :periodicity {:interval {:units "week" :value-string "1"} :occurrences {:value-string "3"}}
-                           :occurrence-assignment {:ts-type-ref ["Mon-Wed-Fri-90min"]
+                           :occurrence-assignment {:ts-type-refs ["Mon-Wed-Fri-90min"]
                                                    :constraints  ["same-time", "different-days"]}}
 
                           {:event-type-name "lab-class"
@@ -174,19 +168,19 @@
                                              {:resource-type "student-type"       :base-type "human"}
                                              {:resource-type "lab-assistant-type" :base-type "human" :quantity {:units "person" :value-string "2"}}]
                            :periodicity {:interval {:units "week" :value-string "1"} :occurrences {:value-string "1"}}
-                           :occurrence-assignment {:ts-type-ref ["Three-hour-lab"]}}
+                           :occurrence-assignment {:ts-type-refs ["Three-hour-lab"]}}
 
                           {:event-type-name {:val "instructor-break" :comment "This is an example of an opportunistic event with periodicity."}
                            :event-resources [{:resource-type "instructor-type" :base-type "human"}]
                            :periodicity {:interval {:units "day" :value-string "1"} :occurrences {:value-string "1"}}
-                           :occurrence-assigment {:opportunistic? true,
+                           :occurrence-assignment {:opportunistic? true,
                                                   :constraints {:val ["every-day", "once"]
                                                                 :comment (str "The purpose of this event type is to ensure the no instructor has to work every timeslot.\n"
                                                                               "Interviewees stipulated this in the conversation.")}
-                                                  :ts-type-ref ["Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab"]}}
+                                                  :ts-type-refs ["Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab"]}}
 
                           {:event-type-name {:val "spring-break" :comment "This is an example of a one-time event. It has no 'event-resources'; in this sense, it is a non-event!"}
-                           :occurrence-assigment {:ts-type-ref {:val ["2025-03-17" "2025-03-18" "2025-03-19" "2025-03-20" "2025-03-21"]
+                           :occurrence-assignment {:ts-type-refs {:val ["2025-03-17" "2025-03-18" "2025-03-19" "2025-03-20" "2025-03-21"]
                                                                 :comment "Instead of enumeration values, we put dates here."}}}]}
 
       :timeslots [{:ts-type-id "Mon-Wed-Fri-60min"
@@ -207,6 +201,7 @@
                            {:span-id "Wednesday" :periods  ["9:00-11:50" "13:00-15:50"]}
                            {:span-id "Thursday"  :periods  ["9:00-11:50" "13:00-15:50"]}
                            {:span-id "Friday"    :periods  ["9:00-11:50" "13:00-15:50"]}]}]}})
+
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-timetabling
