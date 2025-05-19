@@ -166,7 +166,7 @@
               (= card :many)                              `[(s/def ~prop-val-name (s/coll-of ~prop-one-name :kind ~(symbol "vector?")))
                                                             (s/def ~prop-one-name (s/or ~@(or-choices types)))])))))
 
-(defn ^:diag gen-specs
+(defn gen-specs
   "Return specs implementing optional EADS-style annotations for the given property and its constraints.
    The topic argument is only used on for the [:eads-ds :self] object, defining a top-level spec for it."
   [{:keys [type-id spec]} topic]
@@ -181,7 +181,7 @@
           (s/def ~(symbol (str "::annotated-" (name prop-id))) (s/keys :req-un [~(symbol "::comment") ~(keyword (name prop-id) "val")]))]))))
 
 ;;; (dutil/learn-schema {:inputs ["water" {:item-id "grommets" :from "my-process-id"}]})
-(defn ^:admin learn-schema!
+(defn learn-schema!
   "Walk the map data structure, inferring type and structure information that could be stipulated in clojure specs."
   [eads-ds ignore-set]
   (let [eads-ds (remove-annotations eads-ds)]
@@ -192,8 +192,8 @@
 
 ;;; (dutil/make-specs ttable/timetabling "timetabling")
 (defn ^:admin make-specs
-  "This is the top-level function for making specs designed to be called at the REPL.
-  Return a vector of forms defining clojure specs for the argument EADS instructions."
+  "This is the top-level function for making specs. It is designed to be called at the REPL.
+   It return a vector of forms defining clojure specs for the argument EADS instructions."
   [eads-ds topic]
   (reset! schema-info {})
   (learn-schema! eads-ds #{}) ; Sets the schema-info atom

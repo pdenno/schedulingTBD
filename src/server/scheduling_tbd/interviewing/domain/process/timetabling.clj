@@ -85,11 +85,6 @@
  (s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
 
 
-;;; Promises and Pitfalls: Using LLMs to Generate Visualization Items (Fumeng Yang et al. (fy@umg.edu)
-;;; How High School Teachers Develop Tests and How AI Could Help.    (Fumeng Yang et al.) (Maybe not published yet.)
-;;; There was 1 quick slide on decision-making; she has one grad student working on it.
-;;; https://news.northwestern.edu/stories/2020/10/presidential-plinko-visualizes-data-uncertainty/
-
 ;;; ToDo: add a timetabled? property to flow and job shop EADS processes ????
 ;;; ToDo: Define the enumerations that are being used!
 ;;; (s/explain :timetabling/EADS-message ttable/timetabling)
