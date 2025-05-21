@@ -9,10 +9,10 @@
   :tools [{:type "file_search"}],
   :model-class :gpt,
   :instruction-path "agents/orchestrator.txt",
-  ;; Suppress-auto-recreate? exists because new JSON files are written a system start, but they might not have changed.
-  ;; ToDo: Don't write EADS json files to ${SCHEDULING_TBD_DB}/etc/EADS/ if they haven't been updated.
-  :suppress-auto-recreate? true 
-  :vector-store-paths ["*** JSON Files in ${SCHEDULING_TBD_DB}/etc/EADS/ ***" ], ; We replace this with a list of JSON files we find there.
+  :suppress-auto-recreate? true
+  ;; The vector store includes all the EADS instructions for interviewers.
+  ;; Whatever JSON is in the ${SCHEDULING_TBD_DB}/etc/EADS get added to :vector-store-paths.
+  :vector-store-paths [], ; see adb/init-agent-infos for the real value
   :agent-type :shared-assistant}
 
  {:base-type :process-interview-agent,
