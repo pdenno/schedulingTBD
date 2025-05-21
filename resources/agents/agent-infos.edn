@@ -9,7 +9,10 @@
   :tools [{:type "file_search"}],
   :model-class :gpt,
   :instruction-path "agents/orchestrator.txt",
-  :vector-store-paths ["EADS/process/flow-shop.json", "EADS/process/scheduling-problem-type.json" ],
+  ;; Suppress-auto-recreate? exists because new JSON files are written a system start, but they might not have changed.
+  ;; ToDo: Don't write EADS json files to ${SCHEDULING_TBD_DB}/etc/EADS/ if they haven't been updated.
+  :suppress-auto-recreate? true 
+  :vector-store-paths ["*** JSON Files in ${SCHEDULING_TBD_DB}/etc/EADS/ ***" ], ; We replace this with a list of JSON files we find there.
   :agent-type :shared-assistant}
 
  {:base-type :process-interview-agent,
@@ -22,6 +25,7 @@
    :tools [{:type "file_search"}],
    :model-class :gpt,
    :instruction-path "agents/iviewrs/data-iviewr-instructions.txt",
+   :vector-store-paths ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
    :agent-type :shared-assistant}
 
  {:base-type :resources-interview-agent,
@@ -46,14 +50,6 @@
   :agent-type :system
   :instruction-path "agents/scheduling-challenges.txt"
   :response-format-path "agents/scheduling-challenges-response-format.edn"}
-
-#_ {:base-type :process-dur-agent
-  :agent-type :system
-  :instruction-path "agents/process-dur-agent.txt"}
-
-#_ {:base-type :process-ordering-agent
-  :agent-type :system
-    :instruction-path "agents/process-ordering-agent.txt"}
 
  {:base-type :text-to-var
   :agent-type :system

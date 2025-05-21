@@ -1,10 +1,9 @@
 (ns scheduling-tbd.interviewing.domain.process.timetabling
   (:require
    [clojure.spec.alpha    :as s]
-   [datahike.api          :as d]
-   [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.db] ;for mount
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
+   [mount.core :as mount  :refer [defstate]]
+   [scheduling-tbd.db]    ;for mount
+   [scheduling-tbd.sutil  :as sutil]))
 
 (s/def :timetabling/EADS-message (s/keys :req-un [::interview-objective ::interviewer-agent ::EADS ::message-type]))
 (s/def ::EADS (s/keys :req-un [::EADS-id ::event-types ::timeslots]))
@@ -203,16 +202,9 @@
 (defn init-timetabling
   []
   (if (s/valid? :timetabling/EADS-message timetabling)
-    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/timetabling.json"))
-          db-obj {:EADS/id :process/timetabling
-                  :EADS/cid :process
-                  :EADS/specs #:spec{:full :timetabling/EADS-message}
-                  :EADS/msg-str (str timetabling)}
-          conn (connect-atm :system)
-          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-      (->> timetabling clj2json-pretty (spit eads-json-fname)))
+    (when-not (sutil/same-eads-json? timetabling)
+      (sutil/update-eads-json! timetabling)
+      (sutil/update-system-eads! timetabling))
     (throw (ex-info "Invalid EADS message (timetabling)." {}))))
 
 (defstate timetabling-eads
