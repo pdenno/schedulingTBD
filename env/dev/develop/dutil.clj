@@ -43,19 +43,21 @@
 (defn dtype
   "Return the data type of the argument object, either a keyword or a map with one key, :req-un."
   [obj]
-  (assert (not (vector? obj)))
   (cond (string? obj)  :type/string
         (number? obj)  :type/number
         (keyword? obj) :type/keyword
         (boolean? obj) :type/boolean
         (map? obj)     {:req-un (-> obj keys set)}
-        :else          (log! :warn (str "Unknown type for obj = " obj))))
+        (vector? obj)  (do (log! :warn (str "Vector of vectors. Hand code it. obj = " obj))
+                           :VECTOR!)
+        :else          (log! :warn (str "We don't handle the type of this object. obj = " obj))))
 
 (defn dtype-vec
   "Infer types from a vector of values, returning a set of types.
    Argument v could be a mix of object and simple types.
    This looks at what is stored on schema-info as well as the arguments (not a pure function). "
   [v known-types]
+  (reset! diag [v known-types])
   (let [mtype (some #(when (map? %) %) known-types)
         dtypes (remove map? known-types)
         vtypes  (-> (map dtype v) set)
@@ -146,7 +148,8 @@
                                      :type/string 'string?
                                      :type/number 'number?
                                      :type/boolean 'boolean?
-                                     :type/keyword 'keyword?)))
+                                     :type/keyword 'keyword?
+                                     :VECTOR!      'VECTOR!)))
           (prop-singular [pid]
             (when-not (str/ends-with? (name pid) "s")
               (log! :warn (str "Assumed this :many cardinality property ended in an 's': " pid)))

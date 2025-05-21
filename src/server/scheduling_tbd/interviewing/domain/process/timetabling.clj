@@ -10,9 +10,10 @@
 (s/def ::EADS (s/keys :req-un [::EADS-id ::event-types ::timeslots]))
 (s/def ::interview-objective string?)
 (s/def ::interviewer-agent keyword?)
-(s/def ::message-type  keyword?)
+(s/def ::message-type #(= % :EADS-INSTRUCTIONS))
 (s/def ::EADS-id keyword?)
 
+;;; (dutil/make-specs ttable/timetabling "timetabling")
 ;;; Created Sat May 17 18:55:10 EDT 2025 using develop.dutil/make-spec."
  (s/def ::event-types (s/or :normal :event-types/val :annotated ::annotated-event-types))
  (s/def :event-types/val (s/coll-of ::event-type :kind vector?))
