@@ -552,6 +552,7 @@
                           (when (surrogate? pid) (ru/refresh-client client-id pid cid))
                           (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
                             (check-and-put-ds iviewr-response ctx)
+                            ;(ws/send-to-client {:dispatch-key :iviewr-says :text "A new diagram was created with your response. Click here to see: " :client-id (ws/recent-client!)})
                             (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
                               (ws/send-to-client {:client-id (ws/recent-client!) :dispatch-key :load-graph :graph graph-mermaid})))
                           (recur (inc cnt)))))

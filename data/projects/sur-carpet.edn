@@ -1,5 +1,116 @@
 [
-#:project{:conversations
+#:project{:agents
+          [#:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_PkytTl2BpwwIiEL6FcrcwQnd",
+                   :base-type :process-interview-agent,
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_LzAxrMXSXV1CzN6Vc3BQEi2T"}
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
+                   :base-type :data-interview-agent,
+                   :id :data-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_m7RQP4Zo9PhpyjJwQCKOXHVY"}
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
+                   :base-type :resources-interview-agent,
+                   :id :resources-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_Dt0rSIWxd3IrzMqjKNktoFjQ"}
+           #:agent{:base-type :optimality-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_TWr4aPtUrqORzuSVkYMM2ofw",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_IQJUvMRB9Mf911ZK1wXwIlJN",
+                   :id :optimality-interview-agent-openai,
+                   :timestamp #inst "2025-03-05T15:11:11.228-00:00"}
+           #:agent{:base-type :sur-carpet,
+                   :agent-type :project,
+                   :thread-id "thread_NWUZpDgDHIBxJkCAE0yL2YwG",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes carpet.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_tH5Nl01AEhlG0DDzPT7OVFjN",
+                   :id :sur-carpet-openai,
+                   :expertise "carpet",
+                   :timestamp #inst "2025-03-05T15:11:12.687-00:00"}],
+          :claims
+          [#:claim{:string "(project-id :sur-carpet)"}
+           #:claim{:string "(project-name :sur-carpet \"SUR Carpet\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-carpet)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-carpet :bottleneck-processes)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-carpet :demand-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-carpet :variation-in-demand)"}
+           #:claim{:conversation-id :process,
+                   :question-type :work-type,
+                   :string "(provides-product :sur-carpet)"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-motivation,
+                   :string
+                   "(production-mode :sur-carpet make-to-order)"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-system-type,
+                   :string "(flow-shop :sur-carpet)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 1 \"Incoming Material Inspection\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 2 \"Fiber Preparation\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 3 \"Dyeing and Coloring\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 4 \"Yarn Spinning\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 5 \"Weaving or Tufting\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 6 \"Backing Attachment\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 7 \"Finishing Treatment\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 8 \"Quality Inspection\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process-steps,
+                   :string
+                   "(process-step :sur-carpet 9 \"Packaging\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-location,
+                   :string
+                   "(fails-query production-location :sur-carpet)"}],
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {fiberPrep, dyeingColor, yarnSpin, weaveTuft, backAttach, finishTreat, qualityInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 3.500, 4.500, 7.000, 2.500, 1.500, 1.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, fiberPrep] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, fiberPrep] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, fiberPrep] == taskStarts[p, dyeingColor]);\nconstraint forall (p in Product) (taskEnds[p, dyeingColor] == taskStarts[p, yarnSpin]);\nconstraint forall (p in Product) (taskEnds[p, yarnSpin] == taskStarts[p, weaveTuft]);\nconstraint forall (p in Product) (taskEnds[p, weaveTuft] == taskStarts[p, backAttach]);\nconstraint forall (p in Product) (taskEnds[p, backAttach] == taskStarts[p, finishTreat]);\nconstraint forall (p in Product) (taskEnds[p, finishTreat] == taskStarts[p, qualityInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, qualityInspect]);",
+          :conversations
           [#:conversation{:done? true,
                           :id :process,
                           :interviewer-budget 0.5,
@@ -255,118 +366,7 @@
                                      :tags [:response],
                                      :time
                                      #inst "2024-11-20T23:17:03.994-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {fiberPrep, dyeingColor, yarnSpin, weaveTuft, backAttach, finishTreat, qualityInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 3.500, 4.500, 7.000, 2.500, 1.500, 1.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, fiberPrep] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, fiberPrep] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, fiberPrep] == taskStarts[p, dyeingColor]);\nconstraint forall (p in Product) (taskEnds[p, dyeingColor] == taskStarts[p, yarnSpin]);\nconstraint forall (p in Product) (taskEnds[p, yarnSpin] == taskStarts[p, weaveTuft]);\nconstraint forall (p in Product) (taskEnds[p, weaveTuft] == taskStarts[p, backAttach]);\nconstraint forall (p in Product) (taskEnds[p, backAttach] == taskStarts[p, finishTreat]);\nconstraint forall (p in Product) (taskEnds[p, finishTreat] == taskStarts[p, qualityInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, qualityInspect]);",
-          :agents
-          [#:agent{:agent-type :shared-assistant,
-                   :assistant-id "asst_PkytTl2BpwwIiEL6FcrcwQnd",
-                   :base-type :process-interview-agent,
-                   :id :process-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_LzAxrMXSXV1CzN6Vc3BQEi2T"}
-           #:agent{:agent-type :shared-assistant,
-                   :assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
-                   :base-type :data-interview-agent,
-                   :id :data-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_m7RQP4Zo9PhpyjJwQCKOXHVY"}
-           #:agent{:agent-type :shared-assistant,
-                   :assistant-id "asst_S5PYzLpxSZNhTHFwgPfASTHG",
-                   :base-type :resources-interview-agent,
-                   :id :resources-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_Dt0rSIWxd3IrzMqjKNktoFjQ"}
-           #:agent{:base-type :optimality-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_TWr4aPtUrqORzuSVkYMM2ofw",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_IQJUvMRB9Mf911ZK1wXwIlJN",
-                   :id :optimality-interview-agent-openai,
-                   :timestamp #inst "2025-03-05T15:11:11.228-00:00"}
-           #:agent{:base-type :sur-carpet,
-                   :agent-type :project,
-                   :thread-id "thread_NWUZpDgDHIBxJkCAE0yL2YwG",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes carpet.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                   :surrogate? true,
-                   :assistant-id "asst_tH5Nl01AEhlG0DDzPT7OVFjN",
-                   :id :sur-carpet-openai,
-                   :expertise "carpet",
-                   :timestamp #inst "2025-03-05T15:11:12.687-00:00"}],
           :current-conversation :optimality,
-          :claims
-          [#:claim{:string "(project-id :sur-carpet)"}
-           #:claim{:string "(project-name :sur-carpet \"SUR Carpet\")"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-carpet)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-carpet :bottleneck-processes)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-carpet :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-carpet :variation-in-demand)"}
-           #:claim{:conversation-id :process,
-                   :question-type :work-type,
-                   :string "(provides-product :sur-carpet)"}
-           #:claim{:conversation-id :process,
-                   :question-type :production-motivation,
-                   :string
-                   "(production-mode :sur-carpet make-to-order)"}
-           #:claim{:conversation-id :process,
-                   :question-type :production-system-type,
-                   :string "(flow-shop :sur-carpet)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 1 \"Incoming Material Inspection\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 2 \"Fiber Preparation\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 3 \"Dyeing and Coloring\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 4 \"Yarn Spinning\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 5 \"Weaving or Tufting\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 6 \"Backing Attachment\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 7 \"Finishing Treatment\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 8 \"Quality Inspection\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process-steps,
-                   :string
-                   "(process-step :sur-carpet 9 \"Packaging\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :production-location,
-                   :string
-                   "(fails-query production-location :sur-carpet)"}],
-          :name "SUR Carpet",
-          :id :sur-carpet}
+          :id :sur-carpet,
+          :name "SUR Carpet"}
 ]

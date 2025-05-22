@@ -227,9 +227,9 @@
                     :id :sur-plate-glass,
                     :name "SUR Plate Glass"}
           #:project{:dir
-                    "/opt/scheduling/projects/sur-commemorative-coins/db/",
-                    :id :sur-commemorative-coins,
-                    :name "SUR Commemorative Coins"}]}
+                     "/opt/scheduling/projects/sur-plate-glass/db/"
+                    :id :sur-foam-earplugs
+                    :name "SUR Foam Earplugs"}]}
 
 #:spec{:full :flow-shop/EADS-message}
 

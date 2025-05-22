@@ -1,5 +1,77 @@
 [
-#:project{:conversations
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_d3inJrF2wiqKDzkdnWILSL5Q",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2024-12-08T16:12:48.505-00:00"}
+           #:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
+                   :base-type :data-interview-agent,
+                   :id :data-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_cGmzuhNrzz9rXDGHpyTQlhzi"}
+           #:agent{:base-type :sur-craft-beer,
+                   :agent-type :project,
+                   :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes craft beer.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",
+                   :id :sur-craft-beer-openai,
+                   :expertise "craft beer",
+                   :timestamp #inst "2024-12-08T16:12:48.520-00:00"}],
+          :claims
+          [#:claim{:conversation-id :process,
+                   :question-type :work-type,
+                   :string "(provides-product :sur-craft-beer)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :demand-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :string
+                   "(project-name :sur-craft-beer \"SUR Craft Beer\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :bottleneck-processes)"}
+           #:claim{:conversation-id :process,
+                   :string
+                   "(production-mode :sur-craft-beer make-to-stock)"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-craft-beer)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-system-type,
+                   :string "(flow-shop :sur-craft-beer)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :process-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-location,
+                   :string
+                   "(production-location :sur-craft-beer factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :equipment-utilization)"}
+           #:claim{:conversation-id :process,
+                   :question-type :warm-up,
+                   :string
+                   "(scheduling-challenge :sur-craft-beer :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :string "(project-id :sur-craft-beer)"}],
+          :conversations
           [#:conversation{:done? true,
                           :id :process,
                           :interviewer-budget 0.5,
@@ -127,13 +199,13 @@
                                      :tags [:response],
                                      :time
                                      #inst "2024-11-18T13:19:17.969-00:00"}
-                           #:message{:content
+                           #:message{:code
+                                     "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {millGrains, mashing, lautering, boiling, fermentation, conditioning, filtering, carbonation, bottlingCanning, packaging};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|1.000, 1.500, 1.000, 1.000, 252.000, 60.000, 3.000, 24.000, 3.000, 3.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, millGrains] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, millGrains] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, millGrains] == taskStarts[p, mashing]);\nconstraint forall (p in Product) (taskEnds[p, mashing] == taskStarts[p, lautering]);\nconstraint forall (p in Product) (taskEnds[p, lautering] == taskStarts[p, boiling]);\nconstraint forall (p in Product) (taskEnds[p, boiling] == taskStarts[p, fermentation]);\nconstraint forall (p in Product) (taskEnds[p, fermentation] == taskStarts[p, conditioning]);\nconstraint forall (p in Product) (taskEnds[p, conditioning] == taskStarts[p, filtering]);\nconstraint forall (p in Product) (taskEnds[p, filtering] == taskStarts[p, carbonation]);\nconstraint forall (p in Product) (taskEnds[p, carbonation] == taskStarts[p, bottlingCanning]);\nconstraint forall (p in Product) (taskEnds[p, bottlingCanning] == taskStarts[p, packaging]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packaging]);",
+                                     :content
                                      "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
                                      :from :system,
                                      :id 16,
                                      :tags [:info-to-user :minizinc],
-                                     :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {millGrains, mashing, lautering, boiling, fermentation, conditioning, filtering, carbonation, bottlingCanning, packaging};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|1.000, 1.500, 1.000, 1.000, 252.000, 60.000, 3.000, 24.000, 3.000, 3.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, millGrains] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, millGrains] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, millGrains] == taskStarts[p, mashing]);\nconstraint forall (p in Product) (taskEnds[p, mashing] == taskStarts[p, lautering]);\nconstraint forall (p in Product) (taskEnds[p, lautering] == taskStarts[p, boiling]);\nconstraint forall (p in Product) (taskEnds[p, boiling] == taskStarts[p, fermentation]);\nconstraint forall (p in Product) (taskEnds[p, fermentation] == taskStarts[p, conditioning]);\nconstraint forall (p in Product) (taskEnds[p, conditioning] == taskStarts[p, filtering]);\nconstraint forall (p in Product) (taskEnds[p, filtering] == taskStarts[p, carbonation]);\nconstraint forall (p in Product) (taskEnds[p, carbonation] == taskStarts[p, bottlingCanning]);\nconstraint forall (p in Product) (taskEnds[p, bottlingCanning] == taskStarts[p, packaging]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packaging]);",
                                      :time
                                      #inst "2024-11-18T13:21:46.585-00:00"}
                            #:message{:content
@@ -235,79 +307,7 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:53.373-00:00"}]}],
-          :agents
-          [#:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_d3inJrF2wiqKDzkdnWILSL5Q",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-08T16:12:48.505-00:00"}
-           #:agent{:agent-type :shared-assistant,
-                   :assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
-                   :base-type :data-interview-agent,
-                   :id :data-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_cGmzuhNrzz9rXDGHpyTQlhzi"}
-           #:agent{:base-type :sur-craft-beer,
-                   :agent-type :project,
-                   :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av",
-                   :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes craft beer.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                   :surrogate? true,
-                   :assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",
-                   :id :sur-craft-beer-openai,
-                   :expertise "craft beer",
-                   :timestamp #inst "2024-12-08T16:12:48.520-00:00"}],
           :current-conversation :process,
-          :claims
-          [#:claim{:conversation-id :process,
-                   :question-type :work-type,
-                   :string "(provides-product :sur-craft-beer)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :string
-                   "(project-name :sur-craft-beer \"SUR Craft Beer\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :bottleneck-processes)"}
-           #:claim{:conversation-id :process,
-                   :string
-                   "(production-mode :sur-craft-beer make-to-stock)"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-craft-beer)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :production-system-type,
-                   :string "(flow-shop :sur-craft-beer)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :process-variation)"}
-           #:claim{:conversation-id :process,
-                   :question-type :production-location,
-                   :string
-                   "(production-location :sur-craft-beer factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :equipment-utilization)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :product-variation)"}
-           #:claim{:conversation-id :process,
-                   :string "(project-id :sur-craft-beer)"}],
-          :name "SUR Craft Beer",
-          :id :sur-craft-beer}
+          :id :sur-craft-beer,
+          :name "SUR Craft Beer"}
 ]

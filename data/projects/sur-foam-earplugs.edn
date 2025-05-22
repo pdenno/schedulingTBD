@@ -1,0 +1,221 @@
+[
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_rBIg3atN4KC9DmMFKdIDBWB2",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2025-03-03T12:35:41.989-00:00"}
+           #:agent{:base-type :sur-foam-earplugs,
+                   :agent-type :project,
+                   :thread-id "thread_9kC6rMDiVija1CwHMDvAaCPj",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_oYfBmhxZS4nIFBylmF859uIg",
+                   :id :sur-foam-earplugs-openai,
+                   :expertise "foam earplugs",
+                   :timestamp #inst "2025-05-22T20:32:07.127-00:00"}
+           #:agent{:base-type :orchestrator-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_v2teItxzmHD82rcFpAuCvzPt",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_nPIdvlmvxiuVDVQGHTYOfdhc",
+                   :id :orchestrator-agent-openai,
+                   :timestamp #inst "2025-04-23T17:38:29.773-00:00"}],
+          :claims
+          [#:claim{:string "(project-id :sur-foam-earplugs)"}
+           #:claim{:string
+                   "(project-name :sur-foam-earplugs \"SUR Foam Earplugs\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-foam-earplugs)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-foam-earplugs \"Foam Earplugs\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-foam-earplugs :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-foam-earplugs :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-foam-earplugs :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-foam-earplugs :equipment-availability)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-foam-earplugs :variation-in-demand)"}],
+          :conversations
+          [#:conversation{:id :process,
+                          :interviewer-budget 0.39999999999999963,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.\n<svg width=\"300\" height=\"130\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect width=\"200\" height=\"100\" x=\"10\" y=\"10\" rx=\"20\" ry=\"20\" fill=\"blue\" />\n</svg>",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-05-22T20:32:04.840-00:00"}
+                           #:message{:content
+                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-05-22T20:32:19.927-00:00"}
+                           #:message{:content
+                                     "\nWe produce foam earplugs in different sizes and materials, catering to various industries such as construction, healthcare, and personal use. Our primary scheduling challenge lies in efficiently managing production lines for multiple product types while ensuring on-time delivery. Additionally, raw material availability, machine downtime, and fluctuating order volumes further complicate scheduling.",
+                                     :from :surrogate,
+                                     :id 3,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-05-22T20:32:20.075-00:00"}
+                           #:message{:answers-question 4,
+                                     :content
+                                     "\nWhat is the primary function or operation that the machine performs, and what challenges are you facing with the scheduling of its tasks?",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-05-22T20:33:07.376-00:00"}
+                           #:message{:answers-question 4,
+                                     :content
+                                     "\nThe primary function of our machines is molding and cutting foam to produce earplugs. The scheduling challenges include coordinating machine setup times for different product types, minimizing downtime during batch transitions, and aligning tasks with fluctuating customer order deadlines. Balancing machine utilization with maintenance and unexpected breakdowns also poses difficulties.",
+                                     :from :surrogate,
+                                     :id 5,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-05-22T20:33:07.890-00:00"}
+                           #:message{:answers-question 6,
+                                     :content
+                                     "\nIs the machine usage managed in a way where some jobs require specific steps to occur in order, while others don’t follow the same pattern, or do all jobs adhere to the same predefined sequence of steps?",
+                                     :from :system,
+                                     :id 6,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-05-22T20:33:38.423-00:00"}
+                           #:message{:answers-question 6,
+                                     :content
+                                     "\nNot all jobs adhere to the same predefined sequence of steps. Some products require additional or specialized steps, such as coating or packaging customization, that others do not. This variation creates complexity in scheduling, as certain jobs have unique sequences, while others follow a more standard process.",
+                                     :from :surrogate,
+                                     :id 7,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-05-22T20:33:38.887-00:00"}
+                           #:message{:answers-question 8,
+                                     :content
+                                     "\nCould you outline the key steps or processes involved in producing the different types of earplugs? Additionally, which tasks are common and which are unique to specific product types?",
+                                     :from :system,
+                                     :id 8,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-05-22T20:34:21.037-00:00"}
+                           #:message{:EADS-data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :commit-notes \"Documented the core processes involved in earplug manufacturing, highlighting common vs. unique steps.\", :data-structure {\"process-id\" \"earplug-manufacturing\", \"subprocesses\" [{\"process-id\" \"foam-mixing\", \"classification\" \"common\", \"notes\" \"Basic process across all earplugs.\"} {\"process-id\" \"foam-molding\", \"classification\" \"common\", \"notes\" \"Shape formation, standard for all products.\"} {\"process-id\" \"curing-heating\", \"classification\" \"common\", \"notes\" \"Required for foam firmness and durability.\"} {\"process-id\" \"trimming-cutting\", \"classification\" \"common\", \"notes\" \"Finalizes the shape of earplugs.\"} {\"process-id\" \"coating\", \"classification\" \"unique\", \"notes\" \"Applied only to medical-grade or silicone-coated earplugs.\"} {\"process-id\" \"packaging\", \"classification\" \"common\", \"notes\" \"Boxing is standard, but designs and labeling may vary.\"} {\"process-id\" \"custom-labeling-branding\", \"classification\" \"unique\", \"notes\" \"For client-specific or bulk orders with branding.\"}]}}",
+                                     :answers-question 8,
+                                     :content
+                                     "\nHere’s an outline of the key steps and their classification into common and unique tasks:\n",
+                                     :from :surrogate,
+                                     :id 9,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-05-22T20:34:21.558-00:00"}
+                           #:message{:answers-question 10,
+                                     :content
+                                     "\nWhat is the approximate duration for each of the steps outlined? If possible, provide the typical time in units like minutes or hours for each process, including any variations based on product type.",
+                                     :from :system,
+                                     :id 10,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-05-22T20:34:56.613-00:00"}
+                           #:message{:EADS-data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :commit-notes \"Added approximate durations for each process step, including notes on variations based on product type.\", :data-structure {\"process-id\" \"earplug-manufacturing\", \"subprocesses\" [{\"process-id\" \"foam-mixing\", \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"classification\" \"common\", \"notes\" \"Consistent for all products.\"} {\"process-id\" \"foam-molding\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"classification\" \"common\", \"notes\" \"Depends on the complexity of shape and batch size.\"} {\"process-id\" \"curing-heating\", \"duration\" {\"units\" \"hours\", \"value-string\" \"2\"}, \"classification\" \"common\", \"notes\" \"Same for all product types.\"} {\"process-id\" \"trimming-cutting\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-1.5\"}, \"classification\" \"common\", \"notes\" \"Longer for custom or intricate shapes.\"} {\"process-id\" \"coating\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1\"}, \"classification\" \"unique\", \"notes\" \"Only for coated products like medical-grade earplugs.\"} {\"process-id\" \"packaging\", \"duration\" {\"units\" \"minutes\", \"value-string\" \"45\"}, \"classification\" \"common\", \"notes\" \"Time may vary for custom packaging or larger batch volumes.\"} {\"process-id\" \"custom-labeling-branding\", \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-60\"}, \"classification\" \"unique\", \"notes\" \"Varies depending on branding complexity.\"}]}}",
+                                     :answers-question 10,
+                                     :content
+                                     "\nHere are the approximate durations for each step, with variations based on product type included:\n",
+                                     :from :surrogate,
+                                     :id 11,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-05-22T20:34:57.133-00:00"}
+                           #:message{:answers-question 12,
+                                     :content
+                                     "\nHow does the flow of materials work for these steps? Specifically, for each step, could you indicate the raw materials or intermediate outputs needed, and what products or components are produced?",
+                                     :from :system,
+                                     :id 12,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-05-22T20:35:50.289-00:00"}
+                           #:message{:EADS-data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :commit-notes \"Added material flow for each step, specifying inputs (raw materials/intermediates) and outputs (products/components).\", :data-structure {\"process-id\" \"earplug-manufacturing\", \"subprocesses\" [{\"process-id\" \"foam-mixing\", \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"classification\" \"common\", \"inputs\" [\"foam chemicals (polyurethane, silicone)\"], \"outputs\" [\"mixed foam material\"], \"notes\" \"Consistent for all products.\"} {\"process-id\" \"foam-molding\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"classification\" \"common\", \"inputs\" [\"mixed foam material\"], \"outputs\" [\"molded foam blocks or earplug shapes\"], \"notes\" \"Depends on the complexity of shape and batch size.\"} {\"process-id\" \"curing-heating\", \"duration\" {\"units\" \"hours\", \"value-string\" \"2\"}, \"classification\" \"common\", \"inputs\" [\"molded foam blocks\"], \"outputs\" [\"hardened foam products\"], \"notes\" \"Same for all product types.\"} {\"process-id\" \"trimming-cutting\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-1.5\"}, \"classification\" \"common\", \"inputs\" [\"hardened foam products\"], \"outputs\" [\"final shaped earplugs\"], \"notes\" \"Longer for custom or intricate shapes.\"} {\"process-id\" \"coating\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1\"}, \"classification\" \"unique\", \"inputs\" [\"final shaped earplugs\" \"coating material\"], \"outputs\" [\"coated earplugs\"], \"notes\" \"Only for coated products like medical-grade earplugs.\"} {\"process-id\" \"packaging\", \"duration\" {\"units\" \"minutes\", \"value-string\" \"45\"}, \"classification\" \"common\", \"inputs\" [\"earplugs\" \"boxes\" \"labeling materials\"], \"outputs\" [\"packaged earplugs\"], \"notes\" \"Time may vary for custom packaging or larger batch volumes.\"} {\"process-id\" \"custom-labeling-branding\", \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-60\"}, \"classification\" \"unique\", \"inputs\" [\"packaged earplugs\" \"custom labels\"], \"outputs\" [\"branded and labeled earplug packages\"], \"notes\" \"Varies depending on branding complexity.\"}]}}",
+                                     :answers-question 12,
+                                     :content
+                                     "\nHere’s the flow of materials for each step, including inputs and outputs:\n",
+                                     :from :surrogate,
+                                     :id 13,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-05-22T20:35:50.820-00:00"}
+                           #:message{:answers-question 14,
+                                     :content
+                                     "\nWhat resources (e.g., machines, tools, employees) are required for each step in the production process? If possible, include any differences based on product type.",
+                                     :from :system,
+                                     :id 14,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-05-22T20:36:32.502-00:00"}
+                           #:message{:EADS-data-structure
+                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :commit-notes \"Integrated required resources (machines, tools, and employees) for each step, including variations based on product types.\", :data-structure {\"process-id\" \"earplug-manufacturing\", \"subprocesses\" [{\"process-id\" \"foam-mixing\", \"duration\" {\"units\" \"minutes\", \"value-string\" \"30\"}, \"classification\" \"common\", \"inputs\" [\"foam chemicals (polyurethane, silicone)\"], \"outputs\" [\"mixed foam material\"], \"resources\" {\"machines-tools\" [\"mixing machines\" \"measuring tools\"], \"employees\" \"1-2\", \"notes\" \"No significant variation.\"}} {\"process-id\" \"foam-molding\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-2\"}, \"classification\" \"common\", \"inputs\" [\"mixed foam material\"], \"outputs\" [\"molded foam blocks or earplug shapes\"], \"resources\" {\"machines-tools\" [\"injection or compression molds\"], \"employees\" \"1-2\", \"notes\" \"Molds vary by shape and size.\"}} {\"process-id\" \"curing-heating\", \"duration\" {\"units\" \"hours\", \"value-string\" \"2\"}, \"classification\" \"common\", \"inputs\" [\"molded foam blocks\"], \"outputs\" [\"hardened foam products\"], \"resources\" {\"machines-tools\" [\"heating ovens\" \"racks\"], \"employees\" \"1 (monitoring)\", \"notes\" \"No significant variation.\"}} {\"process-id\" \"trimming-cutting\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1-1.5\"}, \"classification\" \"common\", \"inputs\" [\"hardened foam products\"], \"outputs\" [\"final shaped earplugs\"], \"resources\" {\"machines-tools\" [\"cutting tools\" \"trimmers\"], \"employees\" \"2-3\", \"notes\" \"Complex shapes require more precise tools.\"}} {\"process-id\" \"coating\", \"duration\" {\"units\" \"hours\", \"value-string\" \"1\"}, \"classification\" \"unique\", \"inputs\" [\"final shaped earplugs\" \"coating material\"], \"outputs\" [\"coated earplugs\"], \"resources\" {\"machines-tools\" [\"coating applicator\" \"drying equipment\"], \"employees\" \"1-2\", \"notes\" \"Only for medical-grade or coated products.\"}} {\"process-id\" \"packaging\", \"duration\" {\"units\" \"minutes\", \"value-string\" \"45\"}, \"classification\" \"common\", \"inputs\" [\"earplugs\" \"boxes\" \"labeling materials\"], \"outputs\" [\"packaged earplugs\"], \"resources\" {\"machines-tools\" [\"packaging machines\" \"labeling tools\"], \"employees\" \"2-3\", \"notes\" \"Custom packaging requires manual adjustments.\"}} {\"process-id\" \"custom-labeling-branding\", \"duration\" {\"units\" \"minutes-hours\", \"value-string\" \"30-60\"}, \"classification\" \"unique\", \"inputs\" [\"packaged earplugs\" \"custom labels\"], \"outputs\" [\"branded and labeled earplug packages\"], \"resources\" {\"machines-tools\" [\"label printers\" \"adhesive applicators\"], \"employees\" \"1-2\", \"notes\" \"Only for branded or custom-labeled products.\"}}]}}",
+                                     :answers-question 14,
+                                     :content
+                                     "\nHere are the resources required for each step, including variations based on product types:\n",
+                                     :from :surrogate,
+                                     :id 15,
+                                     :tags [:response],
+                                     :time
+                                     #inst "2025-05-22T20:36:33.010-00:00"}]}
+           #:conversation{:id :data,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-05-22T20:32:05.027-00:00"}]}
+           #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-05-22T20:32:05.238-00:00"}]}
+           #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-05-22T20:32:05.404-00:00"}]}],
+          :current-conversation :process,
+          :id :sur-foam-earplugs,
+          :name "SUR Foam Earplugs"}
+]

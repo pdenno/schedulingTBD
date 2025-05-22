@@ -1,5 +1,86 @@
 [
-#:project{:conversations
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_ugGRihps6qY7pW4vm29TJMQs",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_2r78YATlSKvD4qj99GltLPGz",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
+           #:agent{:base-type :sur-office-chairs,
+                   :agent-type :project,
+                   :thread-id "thread_4SmzahRiO4xXOiBLcM0tI8Y8",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_76kb8a2ZppWn4UyIEiC3LpZX",
+                   :id :sur-office-chairs-openai,
+                   :expertise "office chairs",
+                   :timestamp #inst "2025-03-05T12:35:13.120-00:00"}],
+          :claims
+          [#:claim{:string "(project-id :sur-office-chairs)"}
+           #:claim{:string
+                   "(project-name :sur-office-chairs \"SUR Office Chairs\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-office-chairs)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-office-chairs \"Office Chairs\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-office-chairs :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-office-chairs :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-office-chairs :demand-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/work-type,
+                   :string "(provides-product :sur-office-chairs)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-location,
+                   :string
+                   "(production-location :sur-office-chairs factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-motivation,
+                   :string
+                   "(production-mode :sur-office-chairs make-to-order)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-system-type,
+                   :string "(flow-shop :sur-office-chairs)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-office-chairs 1 \"Cut Chair Components\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-office-chairs 2 \"Assemble Chair Frame\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-office-chairs 3 \"Upholster Chair\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-office-chairs 4 \"Attach Chair Components\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-office-chairs 5 \"Inspect Quality\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-office-chairs 6 \"Package Chair\")"}],
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {cutComponents, assembleFrame, upholsterChair, attachComponents, inspectQuality};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 3.000, 4.000, 1.500, 1.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, cutComponents] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, cutComponents] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, cutComponents] == taskStarts[p, assembleFrame]);\nconstraint forall (p in Product) (taskEnds[p, assembleFrame] == taskStarts[p, upholsterChair]);\nconstraint forall (p in Product) (taskEnds[p, upholsterChair] == taskStarts[p, attachComponents]);\nconstraint forall (p in Product) (taskEnds[p, attachComponents] == taskStarts[p, inspectQuality]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, inspectQuality]);",
+          :conversations
           [#:conversation{:done? true,
                           :id :process,
                           :interviewer-budget 0.5,
@@ -202,88 +283,7 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-01-22T19:57:17.092-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {cutComponents, assembleFrame, upholsterChair, attachComponents, inspectQuality};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 3.000, 4.000, 1.500, 1.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, cutComponents] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, cutComponents] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, cutComponents] == taskStarts[p, assembleFrame]);\nconstraint forall (p in Product) (taskEnds[p, assembleFrame] == taskStarts[p, upholsterChair]);\nconstraint forall (p in Product) (taskEnds[p, upholsterChair] == taskStarts[p, attachComponents]);\nconstraint forall (p in Product) (taskEnds[p, attachComponents] == taskStarts[p, inspectQuality]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, inspectQuality]);",
-          :agents
-          [#:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_ugGRihps6qY7pW4vm29TJMQs",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_2r78YATlSKvD4qj99GltLPGz",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
-           #:agent{:base-type :sur-office-chairs,
-                   :agent-type :project,
-                   :thread-id "thread_4SmzahRiO4xXOiBLcM0tI8Y8",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :surrogate? true,
-                   :assistant-id "asst_76kb8a2ZppWn4UyIEiC3LpZX",
-                   :id :sur-office-chairs-openai,
-                   :expertise "office chairs",
-                   :timestamp #inst "2025-03-05T12:35:13.120-00:00"}],
           :current-conversation :process,
-          :claims
-          [#:claim{:string "(project-id :sur-office-chairs)"}
-           #:claim{:string
-                   "(project-name :sur-office-chairs \"SUR Office Chairs\")"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-office-chairs)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(principal-expertise :sur-office-chairs \"Office Chairs\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-office-chairs :delivery-schedules)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-office-chairs :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-office-chairs :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string "(provides-product :sur-office-chairs)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
-                   :string
-                   "(production-location :sur-office-chairs factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-office-chairs make-to-order)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string "(flow-shop :sur-office-chairs)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-office-chairs 1 \"Cut Chair Components\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-office-chairs 2 \"Assemble Chair Frame\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-office-chairs 3 \"Upholster Chair\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-office-chairs 4 \"Attach Chair Components\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-office-chairs 5 \"Inspect Quality\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-office-chairs 6 \"Package Chair\")"}],
-          :name "SUR Office Chairs",
-          :id :sur-office-chairs}
+          :id :sur-office-chairs,
+          :name "SUR Office Chairs"}
 ]

@@ -155,6 +155,10 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "The id of the EADS in the system DB which is currently being pursued in this conversation.\n"
                   "If the conversation doesn't have one, functions such as ork/active-EADS can make one using the project's orchestrator agent.")}
+   :conversation/EADS
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc (str "The id of the EADS in the system DB which is currently being pursued in this conversation.\n"
+                  "If the conversation doesn't have one, functions such as ork/active-EADS can make one using the project's orchestrator agent.")}
    :conversation/done?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if we don't have more to add (though user might)."}
@@ -181,6 +185,9 @@
    :message/content
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string with optional html links."}
+   :message/data-structure
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string that can be edn/read-string into an EADS data structure inferred from conversation so far."}
    :message/EADS-data-structure
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string that can be edn/read-string into an EADS data structure inferred from conversation so far."}
@@ -208,6 +215,9 @@
         :doc "The time at which the message was sent."}
 
    ;; ---------------------- project
+   :project/code
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "latest code"}
    :project/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "an agent (OpenAI Assistant, etc.) that outputs a vector of clojure maps in response to queries."}

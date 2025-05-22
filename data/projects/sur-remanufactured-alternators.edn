@@ -1,5 +1,102 @@
 [
-#:project{:conversations
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_ehfr6tj7LRYBk1TuvcpRoeJw",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
+           #:agent{:base-type :sur-remanufactured-alternators,
+                   :agent-type :project,
+                   :thread-id "thread_WJapV6DHuLUkjAcCi4ibEbch",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_ECJuwZ4HlCTGwevMex85UjvV",
+                   :id :sur-remanufactured-alternators-openai,
+                   :expertise "remanufactured alternators",
+                   :timestamp #inst "2025-01-16T18:54:33.443-00:00"}],
+          :claims
+          [#:claim{:string
+                   "(project-id :sur-remanufactured-alternators)"}
+           #:claim{:string
+                   "(project-name :sur-remanufactured-alternators \"SUR Remanufactured Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :string
+                   "(surrogate :sur-remanufactured-alternators)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-remanufactured-alternators :skilled-worker-availability)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-remanufactured-alternators :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-remanufactured-alternators :equipment-utilization)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-remanufactured-alternators \"Remanufactured Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-remanufactured-alternators :demand-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/work-type,
+                   :string
+                   "(provides-product :sur-remanufactured-alternators)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-location,
+                   :string
+                   "(production-location :sur-remanufactured-alternators factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-motivation,
+                   :string
+                   "(production-mode :sur-remanufactured-alternators make-to-order)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-system-type,
+                   :string
+                   "(job-shop :sur-remanufactured-alternators)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 1 \"Receive Used Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 2 \"Disassemble Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 3 \"Clean and Inspect Components\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 4 \"Replace Worn or Damaged Parts\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 5 \"Reassemble Alternators\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 6 \"Test Alternators for Performance\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 7 \"Paint and Finish\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-remanufactured-alternators 8 \"Package for Shipping\")"}],
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {disassembleAlt, cleanInspect, replaceParts, reassembleAlt, testPerformance, paintFinish};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of int: taskDuration = [|2, 3, 2, 2, 1, 1|];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, disassembleAlt] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, disassembleAlt] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, disassembleAlt] == taskStarts[p, cleanInspect]);\nconstraint forall (p in Product) (taskEnds[p, cleanInspect] == taskStarts[p, replaceParts]);\nconstraint forall (p in Product) (taskEnds[p, replaceParts] == taskStarts[p, reassembleAlt]);\nconstraint forall (p in Product) (taskEnds[p, reassembleAlt] == taskStarts[p, testPerformance]);\nconstraint forall (p in Product) (taskEnds[p, testPerformance] == taskStarts[p, paintFinish]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, paintFinish]);",
+          :conversations
           [#:conversation{:done? true,
                           :id :process,
                           :interviewer-budget 0.5,
@@ -184,104 +281,7 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-01-16T18:54:32.256-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {disassembleAlt, cleanInspect, replaceParts, reassembleAlt, testPerformance, paintFinish};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of int: taskDuration = [|2, 3, 2, 2, 1, 1|];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, disassembleAlt] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, disassembleAlt] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, disassembleAlt] == taskStarts[p, cleanInspect]);\nconstraint forall (p in Product) (taskEnds[p, cleanInspect] == taskStarts[p, replaceParts]);\nconstraint forall (p in Product) (taskEnds[p, replaceParts] == taskStarts[p, reassembleAlt]);\nconstraint forall (p in Product) (taskEnds[p, reassembleAlt] == taskStarts[p, testPerformance]);\nconstraint forall (p in Product) (taskEnds[p, testPerformance] == taskStarts[p, paintFinish]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, paintFinish]);",
-          :agents
-          [#:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_ehfr6tj7LRYBk1TuvcpRoeJw",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
-           #:agent{:base-type :sur-remanufactured-alternators,
-                   :agent-type :project,
-                   :thread-id "thread_WJapV6DHuLUkjAcCi4ibEbch",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :surrogate? true,
-                   :assistant-id "asst_ECJuwZ4HlCTGwevMex85UjvV",
-                   :id :sur-remanufactured-alternators-openai,
-                   :expertise "remanufactured alternators",
-                   :timestamp #inst "2025-01-16T18:54:33.443-00:00"}],
           :current-conversation :process,
-          :claims
-          [#:claim{:string
-                   "(project-id :sur-remanufactured-alternators)"}
-           #:claim{:string
-                   "(project-name :sur-remanufactured-alternators \"SUR Remanufactured Alternators\")"}
-           #:claim{:conversation-id :process,
-                   :string
-                   "(surrogate :sur-remanufactured-alternators)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-remanufactured-alternators :skilled-worker-availability)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-remanufactured-alternators :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-remanufactured-alternators :equipment-utilization)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(principal-expertise :sur-remanufactured-alternators \"Remanufactured Alternators\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-remanufactured-alternators :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string
-                   "(provides-product :sur-remanufactured-alternators)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
-                   :string
-                   "(production-location :sur-remanufactured-alternators factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-remanufactured-alternators make-to-order)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string
-                   "(job-shop :sur-remanufactured-alternators)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-remanufactured-alternators 1 \"Receive Used Alternators\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-remanufactured-alternators 2 \"Disassemble Alternators\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-remanufactured-alternators 3 \"Clean and Inspect Components\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-remanufactured-alternators 4 \"Replace Worn or Damaged Parts\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-remanufactured-alternators 5 \"Reassemble Alternators\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-remanufactured-alternators 6 \"Test Alternators for Performance\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-remanufactured-alternators 7 \"Paint and Finish\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-remanufactured-alternators 8 \"Package for Shipping\")"}],
-          :name "SUR Remanufactured Alternators",
-          :id :sur-remanufactured-alternators}
+          :id :sur-remanufactured-alternators,
+          :name "SUR Remanufactured Alternators"}
 ]
