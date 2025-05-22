@@ -70,6 +70,21 @@
                            #_(s/or  :system          #(= (:agent-type %) :system)
                                     :project          (s/and #(= (:agent-type %) :project)          #(-> % :pid keyword?))
                                     :shared-assistant (s/and #(= (:agent-type %) :shared-assistant) #(-> % :pid keyword?)))))
+(defn init-agent-infos
+  "Read the agent-infos file and complete it by:
+     1) updating the ork's vector-store to include all the EADS instructions used by interviewers."
+  []
+  (let [infos (reduce (fn [res info] (assoc res (:base-type info) info))
+                      {}
+                      (-> "agents/agent-infos.edn" io/resource slurp edn/read-string))
+        eads-json-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/"))
+        files (->> (.list (io/file eads-json-dir)) (map #(str eads-json-dir %)))]
+    (update-in infos [:orchestrator-agent :vector-store] into files)))
+
+;;; Agent-infos (after processing the EDN file) is a map indexed by base-type of maps describing the agent,
+;;; including vector-store, agent-type, and LLM used.
+;;; It gets lots more entries from surrogates projects.
+(defonce agent-infos (atom (init-agent-infos)))
 
 (defn agent-log
   "Log info-string to agent log"
@@ -79,25 +94,12 @@
       (tel/signal!
        {:kind :agents, :level :info, :msg (str "===== " date " " (apply str args))}))))
 
-;;; This might better be called agent-type-infos.
-;;;  "This is a map, indexed by base-type with values being maps providing information sufficient to create/recreate agents.
-;;;   In addition to those found in agents/agent-infos.edn, we add to this surrogate domain experts when they are started."
-(defonce agent-infos
-  (atom (reduce (fn [res info] (assoc res (:base-type info) info))
-                {}
-                (-> "agents/agent-infos.edn"
-                    io/resource
-                    slurp
-                    edn/read-string))))
-
 (defn check-agent-infos
   "Do s/valid? on ::agent-info-decl, an ::agent-info sans pid."
   []
   (doseq [[base-type info] (seq @agent-infos)]
     (when-not (s/valid? ::agent-info-decl info)
       (log! :error (str base-type " is not a valid agent-info:\n" (with-out-str (pprint info)))))))
-
-(check-agent-infos)
 
 (defn put-agent-info!
   "Add an agent info at the given base-type."

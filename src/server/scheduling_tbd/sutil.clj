@@ -2,6 +2,7 @@
   "Server utilities."
   (:require
    [cheshire.core            :as ches]
+   [clojure.java.io          :as io]
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
@@ -251,3 +252,35 @@
   "Return a pprinted string for given clojure object."
   [obj]
   (ches/generate-string obj {:pretty true}))
+
+(defn same-eads-json?
+  "Return true if the argument eads-instructions (an EDN object) is unchange since placed in ${SCHEDULING_TBD_DB}/etc/EADS."
+  [eads-instructions]
+  (let [id (-> eads-instructions :EADS :EADS-id)
+        [ns nam] ((juxt namespace name) id)]
+    (assert (and ns nam))
+    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/" nam ".json"))
+          old-text (if (.exists (io/file eads-json-fname)) (slurp eads-json-fname) "")
+          new-text (clj2json-pretty eads-instructions)]
+      (= old-text new-text))))
+
+(defn update-system-eads!
+  "Update the system DB with a (presumably) new version of the argument EADS instructions."
+  [eads-instructions]
+  (let [id (-> eads-instructions :EADS :EADS-id)
+        [ns nam] ((juxt namespace name) id)
+        db-obj {:EADS/id id
+                :EADS/cid (keyword ns)
+                :EADS/specs #:spec{:full (keyword nam "EADS-message")}
+                :EADS/msg-str (str eads-instructions)}
+          conn (connect-atm :system)
+          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]}))
+  nil)
+
+(defn update-eads-json!
+  "Update the ${SCHEDULING_TBD_DB}/etc/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions."
+  [eads-instructions]
+  (let [id (-> eads-instructions :EADS :EADS-id)
+        eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/" (name id) ".json"))]
+    (spit eads-json-fname (clj2json-pretty eads-instructions))))

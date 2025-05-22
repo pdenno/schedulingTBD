@@ -15,6 +15,7 @@
      [scheduling-tbd.agent-db         :as adb :refer [agent-log]]
      [scheduling-tbd.db               :as db]
      [scheduling-tbd.llm              :as llm]
+     [scheduling-tbd.interviewing.eads] ; for mount
      [scheduling-tbd.interviewing.ork :as ork]
      [scheduling-tbd.interviewing.response-utils :as ru]
      [scheduling-tbd.sutil            :as sutil :refer [elide output-struct2clj]]

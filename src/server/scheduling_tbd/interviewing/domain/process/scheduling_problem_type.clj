@@ -1,11 +1,10 @@
 (ns scheduling-tbd.interviewing.domain.process.scheduling-problem-type
   "Define a EADS to elicit general information about the scheduling problem the interviewees are interested in solving."
   (:require
-   [clojure.spec.alpha :as s]
-   [datahike.api          :as d]
-   [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.db] ;for mount
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
+   [clojure.spec.alpha    :as s]
+   [mount.core :as mount  :refer [defstate]]
+   [scheduling-tbd.db]    ;for mount
+   [scheduling-tbd.sutil  :as sutil]))
 
 ;;; ToDo: Because we use a central spec registry, the specs defined with short namespaces (e.g. :problem-type/val) might collide with specs from other domains.
 ;;;       The best solution might be not to use a central repository. These things won't be needed outside this file.
@@ -65,17 +64,9 @@
 (defn init-scheduling-problem-type
   []
   (if (s/valid? :scheduling-problem-type/EADS-message scheduling-problem-type)
-    ;; Write the EADS to data/EADS/process
-    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/scheduling-problem-type.json"))
-          db-obj {:EADS/id :process/scheduling-problem-type
-                :EADS/cid :process
-                  :EADS/specs #:spec{:full :scheduling-problem-type/EADS-message}
-                  :EADS/msg-str (str scheduling-problem-type)}
-          conn (connect-atm :system)
-          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-      (->> scheduling-problem-type clj2json-pretty (spit eads-json-fname)))
+    (when-not (sutil/same-eads-json? scheduling-problem-type)
+      (sutil/update-eads-json! scheduling-problem-type)
+      (sutil/update-system-eads! scheduling-problem-type))
     (throw (ex-info "Invalid EADS message (scheduling-problem-type)." {}))))
 
 (defstate init-scheduling-problem-type-eads

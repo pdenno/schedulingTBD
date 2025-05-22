@@ -1,6 +1,5 @@
 (ns scheduling-tbd.interviewing.eads-util
   (:require
-   [clojure.spec.alpha    :as s]
    [taoensso.telemere       :refer [log!]]))
 
 ;;; ---------- These are used to check process EADS for valid graphs.

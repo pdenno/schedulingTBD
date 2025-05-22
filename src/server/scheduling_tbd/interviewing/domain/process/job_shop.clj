@@ -6,10 +6,9 @@
    Note: We don't load this code at system startup. When you compile it, it writes the EADS to resources/EADS/job-shop.txt"
   (:require
    [clojure.spec.alpha    :as s]
-   [datahike.api          :as d]
-   [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.db] ;for mount
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
+   [mount.core :as mount  :refer [defstate]]
+   [scheduling-tbd.db]    ;for mount
+   [scheduling-tbd.sutil  :as sutil]))
 
 (s/def :job-shop/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
@@ -45,16 +44,9 @@
 (defn init-job-shop
   []
   (if (s/valid? :job-shop/EADS-message job-shop)
-    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/flow-shop.json"))
-          db-obj {:EADS/id :process/job-shop
-                  :EADS/cid :process
-                  :EADS/specs #:spec{:full :job-shop/EADS-message}
-                  :EADS/msg-str (str job-shop)}
-          conn (connect-atm :system)
-          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-      (->> job-shop clj2json-pretty (spit eads-json-fname)))
+    (when-not (sutil/same-eads-json? job-shop)
+      (sutil/update-eads-json! job-shop)
+      (sutil/update-system-eads! job-shop))
     (throw (ex-info "Invalid EADS message (job-shop)." {}))))
 
 (defstate job-shop-eads

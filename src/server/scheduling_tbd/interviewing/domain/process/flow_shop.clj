@@ -4,11 +4,10 @@
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
    [clojure.spec.alpha    :as s]
-   [datahike.api          :as d]
-   [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.db] ;for mount
+   [mount.core :as mount  :refer [defstate]]
+   [scheduling-tbd.db]    ; for mount
    [scheduling-tbd.interviewing.eads-util :refer [graph-semantics-ok?]]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
+   [scheduling-tbd.sutil :as sutil]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
@@ -207,17 +206,9 @@
 (defn init-flow-shop
   []
   (if (s/valid? :flow-shop/EADS-message flow-shop)
-    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/flow-shop.json"))
-          db-obj {:EADS/id :process/flow-shop
-                  :EADS/cid :process
-                  :EADS/specs #:spec{:full :flow-shop/EADS-message}
-                  :EADS/can-produce-visuals [:flow-shop/graph]
-                  :EADS/msg-str (str flow-shop)}
-          conn (connect-atm :system)
-          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-      (->> flow-shop clj2json-pretty (spit eads-json-fname)))
+    (when-not (sutil/same-eads-json? flow-shop)
+      (sutil/update-eads-json! flow-shop)
+      (sutil/update-system-eads! flow-shop))
     (throw (ex-info "Invalid EADS message (flow-shop)." {}))))
 
 (defstate flow-shop-eads
