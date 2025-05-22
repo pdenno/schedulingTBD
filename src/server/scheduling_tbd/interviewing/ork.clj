@@ -191,7 +191,7 @@
     ;;       'comprehensive history' probably covers all conversations.
     (tell-ork (conversation-history pid) {:ork-agent ork})
     (let [eads (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})]
-      (if (s/valid? ::convey-eads eads)
+      ;(if (s/valid? ::convey-eads eads)
         (if-let [eads-instructions (d/q '[:find ?msg-str .
                                           :in $ ?eid-id
                                           :where
@@ -200,5 +200,5 @@
                                         @(connect-atm :system)
                                         (-> eads :EADS-id keyword))]
           (edn/read-string eads-instructions)
-          (log! :error (str "No EADS-instructions found for " eads)))
-        (log! :error (str "Invalid CONVEY-EADS message: " eads))))))
+          (log! :error (str "No EADS-instructions found for " eads))))))
+        ;(log! :error (str "Invalid CONVEY-EADS message: " eads))))))

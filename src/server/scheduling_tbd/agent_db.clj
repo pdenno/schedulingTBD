@@ -419,7 +419,7 @@
 (defn query-on-thread-aux
   "Create a message for ROLE on the project's (PID) thread and run it, returning the result text.
     aid      - assistant ID (the OpenAI notion)
-    tid      - thread ID (ttheOpenAI notion)
+    tid      - thread ID (the OpenAI notion)
     role     - #{'user' 'assistant'},
     query-text - a string.
    Returns text but uses promesa internally to deal with errors."
