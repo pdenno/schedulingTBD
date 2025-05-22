@@ -42,12 +42,12 @@
    'how    'scheduling-tbd.how-made
    'llm    'scheduling-tbd.llm
    'llmt   'scheduling-tbd.llm-test
-   'datab  'scheduling-tbd.interviewing.domain.data.data-basics
+   'orm    'scheduling-tbd.interviewing.domain.data.orm
    'fshop  'scheduling-tbd.interviewing.domain.process.flow-shop
    'jshop  'scheduling-tbd.interviewing.domain.process.job-shop
    'jshopc 'scheduling-tbd.interviewing.domain.process.job-shop-c
    'jshopu 'scheduling-tbd.interviewing.domain.process.job-shop-u
-   'pan    'scheduling-tbd.interviewing.domain.process.process-analysis
+;  'pan    'scheduling-tbd.interviewing.domain.process.process-analysis
    'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type
    'ttable 'scheduling-tbd.interviewing.domain.process.timetabling
    'eadsu  'scheduling-tbd.interviewing.eads-util

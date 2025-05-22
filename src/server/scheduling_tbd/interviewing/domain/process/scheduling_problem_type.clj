@@ -1,6 +1,7 @@
 (ns scheduling-tbd.interviewing.domain.process.scheduling-problem-type
   "Define a EADS to elicit general information about the scheduling problem the interviewees are interested in solving."
   (:require
+   [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
    [scheduling-tbd.db]    ;for mount
    [scheduling-tbd.sutil  :as sutil]))

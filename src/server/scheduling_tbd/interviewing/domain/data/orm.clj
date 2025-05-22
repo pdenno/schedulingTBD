@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.data.data-basics
+(ns scheduling-tbd.interviewing.domain.data.orm
   "This provides EADS for an interview about data interviewees use in performing their work, the fundamental characteristics of those data.
    The interview creates example data from ORM fact types it formulates rather than upload their spreadsheets and talking about them.
    We work this way because we know that many people prioritize visual appeal over logical organization when using tools like Excel.
@@ -13,16 +13,16 @@
 
 (def ^:diag diag (atom nil))
 
-(s/def :data-basics/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
+(s/def :orm/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
 (s/def ::EADS (s/keys :req-un [::EADS-id ::exhausted? ::inquiry-areas]))
-(s/def ::EADS-id #(= % :data/data-basics))
+(s/def ::EADS-id #(= % :data/orm))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
 (s/def ::interview-objective string?)
 (s/def ::interviewer-agent #(= % :data))
 
 (s/def ::comment string?) ; About annotations
 
-;;; (dutil/make-specs datab/data-basics "data-basics")
+;;; (dutil/make-specs datab/orm "orm")
 ;;; Created Wed May 21 11:09:18 EDT 2025 using develop.dutil/make-spec.
  (s/def ::exhausted? (s/or :normal :exhausted?/val :annotated ::annotated-exhausted?))
  (s/def :exhausted?/val string?)
@@ -82,7 +82,7 @@
  (s/def ::row (s/coll-of string? :kind vector?)) ; We wrote this one by hand (vector of vectors).
  (s/def ::annotated-rows (s/keys :req-un [::comment :rows/val]))
 
-(def data-basics
+(def orm
     {:message-type :EADS-INSTRUCTIONS
      :interviewer-agent :data
      :interview-objective
@@ -186,7 +186,7 @@
           "The interview you conduct may prove to be rather complex and possibly long-running, but it is very important to our work, so we are giving you a big budget for question asking.\n"
           "Good luck!")
      :EADS
-     {:EADS-id :data/data-basics
+     {:EADS-id :data/orm
       :exhausted? {:val "false"
                    :comment "You don't need to specify this property until you are ready to set its value to true, signifying that you believe that all areas of inquiry have been sufficiently investigated."}
       :inquiry-areas
@@ -283,21 +283,13 @@
                                         ["EN-891" "EDM machines"    "2023-03-28"]]}}]}]}})
 
 ;;; -------------------- Starting and stopping -------------------------
-(defn init-data-basics
+(defn init-orm
   []
-  (if (s/valid? :data-basics/EADS-message data-basics)
-    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/data-basics.json"))
-          db-obj {:EADS/id :data/data-basics
-                  :EADS/cid :data
-                  :EADS/specs #:spec{:full :data-basics/EADS-message}
-                  #_#_:EADS/can-produce-visuals [:ORM]
-                  :EADS/msg-str (str data-basics)}
-          conn (connect-atm :system)
-          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-      (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]})
-      ;; Write the EADS JSON to resources/EADS/process so it can be placed in ork's vector store.
-      (->> data-basics clj2json-pretty (spit eads-json-fname)))
-    (throw (ex-info "Invalid EADS message (data-basics)." {}))))
+  (if (s/valid? :orm/EADS-message orm)
+    (when-not (sutil/same-eads-json? orm)
+      (sutil/update-eads-json! orm)
+      (sutil/update-system-eads! orm))
+    (throw (ex-info "Invalid EADS message (orm)." {}))))
 
-(defstate data-basics-eads
-  :start (init-data-basics))
+(defstate orm-eads
+  :start (init-orm))

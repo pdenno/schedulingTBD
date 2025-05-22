@@ -83,7 +83,8 @@
 
 ;;; Agent-infos (after processing the EDN file) is a map indexed by base-type of maps describing the agent,
 ;;; including vector-store, agent-type, and LLM used.
-(defonce agent-infos (atom (-> (init-agent-infos) vals vec)))
+;;; It gets lots more entries from surrogates projects.
+(defonce agent-infos (atom (init-agent-infos)))
 
 (defn agent-log
   "Log info-string to agent log"
@@ -99,8 +100,6 @@
   (doseq [[base-type info] (seq @agent-infos)]
     (when-not (s/valid? ::agent-info-decl info)
       (log! :error (str base-type " is not a valid agent-info:\n" (with-out-str (pprint info)))))))
-
-(check-agent-infos)
 
 (defn put-agent-info!
   "Add an agent info at the given base-type."
