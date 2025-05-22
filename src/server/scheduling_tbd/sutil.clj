@@ -78,9 +78,9 @@
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
       (when error?
-        (throw (ex-info "No such DB" {:key k}))))
+        (throw (ex-info (str "Could not connect to DB: " k) {:key k}))))
     (when error?
-      (throw (ex-info "No such DB" {:key k})))))
+      (throw (ex-info (str "No such DB: " k) {:key k})))))
 
 (defn datahike-schema
   "Create a Datahike-compatible schema from map-type schema with notes such as :mm/info."
