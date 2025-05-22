@@ -24,7 +24,7 @@ Here is the message the interviewer would get:
  "interview-objective": "Using the three property types 'problem-type', 'continuous?', and 'cyclical?', determine the kind of production system and scheduling problem for which the interviewees seek a solution.
                          For 'problem-type' you may only choose one of the following:
                             1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for a set of jobs or product types that execute the same sequence of production steps across multiple machines or workstations.
-                            2) RESOURCE-ASSIGNMENT-PROBLEM: [not exactly a scheduling problem, but it might come up] the problem of assigning work to resources without specifying the time at which the work is to occur.
+                            2) TIMETABLING-PROBLEM: the problem of assigning collections of resources to event time slots, ensuring that all the resources required for each event are available in its time slot.
                             3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within a project.
                             4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which the jobs visit machines or workstations may vary as determined by the job type.
                             5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.",
@@ -80,7 +80,7 @@ Here it is using a protocol we will describe in section PROTOCOL below.
  We: {"message-type": "SUPPLY-EADS"}
 
  You: {"message-type": CONVEY-EADS",
-       "EADS": "process/flow-shop"}
+       "EADS-id": "process/flow-shop"}
 
 Consideration of (2), (3), and (4) above are a matter of studying the details of the most recent CONVERSATION-HISTORY message we provided for the given interviewer.
 

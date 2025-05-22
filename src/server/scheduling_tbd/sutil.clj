@@ -254,12 +254,12 @@
   (ches/generate-string obj {:pretty true}))
 
 (defn same-eads-json?
-  "Return true if the argument eads-instructions (an EDN object) is unchange since placed in ${SCHEDULING_TBD_DB}/etc/EADS."
+  "Return true if the argument eads-instructions (an EDN object) is unchange since placed in resources/agents/iviewrs/EADS."
   [eads-instructions]
   (let [id (-> eads-instructions :EADS :EADS-id)
         [ns nam] ((juxt namespace name) id)]
     (assert (and ns nam))
-    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/" nam ".json"))
+    (let [eads-json-fname (str "resources/agents/iviewrs/EADS/" nam ".json")
           old-text (if (.exists (io/file eads-json-fname)) (slurp eads-json-fname) "")
           new-text (clj2json-pretty eads-instructions)]
       (= old-text new-text))))
@@ -279,8 +279,8 @@
   nil)
 
 (defn update-eads-json!
-  "Update the ${SCHEDULING_TBD_DB}/etc/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions."
+  "Update the resources/agents/iviewrs/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions."
   [eads-instructions]
   (let [id (-> eads-instructions :EADS :EADS-id)
-        eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/" (name id) ".json"))]
+        eads-json-fname (str "resources/agents/iviewrs/EADS/" (name id) ".json")]
     (spit eads-json-fname (clj2json-pretty eads-instructions))))

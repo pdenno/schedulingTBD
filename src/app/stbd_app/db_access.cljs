@@ -33,7 +33,7 @@
   ([pid] (get-conversation-http pid nil))
   ([pid cid]
    (assert (keyword? pid))
-   (log! :info (str "Call to get-conversation-http for " pid " cid = " cid))
+   (log! :info (str "Call to get-conversation-http for pid = " pid " cid = " cid))
    (let [prom (p/deferred)
          url (if cid
                (str "/api/get-conversation?project-id=" (name pid) "&cid=" (name cid) "&client-id=" ws/client-id)
@@ -48,7 +48,7 @@
 
 ;;; This is used by the server/planner to reload the conversation.
 ;;; Unlike chat/get-conversation, the function for (lookup-fn :get-conversation),
-;;; it doesn't resume-conversation because planning is already underway.
+;;; it doesn't resume-conversation because interviewing is already underway.
 (register-fn
  :update-conversation-text
  (fn [{:keys [pid cid pname]}]

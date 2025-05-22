@@ -237,7 +237,7 @@
    (ring/create-default-handler)))
 
 (defn handler-init []
-  (log! :info "Updating handler.")
+  (log! :info "Updating http handler routes.")
   (let [site-config (-> "system.edn" io/resource slurp edn/read-string :dev :handler/ring)
         s ^String (:cookie-secret site-config)
         cookie-store (cookie/cookie-store {:key (.getBytes s)})

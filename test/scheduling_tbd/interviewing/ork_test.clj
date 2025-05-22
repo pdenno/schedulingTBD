@@ -15,9 +15,14 @@
 ;;; ============================= Orchestrator =========================================
 (defonce pid nil #_(db/create-proj-db! {:project/id :orch-test :project/name "orch-test"} {} {:force-this-name? true}))
 
-(defonce ork nil #_(adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent)
-                                    (assoc :pid pid)
+(when-not (some #(= % :sur-plate-glass) (db/list-projects))
+  (log! :error "Project :sur-plate-glass doesn't exist. Most should work for this test."))
+
+(def ork (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent)
+                                    (assoc :pid :sur-plate-glass)
                                     (assoc :force-new? true))))
+
+
 
 ;;; These are defined in the order they are used in exercising the orchestrator.
 (def ch-1 {:message-type "CONVERSATION-HISTORY",

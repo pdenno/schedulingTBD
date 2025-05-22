@@ -77,9 +77,8 @@
   (let [infos (reduce (fn [res info] (assoc res (:base-type info) info))
                       {}
                       (-> "agents/agent-infos.edn" io/resource slurp edn/read-string))
-        eads-json-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/"))
-        files (->> (.list (io/file eads-json-dir)) (map #(str eads-json-dir %)))]
-    (update-in infos [:orchestrator-agent :vector-store] into files)))
+        files (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "agents/iviewrs/EADS/" %)))]
+    (update-in infos [:orchestrator-agent :vector-store-paths] into files)))
 
 ;;; Agent-infos (after processing the EDN file) is a map indexed by base-type of maps describing the agent,
 ;;; including vector-store, agent-type, and LLM used.

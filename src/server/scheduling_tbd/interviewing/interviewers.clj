@@ -583,7 +583,7 @@
                    :tags [:process/warm-up :name-project :informative]})
       ;; This will cause a resume-conversation:
       (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
-                        :new-proj-map {:project/name pname :project/id pid}}))
+                          :new-proj-map {:project/name pname :project/id pid}}))
     (finally
       (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
