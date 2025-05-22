@@ -3,6 +3,8 @@
             [scheduling-tbd.interviewing.eads-util :as eads-util]
             [scheduling-tbd.db :as sdb]
             [clojure.edn  :as edn]
+            [clojure.data.json :as json]
+            [clojure.walk :as w]
             [taoensso.telemere       :refer [log!]]))
 
 (defn decompose-eads [eads]
@@ -130,23 +132,28 @@
                                   (str source " -- " material " --> " target "\n"))
                                 connections))
 
-;Thought this was needed, but we're saving the DSs as clojure objects
-#_(defn parse-eads [eads-str]
+(defn parse-eads [eads-str]
   (json/read-str eads-str :key-fn keyword))
 
-(defn datastructure2mermaid [eads-str]
-  (let [eads (edn/read-string eads-str)]
-    (log! :info eads)
+(defn datastructure2mermaid [eads]
     (when (eads-util/graph-semantics-ok? eads)
-      (print (str "flowchart TD\n"
-                  (decompose-eads eads)))
-      (print (apply str (-> eads
+      (str "flowchart TD\n"
+                  (decompose-eads eads)
+      (apply str (-> eads
                             gather-connections
                             find-connections
                             combine-connections
                             format-combined-connections
-                            format-connections))))))
+                            format-connections)))))
 
 (defn latest-datastructure2mermaid [pid cid]
-  (let [latest-EADS (sdb/get-EADS-ds pid cid)]
-    (datastructure2mermaid latest-EADS)))
+  (let [latest-EADS-message (sdb/get-EADS-ds pid cid)]
+    (-> latest-EADS-message
+        edn/read-string
+        :data-structure
+        w/keywordize-keys
+        datastructure2mermaid)
+    ))
+
+
+;(def test {:message-type "DATA-STRUCTURE-REFINEMENT", :commit-notes "Addressed scaling concerns related to increased task volume, complexity, variability, resource constraints, supply chain integration, real-time monitoring, workforce management, and cost control. Included strategies to future-proof scheduling systems.", :data-structure {"process-id" "job-shop-scheduling", "scaling-concerns" [{"concern" "Increased Volume of Tasks and Jobs", "indicators" ["Difficulty distributing work evenly across machines or workers." "Frequent delays in creating or adjusting schedules." "Decreased visibility into job status with higher volumes."], "solutions" ["Transition to automated scheduling software." "Invest in real-time monitoring tools." "Optimize sequencing with batching algorithms."]} {"concern" "Managing Increased Complexity", "indicators" ["Struggles prioritizing tasks with competing deadlines or specialized needs." "Chaotic planning for multi-stage processes with dependencies." "Failure to model complex workflows accurately."], "solutions" ["Upgrade to dependency-mapping scheduling systems." "Use simulation and scenario planning tools." "Synchronize scheduling with supply chain systems."]} {"concern" "Coping with Variability in Demand", "indicators" ["Difficulty balancing long-term goals with rush orders." "Time-consuming rework of schedules due to shifting demands." "Inability to adapt to seasonal fluctuations."], "solutions" ["Leverage predictive analytics for demand forecasting." "Implement adaptive scheduling tools for real-time re-prioritization." "Create flexible buffer zones to absorb variability."]} {"concern" "Resource Constraints and Utilization", "indicators" ["Overuse of key machines while others remain idle." "Labor or tooling bottlenecks due to increased demand." "Conflicts in overlapping resource requirements."], "solutions" ["Implement capacity-based scheduling tools." "Track resource availability dynamically." "Use load-balancing algorithms to distribute resources."]} {"concern" "Integration with Growing Supply Chain", "indicators" ["Disruptions from late materials or low inventory." "Disconnects between scheduling and procurement." "Difficulty coordinating JIT manufacturing."], "solutions" ["Deploy integrated ERP systems for synchronized workflows." "Monitor materials with real-time tracking alerts." "Account for dynamic lead times in scheduling adjustments."]} {"concern" "Real-Time Monitoring and Scalability", "indicators" ["Difficulties tracking job statuses in expanded operations." "Missed opportunities for dynamic adjustments." "Unnoticed bottlenecks or delays."], "solutions" ["Introduce IoT-enabled monitoring systems." "Adopt advanced visualization tools like Gantt charts." "Enable AI-driven alert mechanisms for proactive issue resolution."]} {"concern" "Workforce Management Challenges", "indicators" ["Frequent overbooking or underutilization of operators." "Trouble scheduling tasks requiring specialized skills." "Rising overtime costs as complexity grows."], "solutions" ["Integrate dynamic workforce scheduling features." "Cross-train employees for flexible task assignment." "Balance shifts to prevent fatigue while meeting demand."]} {"concern" "Cost Control in Scaling Operations", "indicators" ["Increased energy, overtime, and material costs." "Quality issues from rushed or mismanaged jobs." "Escalating tool wear and machine inefficiency."], "solutions" ["Deploy cost-aware scheduling tools." "Simulate financial impacts of scenarios before implementation."]}], "scaling-strategies" ["Implement cloud-based or modular software tools for scalability." "Invest in AI and ML technologies for adaptive and predictive scheduling." "Automate scheduling processes to reduce manual intervention." "Integrate real-time data collection and analysis for actionable insights."]}})

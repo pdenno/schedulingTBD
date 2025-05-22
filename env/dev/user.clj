@@ -13,7 +13,7 @@
    [mount.core :as mount]
    [lambdaisland.classpath.watch-deps :as watch-deps]      ; hot loading for deps.
    [scheduling-tbd.core :refer [server]]                   ; for mount.
-   [scheduling-tbd.interviewing.domain.data.data-analysis]                 ; for mount.
+   [scheduling-tbd.interviewing.domain.data.data-basics]                 ; for mount.
    [scheduling-tbd.interviewing.domain.process.process-analysis]           ; for mount.
    [scheduling-tbd.interviewing.domain.resources.resources-analysis]       ; for mount.
    [scheduling-tbd.llm  :as llm]                           ; Because of deep synchronization problems when this is from mount.
