@@ -20,6 +20,7 @@
      [scheduling-tbd.interviewing.response-utils :as ru]
      [scheduling-tbd.sutil            :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.web.websockets   :as ws]
+     [scheduling-tbd.datastructure2mermaid :as ds2m]
      [taoensso.telemere               :as tel :refer [log!]]))
 
 ;;; The usual way of interviews involves q-and-a called from resume-conversation.
@@ -550,7 +551,9 @@
                           (log! :info (str "Interviewer in resume-conversation-loop: " iviewr-response))
                           (when (surrogate? pid) (ru/refresh-client client-id pid cid))
                           (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
-                            (check-and-put-ds iviewr-response ctx))
+                            (check-and-put-ds iviewr-response ctx)
+                            (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
+                              (ws/send-to-client {:client-id (ws/recent-client!) :dispatch-key :load-graph :graph graph-mermaid})))
                           (recur (inc cnt)))))
                     (log! :warn "Exiting because conversation is exhausted or active? atom is false."))))
             (log! :warn "Exiting because active? atom is false.")))))

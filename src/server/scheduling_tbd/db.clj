@@ -144,7 +144,7 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The conversation from which this claim is founded. Currently a cid."}
    :claim/question-type
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The question-type (if any) on which this claim is founded."}
    :claim/confidence
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
@@ -639,6 +639,26 @@
             @(connect-atm pid) cid)
        (mapv #(update % :message/EADS-data-structure edn/read-string))
        not-empty))
+
+(defn get-EADS-ds
+  "Return the most recent EADS string from messages in the argument conversation, or any conversation if CID is not specified.
+   Return null string if no EADS found."
+  ([pid] (get-code pid :all))
+  ([pid cid]
+   (let [conn @(connect-atm pid)
+         eids (if (= cid :all)
+                (d/q '[:find [?eid ...] :where [?eid :message/EADS-data-structure]] conn)
+                (d/q '[:find [?eid ...]
+                       :in $ ?cid
+                       :where
+                       [?c-eid :conversation/id ?cid]
+                       [?c-eid :conversation/messages ?eid]
+                       [?eid :message/EADS-data-structure]]
+                     conn cid))
+         code-msgs (dp/pull-many conn '[*] eids)]
+     (if (not-empty code-msgs)
+       (-> (apply max-key #(-> % :message/time inst-ms) code-msgs) :message/EADS-data-structure)
+       ""))))
 
 (defn put-EADS-ds!
   "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message."
