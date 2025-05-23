@@ -5,7 +5,7 @@
    [clojure.pprint                     :refer [pprint]]
    [clojure.spec.alpha                 :as s]
    [clojure.string                     :as str]
-   [scheduling-tbd.agent-db            :as adb]
+   [scheduling-tbd.agent-db            :as adb :refer [agent-log]]
    [scheduling-tbd.db                  :as db]
    [scheduling-tbd.minizinc            :as mzn]
    [scheduling-tbd.interviewing.response-utils :as ru :refer [analyze-warm-up conversation-complete?]]
@@ -25,11 +25,13 @@
   "Analyze the response for project name,a fixed set of 'scheduling challenges' and 'one-more-thing', an observation.
    Returns a map {:project-or-service-name, :challenge <keywords naming challenges> :one-more-thing <a string>}."
   [response]
+  (agent-log (str "[scheduling-challenges-agent] (asking to analyze interviewees' response): " response))
   (let [{:keys [one-more-thing] :as res}  (-> (adb/query-agent :scheduling-challenges-agent response {:tries 2 :asking-role :process-analysis})
                                               ches/parse-string
                                               (update-keys str/lower-case)
                                               (update-keys keyword)
                                               (update :challenges #(mapv keyword %)))]
+    (agent-log (str "[scheduling-challenges-agent] (analysis of analyze interviewees' response): " (with-out-str (pprint response))))
     (when (not-empty one-more-thing)
       (log! :info (str "one-more-thing: " one-more-thing))) ; This just to see whether another claim should be added to the agent.
     (when-not (s/valid? ::scheduling-challenges-response res)

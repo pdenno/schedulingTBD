@@ -4,14 +4,11 @@
    [clojure.core.unify       :as uni]
    [clojure.edn              :as edn]
    [clojure.string           :as str]
-   [datahike.api             :as d]
-   [datahike.pull-api        :as dp]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.agent-db  :as adb :refer [agent-log]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.interviewing.interviewers :as inv]
    [scheduling-tbd.interviewing.response-utils :as ru]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere        :refer [log!]]))
 
@@ -62,7 +59,7 @@
         expertise (str/lower-case expertise)
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
         instructions (system-instruction expertise)]
-    (agent-log "============= Start surrogate " pid " :process  =========================")
+    (agent-log (str "============= Start surrogate " pid " :process  ========================="))
     (adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
     (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
@@ -102,7 +99,7 @@
                                           "in a room having the right equipment. (Only some practice rooms have pianos or drums.) Of course, instructors don't want\n"
                                           "to come in to teach just one student. Most instructors would like to do a block of a few hours of lessons on days they come in.\n"
                                           "Lessons are either 30 min, 45, or an hour.")
-                   :warm-up-response "Thanks! Yes, we run a music school and we'd like a system that helps us schedule our practice rooms with students and instructors."
+                   :warm-up-response "Thanks! Yes, we run a music school and we'd like a system that helps us schedule use of our practice rooms with students and instructors."
                    :expertise "running a music school"})})
 
 (defn start-surrogate+
@@ -120,7 +117,7 @@
                                     "OK, I think we can still help. What's the scheduling problem you are trying to solve.")})
           a-id (db/add-msg {:pid pid :cid :process :from :surrogate :tags [:response :warm-up] :text warm-up-response})]
       (db/update-msg pid :process a-id  {:message/answers-question q-id})
-      (agent-log "============= Start surrogate " pid " :process  =========================")
+      (agent-log (str "============= Start surrogate+ " pid " :process  ========================="))
       (adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string sur-instructions :surrogate? true :expertise expertise})
       (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid pid)))
       (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
@@ -144,28 +141,8 @@
 
 ;;; ----------------------- Starting and stopping -----------------------------------------
 
-;;; ToDo: This probably belongs in agent_db.clj, as part of adb/init-agent-infos.
-;;;       Also, maybe the atom should be replaced with a db.
-(defn add-surrogate-agent-infos
-  "Add an agent-info object to adb/agent-infos for every project's surrogate.
-   Does not check that it is viable (does not check that the assistant and thread are still
-   maintained by llm provider). Thus, it is lazy, with updating done by adb/ensure-agent! as needed."
-  []
-  (log! :info "Adding surrogates from all project to adb/agent-infos.")
-  (doseq [pid (db/list-projects)]
-    (let [conn @(connect-atm pid)]
-      (when-let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] conn)]
-        (let [{:agent/keys [expertise]} (dp/pull conn '[*] eid)
-              info {:base-type pid
-                    :agent-type :project
-                    :model-class :gpt
-                    :surrogate? true
-                    :expertise expertise}]
-          (adb/put-agent-info! pid info))))))
-
 (defn init-surrogates! []
   (mount/start (find-var 'scheduling-tbd.db/sys&proj-database-cfgs)) ; ToDo: Investigate. I expected this to have happened already.
-  (add-surrogate-agent-infos)
   (ws/register-ws-dispatch :start-surrogate start-surrogate!)         ; User types 'SUR:'
   (ws/register-ws-dispatch :start-surrogate+ start-surrogate+)        ; User types 'SUR+:'
   (ws/register-ws-dispatch :surrogate-follow-up surrogate-follow-up)  ; User types 'SUR?:'

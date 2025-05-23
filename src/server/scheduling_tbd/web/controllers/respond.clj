@@ -14,6 +14,7 @@
 
 ;;; (resp/get-conversation {:query-params {:project-id "sur-craft-beer"}})
 
+;;; I've replaced this with db/ws-get-conversation, but I'm leaving this and its reference in handler.clj around while evaluate the alternative.
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    get-conversation always returns the conversation corresponding to :project/current-converation in the project's DB.
@@ -26,9 +27,8 @@
     (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
     (let [eid (db/project-exists? pid)
           pname (db/get-project-name pid)
-          msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) []) ; ToDo: Trim some of conversation?
-          code (if eid (db/get-code pid) "")]
-      (http/ok {:project-id pid :project-name pname :conv msgs :cid cid :code code}))))
+          msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) [])] ; ToDo: Trim some of conversation?
+      (http/ok {:project-id pid :project-name pname :conv msgs :cid cid}))))
 
 (defn list-projects
     "Return a map containing :current-project, :cid, and :others, which is a sorted list of every other project in the system DB.

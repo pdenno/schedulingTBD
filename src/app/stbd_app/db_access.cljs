@@ -54,6 +54,7 @@
  (fn [{:keys [pid cid pname]}]
    (assert (keyword? pid))
    (-> (get-conversation-http pid cid)
+       (p/catch (fn [err] (log! :error (str "Error in update-conversation text: " err))))
        (p/then (fn [resp]
                  (log! :info (str "update-conversation-text: msg count = " (-> resp :conv count)))
                  (update-common-info! resp)

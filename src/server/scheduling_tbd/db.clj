@@ -5,17 +5,17 @@
    [clojure.core :as c]
    [clojure.edn  :as edn]
    [clojure.instant]
-   [clojure.java.io              :as io]
-   [clojure.pprint       :refer [pprint]]
-   [clojure.set                  :as set]
-   [clojure.spec.alpha           :as s]
-   [clojure.string               :as str]
-   [datahike.api                 :as d]
-   [datahike.pull-api            :as dp]
-   [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.sutil    :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
-   [scheduling-tbd.util     :as util :refer [now]]
-   [taoensso.telemere       :refer [log!]]))
+   [clojure.java.io               :as io]
+   [clojure.pprint                :refer [pprint]]
+   [clojure.set                   :as set]
+   [clojure.spec.alpha            :as s]
+   [clojure.string                :as str]
+   [datahike.api                  :as d]
+   [datahike.pull-api             :as dp]
+   [mount.core                    :as mount :refer [defstate]]
+   [scheduling-tbd.sutil          :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
+   [scheduling-tbd.util           :as util :refer [now]]
+   [taoensso.telemere             :refer [log!]]))
 
 (def db-schema-agent+
   "Defines properties that can be used for agents, which can be stored either in the system DB or a project DB.
@@ -283,14 +283,6 @@
          :where [?eid :conversation/id ?cid]]
        @(connect-atm pid) cid))
 
-#_(defn get-conversation-eids
-  "Return a vector of the EIDs of the argument conversation's messages."
-  [pid cid]
-  (when-let [eid (conversation-exists? pid cid)]
-    (->> (dp/pull @(connect-atm pid) '[*] eid)
-         :conversation/messages
-         (mapv :db/id))))
-
 (defn ^:diag get-project
   "Return the project structure.
    Throw an error if :error is true (default) and project does not exist."
@@ -339,26 +331,6 @@
     (-> (resolve-db-id {:db/id eid} (connect-atm pid))
          (update :conversation/messages #(->> % (sort-by :message/id) vec)))
     {}))
-
-(defn get-code
-  "Return the most recent code string from messages in the argument conversation, or any conversation if CID is not specified.
-   Return null string if no code found."
-  ([pid] (get-code pid :all))
-  ([pid cid]
-   (let [conn @(connect-atm pid)
-         eids (if (= cid :all)
-                (d/q '[:find [?eid ...] :where [?eid :message/code]] conn)
-                (d/q '[:find [?eid ...]
-                       :in $ ?cid
-                       :where
-                       [?c-eid :conversation/id ?cid]
-                       [?c-eid :conversation/messages ?eid]
-                       [?eid :message/code]]
-                     conn cid))
-         code-msgs (dp/pull-many conn '[*] eids)]
-     (if (not-empty code-msgs)
-       (-> (apply max-key #(-> % :message/time inst-ms) code-msgs) :message/code)
-       ""))))
 
 (defn get-claims
   "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
@@ -640,28 +612,29 @@
        (mapv #(update % :message/EADS-data-structure edn/read-string))
        not-empty))
 
+;;; ToDo: Merge this and the above.
 (defn get-EADS-ds
-  "Return the most recent EADS string from messages in the argument conversation, or any conversation if CID is not specified.
+  "Return the most recent EADS string from messages in the argument conversation.
    Return null string if no EADS found."
-  ([pid] (get-code pid :all))
-  ([pid cid]
-   (let [conn @(connect-atm pid)
-         eids (if (= cid :all)
-                (d/q '[:find [?eid ...] :where [?eid :message/EADS-data-structure]] conn)
-                (d/q '[:find [?eid ...]
-                       :in $ ?cid
-                       :where
-                       [?c-eid :conversation/id ?cid]
-                       [?c-eid :conversation/messages ?eid]
-                       [?eid :message/EADS-data-structure]]
-                     conn cid))
-         code-msgs (dp/pull-many conn '[*] eids)]
-     (if (not-empty code-msgs)
-       (-> (apply max-key #(-> % :message/time inst-ms) code-msgs) :message/EADS-data-structure)
-       ""))))
+  [pid cid]
+  (let [conn @(connect-atm pid)
+        eids (if (= cid :all)
+               (d/q '[:find [?eid ...] :where [?eid :message/EADS-data-structure]] conn)
+               (d/q '[:find [?eid ...]
+                      :in $ ?cid
+                      :where
+                      [?c-eid :conversation/id ?cid]
+                      [?c-eid :conversation/messages ?eid]
+                      [?eid :message/EADS-data-structure]]
+                    conn cid))
+        code-msgs (dp/pull-many conn '[*] eids)]
+    (if (not-empty code-msgs)
+      (-> (apply max-key #(-> % :message/time inst-ms) code-msgs) :message/EADS-data-structure)
+      "")))
 
 (defn put-EADS-ds!
-  "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message."
+  "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message.
+   The data structure should have keywords for keys at this point (not checked)."
   [pid cid ds]
   (let [max-id (max-msg-id pid cid)
         conn-atm (connect-atm pid)
@@ -764,7 +737,7 @@
      (log! :info (str "Created project database for " id))
      id)))
 
-(defn get-active-eads
+(defn get-active-eads-id
   "Return the EADS-id (keyword) for whatever EADS is active in the given project and conversation."
   [pid cid]
   (d/q '[:find ?eads-id .

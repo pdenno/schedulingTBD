@@ -69,22 +69,21 @@
 (defn chat-pair-aux
   "Run one query/response pair of chat elements with a human or a surrogate. This executes blocking.
    For human interactions, the response is based on :dispatch-key :domain-experts-says (See websockets/domain-expert-says)."
-  [{:keys [question table table-text surrogate-agent responder-type preprocess-fn tries asking-role pid cid] :as ctx
+  [{:keys [question table table-text surrogate-agent responder-type preprocess-fn tries pid cid] :as ctx
     :or {tries 1  preprocess-fn identity}}]
   (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
-   (let [asking-role (or asking-role (if cid (-> (str cid "-interviewer") keyword) :an-interviewer))
-         prom (if (= :human responder-type)
+   (let [prom (if (= :human responder-type)
                 (ws/send-to-client (-> ctx                        ; This cannot timeout.
-                                     (assoc :text question)
-                                     (assoc :table table)
-                                     (assoc :promise? true)
-                                     (assoc :dispatch-key :iviewr-says)))
+                                       (assoc :text question)
+                                       (assoc :table table)
+                                       (assoc :promise? true)
+                                       (assoc :dispatch-key :iviewr-says)))
                 (px/submit! (fn [] ; surrogate responder...
                               (try
+                                (agent-log (str "["(name cid) "interviewer] (asking interviewees): " question "\n\n" table-text))
                                 (adb/query-agent surrogate-agent  ; This can timeout.
                                                  (str question "\n\n" table-text)
                                                  {:tries tries
-                                                  :asking-role asking-role
                                                   :base-type pid
                                                   :preprocess-fn preprocess-fn})
                                 (catch Exception e {:error e})))))]
@@ -100,8 +99,9 @@
         :text is text in response to the query with surrogate tables removed.
         :table is a table map completed by the expert.
    If response is immoderate returns {:msg-type :immoderate}"
-  [{:keys [responder-type client-id] :as ctx}]
+  [{:keys [responder-type client-id cid] :as ctx}]
   (let [response (chat-pair-aux ctx)]
+    (agent-log (str "["(name cid) "interviewer] (response from interviewees): " response))
     (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})
     (case responder-type
       :human (if (-> response :text llm/immoderate?)
@@ -167,10 +167,11 @@
 (defn tell-interviewer
   "Send a message to an interviewer agent and wait for response; translate it.
    :aid and :tid in the ctx should be for the interviewer agent."
-  [msg {:keys [interviewer-agent] :as ctx}]
+  [msg {:keys [interviewer-agent cid] :as ctx}]
   (too-many-course-corrections! msg)
   (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid interviewer-msg: " (with-out-str (pprint msg)))))
+  (agent-log (str "[interview manager] (tells " (name cid) " interviewer) " (with-out-str (pprint msg))))
   (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
   (let [msg-string (ches/generate-string msg {:pretty true})
         res (-> (adb/query-agent interviewer-agent msg-string ctx) output-struct2clj)]
@@ -185,11 +186,13 @@
   [q-txt a-txt ctx]
   (assert (string? q-txt))
   (assert (string? a-txt))
-  (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt) ctx)
-      ches/parse-string
-      (update-keys str/lower-case)
-      (update-keys keyword)
-      (update-vals #(if (empty? %) false %))))
+  (let [res (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt) ctx)
+                ches/parse-string
+                (update-keys str/lower-case)
+                (update-keys keyword)
+                (update-vals #(if (empty? %) false %)))]
+    (agent-log (str "[response analysis agent] (concludes): " (with-out-str (pprint res))))
+    res))
 
 ;;; ToDo: Implement these (next three). They will probably involve some looping.
 (defn handle-wants-a-break
@@ -484,23 +487,7 @@
   [iviewr-response {:keys [pid cid] :as _ctx}]
   (db/put-EADS-ds! pid cid iviewr-response))
 
-;;; Right now it is inchoate, but it should take into account EADSs that have been completed,
-;;; conversations, scheduling challenges and reframing that took place."
-(defn continue-or-switch-and-continue?!
-  "Returns false if there is nothing more to pursue in this conversation.
-   Returns true if either there is more to pursue on the current EADS, or there is a new EADS to pursue.
-   Side effects occur in two cases:
-      1) In the case that there is nothing more to pursue in this conversation, we set :conversation/done? to true in the DB and
-         retract :conversation/active-EADS, return nil.
-      2) In the case that the current EADS is complete, what happens next depends on the orchestrator.
-         If it finds ..."
-  [pid cid]
-  (let [eads-id (db/get-active-eads pid cid)
-        eads-complete? (and eads-id (ork/eads-complete? pid cid eads-id))]
-    (cond (and eads-id (not eads-complete?))               true
-          :else                                            (ork/get-new-EADS pid)))) ; Will return nil if no more EADS. ToDo: Then what? Change conversations?
-
-(defn update-db-conversation
+(defn update-db-conversation!
   "Write to the DB conversation messages that occurred inclusive of a q/a pair."
   [pid cid conversation]
   (let [msg-ids (atom [])
@@ -508,8 +495,46 @@
     (doseq [msg conversation]
       (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
                                         EADS-id  (assoc :pursuing-EADS EADS-id))))
-      (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})
-      (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05)))))
+      (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)}))))
+
+(defn aux-ui-actions
+  "Send client actions to perform such as loading graphs."
+  [iviewr-response {:keys [pid cid client-id] :as ctx}]
+  (when (surrogate? pid) (ru/refresh-client client-id pid cid))
+  (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
+    (check-and-put-ds iviewr-response ctx)
+    (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
+      (ws/send-to-client {:client-id (ws/recent-client!) :dispatch-key :load-graph :graph graph-mermaid}))))
+
+;;; It should be possible to test ork-review by updating the project.
+;;;  (ready-for-discussion? pid cid)
+;;;  (redirect-user-to-discussion client-id cid :process)   ; <===============================================================================================
+
+(defn clear-context-ephemeral
+  "Some properties in the context map are only relevant in the current iteration of the interview loop.
+   Those must be cleared before the next iteration. This function returns the argument ctx with those props removed."
+  [ctx]
+  (dissoc ctx :new-eads?))
+
+(defn ork-review
+  "Looks at the project DB to return a map that may cause
+     1) a change in the eads to pursue (because either complete or exceeded budget),
+     2) a change of the interviewer (and new eads-instrucitons, of course),
+     3) a message to the interviewees to change conversations to what the ork wants to do,
+     4) interviewing to stop (because ork conludes no more eads-instructions apply, or forced by active? atom)."
+  [{:keys [pid cid] :as ctx}]
+  (let [budget (db/get-budget pid cid)
+        active-eads-id (db/get-active-eads-id pid cid)
+        eads-id (or active-eads-id (ork/get-new-EADS pid))
+        eads-complete? (and eads-id (ork/eads-complete? pid cid eads-id))
+        new-eads  (when (or eads-complete? (<= budget 0)) (ork/get-new-EADS pid)) ; returns nil when exhausted.
+        new-cid (when new-eads
+    (when (<= budget 0)
+      (agent-log (str "[ork manager] (in ork-review) switching to new EADS instructions " new-eads" owing to budget constraint.")
+                 {:console? true :level :warn}))
+    (cond-> {}
+      (and eads-complete? new-eads)        (assoc :new-eads? true)    ; These will need to be cleared.
+      (and eads-complete? new-eads)        (assoc :new-eads? true))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
@@ -520,44 +545,23 @@
   [{:keys [client-id pid cid] :as ctx}]
   (assert (s/valid? ::client-id client-id))
   (assert (s/valid? ::cid cid))
-  (log! :debug (str "--------- Resume conversation: ctx: " ctx))
   (reset! course-correction-count 0)
+  (agent-log (str "============= resume-conversation: " pid  " " cid " ========================") {:console? true :level :debug})
   (try
-    (if (not (ready-for-discussion? pid cid))
-      (redirect-user-to-discussion client-id cid :process)
-      ;; The conversation loop.
-      (let [asking-role (-> (str cid "-interviewer") keyword)
-            ctx (-> (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))
-                    (assoc :asking-role asking-role))]
-        (when-not (db/conversation-done? pid cid)
-          (if @active?
-            (do (agent-log "resume-conversation: " pid  " " cid)
-                (-> (conversation-history pid cid) (tell-interviewer ctx))
-                (loop [cnt 0]
-                  (if (and @active? (continue-or-switch-and-continue?! pid cid))
-                    ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
-                    (let [conversation (q-and-a ctx)
-                          expert-response (-> conversation last :full-text)] ; ToDo: This assumes the last is meaningful.
-                      (update-db-conversation pid cid conversation)
-                      (cond
-                        (> cnt 10)                                  :exceeded-questions-safety-stop
-                        ;; ToDo: Write some utility to "re-fund and re-open" conversations.
-                        (<= (db/get-budget pid cid) 0)              (db/assert-conversation-done! pid cid)
-                        :else
-                        ;; Interviewer respond to INTERVIEWEES-RESPOND with either OK, PHASE-1-CONCLUSION, or DATA-STRUCTURE-REFINEMENT.
-                        (let [iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
-                                                                 :response expert-response}
-                                                                ctx)]
-                          (log! :info (str "Interviewer in resume-conversation-loop: " iviewr-response))
-                          (when (surrogate? pid) (ru/refresh-client client-id pid cid))
-                          (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
-                            (check-and-put-ds iviewr-response ctx)
-                            (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
-                              (ws/send-to-client {:client-id (ws/recent-client!) :dispatch-key :load-graph :graph graph-mermaid})))
-                          (recur (inc cnt)))))
-                    (log! :warn "Exiting because conversation is exhausted or active? atom is false."))))
-            (log! :warn "Exiting because active? atom is false.")))))
-    (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+    (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
+      (-> (conversation-history pid cid) (tell-interviewer ctx))
+      (loop [ctx ctx]
+        (let [{:keys [exhausted? new-eads? new-cid? cid]} (merge ctx (ork-review ctx))]
+          (when-not exhausted?
+            (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
+                  expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
+                  iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND" :response expert-response} ctx)]
+              (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
+              (update-db-conversation! pid cid conversation)
+              (aux-ui-actions iviewr-response ctx)
+              (when-not exhausted?
+                (recur (clear-context-ephemeral ctx))))))))
+      (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
 ;;; The equivalent for surrogates is start-surrogate. It also asks the first question.
 (defn start-conversation
@@ -566,8 +570,8 @@
   [{:keys [client-id cid] :as ctx}]
   (assert (= :process cid)) ; Conversation always starts with the :process conversation.
   (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :promise? true
-                    :text (str "You want to start a new project? This is the right place! "
-                               (db/conversation-intros :process))})
+                      :text (str "You want to start a new project? This is the right place! "
+                                 (db/conversation-intros :process))})
   (try
     (let [ctx (merge ctx {:responder-type :human
                           :human-starting? true

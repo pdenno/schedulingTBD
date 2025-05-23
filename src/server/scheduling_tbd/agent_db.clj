@@ -56,49 +56,33 @@
 (s/def ::tools (s/and vector? (s/coll-of ::tool)))
 (s/def ::tool (s/keys :req-un [::type]))
 (s/def ::vector-store-paths (s/coll-of string?))
+(s/def ::pid keyword?)
 
-(s/def ::agent-info-decl ; This is for checking what is on the agent-infos atom; they won't have PIDs.
+(s/def ::agent-info-base ; no PID
   (s/and (s/keys :req-un [::base-type ::agent-type]
                  :opt-un [::instruction-path ::instruction-string ::response-format-path ::llm-provider ::model-class
-                          ::tools ::tool-resources ::vector-store-paths ::expertise ::surrogate?])
-         (s/or  :system           (s/and #(= (:agent-type %) :system)  #(not (:surrogate? %)))
-                :project          #(= (:agent-type %) :project)
-                :shared-assistant #(= (:agent-type %) :shared-assistant))))
+                          ::tools ::tool-resources ::vector-store-paths ::expertise ::surrogate?])))
 
-;;; ToDo: Fix this!
-(s/def ::agent-info (s/and ::agent-info-decl
-                           #_(s/or  :system          #(= (:agent-type %) :system)
-                                    :project          (s/and #(= (:agent-type %) :project)          #(-> % :pid keyword?))
-                                    :shared-assistant (s/and #(= (:agent-type %) :shared-assistant) #(-> % :pid keyword?)))))
-(defn init-agent-infos
-  "Read the agent-infos file and complete it by:
-     1) updating the ork's vector-store to include all the EADS instructions used by interviewers."
-  []
-  (let [infos (reduce (fn [res info] (assoc res (:base-type info) info))
-                      {}
-                      (-> "agents/agent-infos.edn" io/resource slurp edn/read-string))
-        files (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "agents/iviewrs/EADS/" %)))]
-    (update-in infos [:orchestrator-agent :vector-store-paths] into files)))
+(s/def ::agent-info (s/and ::agent-info-base
+                           (s/or  :system          #(= (:agent-type %) :system)
+                                  :project          (s/and #(= (:agent-type %) :project)          (s/keys :req-un [::pid]))
+                                  :shared-assistant (s/and #(= (:agent-type %) :shared-assistant) (s/keys :req-un [::pid])))))
+
+(declare put-agent-info!)
 
 ;;; Agent-infos (after processing the EDN file) is a map indexed by base-type of maps describing the agent,
 ;;; including vector-store, agent-type, and LLM used.
 ;;; It gets lots more entries from surrogates projects.
-(defonce agent-infos (atom (init-agent-infos)))
+(def agent-infos (atom nil))
 
 (defn agent-log
   "Log info-string to agent log"
-  [& args]
-  (let [date (str (java.util.Date.))]
-    (tel/with-kind-filter {:allow :agents}
-      (tel/signal!
-       {:kind :agents, :level :info, :msg (str "===== " date " " (apply str args))}))))
-
-(defn check-agent-infos
-  "Do s/valid? on ::agent-info-decl, an ::agent-info sans pid."
-  []
-  (doseq [[base-type info] (seq @agent-infos)]
-    (when-not (s/valid? ::agent-info-decl info)
-      (log! :error (str base-type " is not a valid agent-info:\n" (with-out-str (pprint info)))))))
+  ([msg-text] (agent-log msg-text {}))
+  ([msg-text {:keys [console? level] :or {level :info}}]
+   (tel/with-kind-filter {:allow :agents}
+     (tel/signal!
+      {:kind :agents, :level :info, :msg msg-text}))
+   (when console? (log! level msg-text))))
 
 (defn put-agent-info!
   "Add an agent info at the given base-type."
@@ -212,7 +196,7 @@
                        :agent/assistant-id aid}
                 surrogate?     (assoc :agent/surrogate? true)
                 expertise      (assoc :agent/expertise expertise))]
-    (agent-log "\n\n Creating agent (no thread yet) " base-type ":\n" (with-out-str (pprint agent)))
+    (agent-log (str "\n\n Creating agent (no thread yet) " base-type ":\n" (with-out-str (pprint agent))))
     agent))
 
 (defn newest-file-modification-date
@@ -247,13 +231,13 @@
                                       (:thread missing-at-provider)         (assoc :make-thread? true)))]
     (when substitute-aid
       (log! :info (str "Agent " base-type " will use an updated assistant: " substitute-aid "."))
-      (agent-log "Agent " base-type " will use an updated assistant: " substitute-aid "."))
+      (agent-log (str "Agent " base-type " will use an updated assistant: " substitute-aid ".")))
     (when (:make-agent? res)
       (log! :info (str "Agent " base-type " will be created."))
-      (agent-log "\n Agent " base-type " will be recreated."))
+      (agent-log (str "\n Agent " base-type " will be recreated.")))
     (when (:make-thread? res) ; ToDo: Could pass in PID here and mention it.
       (log! :info (str "A thread will be made for agent " base-type " agent-type " agent-type "."))
-      (agent-log "\n\n A thread will be made for agent " base-type " agent type " agent-type "."))
+      (agent-log (str "\n\n A thread will be made for agent " base-type " agent type " agent-type ".")))
     res))
 
 (defn db-agents
@@ -363,11 +347,11 @@
 
       :system
       (do (log! :info (str "Adding thread " tid " to system DB.\n" (with-out-str (pprint agent))))
-          (agent-log "\n\n Adding thread " tid " to system DB\n" (with-out-str (pprint agent))))
+          (agent-log (str "\n\n Adding thread " tid " to system DB\n" (with-out-str (pprint agent)))))
 
       (:project :shared-assistant)
       (log! :debug (str "Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
-      (agent-log "\n\n Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
+      (agent-log (str "\n\n Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent)))))
     tid))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
@@ -465,8 +449,8 @@
   [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn asked-role asking-role]
       :or {test-fn (fn [_] true),
            preprocess-fn identity
-           asked-role :unknown
-           asking-role :unknown
+           ;asked-role :unknown
+           ;asking-role :unknown
            llm-provider @default-llm-provider
            timeout-secs 60
            role "user"} :as obj}]
@@ -476,10 +460,10 @@
     (assert (< (:tries obj) 10))
     (if (> (:tries obj) 0)
       (try
-        (agent-log "\n\n" (name asking-role) " ===> " query-text)
+        ;(agent-log (str "\n\n" (name asking-role) " ===> " query-text))
         (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
               res (preprocess-fn raw)]
-          (agent-log "\n" (name asked-role) " <=== " raw)
+          ;(agent-log (str "\n" (name asked-role) " <=== " raw))
           (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
         (catch Exception e
           (let [d-e (datafy e)]
@@ -498,7 +482,7 @@
        :asked-role - defaults to the base-type, so entirely unnecessary if agent-or-info is the agent keyword.
        :asking-role - useful for logging and debugging, typically some interviewer keyword."
   ([agent-or-info text] (query-agent agent-or-info text {}))
-  ([agent-or-info text {:keys [asked-role] :as opts-map}]
+  ([agent-or-info text opts-map]
    (try
      (let [agent (cond (keyword? agent-or-info)                   (ensure-agent! {:base-type agent-or-info})
                        (and (map? agent-or-info)
@@ -511,16 +495,54 @@
        (assert (string? tid))
        (query-on-thread (merge opts-map {:aid aid
                                          :tid tid
-                                         :query-text text
-                                         :asked-role (or asked-role base-type)})))
+                                         :query-text text})))
      (catch Exception e
        (log! :error (str "query-agent failed: " e))))))
 
 ;;; -------------------- Starting and stopping -------------------------
+(defn init-agent-infos-from-edn
+  "Read the agent-infos file and complete it by:
+      1) updating the ork's vector-store to include all the EADS instructions used by interviewers.
+   The source file resources/agents/agent-info.edn has them as a vector.
+   This sets the atom to a map indexed by the :base-type."
+  []
+  (let [infos (reduce (fn [res info] (assoc res (:base-type info) info))
+                      {}
+                      (-> "agents/agent-infos.edn" io/resource slurp edn/read-string))
+        files (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "agents/iviewrs/EADS/" %)))]
+    (update-in infos [:orchestrator-agent :vector-store-paths] into files)))
+
+(defn add-surrogate-agent-infos!
+  "Add an agent-info object to adb/agent-infos for every project's surrogate.
+   Does not check that it is viable (does not check that the assistant and thread are still
+   maintained by llm provider). Thus, it is lazy, with updating done by adb/ensure-agent! as needed."
+  []
+  (log! :info "Adding surrogates from all project to adb/agent-infos.")
+  (doseq [pid (db/list-projects)]
+    (let [conn @(connect-atm pid)]
+      (when-let [eid (d/q '[:find ?eid . :where [?eid :agent/surrogate? true]] conn)]
+        (let [{:agent/keys [expertise]} (dp/pull conn '[*] eid)
+              info {:base-type pid
+                    :agent-type :project
+                    :model-class :gpt
+                    :surrogate? true
+                    :expertise expertise}]
+          (put-agent-info! pid info))))))
+
+(defn check-agent-infos
+  "Do s/valid? on ::agent-info-decl, an ::agent-info sans pid."
+  []
+  (doseq [[base-type info] @agent-infos]
+    (when-not (s/valid? ::agent-info-decl info)
+      (log! :error (str base-type " is not a valid agent-info:\n" (with-out-str (pprint info)))))))
+
 (defn init-agents!
   "Things done on start and restart."
   []
-  (check-agent-infos))
+  (reset! agent-infos (init-agent-infos-from-edn))
+  (add-surrogate-agent-infos!)
+;  (check-agent-infos)
+  :ok)
 
 (defstate agents
   :start (init-agents!))

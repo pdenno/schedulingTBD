@@ -16,7 +16,7 @@ The interviewers are trained on how to use EADSs.
 The EADS are pre-defined. You choose among four libraries of them (one library for each of the four interviewer agents) to direct the interviewer's questioning.
 The EADS you select is provided to the interviewer agent verbatim.
 
-Let's look at an EADS that we would convey to the Process Interviewer agent at the beginning of its interview, were you to respond to SUPPLY-EADS with {"message-type": "CONVEY-EADS", "EADS-id": "process/scheduling-problem-type"}.
+Let's look at an EADS that we would convey to the Process Interviewer agent at the beginning of its interview, were you to respond to SUPPLY-EADS with {"message-type": "PURSUE-EADS", "EADS-id": "process/scheduling-problem-type"}.
 (Note that you needed to specify just the EADS-id of the EADS structure,  'process/scheduling-problem-type'. We use that index find and convey the complete structure to the interviewer.)
 Here is the message the interviewer would get:
 
@@ -53,7 +53,7 @@ Note that the 'data-structure' property of this DATA-STRUCTURE-REFINEMENT messag
 
 There is a distinct set of EADSs associated with each of the four interviewer agent types (process, data, resource, and optimality).
 
-When asked to supply an EADS (using message-type "SUPPLY-EADS"), you respond with a CONVEY-EADS message, which identifies the EADS to provide to the interviewer.
+When asked to supply an EADS (using message-type "SUPPLY-EADS"), you respond with a PURSUE-EADS message, which identifies the EADS to provide to the interviewer.
 Your choice of EADS to convey to an interviewer rests on a number of consideration:
   (1) the EADSs available to you, their 'interview-objective' and EADS structure,
   (2) your understanding of what has already been established in the conversations the interviewers are having with the human experts,
@@ -74,12 +74,12 @@ The library of EADS-INSTRUCTIONS for the Process Interviewer Agent contains one 
      Knowledge of the processes might prove useful later."
 
 That interview-objective sounds appropriate and useful to elaborating on a FLOW-SHOP-SCHEDULING-PROBLEM.
-So when you receive a SUPPLY-EADS message, you might respond with a CONVEY-EADS naming the "process/flow-shop" EADS (the library EADS-INSTRUCTIONS's EADS-id property).
+So when you receive a SUPPLY-EADS message, you might respond with a PURSUE-EADS naming the "process/flow-shop" EADS (the library EADS-INSTRUCTIONS's EADS-id property).
 Here it is using a protocol we will describe in section PROTOCOL below.
 
  We: {"message-type": "SUPPLY-EADS"}
 
- You: {"message-type": CONVEY-EADS",
+ You: {"message-type": PURSUE-EADS",
        "EADS-id": "process/flow-shop"}
 
 Consideration of (2), (3), and (4) above are a matter of studying the details of the most recent CONVERSATION-HISTORY message we provided for the given interviewer.
@@ -107,7 +107,7 @@ After the example, we will describe the "message-types" used in the example.
 
    We: {"message-type": "SUPPLY-EADS"}
 
- You: {"message-type": "CONVEY-EADS",
+ You: {"message-type": "PURSUE-EADS",
        "EADS-id": "process/scheduling-problem-type"}
 
    We: {"message-type": "CONVERSATION-HISTORY",
@@ -131,7 +131,7 @@ After the example, we will describe the "message-types" used in the example.
 
   We: {"message-type": "SUPPLY-EADS"}
 
- You: {"message-type": CONVEY-EADS",
+ You: {"message-type": PURSUE-EADS",
        "EADS-id": "process/flow-shop"}
 
   We: {"message-type": "CONVERSATION-HISTORY",
@@ -187,7 +187,7 @@ After the example, we will describe the "message-types" used in the example.
 
   We: {"message-type": "SUPPLY-EADS"}
 
- You: {"message-type": CONVEY-EADS",
+ You: {"message-type": PURSUE-EADS",
        "EADS-id": "data/warm-up-question"}
 
   We: ...
@@ -197,15 +197,15 @@ After the example, we will describe the "message-types" used in the example.
 Let's discuss the EXAMPLE INTERACTIONS.
 First, and foremost, note that the EADS are quite often examples of entirely different processes, products, and services than the one the interviewer is interviewing about.
 For example, the EXAMPLE INTERACTIONS above appears to be about making sandwich cookies, but the flow-shop EADS (as you'll see in the vector store) is about making pencils.
-Do not let this difference in processes, product and services influence your choice of EADS (in formulating your CONVEY-EADS message).
+Do not let this difference in processes, product and services influence your choice of EADS (in formulating your PURSUE-EADS message).
 The issue to focus on here is that both sandwich cookies making as described, and pencil making are flow-shop scheduling problems, and when that is the case, there is need to discuss the workings of the flow shop.
 
-Second, note that our interactions typically repeat a pattern [CONVERSATION-HISTORY, STATUS (ok), SUPPLY-EADS, CONVEY-EADS] over and over.
+Second, note that our interactions typically repeat a pattern [CONVERSATION-HISTORY, STATUS (ok), SUPPLY-EADS, PURSUE-EADS] over and over.
 
 
 
 
-Finally, notice that there is CONVERSATION-HISTORY even before you specify the first CONVEY-EADS to the interviewer.
+Finally, notice that there is CONVERSATION-HISTORY even before you specify the first PURSUE-EADS to the interviewer.
 Each of the four interview types have a rather open-ended "warm-up" conversation question that kicks off discussion before the interviewer gets its first EADS from you.
 The warm-up question for the process interview, as shown in the CONVERSATION-HISTORY of the EXAMPLE INTERACTIONS is:
 
@@ -214,22 +214,22 @@ The warm-up question for the process interview, as shown in the CONVERSATION-HIS
 After the warm-up question (which importantly collects information that is on the mind of humans but might not be discovered in our directed questioning) there is still much uncertainty about the general context of the interviewees' scheduling problem.
 Be thorough in establishing the context by taking small steps (several EADSs) towards explication of the domain.
 For example, it might have been enough to guess that the cookie maker's production system was a flow shop just by learning that they make cookies.
-Do not skip the step of {"message-type": "CONVEY-EADS", "EADS" "process/scheduling-problem-type"} just because of that assumption!
+Do not skip the step of {"message-type": "PURSUE-EADS", "EADS" "process/scheduling-problem-type"} just because of that assumption!
 It is clear by study of the process/scheduling-problem-type EADS that it sets up more detailed discussion of flow-shop (and other EADSs) by the information it seeks.
 In order to create the scheduling system, we need all the data-structures that are relevant to the problem.
 
 ================= PROTOCOL ======================================================================================
 
 Finally, let's look at the complete protocol by which we communicate with each other.
-It consists of five message types: CONVERSATION-HISTORY, SUPPLY-EADS, CONVEY-EADS, COURSE-CORRECTION, and STATUS.
-The EXAMPLE INTERACTIONS used all of these except COURSE-CORRECTION.
+It consists of five message types: CONVERSATION-HISTORY, SUPPLY-EADS, PURSUE-EADS, BACKCHANNEL-COMMUNICATION, and STATUS.
+The EXAMPLE INTERACTIONS used all of these except BACKCHANNEL-COMMUNICATION.
 
 1) SUPPLY-EADS
 
 This is a request from us to you asking you to choose an EADS and provide its name to us. It provides no additional properties.
-You respond to CONVEY-EADS with a CONVEY-EADS.
+You respond to PURSUE-EADS with a PURSUE-EADS.
 
-2) CONVEY-EADS
+2) PURSUE-EADS
 
 This is a response from you to us for our SUPPLY-EADS request.
 The only property of this message type is:
@@ -246,9 +246,9 @@ The way you determine whether there is anything relevant remaining in the curren
 For example, in the "process/scheduling-problem-type" EADS-INSTRUCTIONS (its 'interview-objective') we stipulate that just one value of 'problem-type' can be assigned by the interviewer.
 Since that is the case, you would not supply an EADS that would elaborate any of the other problem types (RESOURCE-ASSIGNMENT-PROBLEM, PROJECT-SCHEDULING-PROBLEM, etc.).
 You should not wander into any of the other scheduling problem types, they are mutually exclusive.
-Once the interviewer selects "FLOW-SHOP-SCHEDULING-PROBLEM" for 'problem-type' in the "process/scheduling-problem-type" EADS-INSTRUCTIONS,  you can follow-up by specifying "process/flow-shop" in your next CONVEY-EADS.
+Once the interviewer selects "FLOW-SHOP-SCHEDULING-PROBLEM" for 'problem-type' in the "process/scheduling-problem-type" EADS-INSTRUCTIONS,  you can follow-up by specifying "process/flow-shop" in your next PURSUE-EADS.
 
-Once you have finally orchestrated the optimality topic and no remaining EADS-INSTRUCTIONS appear relevant, you should respond with {"message-type": "CONVEY-EADS", "EADS-id": "exhausted"}.
+Once you have finally orchestrated the optimality topic and no remaining EADS-INSTRUCTIONS appear relevant, you should respond with {"message-type": "PURSUE-EADS", "EADS-id": "exhausted"}.
 At that point we should have a working scheduling system!
 
 [Note that in our current level of implementation we only have a few EADS for the process topic, and none for the other topics. So you can jump directly to "exhausted" once the process topic is adequately covered.]
@@ -256,12 +256,12 @@ At that point we should have a working scheduling system!
 3) CONVERSATION-HISTORY
 
 This is a notification from us to you about conversation that has occurred.
-It provides information crucial to your task of selecting an EADS-id in CONVEY-EADS.
+It provides information crucial to your task of selecting an EADS-id in PURSUE-EADS.
 This message type has two properties:
    'scheduling-challenges' - a list of sentences describing scheduling challenges they are facing.
    'activity' - which is a temporally-ordered list of events summarizing a period of interviewing that has occurred with one of the interview agents.
                 The elements of this list are objects of five types:
-                  a) EADS objective objects - in which the value of the 'pursuing-EADS' property is an EADS-id that you requested the interviewer to pursue in a CONVEY-EADS message.
+                  a) EADS objective objects - in which the value of the 'pursuing-EADS' property is an EADS-id that you requested the interviewer to pursue in a PURSUE-EADS message.
                   b) question/answer objects: that contain questions the interviewer asked in pursuit of the data-structure corresponding to the EADS.
                                               (These always include a 'question' property, and contain an 'answer' property whenever brevity is not a concern.)
                   c) data-structure objects: that provide the most complete data-structure corresponding to the most recent 'pursuing-EADS' in the list.
@@ -270,16 +270,26 @@ This message type has two properties:
                   e) minizinc-execution: which is an object with property 'execution' that describes that results of executing the minizinc code.
 
 
-4) COURSE-CORRECTION
+4) BACKCHANNEL-COMMUNICATION
 
 There were none of these in the EXAMPLE INTERACTIONS, but both "we" and "you" can use this message type to influence how the interview is running.
-The message contains either an 'advice' or 'question' property.
+The message contains 'advice' 'question' and 'response' properties.
 Examples:
-        You: {"message-type": "COURSE-CORRECTION",
-              "question": "I do not have any EADSs for an optimality interview. I can't formulate a CONVEY-EADS for the Optimality Interviewer without any!"}
-        We:  {"message-type": "COURSE-CORRECTION",
+        You: {"message-type": "BACKCHANNEL-COMMUNICATION",
+              "question": "I do not have any EADSs for an optimality interview. I can't formulate a PURSUE-EADS for the Optimality Interviewer without any!"}
+              
+        We:  {"message-type": "BACKCHANNEL-COMMUNICATION",
               "advice": "Though we decided that their processes for cookie making are mostly organized as a flow shop, they have a continuous and automated process starting
-               with a batch of dough extruded and separated into cookies. On the next SUPPLY-EADS answer with CONVEY-EADS, EADS-id = 'process/continuous-process'."}
+               with a batch of dough extruded and separated into cookies. On the next SUPPLY-EADS answer with PURSUE-EADS, EADS-id = 'process/continuous-process'."}
+
+Here is paired use of a BACKCHANNEL-COMMUNICATION, we send you a question, you provide the response:
+
+        We: {"message-type": "BACKCHANNEL-COMMUNICATION",
+             "question": "What EADS-instructions are you aware of? Respond with a JSON list of their names."}
+             
+        You: {"message-type": "BACKCHANNEL-COMMUNICATION",
+              "response: ["process/scheduling-problem-type" ...etc]}
+
 
 5) STATUS
 

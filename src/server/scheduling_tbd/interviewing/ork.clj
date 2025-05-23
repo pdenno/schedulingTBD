@@ -7,7 +7,7 @@
    [clojure.set                   :as set]
    [clojure.spec.alpha            :as s]
    [datahike.api                  :as d]
-   [scheduling-tbd.agent-db       :as adb]
+   [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
    ;; EADS. These might be temporary
    [scheduling-tbd.interviewing.domain.process.flow-shop] ; for mount
@@ -124,29 +124,37 @@
 
 (def EADS-ignore-keys "Ignore these in comparing EADS to a data structure"  #{:comment :val :EADS-id})
 
-;;; ToDo: At some point I hope to use the spec (or Malli) but for now, I look at the EADS and see if there are values for all properties SOMEWHERE in the data structure.
+;;; ToDo: At some point I hope to use the spec (or Malli) but for now I look at the EADS and see if there are values for all properties SOMEWHERE in the data structure.
 ;;; ToDo: More thoughts on the above ToDo: It might be valuable to list what keys are optional. The specs can do this, of course, but can I use them?
 ;;;       This would also be
+;;;(ork/eads-complete :plate-glass-ork :process
 (defn eads-complete?
-  "Check whether all the properties of the EADS are used somewhere in the data structure."
+  "Check whether the argument eads is complete.
+   Some interviewers are instructed to set a property 'exhausted?' to true (e.g. the orm interviewer does this),
+   for other we check that all the properties of the EADS are used somewhere in the data structure."
   [pid cid eads-id]
-  (let [dstruct (-> (db/get-EADS-dstructs pid cid) (max-key :message/id) :message/EADS-data-structure)
-        ds-eads-ref (:based-on-EADS dstruct)
-        ds-keys (-> dstruct (max-key :message/id) edn/read-string collect-keys)
-        eads-keys (-> (d/q '[:find ?str .
-                             :in $ ?eads-id
-                             :where
-                             [?e :EADS/id ?eads-id]
-                             [?e :EADS/msg-str ?str]]
-                           @(connect-atm :system) eads-id)
-                      edn/read-string
-                      collect-keys)]
-    (when-not (= eads-id ds-eads-ref)
-      (log! :warn (str "Argument eads-id, " eads-id " does not match that of data structure, " ds-eads-ref)))
-    (-> eads-keys
-        (set/difference ds-keys)
-        (set/difference EADS-ignore-keys)
-        empty?)))
+  (let [dstruct (as-> (db/get-EADS-dstructs pid cid) ?x
+                  (apply max-key :message/id ?x)
+                  (:message/EADS-data-structure ?x)
+                  (edn/read-string ?x))]
+    (if (:exhausted? dstruct)
+      true
+      (let [ds-eads-ref (:based-on-EADS dstruct)
+            ds-keys (collect-keys dstruct)
+            eads-keys (-> (d/q '[:find ?str .
+                                 :in $ ?eads-id
+                                 :where
+                                 [?e :EADS/id ?eads-id]
+                                 [?e :EADS/msg-str ?str]]
+                               @(connect-atm :system) eads-id)
+                          edn/read-string
+                          collect-keys)]
+        (when-not (= eads-id ds-eads-ref)
+          (log! :warn (str "Argument eads-id, " eads-id " does not match that of data structure, " ds-eads-ref)))
+        (-> eads-keys
+            (set/difference ds-keys)
+            (set/difference EADS-ignore-keys)
+            empty?)))))
 
 (s/def ::ork-msg map?) ; ToDo: Write specs for ork messages.
 
@@ -157,9 +165,11 @@
   (when-not (s/valid? ::ork-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid ork msg: " (with-out-str (pprint msg)))))
   (log! :info (-> (str "Ork told: " msg) (elide 150)))
+  (agent-log (str "[ork manager] (tells ork) " (with-out-str (pprint msg))))
   (let [msg-string (clj2json-pretty msg)
         res (-> (adb/query-agent ork-agent msg-string ctx) output-struct2clj)]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
+    (agent-log (str "[ork manager] (receives response form ork) " (with-out-str (pprint res))))
     res))
 
 (defn known-eads?
@@ -171,13 +181,13 @@
        (map #(str (namespace %) "/" (name %)))
        set))
 
-(s/def ::convey-eads (s/keys :req-un [::message-type ::EADS-id]))
-(s/def ::message-type #(= % "CONVEY-EADS"))
+(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
+(s/def ::message-type #(= % "PURSUE-EADS"))
 (s/def ::EADS-id #((known-eads?) %))
 
 (defn get-new-EADS
   "Update the project's orchestrator with CONVERSATION-HISTORY and do a SUPPLY-EADS request to the ork.
-   If the ork returns {:message-type 'CONVEY-EDS', :EADS-id 'exhausted'} return nil to the caller."
+   If the ork returns {:message-type 'PURSUE-EDS', :EADS-id 'exhausted'} return nil to the caller."
   [pid]
   (let [ork (ensure-ork pid)
         old-tid (d/q '[:find ?tid .
@@ -191,7 +201,7 @@
     ;;       'comprehensive history' probably covers all conversations.
     (tell-ork (conversation-history pid) {:ork-agent ork})
     (let [eads (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})]
-      (if (s/valid? ::convey-eads eads)
+      (if (s/valid? ::pursue-eads eads)
         (if-let [eads-instructions (d/q '[:find ?msg-str .
                                           :in $ ?eid-id
                                           :where
@@ -201,4 +211,4 @@
                                         (-> eads :EADS-id keyword))]
           (edn/read-string eads-instructions)
           (log! :error (str "No EADS-instructions found for " eads)))
-        (log! :error (str "Invalid CONVEY-EADS message: " eads))))))
+        (log! :error (str "Invalid PURSUE-EADS message: " eads))))))

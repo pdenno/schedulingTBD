@@ -8,21 +8,27 @@
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.llm            :as llm]
-   [scheduling-tbd.sutil          :as sutil :refer [connect-atm]]
+   [scheduling-tbd.sutil          :as sutil]
    [scheduling-tbd.surrogate      :as sur]
    [taoensso.telemere             :as tel :refer [log!]]))
 
 ;;; ============================= Orchestrator =========================================
 (defonce pid nil #_(db/create-proj-db! {:project/id :orch-test :project/name "orch-test"} {} {:force-this-name? true}))
 
-(when-not (some #(= % :sur-plate-glass) (db/list-projects))
-  (log! :error "Project :sur-plate-glass doesn't exist. Most should work for this test."))
+(def ork
+  (if (some #(= % :sur-plate-glass) (db/list-projects))
+    (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent)
+                                    (assoc :pid :sur-plate-glass)))
+    (log! :error "Project :sur-plate-glass doesn't exist. Most should work for this test.")))
 
-(def ork (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent)
-                                    (assoc :pid :sur-plate-glass)
-                                    (assoc :force-new? true))))
-
-
+(defn check-knowledge-of-eads
+  []
+  (-> (adb/query-agent
+       ork
+       (sutil/clj2json-pretty
+        {:message-type "BACKCHANNEL-COMMUNICATION",
+         :question  "What EADS-instructions are you aware of? Respond with a JSON list of their names."}))
+      sutil/output-struct2clj))
 
 ;;; These are defined in the order they are used in exercising the orchestrator.
 (def ch-1 {:message-type "CONVERSATION-HISTORY",
@@ -61,6 +67,7 @@
 
 (defn ^:diag try-ork
   []
-  (doseq [msg [ch-1 sup-eads-1 ch-2 sup-eads-2]]
-    (let [resp (->> msg msg2json-str (adb/query-agent ork) json-str2msg)]
-      (log! :info (str "Response: " resp)))))
+  (let [ork (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid :sur-plate-glass)))]
+    (doseq [msg [ch-1 sup-eads-1 ch-2 sup-eads-2]]
+      (let [resp (->> msg msg2json-str (adb/query-agent ork) json-str2msg)]
+        (log! :info (str "Response: " resp))))))
