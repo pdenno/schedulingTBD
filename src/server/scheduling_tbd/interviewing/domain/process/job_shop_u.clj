@@ -5,7 +5,7 @@
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.db] ;for mount
+   [scheduling-tbd.db     :as db]
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 (s/def :job-shop-u/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
@@ -113,9 +113,9 @@
 (defn init-job-shop-u
   []
   (if (s/valid? :job-shop-u/EADS-message job-shop-u)
-    (when-not (sutil/same-eads-json? job-shop-u)
-      (sutil/update-eads-json! job-shop-u)
-      (sutil/update-system-eads! job-shop-u))
+    (when-not (db/same-EADS-instructions? job-shop-u)
+      (sutil/update-resources-EADS-json! job-shop-u)
+      (db/put-EADS-instructions! job-shop-u))
     (throw (ex-info "Invalid EADS message (job-shop-u)." {}))))
 
 (defstate job-shop-u-eads

@@ -483,15 +483,26 @@
      (swap! adb/agent-infos #(assoc % base-type (dissoc info :pid)))
      (when pid (adb/ensure-agent! info)))))
 
-(defn check-and-put-ds
+(defn put-EADS-ds-on-msg
+  "Clean-up the EADS data structure and save it on a property :message/EADS-data-structure
+   of the interviewee response which is responsible for this update (the current response
+   in the argument conversation."
   [iviewr-response {:keys [pid cid] :as _ctx}]
-  (db/put-EADS-ds! pid cid iviewr-response))
+  (letfn [(up-keys [obj]
+            (cond (map? obj)     (reduce-kv (fn [m k v] (assoc m (keyword k) (up-keys v))) {} obj)
+                  (vector? obj)  (mapv up-keys obj)
+                  :else          obj))]
+    (let [obj (-> iviewr-response
+                  up-keys
+                  (update :message-type keyword)
+                  (update :EADS-ref keyword))]
+      (db/put-EADS-ds! pid cid obj))))
 
 (defn update-db-conversation!
   "Write to the DB conversation messages that occurred inclusive of a q/a pair."
   [pid cid conversation]
   (let [msg-ids (atom [])
-        EADS-id (db/get-active-eads pid cid)]
+        EADS-id (db/get-active-EADS-id pid cid)]
     (doseq [msg conversation]
       (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
                                         EADS-id  (assoc :pursuing-EADS EADS-id))))
@@ -502,7 +513,7 @@
   [iviewr-response {:keys [pid cid client-id] :as ctx}]
   (when (surrogate? pid) (ru/refresh-client client-id pid cid))
   (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
-    (check-and-put-ds iviewr-response ctx)
+    (put-EADS-ds-on-msg iviewr-response ctx)
     (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
       (ws/send-to-client {:client-id (ws/recent-client!) :dispatch-key :load-graph :graph graph-mermaid}))))
 
@@ -514,27 +525,37 @@
   "Some properties in the context map are only relevant in the current iteration of the interview loop.
    Those must be cleared before the next iteration. This function returns the argument ctx with those props removed."
   [ctx]
-  (dissoc ctx :new-eads?))
+  (dissoc ctx :new-eads))
 
+;;; (inv/ork-review {:pid :plate-glass-ork :cid :process})
 (defn ork-review
   "Looks at the project DB to return a map that may cause
-     1) a change in the eads to pursue (because either complete or exceeded budget),
-     2) a change of the interviewer (and new eads-instrucitons, of course),
-     3) a message to the interviewees to change conversations to what the ork wants to do,
-     4) interviewing to stop (because ork conludes no more eads-instructions apply, or forced by active? atom)."
+     1) a change in the eads to pursue (because either there is none yet, the current on is complete, or exceeded budget),
+     2) a change in interviewer, which occurs simply by changing :cid in the context; no initialization needed.
+     3) a message to human interviewees to change conversations to what the ork wants to do,
+     4) interviewing to stop (because ork conludes that no more eads-instructions apply, or forced by active? atom)."
   [{:keys [pid cid] :as ctx}]
+  (ork/ensure-ork! pid)
   (let [budget (db/get-budget pid cid)
-        active-eads-id (db/get-active-eads-id pid cid)
+        active-eads-id (db/get-active-EADS-id pid cid)
         eads-id (or active-eads-id (ork/get-new-EADS pid))
-        eads-complete? (and eads-id (ork/eads-complete? pid cid eads-id))
-        new-eads  (when (or eads-complete? (<= budget 0)) (ork/get-new-EADS pid)) ; returns nil when exhausted.
+        eads-complete? (and eads-id (ork/EADS-complete? pid cid eads-id))
+        new-eads (when (or eads-complete? (<= budget 0))
+                   (ork/tell-ork (ork/conversation-history pid cid) ctx)
+                   (ork/get-new-EADS pid)) ; returns nil when exhausted.
         new-cid (when new-eads
+                  (let [nspace (-> new-eads namespace keyword)]
+                    (when (not= cid nspace) nspace)))]
     (when (<= budget 0)
       (agent-log (str "[ork manager] (in ork-review) switching to new EADS instructions " new-eads" owing to budget constraint.")
                  {:console? true :level :warn}))
-    (cond-> {}
-      (and eads-complete? new-eads)        (assoc :new-eads? true)    ; These will need to be cleared.
-      (and eads-complete? new-eads)        (assoc :new-eads? true))))
+    (when new-cid
+      (agent-log (str "[ork manager] (in ork-review) changing conversation to " new-cid ".")))
+    (cond-> ctx
+      (and eads-complete? new-eads)             (assoc :new-eads new-eads)
+      (or (not @active?)
+          (and eads-complete? (not new-eads)))  (assoc :exhausted? true)
+      new-cid                                   (assoc :cid true))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
@@ -551,8 +572,10 @@
     (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
       (-> (conversation-history pid cid) (tell-interviewer ctx))
       (loop [ctx ctx]
-        (let [{:keys [exhausted? new-eads? new-cid? cid]} (merge ctx (ork-review ctx))]
+        (let [{:keys [exhausted? new-eads cid] :as ctx} (ork-review ctx)]
           (when-not exhausted?
+            (when new-eads (db/put-active-EADS-id pid cid new-eads))
+            ;(tell-interviewer ) ; <=============================================================================================================================================
             (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                   expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
                   iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND" :response expert-response} ctx)]

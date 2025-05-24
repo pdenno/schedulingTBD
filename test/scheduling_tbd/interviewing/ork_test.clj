@@ -1,27 +1,22 @@
 (ns scheduling-tbd.interviewing.ork-test
   (:require
-   [clojure.data.json             :as cdjson]
-   [clojure.pprint                :refer [pprint]]
-   [clojure.spec.alpha            :as s]
-   [clojure.test                  :refer [deftest is testing]]
-   [datahike.api                  :as d]
-   [scheduling-tbd.agent-db       :as adb]
-   [scheduling-tbd.db             :as db]
-   [scheduling-tbd.llm            :as llm]
-   [scheduling-tbd.sutil          :as sutil]
-   [scheduling-tbd.surrogate      :as sur]
-   [taoensso.telemere             :as tel :refer [log!]]))
+   [clojure.data.json                        :as cdjson]
+   [clojure.test                             :refer [deftest is testing]]
+   [scheduling-tbd.agent-db                  :as adb]
+   [scheduling-tbd.db                        :as db]
+   [scheduling-tbd.interviewing.interviewers :as inv]
+   [scheduling-tbd.interviewing.ork          :as ork]
+   [scheduling-tbd.sutil                     :as sutil]
+   [taoensso.telemere                         :as tel :refer [log!]]))
 
-;;; ============================= Orchestrator =========================================
 (defonce pid nil #_(db/create-proj-db! {:project/id :orch-test :project/name "orch-test"} {} {:force-this-name? true}))
 
 (def ork
-  (if (some #(= % :sur-plate-glass) (db/list-projects))
-    (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent)
-                                    (assoc :pid :sur-plate-glass)))
-    (log! :error "Project :sur-plate-glass doesn't exist. Most should work for this test.")))
+  (if (some #(= % :plate-glass-ork) (db/list-projects))
+    (ork/ensure-ork :plate-glass-ork)
+    (log! :error "Project :plate-glass-ork doesn't exist. Most projects should work for this test; change it.")))
 
-(defn check-knowledge-of-eads
+(defn ^:diag check-ork-knowledge-of-eads
   []
   (-> (adb/query-agent
        ork
@@ -29,6 +24,10 @@
         {:message-type "BACKCHANNEL-COMMUNICATION",
          :question  "What EADS-instructions are you aware of? Respond with a JSON list of their names."}))
       sutil/output-struct2clj))
+
+(defn tryme []
+  (let [ctx {:pid :plate-glass-ork
+
 
 ;;; These are defined in the order they are used in exercising the orchestrator.
 (def ch-1 {:message-type "CONVERSATION-HISTORY",

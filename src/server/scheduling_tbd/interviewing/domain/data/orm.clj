@@ -8,7 +8,7 @@
    [clojure.spec.alpha    :as s]
    [datahike.api          :as d]
    [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.db] ;for mount
+   [scheduling-tbd.db     :as db]
    [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
 
 (def ^:diag diag (atom nil))
@@ -286,9 +286,9 @@
 (defn init-orm
   []
   (if (s/valid? :orm/EADS-message orm)
-    (when-not (sutil/same-eads-json? orm)
-      (sutil/update-eads-json! orm)
-      (sutil/update-system-eads! orm))
+    (when-not (db/same-EADS-instructions? orm)
+      (sutil/update-resources-EADS-json! orm)
+      (db/put-EADS-instructions! orm))
     (throw (ex-info "Invalid EADS message (orm)." {}))))
 
 (defstate orm-eads

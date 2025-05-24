@@ -3,7 +3,7 @@
   (:require
    [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
-   [scheduling-tbd.db]    ;for mount
+   [scheduling-tbd.db     :as db]
    [scheduling-tbd.sutil  :as sutil]))
 
 ;;; ToDo: Because we use a central spec registry, the specs defined with short namespaces (e.g. :problem-type/val) might collide with specs from other domains.
@@ -64,9 +64,9 @@
 (defn init-scheduling-problem-type
   []
   (if (s/valid? :scheduling-problem-type/EADS-message scheduling-problem-type)
-    (when-not (sutil/same-eads-json? scheduling-problem-type)
-      (sutil/update-eads-json! scheduling-problem-type)
-      (sutil/update-system-eads! scheduling-problem-type))
+    (when-not (db/same-EADS-instructions? scheduling-problem-type)
+      (sutil/update-resources-EADS-json! scheduling-problem-type)
+      (db/put-EADS-instructions! scheduling-problem-type))
     (throw (ex-info "Invalid EADS message (scheduling-problem-type)." {}))))
 
 (defstate init-scheduling-problem-type-eads

@@ -207,6 +207,7 @@
                 instruction-path (conj instruction-path)
                 response-format-path (conj response-format-path)
                 vector-store-paths (into vector-store-paths))
+        zippy  (reset! diag files)
         newest (when (not-empty files)
                  (apply max (mapv #(->> % io/resource io/file .lastModified) files)))]
     (when newest

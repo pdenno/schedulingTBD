@@ -9,19 +9,13 @@
    [datahike.api                  :as d]
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
-   ;; EADS. These might be temporary
-   [scheduling-tbd.interviewing.domain.process.flow-shop] ; for mount
-   [scheduling-tbd.interviewing.domain.process.job-shop-c]
-   [scheduling-tbd.interviewing.domain.process.job-shop-u]
-   [scheduling-tbd.interviewing.domain.process.scheduling-problem-type]
-   ;;[scheduling-tbd.interviewing.domain.process.timetabling]
-
+   [scheduling-tbd.interviewing.eads] ; for mount
    [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide output-struct2clj]]
    [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
-(defn ensure-ork
+(defn ensure-ork!
   "Create a orchstrator using ordinary rules for shared-assistant agents.
    This is typically called when the project starts. It updates :project/agents in the project DB."
   [pid]
@@ -128,7 +122,7 @@
 ;;; ToDo: More thoughts on the above ToDo: It might be valuable to list what keys are optional. The specs can do this, of course, but can I use them?
 ;;;       This would also be
 ;;;(ork/eads-complete :plate-glass-ork :process
-(defn eads-complete?
+(defn EADS-complete?
   "Check whether the argument eads is complete.
    Some interviewers are instructed to set a property 'exhausted?' to true (e.g. the orm interviewer does this),
    for other we check that all the properties of the EADS are used somewhere in the data structure."
@@ -172,24 +166,16 @@
     (agent-log (str "[ork manager] (receives response form ork) " (with-out-str (pprint res))))
     res))
 
-(defn known-eads?
-  "Return a set of known eads strings."
-  []
-  (->> (d/q '[:find [?eads-id ...]
-             :where [_ :EADS/id ?eads-id]]
-            @(connect-atm :system))
-       (map #(str (namespace %) "/" (name %)))
-       set))
-
-(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
-(s/def ::message-type #(= % "PURSUE-EADS"))
-(s/def ::EADS-id #((known-eads?) %))
+;(def eads-id? (-> (db/list-system-EADS) set))
+;(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
+;(s/def ::message-type #(= % "PURSUE-EADS"))
+;(s/def ::EADS-id eads-id?)
 
 (defn get-new-EADS
   "Update the project's orchestrator with CONVERSATION-HISTORY and do a SUPPLY-EADS request to the ork.
    If the ork returns {:message-type 'PURSUE-EDS', :EADS-id 'exhausted'} return nil to the caller."
   [pid]
-  (let [ork (ensure-ork pid)
+  (let [ork (ensure-ork! pid)
         old-tid (d/q '[:find ?tid .
                        :where
                        [?e :agent/base-type :orchestrator-agent]

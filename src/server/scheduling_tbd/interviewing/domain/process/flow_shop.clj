@@ -5,7 +5,7 @@
   (:require
    [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
-   [scheduling-tbd.db]    ; for mount
+   [scheduling-tbd.db     :as db]
    [scheduling-tbd.interviewing.eads-util :refer [graph-semantics-ok?]]
    [scheduling-tbd.sutil :as sutil]))
 
@@ -206,9 +206,9 @@
 (defn init-flow-shop
   []
   (if (s/valid? :flow-shop/EADS-message flow-shop)
-    (when-not (sutil/same-eads-json? flow-shop)
-      (sutil/update-eads-json! flow-shop)
-      (sutil/update-system-eads! flow-shop))
+    (when-not (db/same-EADS-instructions? flow-shop)
+      (sutil/update-resources-EADS-json! flow-shop)
+      (db/put-EADS-instructions! flow-shop))
     (throw (ex-info "Invalid EADS message (flow-shop)." {}))))
 
 (defstate flow-shop-eads

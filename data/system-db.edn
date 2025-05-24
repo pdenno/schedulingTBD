@@ -112,13 +112,14 @@
                   :assistant-id "asst_jD6xz9YjfzqeDWnZAKTJgZvX",
                   :id :text-to-var-openai,
                   :timestamp #inst "2025-02-21T13:19:00.143-00:00"}
-          #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_nPIdvlmvxiuVDVQGHTYOfdhc",
-                  :base-type :orchestrator-agent,
-                  :id :orchestrator-agent-openai,
-                  :llm-provider :openai,
+          #:agent{:base-type :orchestrator-agent,
+                  :agent-type :shared-assistant,
+                  :thread-id "thread_XFFDfShdLZkXyCxr8W8t0pR1",
                   :model-class :gpt,
-                  :timestamp #inst "2025-04-23T17:38:29.773-00:00"}],
+                  :llm-provider :openai,
+                  :assistant-id "asst_fSEkx3k4b4WtY9jYnJ1Qiurr",
+                  :id :orchestrator-agent-openai,
+                  :timestamp #inst "2025-05-22T18:47:46.876-00:00"}],
          :default-project-id :blank-project,
          :name "SYSTEM",
          :projects
@@ -229,7 +230,12 @@
           #:project{:dir
                     "/opt/scheduling/projects/sur-commemorative-coins/db/",
                     :id :sur-commemorative-coins,
-                    :name "SUR Commemorative Coins"}]}
+                    :name "SUR Commemorative Coins"}
+          nil
+          #:project{:dir
+                    "/opt/scheduling/projects/sur-music-school/db/",
+                    :id :sur-music-school,
+                    :name "Music School"}]}
 
 #:spec{:full :flow-shop/EADS-message}
 

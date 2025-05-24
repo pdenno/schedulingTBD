@@ -115,7 +115,6 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "warm-up objects for various conversations."}})
 
-
 ;;;========================================================== Project DBs ==========================================
 (def db-schema-proj+
   "Defines schema for a project plus metadata :mm/info.
@@ -155,9 +154,6 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "The id of the EADS in the system DB which is currently being pursued in this conversation.\n"
                   "If the conversation doesn't have one, functions such as ork/active-EADS can make one using the project's orchestrator agent.")}
-   :conversation/done?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "true if we don't have more to add (though user might)."}
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword uniquely identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
@@ -233,9 +229,6 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc (str "The thread-id of orchestrator agent.\n"
                   "When this does not match the current ork-agent, the agent needs a more expansive CONVERSATION-HISTORY messagethe messages of the conversation.")}
-   :project/processes
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the project's process objects; everything about processes in a complex structure."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
@@ -268,22 +261,7 @@
   (when-let [eid (project-exists? pid)]
     (-> (dp/pull @(connect-atm pid) '[:project/name] eid) :project/name)))
 
-(defn get-current-cid
-  "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
-  [pid]
-  (or (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))
-      :process))
-
-(defn conversation-exists?
-  "Return the eid of the conversation if it exists."
-  [pid cid]
-  (assert (#{:process :data :resources :optimality} cid))
-  (d/q '[:find ?eid .
-         :in $ ?cid
-         :where [?eid :conversation/id ?cid]]
-       @(connect-atm pid) cid))
-
-(defn ^:diag get-project
+(defn ^:admin get-project
   "Return the project structure.
    Throw an error if :error is true (default) and project does not exist."
   [pid & {:keys [drop-set error?]
@@ -323,15 +301,7 @@
          sort
          vec))))
 
-(defn get-conversation
-  "For the argument project (pid) return a vector of messages sorted by their :message/id."
-  [pid cid]
-  (assert (#{:process :data :resources :optimality} cid))
-  (if-let [eid (conversation-exists? pid cid)]
-    (-> (resolve-db-id {:db/id eid} (connect-atm pid))
-         (update :conversation/messages #(->> % (sort-by :message/id) vec)))
-    {}))
-
+;;; ----------------------------------- Claims -------------------------------------------------------------
 (defn get-claims
   "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
   [pid & {:keys [objects?]}]
@@ -375,27 +345,6 @@
                                    confidence (assoc :claim/confidence confidence))}]}))
   true)
 
-(defn get-process
-  "Return the process structure for the argument pid and interview-class."
-  [pid interview-class]
-  (assert (keyword? pid))
-  (assert (keyword? interview-class))
-  (let [conn (connect-atm pid)
-        eid (d/q '[:find ?eid .
-                   :in $ ?class
-                   :where [?eid :process/interview-class ?class]]
-                 @conn
-                 interview-class)]
-    (resolve-db-id {:db/id eid} conn)))
-
-(defn put-process-sequence!
-  "Write project/process-sequence to the project's database.
-   The 'infos' argument is a vector of maps such as produced by analyze-process-durs-response."
-  [pid full-obj]
-  (let [conn (connect-atm pid)
-        eid (project-exists? pid)]
-    (d/transact conn {:tx-data [{:db/id eid :project/processes full-obj}]})))
-
 (defn clean-project-for-schema
   "Remove attributes that are no longer in the schema.
    Remove nil values, these can show up after doing a :db/retract."
@@ -423,14 +372,14 @@
     (log! :info (str "Writing project to " filename))
     (spit filename s)))
 
-(defn ^:diag backup-proj-dbs
+(defn ^:admin backup-proj-dbs
   "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir.
    Example usage: (backup-proj-dbs)."
   [& {:keys [target-dir] :or {target-dir "data/projects/"}}]
   (doseq [id (list-projects)]
     (backup-proj-db id {:target-dir target-dir})))
 
-(defn ^:diag backup-system-db
+(defn ^:admin backup-system-db
   "Backup the system database to an edn file."
   [& {:keys [target-dir] :or {target-dir "data/"}}]
       (let [conn-atm (connect-atm :system)
@@ -487,7 +436,7 @@
     (log! :error (str "Not recreating DB because backup file does not exist: " backup-file)))))
 
 (def keep-db? #{:him})
-(defn ^:diag recreate-dbs!
+(defn ^:admin recreate-dbs!
   "Recreate the system DB on storage from backup.
    For each project it lists, recreate it from backup if such backup exists."
   []
@@ -498,34 +447,63 @@
   (doseq [pid (list-projects)]
     (recreate-project-db! pid)))
 
-(defn ^:diag unknown-projects
-  "Return a vector of directories that the system DB does not know."
-  []
-  (set/difference
-   (set (list-projects {:from-storage? true}))
-   (set (list-projects))))
+;;; --------------------------------------- Conversations ---------------------------------------------------------------------
+(def conversation-intros
+  {:process
+   (str "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. "
+        "It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) "
+        "through which together we design a solution to your scheduling problem. "
+        "You can read more about <a href=\"about/process-conversation\">how this works</a>.")
+   :data
+   (str "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). "
+        "Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and "
+        "we can invent some similar data to run demonstrations. "
+        "Whenever someone suggests that you upload information to them, you should be cautious. "
+        "Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.")
+   :resources
+   (str "This is typically the third conversation we'll have, after discussing process and data. "
+        "(By the way, you can always go back to a conversation and add to it.) "
+        "You might have already mentioned the resources (people, machines) by which you make product or deliver services. "
+        "Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.")
+   :optimality
+   (str "This is where we discuss what you intend by 'good' and 'ideal' schedules. "
+        "With these we formulate an objective and model it in MiniZinc. "
+        "The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did "
+        "to define requirements, we think it will be successful.")})
 
-;;; ----------------------- Creating a project DB ----------------------
-(defn unique-proj
-  "If necessary to ensure uniqueness, update the project name and id."
-  [proj-info]
-  (let [names (d/q '[:find [?name ...]
-                     :where [_ :project/name ?name]] @(connect-atm :system))
-        name (:project/name proj-info)]
-    (if (not-any? #(= name %) names)
-      proj-info
-      (let [pat (re-pattern (str "^" name ".*"))
-            similar-names (filter #(re-matches pat %) names)
-            pat (re-pattern (str "^" name "( \\d+)?"))
-            nums (map #(let [[success num] (re-matches pat %)]
-                         (when success (or num "0"))) similar-names)
-            num (->> nums (map read-string) (apply max) inc)
-            new-name (str name " " num)
-            new-id   (-> new-name str/lower-case (str/replace #"\s+" "-") keyword)]
-        (-> proj-info
-            (assoc :project/name new-name)
-            (assoc :project/id new-id))))))
+(declare add-msg)
 
+(defn add-conversation-intros
+  "Add an intro describing the topic and rationale of the conversation."
+  [pid]
+  (doseq [cid [:process :data :resources :optimality]]
+    (add-msg  {:pid pid :cid cid :from :system :text (get conversation-intros cid) :tags [:conversation-intro]})))
+
+(defn get-current-cid
+  "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
+  [pid]
+  (or (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))
+      :process))
+
+(defn conversation-exists?
+  "Return the eid of the conversation if it exists."
+  [pid cid]
+  (assert (#{:process :data :resources :optimality} cid))
+  (d/q '[:find ?eid .
+         :in $ ?cid
+         :where [?eid :conversation/id ?cid]]
+       @(connect-atm pid) cid))
+
+(defn get-conversation
+  "For the argument project (pid) return a vector of messages sorted by their :message/id."
+  [pid cid]
+  (assert (#{:process :data :resources :optimality} cid))
+  (if-let [eid (conversation-exists? pid cid)]
+    (-> (resolve-db-id {:db/id eid} (connect-atm pid))
+         (update :conversation/messages #(->> % (sort-by :message/id) vec)))
+    {}))
+
+;;; --------------------------------------- Messages ---------------------------------------------------------------------
 (defn max-msg-id
   "Return the current highest message ID used in the project."
   [pid cid]
@@ -576,6 +554,7 @@
       (d/transact (connect-atm pid) {:tx-data [(merge msg info)]})
       (log! :warn (str "Could not find msg for update-msg: pid = " pid " cid = " cid " mid = " mid)))))
 
+;;; ----------------------------------------- Budget ---------------------------------------------
 (defn get-budget
   "Return the :conversation/interviewer-budget."
   [pid cid]
@@ -595,6 +574,16 @@
     (if eid
       (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
       (log! :error (str "No such conversation: " cid)))))
+
+;;; ----------------------------------------- EADS ---------------------------------------------
+(defn ^:admin list-system-EADS
+  "Return a sorted vector of EADS-ids (keywords) known to the system db."
+  []
+  (-> (d/q '[:find [?eads-id ...]
+             :where [_ :EADS/id ?eads-id]]
+           @(sutil/connect-atm :system))
+      sort
+      vec))
 
 ;;; ToDo: I think maybe this isn't needed.
 (defn get-EADS-dstructs
@@ -648,6 +637,95 @@
       (d/transact conn-atm {:tx-data [{:db/id eid :message/EADS-data-structure (str ds)}]})
       (log! :error (str "No such conversation: " cid)))))
 
+(defn get-active-EADS-id
+  "Return the EADS-id (keyword) for whatever EADS is active in the given project and conversation."
+  [pid cid]
+  (d/q '[:find ?eads-id .
+         :in $ ?cid
+         :where
+         [?e :conversation/id ?cid]
+         [?e :conversation/active-EADS ?eads-id]]
+       @(connect-atm pid) cid))
+
+(defn put-active-EADS-id
+  "Set :conversation/active-EADS."
+  [pid cid eads-id]
+  (let [eid (conversation-exists? pid cid)]
+    (d/transact @(connect-atm pid)
+                {:tx-data [{:db/id eid :conversation/active-eads eads-id}]})))
+
+(defn put-EADS-instructions!
+  "Update the system DB with a (presumably) new version of the argument EADS instructions.
+   Of course, this is a development-time activity."
+  [eads-instructions]
+  (let [id (-> eads-instructions :EADS :EADS-id)
+        [ns nam] ((juxt namespace name) id)
+        db-obj {:EADS/id id
+                :EADS/cid (keyword ns)
+                :EADS/specs #:spec{:full (keyword nam "EADS-message")}
+                :EADS/msg-str (str eads-instructions)}
+          conn (connect-atm :system)
+        eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
+    (log! :info (str "Writing EADS instructions to system DB: " id))
+    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]}))
+  nil)
+
+(defn get-EADS-instructions
+  "Return the full EADS instructions object maintained in the system DB
+   (the EDN structure from edn/read-string of :EADS/msg-str).
+   Returns the empty string when the EADS ID is not known."
+  [eads-id]
+  (if-let [msg-str (d/q '[:find ?msg-str .
+                          :in $ ?eads-id
+                          :where
+                          [?e :EADS/id ?eads-id]
+                          [?e :EADS/msg-str ?msg-str]]
+                        @(connect-atm :system) eads-id)]
+    (edn/read-string msg-str)
+    ""))
+
+(defn same-EADS-instructions?
+  "Return true if the argument eads-instructions (an EDN object) is exactly what the system already maintains."
+  [eads-instructions]
+  (let [id (-> eads-instructions :EADS :EADS-id)]
+    (= eads-instructions (get-EADS-instructions id))))
+
+(defn ^:admin update-all-EADS-json!
+  "Copy JSON versions of the system DB's EADS instructions to the files in resources/agents/iviewrs/EADS."
+  []
+  (doseq [eads-id (list-system-EADS)]
+    (if-let [eads-instructions (-> eads-id get-EADS-instructions not-empty)]
+      (sutil/update-resources-EADS-json! eads-instructions)
+      (log! :error (str "No such EADS instructions " eads-id)))))
+
+;;; ----------------------------------------- Project ---------------------------------------------
+(defn ^:admin unknown-projects
+  "Return a vector of directories that the system DB does not know."
+  []
+  (set/difference
+   (set (list-projects {:from-storage? true}))
+   (set (list-projects))))
+
+(defn unique-proj
+  "If necessary to ensure uniqueness, update the project name and id."
+  [proj-info]
+  (let [names (d/q '[:find [?name ...]
+                     :where [_ :project/name ?name]] @(connect-atm :system))
+        name (:project/name proj-info)]
+    (if (not-any? #(= name %) names)
+      proj-info
+      (let [pat (re-pattern (str "^" name ".*"))
+            similar-names (filter #(re-matches pat %) names)
+            pat (re-pattern (str "^" name "( \\d+)?"))
+            nums (map #(let [[success num] (re-matches pat %)]
+                         (when success (or num "0"))) similar-names)
+            num (->> nums (map read-string) (apply max) inc)
+            new-name (str name " " num)
+            new-id   (-> new-name str/lower-case (str/replace #"\s+" "-") keyword)]
+        (-> proj-info
+            (assoc :project/name new-name)
+            (assoc :project/id new-id))))))
+
 (defn add-project-to-system
   "Add the argument project (a db-cfg map) to the system database."
   [id project-name dir]
@@ -657,35 +735,6 @@
                                      :system/projects {:project/id id
                                                        :project/name project-name
                                                        :project/dir dir}}]})))
-
-(def conversation-intros
-  {:process
-   (str "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. "
-        "It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) "
-        "through which together we design a solution to your scheduling problem. "
-        "You can read more about <a href=\"about/process-conversation\">how this works</a>.")
-   :data
-   (str "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). "
-        "Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and "
-        "we can invent some similar data to run demonstrations. "
-        "Whenever someone suggests that you upload information to them, you should be cautious. "
-        "Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.")
-   :resources
-   (str "This is typically the third conversation we'll have, after discussing process and data. "
-        "(By the way, you can always go back to a conversation and add to it.) "
-        "You might have already mentioned the resources (people, machines) by which you make product or deliver services. "
-        "Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.")
-   :optimality
-   (str "This is where we discuss what you intend by 'good' and 'ideal' schedules. "
-        "With these we formulate an objective and model it in MiniZinc. "
-        "The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did "
-        "to define requirements, we think it will be successful.")})
-
-(defn add-conversation-intros
-  "Add an intro describing the topic and rationale of the conversation."
-  [pid]
-  (doseq [cid [:process :data :resources :optimality]]
-    (add-msg  {:pid pid :cid cid :from :system :text (get conversation-intros cid) :tags [:conversation-intro]})))
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
@@ -737,17 +786,7 @@
      (log! :info (str "Created project database for " id))
      id)))
 
-(defn get-active-eads-id
-  "Return the EADS-id (keyword) for whatever EADS is active in the given project and conversation."
-  [pid cid]
-  (d/q '[:find ?eads-id .
-         :in $ ?cid
-         :where
-         [?e :conversation/id ?cid]
-         [?e :conversation/active-EADS ?eads-id]]
-       @(connect-atm pid) cid))
-
-(defn ^:diag delete-project!
+(defn ^:admin delete-project!
   "Remove project from the system."
   [pid]
   (if (some #(= % pid) (list-projects))
@@ -759,36 +798,13 @@
           nil)))
     (log! :warn (str "Delete-project: Project not found: " pid))))
 
-(defn assert-conversation-done!
-  "Set the conversation's :converation/done? attribute to true."
-  [pid cid]
-  (if-let [eid (conversation-exists? pid cid)]
-    (d/transact (connect-atm pid) {:tx-data [[:db/add eid :conversation/done? true]]})
-    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
-
-(defn ^:diag retract-conversation-done!
-  [pid cid]
-  (if-let [eid (conversation-exists? pid cid)]
-    (d/transact (connect-atm pid) {:tx-data [[:db/add eid :conversation/done? false]]})
-    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
-
-(defn conversation-done?
-  "Returns true if the conversation is completed, as far as the interviewer is concerned."
-  [pid cid]
-  (if-let [eid (conversation-exists? pid cid)]
-    (d/q '[:find ?done .
-           :in $ ?eid
-           :where [?eid :conversation/done? ?done]]
-         @(connect-atm pid) eid)
-    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
-
-(defn ^:diag update-project-for-schema!
+(defn ^:admin update-project-for-schema!
   "This has the ADDITIONAL side-effect of writing a backup file."
   [pid]
   (backup-proj-db pid)
   (recreate-project-db! pid))
 
-(defn ^:diag update-all-projects-for-schema!
+(defn ^:admin update-all-projects-for-schema!
   []
   (doseq [p (list-projects)]
     (update-project-for-schema! p)))
@@ -800,22 +816,11 @@
   (doseq [id (list-projects {:from-storage? true})]
     (register-db id (db-cfg-map {:type :project :id id}))))
 
-(defn make-etc-dirs
-  "Temporary directories are rooted in a directory 'tmp' below $SCHEDULING_TBD_DB (environment variable)."
-  []
-  (if-let [root (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
-    (let [etc-root (str root "/etc/EADS")]
-      (when-not (.isDirectory (io/file etc-root))
-        (io/make-parents etc-root)
-        (-> etc-root io/as-file .mkdir)))
-    (log! :error "Set the SCHEDULING_TBD_DB environment variable.")))
-
 (defn init-dbs
   "Register DBs using "
   []
   (register-project-dbs)
   (register-db :system (db-cfg-map {:type :system}))
-  (make-etc-dirs)
   {:sys-cfg (db-cfg-map {:type :system})})
 
 (defstate sys&proj-database-cfgs
