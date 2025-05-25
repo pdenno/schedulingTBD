@@ -382,25 +382,48 @@
                           (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q)))))
        (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
 
+;;; ToDo: This needs work. You should be able to reopen a conversation at any time.
 (defn ready-for-discussion?
   "Return true if the state of conversation is such that we can now have
    discussion on the given topic."
   [pid cid]
-  (case cid
-    ;; ToDo: Someday we will be able to do better than this!
-    (:resources :optimality) (ru/find-claim '(flow-shop ?x) (db/get-claims pid))
-    (:process :data) true))
+  (letfn [(done? [status] (= status :eads-exhausted))]
+    (let [[pstat dstat rstat ostat]  (doall (for [c [:process :data :resources :optimality]]
+                                              (db/get-conversation-status pid c)))]
+      (case cid
+            :resources               (and (done? pstat) (done? dstat))
+            :optimality              (and (done? pstat) (done? dstat) (done? rstat))
+            :data                    (not (done? dstat))
+            :process                 (not (done? pstat))))))
 
-(defn redirect-user-to-discussion
-  "Put a message in the current chat to go to the recommended chat."
-  [client-id current-chat recommended-chat]
-  (let [text (str
-              (format "We aren't quite ready to discuss %s until we've talked more about %s. "
-                      (name current-chat) (name recommended-chat))
-              (format "Could you pop over to the %s discussion (menu on left, 'Process', 'Data' etc.) and chat more with that agent?"
-                      (name recommended-chat)))]
-    ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
-    (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :text text})))
+;;; ToDo: This needs work. You should be able to reopen a conversation at any time. Maybe need an agent for this!
+(defn find-appropriate-conv-and-redirect
+  "If we think the conversation is over, ask them if they want to reopen it.
+  Put a message in the current chat to go to the recommended chat or
+   Typically this is called with ready-for-discussion? returned false."
+  [{:keys [pid cid client-id]}]
+  (letfn [(ready? [status] (#{:not-started :in-progress} status))]
+    (let [[pstat dstat rstat ostat]  (doall (for [c [:process :data :resources :optimality]]
+                                              (db/get-conversation-status pid c)))
+          better-choice (case cid
+                          :process      (cond (ready? dstat) :data
+                                              (ready? rstat) :resources
+                                              (ready? ostat) :optimality
+                                              :else          :all-done!)
+                          :data         (cond (ready? pstat) :process
+                                              (ready? rstat) :resources
+                                              (ready? ostat) :optimality
+                                              :else          :all-done!)
+                          :resources    (cond (ready? pstat) :process
+                                              (ready? dstat) :data
+                                              (ready? ostat) :optimality
+                                              :else          :all-done!))
+          text (if (= :all-done! better-choice)
+                 "We are satisfied with this conversation as it is. Did you want to reopen it for discussion?"
+                 (str "At this point in our work, it would be better to discuss " (name better-choice) ". "
+                      "Could you select " (-> better-choice name str/capitalize) " from the menu on the left?"))]
+      ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
+      (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :text text}))))
 
 (defn ctx-surrogate
   "Return context updated with surrogate info."
@@ -499,63 +522,76 @@
       (db/put-EADS-ds! pid cid obj))))
 
 (defn update-db-conversation!
-  "Write to the DB conversation messages that occurred inclusive of a q/a pair."
-  [pid cid conversation]
+  "Write to the project DB messages that occurred inclusive of a q/a pair."
+  [pid cid new-msgs-vec]
   (let [msg-ids (atom [])
         EADS-id (db/get-active-EADS-id pid cid)]
-    (doseq [msg conversation]
+    (doseq [msg new-msgs-vec]
       (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
                                         EADS-id  (assoc :pursuing-EADS EADS-id))))
       (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)}))))
 
-(defn aux-ui-actions
-  "Send client actions to perform such as loading graphs."
-  [iviewr-response {:keys [pid cid client-id] :as ctx}]
+(defn post-ui-actions
+  "Send client actions to perform such as loading graphs or (for humans) changing conversations."
+  [iviewr-response {:keys [pid cid new-cid? client-id responder-type] :as ctx}]
   (when (surrogate? pid) (ru/refresh-client client-id pid cid))
   (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
-    (put-EADS-ds-on-msg iviewr-response ctx)
-    (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
-      (ws/send-to-client {:client-id (ws/recent-client!) :dispatch-key :load-graph :graph graph-mermaid}))))
+    ;; Using the data structure being pursued in some EADS instructions to show a FFBD of their processes.
+    (when (#{:process/flow-shop :process/job-shop--classifiable} (db/get-active-EADS-id pid cid))
+      (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
+        (ws/send-to-client {:client-id client-id :dispatch-key :load-graph :graph graph-mermaid}))))
+  ;; Of course, we don't switch the conversation for humans; we have to tell them to switch.
+  (when (and new-cid? (= :human responder-type))
+    (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :promise? true
+                        :text (str "Right now we don't have much more to ask on this conversation, "
+                                   "but we'd like to continue on the " (-> cid name str/capitalize) "conversation. "
+                                   "Would you mind switching over there? (Use menu on the right.)")})))
 
-;;; It should be possible to test ork-review by updating the project.
-;;;  (ready-for-discussion? pid cid)
-;;;  (redirect-user-to-discussion client-id cid :process)   ; <===============================================================================================
+(defn post-db-actions!
+  "If the interviewer responded with a DATA-STRUCTURE-REFINEMENT (which is typical), associate the
+   whole message as a string to the message which is an answer to the question."
+  [iviewr-response ctx]
+  (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
+    (put-EADS-ds-on-msg iviewr-response ctx)))
 
-(defn clear-context-ephemeral
+(defn clear-ctx-ephemeral
   "Some properties in the context map are only relevant in the current iteration of the interview loop.
    Those must be cleared before the next iteration. This function returns the argument ctx with those props removed."
   [ctx]
-  (dissoc ctx :new-eads))
+  (dissoc ctx :new-eads-id :new-cid? :old-cid))
 
 ;;; (inv/ork-review {:pid :plate-glass-ork :cid :process})
 (defn ork-review
-  "Looks at the project DB to return a map that may cause
-     1) a change in the eads to pursue (because either there is none yet, the current on is complete, or exceeded budget),
-     2) a change in interviewer, which occurs simply by changing :cid in the context; no initialization needed.
-     3) a message to human interviewees to change conversations to what the ork wants to do,
-     4) interviewing to stop (because ork conludes that no more eads-instructions apply, or forced by active? atom)."
+  "Looks at the project DB to decide whether there is an active-eads-id and whether the active is complete.
+   If there is no active-eads-id or the active one is complete, ork will get a conversation-history (including completed EADS data structures,
+   and will determine a new-eads-id or return nil (if conversation for EADS-ds has been exhausted).
+   The consequences of an ork-review can be:
+         1) a change in the eads to pursue (because either there is none yet, the current on is complete, or exceeded budget),
+         2) a change in interviewer, which occurs simply by changing :cid in the context; no initialization needed.
+         3) a message to human interviewees to change conversations to what the ork wants to do,
+         4) interviewing to stop (because ork conludes that no more eads-instructions apply, or forced by active? atom)."
   [{:keys [pid cid] :as ctx}]
   (ork/ensure-ork! pid)
   (let [budget (db/get-budget pid cid)
         active-eads-id (db/get-active-EADS-id pid cid)
-        eads-id (or active-eads-id (ork/get-new-EADS pid))
+        eads-id (when-not active-eads-id (ork/get-new-EADS-id pid))
+
         eads-complete? (and eads-id (ork/EADS-complete? pid cid eads-id))
-        new-eads (when (or eads-complete? (<= budget 0))
-                   (ork/tell-ork (ork/conversation-history pid cid) ctx)
-                   (ork/get-new-EADS pid)) ; returns nil when exhausted.
-        new-cid (when new-eads
-                  (let [nspace (-> new-eads namespace keyword)]
+        new-eads-id (when (or eads-complete? (<= budget 0))
+                      (ork/get-new-EADS-id pid)) ; provides conversation, returns nil when exhausted.
+        new-cid (when new-eads-id
+                  (let [nspace (-> new-eads-id namespace keyword)]
                     (when (not= cid nspace) nspace)))]
     (when (<= budget 0)
-      (agent-log (str "[ork manager] (in ork-review) switching to new EADS instructions " new-eads" owing to budget constraint.")
+      (agent-log (str "[ork manager] (in ork-review) switching to new EADS instructions " new-eads-id "  owing to budget.")
                  {:console? true :level :warn}))
     (when new-cid
       (agent-log (str "[ork manager] (in ork-review) changing conversation to " new-cid ".")))
     (cond-> ctx
-      (and eads-complete? new-eads)             (assoc :new-eads new-eads)
-      (or (not @active?)
-          (and eads-complete? (not new-eads)))  (assoc :exhausted? true)
-      new-cid                                   (assoc :cid true))))
+      (not @active?)           (assoc :force-stop? true)
+      (not new-eads-id)        (assoc :exhausted? true)
+      new-eads-id              (assoc :new-eads-id new-eads-id)
+      new-cid                  (assoc :new-cid? true :old-cid cid :cid new-cid))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
@@ -568,23 +604,30 @@
   (assert (s/valid? ::cid cid))
   (reset! course-correction-count 0)
   (agent-log (str "============= resume-conversation: " pid  " " cid " ========================") {:console? true :level :debug})
-  (try
-    (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
-      (-> (conversation-history pid cid) (tell-interviewer ctx))
-      (loop [ctx ctx]
-        (let [{:keys [exhausted? new-eads cid] :as ctx} (ork-review ctx)]
-          (when-not exhausted?
-            (when new-eads (db/put-active-EADS-id pid cid new-eads))
-            ;(tell-interviewer ) ; <=============================================================================================================================================
-            (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
-                  expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
-                  iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND" :response expert-response} ctx)]
-              (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
-              (update-db-conversation! pid cid conversation)
-              (aux-ui-actions iviewr-response ctx)
-              (when-not exhausted?
-                (recur (clear-context-ephemeral ctx))))))))
-      (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+  (if (ready-for-discussion? pid cid)
+    (try
+      (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
+        (-> (conversation-history pid cid) (tell-interviewer ctx))
+        (loop [ctx ctx]
+          (let [{:keys [exhausted? force-stop? new-eads-id cid old-cid new-cid?] :as ctx} (ork-review ctx)]
+            (if (or exhausted? force-stop?)
+              (agent-log (str "resume-conversation exiting. ctx = " (with-out-str (pprint ctx))) {:console? true})
+              (do (when new-cid?
+                    (db/put-conversation-status! pid old-cid :eads-exhausted)
+                    (db/put-conversation-status! pid cid :in-progress))
+                  (when new-eads-id
+                    (db/put-active-EADS-id pid cid new-eads-id)
+                    (tell-interviewer (db/get-EADS-instructions new-eads-id) pid))
+                  (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
+                        expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
+                        iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND" :response expert-response} ctx)]
+                    (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
+                    (update-db-conversation! pid cid conversation)
+                    (post-ui-actions  iviewr-response ctx)  ; show graphs and tables, tell user to switch conv.
+                    (post-db-actions! iviewr-response ctx)) ; associate ds refinement with msg.
+                  (recur (clear-ctx-ephemeral ctx)))))))
+      (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))
+    (find-appropriate-conv-and-redirect ctx)))
 
 ;;; The equivalent for surrogates is start-surrogate. It also asks the first question.
 (defn start-conversation
@@ -597,6 +640,8 @@
                                  (db/conversation-intros :process))})
   (try
     (let [ctx (merge ctx {:responder-type :human
+                          ;; There is no need to subsequently clear :human-starting because we'll continue the
+                          ;; conversation with resume-conversation, which only gets pid and cid.
                           :human-starting? true
                           :question (ru/get-warm-up-q cid)})
           conversation (get-an-answer ctx) ; get-an-answer also used by q-and-a, but here we have the q.

@@ -6,8 +6,9 @@
    [scheduling-tbd.db                        :as db]
    [scheduling-tbd.interviewing.interviewers :as inv]
    [scheduling-tbd.interviewing.ork          :as ork]
-   [scheduling-tbd.sutil                     :as sutil]
-   [taoensso.telemere                         :as tel :refer [log!]]))
+   [scheduling-tbd.surrogate                 :as sur]
+   [scheduling-tbd.web.websockets            :as ws]
+   [taoensso.telemere                        :as tel :refer [log!]]))
 
 (defonce pid nil #_(db/create-proj-db! {:project/id :orch-test :project/name "orch-test"} {} {:force-this-name? true}))
 
@@ -15,6 +16,21 @@
   (if (some #(= % :plate-glass-ork) (db/list-projects))
     (ork/ensure-ork :plate-glass-ork)
     (log! :error "Project :plate-glass-ork doesn't exist. Most projects should work for this test; change it.")))
+
+(defn music-school
+  "Run a surrogate with special instructions (using start-surrogate+)."
+  []
+  (sur/start-surrogate+
+   {:client-id (ws/recent-client!)
+    :map-str (str {:pid :sur-music-school
+                   :pname "Music School"
+                   :sur-instructions (str "You run a music school. Until today you've been scheduling student lessons by fiddling with a spreadsheet.\n"
+                                          "But that is error-prone and time consuming. The problem is that you need to bring each student together with their instructor\n"
+                                          "in a room having the right equipment. (Only some practice rooms have pianos or drums.) Of course, instructors don't want\n"
+                                          "to come in to teach just one student. Most instructors would like to do a block of a few hours of lessons on days they come in.\n"
+                                          "Lessons are either 30 min, 45, or an hour.")
+                   :warm-up-response "Thanks! Yes, we run a music school and we'd like a system that helps us schedule use of our practice rooms with students and instructors."
+                   :expertise "running a music school"})}))
 
 (defn ^:diag check-ork-knowledge-of-eads
   []
@@ -26,8 +42,7 @@
       sutil/output-struct2clj))
 
 (defn tryme []
-  (let [ctx {:pid :plate-glass-ork
-
+  (let [ctx {:pid :plate-glass-ork}]))
 
 ;;; These are defined in the order they are used in exercising the orchestrator.
 (def ch-1 {:message-type "CONVERSATION-HISTORY",

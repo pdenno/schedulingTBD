@@ -128,7 +128,7 @@
   [{:keys [client-id pid question] :as obj}]
   (log! :info (str "SUR follow-up:" obj))
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
-        cid (db/get-current-cid pid)]
+        cid (db/get-active-cid pid)]
     (try (when-let [answer (adb/query-agent pid question {:asking-role :surrogate-follow-up})]
            (log! :info (str "SUR's answer:" answer))
            (when (string? answer)

@@ -63,6 +63,7 @@
                    :string "(scheduling-challenge :sur-plate-glass :process-variation)"}],
           :conversations
           [#:conversation{:id :process,
+                          :status :in-process
                           :interviewer-budget 0.8999999999999999,
                           :messages
                           [#:message{:content
@@ -98,23 +99,17 @@
                                      :id 5,
                                      :tags [:query],
                                      :time #inst "2025-04-28T18:04:31.681-00:00"}
-                           #:message{:answers-question 6,
-                                     :content
-                                     "\nDo all of your glass products, such as standard, tempered, laminated, and specialty glass, follow the same production process? If not, what differences exist in their production processes?",
-                                     :from :system,
-                                     :id 6,
-                                     :tags [:query],
-                                     :time #inst "2025-04-28T18:18:35.435-00:00"}
                            #:message{:EADS-data-structure
                                      "{:EADS-ref :process/scheduling-problem-type, :message-type :DATA-STRUCTURE-REFINEMENT, :data-structure {\"continuous?\" {\"comment\" \"Product flows are not continuous but progress in batches with varying duration depending on quality or additional processing.\", \"val\" false}, \"cyclical?\" {\"comment\" \"Not cyclical due to demand variability and customization of specialty products.\", \"val\" false}, \"problem-type\" {\"comment\" \"Processes for the products follow shared early steps but diverge based on product requirements, fitting the job-shop scheduling paradigm.\", \"val\" \"JOB-SHOP-SCHEDULING-PROBLEM\"}}, :commit-notes \"Refined the problem-type as JOB-SHOP-SCHEDULING-PROBLEM. Processes include shared early stages (melting, shaping, and annealing) and diverging later steps for different glass products. Production processes are not continuous and not cyclical based on interviewee inputs.\"}",
-                                     :answers-question 6,
+                                     :answers-question 5,
                                      :content
                                      "\nNo, not all of our glass products—standard, tempered, laminated, and specialty glass—follow the exact same production process. While there are common steps in the early stages of production, the processes diverge after the initial stages to meet the unique properties and performance standards of each product. Here's how they differ:\n\n---\n\n### <b>1. Standard Glass</b>:\n<b>Process</b>:\n- <b>Melting</b>: Raw materials (silica sand, soda ash, limestone, etc.) are melted at high temperatures to form molten glass.\n- <b>Shaping</b>: The molten glass is shaped into sheets using the float glass process, where it is floated on a bed of molten tin to create a flat, smooth surface.\n- <b>Annealing</b>: The glass is cooled slowly in a controlled manner to relieve internal stresses.\n- <b>Finishing</b>: The glass sheets are cut, polished, and inspected for defects.\n \n<b>Key Property</b>: Standard glass is relatively fragile and shatters into large, dangerous shards when broken.\n\n---\n\n### <b>2. Tempered Glass</b>:\n<b>Process</b>:\n- Tempered glass starts as <b>standard annealed glass</b>, which undergoes additional processing:\n  - <b>Reheating</b>: The annealed glass is reheated to a high temperature near its softening point (around 620°C/1,148°F).\n  - <b>Quenching</b>: The glass is rapidly cooled using high-pressure air jets. This creates compressive stress on the surface and tensile stress within the core, making it much stronger than standard glass.\n- <b>Finishing</b>: Because tempered glass cannot be cut or altered after tempering, it must be cut and shaped to its final size *before* tempering.\n\n<b>Key Properties</b>: Tempered glass is about 4-5 times stronger than standard glass and, when broken, shatters into small, rounded pieces, making it safer for applications like car windows, safety doors, and shower enclosures.\n\n---\n\n### <b>3. Laminated Glass</b>:\n<b>Process</b>:\n- Laminated glass is made by combining multiple layers of glass sheets with a plastic interlayer, typically polyvinyl butyral (PVB):\n  - <b>Melting and Shaping</b>: Glass is formed into sheets (using the float process) and annealed to create standard glass.\n  - <b>Layering with Interlayer</b>: Two or more sheets of glass are bonded with one or more interlayers. The materials are assembled and heated to adhere the layers together.\n  - <b>Pressing</b>: Pressure and heat are applied in an autoclave, a high-pressure oven, to seal the glass and interlayer into a single composite product.\n \n<b>Key Properties</b>: Laminated glass is extremely durable and resists shattering. If broken, the interlayer holds the fragments together, making it ideal for safety applications, soundproofing, and UV protection (e.g., car windshields and skylights).\n\n---\n\n### <b>4. Specialty Glass</b> (e.g., Tinted, Coated, Frosted, Insulated):\n<b>Process</b>:\n- The production process for specialty glass varies depending on its type and purpose. \n    - <b>Tinted Glass</b>: Color additives (metal oxides) are introduced into the molten glass during the melting stage to create a permanent color.\n    - <b>Coated Glass</b>: Thin coatings (e.g., reflective, low-emissivity, or mirror finishes) are applied to the surface of the glass after shaping and annealing.\n    - <b>Frosted Glass</b>: Acid etching or sandblasting is applied to the surface of annealed glass to diffuse light and create a frosted appearance.\n    - <b>Insulated Glass Units (IGUs)</b>: Two or more sheets of glass are separated by a spacer and sealed to create air or gas-filled insulating layers.\n\n<b>Key Properties</b>: Specialty glass can include features like thermal insulation, light control, aesthetic finishes, or UV resistance. Each type requires unique modifications in production.\n\n---\n\n### <b>Summary of Differences</b>:\n| **Step**               | **Standard Glass**   | **Tempered Glass**         | **Laminated Glass**      | <b>Specialty Glass</b>         |\n|-------------------------|----------------------|-----------------------------|---------------------------|-----------------------------|\n| <b>Base Glass</b>          | Produced directly   | Starts as standard glass    | Starts as standard glass  | Varies (usually standard)   |\n| <b>Annealing</b>           | Yes                 | Yes (before tempering)      | Yes                      | Optional                    |\n| <b>Thermal Treatment</b>   | No                  | Heating and quenching       | No                       | Optional (depending on type)|\n| <b>Layering</b>            | No                  | No                          | Bonded with interlayer    | No or Optional (e.g., IGUs) |\n| <b>Surface Treatment</b>   | No                  | No                          | No                       | Yes (e.g., coatings, etching)|\n\n---\n\n### <b>Conclusion</b>:\nWhile the production of standard glass involves the basic steps of melting, shaping, annealing, and finishing, tempered, laminated, and specialty glass include additional or altered steps to deliver enhanced properties such as strength, safety, durability, or aesthetic appeal. These differences make each type of glass suited to its specific application.",
                                      :from :surrogate,
-                                     :id 7,
+                                     :id 6,
                                      :tags [:response],
                                      :time #inst "2025-04-28T18:18:35.504-00:00"}]}
            #:conversation{:id :data,
+                          :status :not-started
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
@@ -124,6 +119,7 @@
                                      :tags [:conversation-intro],
                                      :time #inst "2025-03-05T15:06:37.184-00:00"}]}
            #:conversation{:id :resources,
+                          :status :not-started
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
@@ -133,6 +129,7 @@
                                      :tags [:conversation-intro],
                                      :time #inst "2025-03-05T15:06:37.184-00:00"}]}
            #:conversation{:id :optimality,
+                          :status :not-started
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
@@ -141,7 +138,7 @@
                                      :id 1,
                                      :tags [:conversation-intro],
                                      :time #inst "2025-03-05T15:06:37.184-00:00"}]}],
-          :current-conversation :process,
-          :id :plate-glass-ork-test-1,
+          :active-conversation :process,
+          :id :plate-glass-ork,
           :name "Plate Glass Ork"}
 ]

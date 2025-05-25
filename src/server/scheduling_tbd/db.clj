@@ -62,10 +62,7 @@
   {;; ------------------------------- EADS
    :EADS/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A unique ID for each EADS. Typically the namespace of the keyword is the cid, e.g. :process/flow-shop."}
-   :EADS/cid
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "A keyword naming a conversation, e.g. :process"}
+        :doc "A unique ID for each EADS. The namespace of the keyword is the cid, e.g. :process/flow-shop."}
    :EADS/msg-str
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "The stringified message object, it can be edn/read-string. It is the EDN version of the JSON in resources used by ork."}
@@ -150,10 +147,17 @@
         :doc "a number [0,1] expressing how strongly we believe the proposition ."}
 
    ;; ---------------------- conversation
-   :conversation/active-EADS
+   :conversation/active-EADS-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc (str "The id of the EADS in the system DB which is currently being pursued in this conversation.\n"
-                  "If the conversation doesn't have one, functions such as ork/active-EADS can make one using the project's orchestrator agent.")}
+        :doc (str "The id of the EADS instructions which is currently being pursued in this conversation.\n"
+                  "If the conversation doesn't have one, functions such as ork/get-EADS-id can make one using the project's orchestrator agent."
+                  "Though only one EADS can truely be active at a time, we index the active-EADS-id by [pid, cid] because other conversations "
+                  "could still need work.")}
+   :conversation/status
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc (str "A keyword that specifies the status of the conversation. Thus far, the only values are :eads-exhausted :in-progress, and "
+                  ":not-started. :in-progress only means that this conversation can be pursued further. For this conversation to be the one "
+                  "currently being pursued, it must also be the case that :project/active-conversation is this conversation.")}
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword uniquely identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
@@ -204,6 +208,10 @@
         :doc "The time at which the message was sent."}
 
    ;; ---------------------- project
+   :project/active-conversation
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc (str "The conversation most recently busy. Note that several conversations can still need work, and there can be an "
+                  ":conversation/active-EADS-id on several, however, this is the conversation to start if coming back to the project.")}
    :project/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "an agent (OpenAI Assistant, etc.) that outputs a vector of clojure maps in response to queries."}
@@ -213,9 +221,6 @@
    :project/conversations
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "The conversations of this project."}
-   :project/current-conversation
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The conversation most recently busy."}
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
@@ -228,7 +233,13 @@
    :project/ork-tid
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc (str "The thread-id of orchestrator agent.\n"
-                  "When this does not match the current ork-agent, the agent needs a more expansive CONVERSATION-HISTORY messagethe messages of the conversation.")}
+                  "When this does not match the current ork-agent, "
+                  "the agent needs a more expansive CONVERSATION-HISTORY message for the conversation.")}
+   :project/interviewer-tid ; ToDo: This hasn't been implemented yet, I think. The ork one has. See ork/get-new-EADS-id.
+      #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc (str "The thread-id of the current interviewer agent.\n"
+                  "When this does not match the current intervierwer agent tid, "
+                  "the agent needs a more expansive CONVERSATION-HISTORY message for the conversation.")}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
@@ -479,10 +490,10 @@
   (doseq [cid [:process :data :resources :optimality]]
     (add-msg  {:pid pid :cid cid :from :system :text (get conversation-intros cid) :tags [:conversation-intro]})))
 
-(defn get-current-cid
+(defn get-active-cid
   "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
   [pid]
-  (or (d/q '[:find ?cid . :where [_ :project/current-conversation ?cid]] @(connect-atm pid))
+  (or (d/q '[:find ?cid . :where [_ :project/active-conversation ?cid]] @(connect-atm pid))
       :process))
 
 (defn conversation-exists?
@@ -502,6 +513,29 @@
     (-> (resolve-db-id {:db/id eid} (connect-atm pid))
          (update :conversation/messages #(->> % (sort-by :message/id) vec)))
     {}))
+
+(defn get-conversation-status
+  "Returns a keyword indicating the status of the argument conversation.
+   If the conversation does not have a value for :conversation/status it returns nil."
+  [pid cid]
+  (if-let [eid (conversation-exists? pid cid)]
+    (if-let [status (d/q '[:find ?status .
+                           :in $ ?eid
+                           :where [?eid :conversation/status ?status]]
+                         @(connect-atm pid) eid)]
+      status
+      ;; ToDo: This can go away once old projects go away.
+      (do (log! :warn "Conversation status not set. Returning :not-started")
+          :not-started))
+  (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
+
+(defn put-conversation-status!
+  "Set the project' s:converation/status attribute to true."
+  [pid cid status]
+  (assert (#{:eads-exhausted :not-started :in-progress} status))
+  (if-let [eid (conversation-exists? pid cid)]
+    (d/transact (connect-atm pid) {:tx-data [[:db/add eid :conversation/status status]]})
+    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
 
 ;;; --------------------------------------- Messages ---------------------------------------------------------------------
 (defn max-msg-id
@@ -661,7 +695,6 @@
   (let [id (-> eads-instructions :EADS :EADS-id)
         [ns nam] ((juxt namespace name) id)
         db-obj {:EADS/id id
-                :EADS/cid (keyword ns)
                 :EADS/specs #:spec{:full (keyword nam "EADS-message")}
                 :EADS/msg-str (str eads-instructions)}
           conn (connect-atm :system)
@@ -738,6 +771,20 @@
 
 (s/def ::project-info (s/keys :req [:project/id :project/name]))
 
+(def conversation-defaults
+  [{:conversation/id :process
+    :conversation/status :in-progress ; <==================
+    :conversation/interviewer-budget 1.0}
+   {:conversation/id :data
+    :conversation/status :not-started
+    :conversation/interviewer-budget 1.0}
+   {:conversation/id :resources
+    :conversation/status :not-started
+    :conversation/interviewer-budget 1.0}
+   {:conversation/id :optimality
+    :conversation/status :not-started
+    :conversation/interviewer-budget 1.0}])
+
 ;;; (db/create-proj-db! {:project/id :test :project/name "Test Project"} {} {:force-this-name? true})
 (defn create-proj-db!
   "Create a project database for the argument project.
@@ -772,13 +819,10 @@
      (d/transact (connect-atm id) db-schema-proj)
      (d/transact (connect-atm id) {:tx-data [{:project/id id
                                               :project/name pname
-                                              :project/current-conversation :process
+                                              :project/active-conversation :process
                                               :project/claims [{:claim/string (str `(~'project-id ~id))}
                                                                {:claim/string (str `(~'project-name ~id ~pname))}]
-                                              :project/conversations [{:conversation/id :process :conversation/interviewer-budget 1.0}
-                                                                      {:conversation/id :data :conversation/interviewer-budget 1.0}
-                                                                      {:conversation/id :resources :conversation/interviewer-budget 1.0}
-                                                                      {:conversation/id :optimality :conversation/interviewer-budget 1.0}]}]})
+                                              :project/conversations conversation-defaults}]})
      (add-conversation-intros id)
      (when (not-empty additional-info)
        (d/transact (connect-atm id) additional-info))

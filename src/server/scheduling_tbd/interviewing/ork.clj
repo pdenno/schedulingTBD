@@ -166,14 +166,15 @@
     (agent-log (str "[ork manager] (receives response form ork) " (with-out-str (pprint res))))
     res))
 
-;(def eads-id? (-> (db/list-system-EADS) set))
-;(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
-;(s/def ::message-type #(= % "PURSUE-EADS"))
-;(s/def ::EADS-id eads-id?)
+(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
+(s/def ::message-type #(= % "PURSUE-EADS"))
+(def eads-id? (-> (db/list-system-EADS) set))
+(s/def ::EADS-id eads-id?)
 
-(defn get-new-EADS
+(defn get-new-EADS-id
   "Update the project's orchestrator with CONVERSATION-HISTORY and do a SUPPLY-EADS request to the ork.
-   If the ork returns {:message-type 'PURSUE-EDS', :EADS-id 'exhausted'} return nil to the caller."
+   If the ork returns {:message-type 'PURSUE-EDS', :EADS-id 'exhausted'} return nil to the caller,
+   otherwise, return the :EADS-id as a keyword."
   [pid]
   (let [ork (ensure-ork! pid)
         old-tid (d/q '[:find ?tid .
@@ -182,19 +183,12 @@
                        [?e :agent/thread-id ?tid]]
                      @(connect-atm pid))]
     (when-not (= old-tid (:tid ork))
-      (log! :warn "Project's ork thread has been updated; provide comprehensive history."))
+      (agent-log "Project's ork thread has been updated; provide comprehensive history."
+                 {:console? true :level :warn}))
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
-    ;;       'comprehensive history' probably covers all conversations.
     (tell-ork (conversation-history pid) {:ork-agent ork})
-    (let [eads (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})]
-      (if (s/valid? ::pursue-eads eads)
-        (if-let [eads-instructions (d/q '[:find ?msg-str .
-                                          :in $ ?eid-id
-                                          :where
-                                          [?e :EADS/id ?eid-id]
-                                          [?e :EADS/msg-str ?msg-str]]
-                                        @(connect-atm :system)
-                                        (-> eads :EADS-id keyword))]
-          (edn/read-string eads-instructions)
-          (log! :error (str "No EADS-instructions found for " eads)))
-        (log! :error (str "Invalid PURSUE-EADS message: " eads))))))
+    (let [eads-msg (-> (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})
+                       (update :EADS-id keyword))]
+      (if (s/valid? ::pursue-eads eads-msg)
+        (:EADS-id eads-msg)
+        (log! :error (str "Invalid PURSUE-EADS message: " eads-msg))))))

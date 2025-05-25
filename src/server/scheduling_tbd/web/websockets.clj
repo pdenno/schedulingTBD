@@ -93,7 +93,7 @@
 
 (defn ^:diag recent-client!
   "Return the client-id of the client that pinged most recently.
-   This should only used in development, I think!"
+   This should only used in development!"
   []
   (->> @ping-dates seq (sort-by second) reverse first first))
 

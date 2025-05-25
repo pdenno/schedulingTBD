@@ -39,7 +39,7 @@
    'adb    'scheduling-tbd.agent-db
    'core   'scheduling-tbd.core
    'db     'scheduling-tbd.db
-   'how    'scheduling-tbd.how-made
+   ;'how    'scheduling-tbd.how-made
    'llm    'scheduling-tbd.llm
    'llmt   'scheduling-tbd.llm-test
    'orm    'scheduling-tbd.interviewing.domain.data.orm
@@ -75,7 +75,11 @@
     (safe-alias a nspace)))
 
 (defn ^:diag ns-fix-setup!
-  "Remove all the namespace aliases from the argument namespace. Then you can recompile it."
+  "Remove all the namespace aliases from the argument namespace.
+   For example, when you get *Alias sutil already exists in namespace <messed-up-ns>, aliasing scheduling-tbd.sutil*
+   Do:
+       1) (repl/ns-fix-setup! '<messed-up-ns>), which removes all the aliases in <messed-up-ns>, and
+       2) Reestablish aliases in the namespace: compile the file, or, in the repl's ns, do (ns-setup!)."
   [ns-sym]
   (when-let [tns (find-ns ns-sym)]
     (binding [*ns* tns]
