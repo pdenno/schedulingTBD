@@ -3,10 +3,12 @@
   (:require
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
+   [clojure.java.io               :as io]
    [clojure.pprint                :refer [pprint]]
    [clojure.set                   :as set]
    [clojure.spec.alpha            :as s]
    [datahike.api                  :as d]
+   [mount.core                    :as mount :refer [defstate]]
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.interviewing.eads] ; for mount
@@ -17,16 +19,12 @@
 
 (defn ensure-ork!
   "Create a orchstrator using ordinary rules for shared-assistant agents.
-   This is typically called when the project starts. It updates :project/agents in the project DB."
-  [pid]
-  (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid}))
-
-(defn ^:diag ensure-ork-diag
-  "It is necessary to get a new orchestrartor thread for the project if you haven't changed the ork but want to start from scratch on the project."
-  [pid]
-  (adb/ensure-agent! {:base-type :orchestrator-agent
-                      :pid pid
-                      :make-thread? true}))
+   This is typically called when the project starts. It updates :project/agents in the project DB.
+   It is necessary to get a new orchestrartor thread for the project if you haven't changed the ork
+   but want to start from scratch on the project."
+  ([pid] (ensure-ork! pid {}))
+  ([pid opts]
+   (adb/ensure-agent! nil (merge {:pid pid :base-type :orchestrator-agent} opts))))
 
 ;;; ToDo: Find a better home for this.
 (def scheduling-challenge2-description
@@ -166,10 +164,10 @@
     (agent-log (str "[ork manager] (receives response form ork) " (with-out-str (pprint res))))
     res))
 
-(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
-(s/def ::message-type #(= % "PURSUE-EADS"))
-(def eads-id? (-> (db/list-system-EADS) set))
-(s/def ::EADS-id eads-id?)
+;(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
+;(s/def ::message-type #(= % "PURSUE-EADS"))
+;(def eads-id? (-> (db/list-system-EADS) set))
+;(s/def ::EADS-id eads-id?)
 
 (defn get-new-EADS-id
   "Update the project's orchestrator with CONVERSATION-HISTORY and do a SUPPLY-EADS request to the ork.
@@ -192,3 +190,19 @@
       (if (s/valid? ::pursue-eads eads-msg)
         (:EADS-id eads-msg)
         (log! :error (str "Invalid PURSUE-EADS message: " eads-msg))))))
+
+;;; ------------------------------- starting and stopping ---------------------------------
+(defn set-ork-vector-store
+  "Update the agent-infos :orchestrator-agent base type with EADS information from
+   resources/agentes/iviewers/EADS, which contains JSON files."
+  []
+  (let [files (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "agents/iviewrs/EADS/" %)))]
+    (reset! adb/agent-infos #(update-in % [:orchestrator-agent :vector-store-paths] into files)))
+  :ok)
+
+(defn init-ork!
+  []
+  (set-ork-vector-store))
+
+(defstate ork
+  :start (init-ork!))

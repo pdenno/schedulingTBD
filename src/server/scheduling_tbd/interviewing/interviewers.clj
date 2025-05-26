@@ -56,7 +56,7 @@
 (s/def ::base-type keyword?)
 (s/def :sur/responder-type #(= % :surrogate))
 (s/def :hum/responder-type #(= % :human))
-(s/def ::client-id string?)
+(s/def ::client-id (s/or :typical string? :debug #(= % :console)))
 (s/def ::question string?)
 
 ;;; Optional
@@ -570,7 +570,7 @@
          2) a change in interviewer, which occurs simply by changing :cid in the context; no initialization needed.
          3) a message to human interviewees to change conversations to what the ork wants to do,
          4) interviewing to stop (because ork conludes that no more eads-instructions apply, or forced by active? atom)."
-  [{:keys [pid cid] :as ctx}]
+  [{:keys [pid cid make-ork-thread?] :as ctx}]
   (ork/ensure-ork! pid)
   (let [budget (db/get-budget pid cid)
         active-eads-id (db/get-active-EADS-id pid cid)
@@ -623,7 +623,7 @@
                         iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND" :response expert-response} ctx)]
                     (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
                     (update-db-conversation! pid cid conversation)
-                    (post-ui-actions  iviewr-response ctx)  ; show graphs and tables, tell user to switch conv.
+                    (post-ui-actions  iviewr-response ctx)  ; show graphs and tables, tell humans to switch conv.
                     (post-db-actions! iviewr-response ctx)) ; associate ds refinement with msg.
                   (recur (clear-ctx-ephemeral ctx)))))))
       (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))

@@ -40,7 +40,7 @@
                                     :iviewr-says
                                     :update-code} x))
 
-(s/def ::client-id string?) ; ToDo: random-uuid once switch to transit.
+(s/def ::client-id (s/or :normal string? :debug #(= % :console))) ; ToDo: random-uuid once switch to transit.
 (s/def ::dispatch-key outbound-dispatch-key?)
 (s/def ::text (s/and string? #(not-empty %)))
 (s/def ::chat-msg-obj (s/and (s/keys :req-un [::client-id ::dispatch-key])

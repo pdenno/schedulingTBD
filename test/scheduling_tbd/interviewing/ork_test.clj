@@ -12,10 +12,12 @@
 
 (defonce pid nil #_(db/create-proj-db! {:project/id :orch-test :project/name "orch-test"} {} {:force-this-name? true}))
 
-(def ork
+#_(def ork
   (if (some #(= % :plate-glass-ork) (db/list-projects))
-    (ork/ensure-ork :plate-glass-ork)
+    (ork/ensure-ork! :plate-glass-ork)
     (log! :error "Project :plate-glass-ork doesn't exist. Most projects should work for this test; change it.")))
+
+(def ork nil)
 
 (defn music-school
   "Run a surrogate with special instructions (using start-surrogate+)."
@@ -32,7 +34,7 @@
                    :warm-up-response "Thanks! Yes, we run a music school and we'd like a system that helps us schedule use of our practice rooms with students and instructors."
                    :expertise "running a music school"})}))
 
-(defn ^:diag check-ork-knowledge-of-eads
+#_(defn ^:diag check-ork-knowledge-of-eads
   []
   (-> (adb/query-agent
        ork

@@ -60,7 +60,7 @@
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
         instructions (system-instruction expertise)]
     (agent-log (str "============= Start surrogate " pid " :process  ========================="))
-    (adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise})
+    ;(adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
     (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
     (try ;; Now do the warm-up question.
@@ -80,7 +80,7 @@
           (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
                               :q-type :process/warm-up
                               :cid :process}))
-        (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid pid)))
+        (adb/ensure-agent! nil {:base-type :orchestrator-agent :pid pid})
         ;; This will cause a resume-conversation, which will start with a conversation-history, so the interviewer should see the warm-up question.
         (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
                             :new-proj-map {:project/name pname :project/id pid}}))
@@ -106,8 +106,9 @@
   "This is like start-surrogate! but the call to it is provided with the project name, challenge descriptiion,
    and a map of all the warm-up stuff. This is especially useful for starting projects for test where the
    the default system-instruction (currently about production) doesn't fit the needs of the interviewees.
-   For example, you run a music school and you want to schedule music lessons with instructors, rooms, and students."
-  [{:keys [map-str client-id]}]
+   For example, you run a music school and you want to schedule music lessons with instructors, rooms, and students.
+   A new thread will be made for the orchestrator for the given pid."
+  [{:keys [map-str]}]
   (let [{:keys [pid pname sur-instructions warm-up-response expertise]} (edn/read-string map-str)]
     (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? true})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
@@ -118,9 +119,10 @@
           a-id (db/add-msg {:pid pid :cid :process :from :surrogate :tags [:response :warm-up] :text warm-up-response})]
       (db/update-msg pid :process a-id  {:message/answers-question q-id})
       (agent-log (str "============= Start surrogate+ " pid " :process  ========================="))
-      (adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string sur-instructions :surrogate? true :expertise expertise})
-      (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid pid)))
-      (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
+      ;(adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string sur-instructions :surrogate? true :expertise expertise})
+      (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
+      (inv/resume-conversation {:client-id :console :pid pid :cid :process :make-ork-thread? true})
+      #_(ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
                           :new-proj-map {:project/name pname :project/id pid}}))))
 
 (defn surrogate-follow-up

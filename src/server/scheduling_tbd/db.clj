@@ -230,6 +230,9 @@
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
+   :project/ork-aid
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "The orchestrator agent id (OpenAI notion)."}
    :project/ork-tid
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc (str "The thread-id of orchestrator agent.\n"
@@ -255,7 +258,7 @@
 (def db-schema-proj (-> db-schema-proj+  (merge db-schema-agent+) datahike-schema))
 (def project-schema-key? (-> db-schema-proj+ (merge db-schema-agent+) keys set))
 
-;;; ------------------------------------------------- projects and system db generally ----------------------
+;;; ------------------------------------------------- projects db generally ----------------------
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
    (the entity id of the map containing :project/id in the database named by the argumen project-id)."
@@ -370,7 +373,34 @@
                   :else         x))]
     (cpfs proj)))
 
-;;; ----------------------- Backup and recover project and system DB ---------------------
+;;; ------------------------------------------------- system db generally ----------------------
+
+(def system-agents
+  {:response-analysis-agent
+   {:base-type :response-analysis-agent
+    :agent-type :system
+    :instruction-path "agents/response-analysis-agent.txt"
+    :response-format-path "agents/response-analysis-format.edn"}
+
+   :scheduling-challenges-agent
+   {:base-type :scheduling-challenges-agent
+    :agent-type :system
+    :instruction-path "agents/scheduling-challenges.txt"
+    :response-format-path "agents/scheduling-challenges-response-format.edn"}
+
+   :text-to-var
+   {:base-type :text-to-var
+    :agent-type :system
+    :model-class :mini
+    :response-format-path "agents/text-to-var-response-format.edn"
+    :instruction-path "agents/text-to-var.txt"}
+
+   :text-function-agent
+   {:base-type :text-function-agent
+    :agent-type :system
+    :instruction-path "agents/text-function-agent.txt"}})
+
+
 (defn backup-proj-db
   [id & {:keys [target-dir clean?] :or {target-dir "data/projects/" clean? true}}]
   (let [filename (str target-dir (name id) ".edn")

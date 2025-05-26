@@ -74,9 +74,11 @@
   (doseq [[a nspace] alias-map]
     (safe-alias a nspace)))
 
+;;; See also https://github.com/clojure/tools.namespace?tab=readme-ov-file#warnings-for-aliases
 (defn ^:diag ns-fix-setup!
   "Remove all the namespace aliases from the argument namespace.
    For example, when you get *Alias sutil already exists in namespace <messed-up-ns>, aliasing scheduling-tbd.sutil*
+   Don't: Use this on the user namespace. <======================????
    Do:
        1) (repl/ns-fix-setup! '<messed-up-ns>), which removes all the aliases in <messed-up-ns>, and
        2) Reestablish aliases in the namespace: compile the file, or, in the repl's ns, do (ns-setup!)."

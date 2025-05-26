@@ -7,7 +7,7 @@
    [clojure.string]
    [clojure.spec.alpha :as s]
    [clojure.tools.namespace.repl :as tools-ns :refer [disable-reload! refresh clear set-refresh-dirs]]
-   [develop.repl :refer [ns-setup!]] ; for use at REPL.
+   [develop.repl :refer [ns-setup! ns-fix-setup!]] ; for use at REPL.
    [develop.dutil]
    [expound.alpha :as expound]
    [mount.core :as mount]
