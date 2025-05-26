@@ -11,7 +11,6 @@
    [datahike.api            :as d]
    [datahike.pull-api       :as dp]
    [mount.core              :as mount :refer [defstate]]
-   [scheduling-tbd.db       :as db]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm default-llm-provider]]
    [scheduling-tbd.util     :as util]
@@ -96,10 +95,7 @@
   (reduce-kv (fn [m k v]
                (cond (= k :agent/assistant-id)         (assoc m :aid v)
                      (= k :agent/thread-id)            (assoc m :tid v)
-                     (= k :agent/base-type)            (assoc m :base-type v)
-                     (= k :agent/expertise)            (assoc m :expertise v)
-                     (= k :agent/surrogate?)           (assoc m :surrogate? true)
-                     :else m))
+                     :else                             (assoc m (-> k name keyword) v)))
              {}
              agent))
 
@@ -128,7 +124,12 @@
          true                               (dissoc :db/id)
          (-> agent :agent/timestamp not)    (assoc :agent/timestamp #inst "2024-12-08T16:12:48.505-00:00"))))))
 
-(def agent-db-info? (->> db/db-schema-agent+ keys (filter #(= "agent" (namespace %))) set))
+(def agent-db-info?
+  "I don't want to :require db.clj because it needs system-agents.clj, which uses agent-db.clj, so this list
+   will have to be updated by hand."
+  #{:agent/agent-type :agent/assistant-id :agent/base-type :agent/expertise :agent/id :agent/instruction-path
+    :agent/llm-provider :agent/model-class :agent/response-format-path :agent/surrogate? :agent/system-instruction
+    :agent/thread-id :agent/timestamp :agent/tools :agent/vector-store-paths})
 
 (defn put-agent!
   "Add the agent to one or more DBs."
@@ -153,7 +154,7 @@
            response-format-path vector-store-paths tools]
     :or {llm-provider @default-llm-provider
          model-class :gpt} :as agent-info}]
-  (log! :info (str "Creating agent: " base-type))
+  ;(log! :info (str "Creating agent: " base-type))
   (s/valid? ::agent-info agent-info)
   (let [user (-> (System/getenv) (get "USER"))
         a-name (-> base-type name (str "-" (name llm-provider)) keyword)
@@ -277,8 +278,8 @@
 (defn agent-status-basic
   "Find the agent status information for :project and :system agents."
   [{:keys [base-type llm-provider pid]
-    :or {llm-provider @default-llm-provider} :as agent-info}]
-  (let [files-modify-date (newest-file-modification-date agent-info)
+    :or {llm-provider @default-llm-provider} :as agent}]
+  (let [files-modify-date (newest-file-modification-date agent)
         conn-atm (if pid (connect-atm pid) (connect-atm :system))
         eid (agent-eid base-type llm-provider conn-atm)
         {:agent/keys [timestamp assistant-id thread-id]} (when eid (dp/pull @conn-atm '[*] eid))
@@ -292,7 +293,7 @@
         missing-provider (cond-> #{}
                            (not provider-aid?)            (conj :assistant)
                            (and pid (not provider-tid?))  (conj :thread))
-        status (cond-> agent-info ; {:base-type base-type, :agent-type agent-type}
+        status (cond-> agent ; {:base-type base-type, :agent-type agent-type}
                  files-modify-date                      (assoc :files-data files-modify-date)
                  timestamp                              (assoc :agent-date timestamp)
                  outdated?                              (assoc :outdated? true)
@@ -323,11 +324,12 @@
       :agent-date -- if not missing?, the timepoint (Instant) when the agent was created.}
 
    :agent-date is not provided if the agent is not present in the any database we maintain."
-  [agent-info]
-  (let [{:keys [agent-type] :as info} (merge-with-agent-info-atom agent-info)]
-    (case agent-type
-      (:system :project) (agent-status-basic info)
-      :shared-assistant  (agent-status-shared-assistant info))))
+  [id]
+  (s/assert ::agent-id id)
+  (let [agent (-> id get-agent agent-db2proj)]
+    (case (:agent-type agent)
+      (:system :project) (agent-status-basic agent)
+      :shared-assistant  (agent-status-shared-assistant agent))))
 
 (defn make-agent-thread
   "Return a tid for the argument agent, which must have an assisatnt-id.
@@ -362,14 +364,15 @@
   ([id] (ensure-agent! id {}))
   ([id opts]
    (s/assert ::agent-id id)
-   (let [{:keys [make-agent? make-thread? substitute-aid] :as info} (merge (get-agent id) opts)
+   (let [needs (agent-status id)
+         {:keys [make-agent? make-thread? substitute-aid]} (merge needs opts)
+         agent (-> id get-agent agent-db2proj)
          agent (if make-agent?
-                 (make-agent-assistant info) ; Returns agent in DB attributes.
-                 (get-agent info))           ; Returns agent in DB attributes.
-         agent  (merge info agent)           ; Gets pid, at least.
+                 (make-agent-assistant agent) ; Returns agent in DB attributes.
+                 (get-agent id))              ; Returns agent in DB attributes.
          agent  (cond-> agent
                   substitute-aid   (assoc :agent/assistant-id substitute-aid)
-                  make-thread?     (assoc :agent/thread-id (make-agent-thread info)))]
+                  make-thread?     (assoc :agent/thread-id (make-agent-thread agent)))]
      (put-agent! agent)
      (agent-db2proj agent))))
 

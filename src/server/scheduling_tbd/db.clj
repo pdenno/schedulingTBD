@@ -35,12 +35,18 @@
    :agent/expertise
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a description of what the agent is good at (used in surrogates, at least)."}
+   :agent/instruction-path
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "as it is used by OpenAI circa 2025."}
    :agent/llm-provider
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "Currently either :openai or :azure."}
    :agent/model-class
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "One of the classes of LLM model defined in the system. See llm.clj."}
+   :agent/response-format-path
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "as it is used by OpenAI circa 2025."}
    :agent/surrogate?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "True if the agent is a human surrogate."}
@@ -52,7 +58,13 @@
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
    :agent/timestamp
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "The time at which the agent was created."}})
+        :doc "The time at which the agent was created."}
+   :agent/tools
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "as it is used by OpenAI circa 2025."}
+   :agent/vector-store-paths
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
+        :doc "as it is used by OpenAI circa 2025."}})
 
 (def db-schema-sys+
   "Defines content that manages project DBs and their analysis including:
@@ -372,34 +384,6 @@
                   (vector? x)   (->> (mapv cpfs x) (remove nil?) vec)
                   :else         x))]
     (cpfs proj)))
-
-;;; ------------------------------------------------- system db generally ----------------------
-
-(def system-agents
-  {:response-analysis-agent
-   {:base-type :response-analysis-agent
-    :agent-type :system
-    :instruction-path "agents/response-analysis-agent.txt"
-    :response-format-path "agents/response-analysis-format.edn"}
-
-   :scheduling-challenges-agent
-   {:base-type :scheduling-challenges-agent
-    :agent-type :system
-    :instruction-path "agents/scheduling-challenges.txt"
-    :response-format-path "agents/scheduling-challenges-response-format.edn"}
-
-   :text-to-var
-   {:base-type :text-to-var
-    :agent-type :system
-    :model-class :mini
-    :response-format-path "agents/text-to-var-response-format.edn"
-    :instruction-path "agents/text-to-var.txt"}
-
-   :text-function-agent
-   {:base-type :text-function-agent
-    :agent-type :system
-    :instruction-path "agents/text-function-agent.txt"}})
-
 
 (defn backup-proj-db
   [id & {:keys [target-dir clean?] :or {target-dir "data/projects/" clean? true}}]

@@ -61,6 +61,7 @@
    'sutil  'scheduling-tbd.sutil
    'sur    'scheduling-tbd.surrogate
    'surt   'scheduling-tbd.surrogate-test
+   'sa     'scheduling-tbd.system-agents
    'util   'scheduling-tbd.util
    'resp   'scheduling-tbd.web.controllers.respond
    'ws     'scheduling-tbd.web.websockets

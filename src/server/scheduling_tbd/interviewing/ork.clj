@@ -3,12 +3,10 @@
   (:require
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
-   [clojure.java.io               :as io]
    [clojure.pprint                :refer [pprint]]
    [clojure.set                   :as set]
    [clojure.spec.alpha            :as s]
    [datahike.api                  :as d]
-   [mount.core                    :as mount :refer [defstate]]
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.interviewing.eads] ; for mount
@@ -190,19 +188,3 @@
       (if (s/valid? ::pursue-eads eads-msg)
         (:EADS-id eads-msg)
         (log! :error (str "Invalid PURSUE-EADS message: " eads-msg))))))
-
-;;; ------------------------------- starting and stopping ---------------------------------
-(defn set-ork-vector-store
-  "Update the agent-infos :orchestrator-agent base type with EADS information from
-   resources/agentes/iviewers/EADS, which contains JSON files."
-  []
-  (let [files (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "agents/iviewrs/EADS/" %)))]
-    (reset! adb/agent-infos #(update-in % [:orchestrator-agent :vector-store-paths] into files)))
-  :ok)
-
-(defn init-ork!
-  []
-  (set-ork-vector-store))
-
-(defstate ork
-  :start (init-ork!))
