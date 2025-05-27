@@ -104,15 +104,14 @@
                                                                   :client-id "2f30f002-37b7-4dd1-bc01-5484273012f0"}}))
 
 (s/def ::conv (s/coll-of map?))
-(s/def ::code string?)
 (s/def ::mzn-output string?)
-(s/def ::get-conversation-response (s/keys :req-un [::project-id ::project-name ::conv] :opt-un [::code ::cid]))
+(s/def ::get-conversation-response (s/keys :req-un [::project-id ::project-name ::conv ::cid]))
 (s/def ::project-id (st/spec {:spec #(or (string? %) (keyword? %))
                               :name "project-id"
                               :description "A kebab-case string (will be keywordized) unique to the system DB identifying a project."
                               :json-schema/default "sur-craft-beer"}))
 
-(s/def ::project-name (st/spec {:spec string?
+#_(s/def ::project-name (st/spec {:spec string?
                               :name "project-name"
                               :description "The name of a project."
                               :json-schema/default "sur-craft-beer"}))
@@ -237,7 +236,7 @@
    (ring/create-default-handler)))
 
 (defn handler-init []
-  (log! :info "Updating handler.")
+  (log! :info "Updating http handler routes.")
   (let [site-config (-> "system.edn" io/resource slurp edn/read-string :dev :handler/ring)
         s ^String (:cookie-secret site-config)
         cookie-store (cookie/cookie-store {:key (.getBytes s)})

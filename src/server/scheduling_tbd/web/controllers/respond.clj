@@ -14,21 +14,21 @@
 
 ;;; (resp/get-conversation {:query-params {:project-id "sur-craft-beer"}})
 
+;;; I've replaced this with db/ws-get-conversation, but I'm leaving this and its reference in handler.clj around while evaluate the alternative.
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
-   get-conversation always returns the conversation corresponding to :project/current-converation in the project's DB.
+   get-conversation always returns the conversation corresponding to :project/active-conversation in the project's DB.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
-   Note that this can CHANGE :project/current-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
+   Note that this can CHANGE :project/active-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
   [request]
   (let [{:keys [project-id cid client-id]}  (-> request :query-params (update-keys keyword))
         pid (keyword project-id)
-        cid (if cid (keyword cid) (db/get-current-cid pid))]
+        cid (if cid (keyword cid) (db/get-active-cid pid))]
     (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
     (let [eid (db/project-exists? pid)
           pname (db/get-project-name pid)
-          msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) []) ; ToDo: Trim some of conversation?
-          code (if eid (db/get-code pid) "")]
-      (http/ok {:project-id pid :project-name pname :conv msgs :cid cid :code code}))))
+          msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) [])] ; ToDo: Trim some of conversation?
+      (http/ok {:project-id pid :project-name pname :conv msgs :cid cid}))))
 
 (defn list-projects
     "Return a map containing :current-project, :cid, and :others, which is a sorted list of every other project in the system DB.
@@ -40,7 +40,7 @@
                            :keep-set #{:project/name :project/id :project/surrogate?}))]
     (let [proj-infos (mapv resolve-proj-info (db/list-projects))
           {:project/keys [id] :as current} (db/default-project)
-          cid (or (db/get-current-cid id) :process)
+          cid (or (db/get-active-cid id) :process)
           others (filterv #(not= % current) proj-infos)]
       (http/ok
        (cond-> {:current-project current, :cid cid}

@@ -104,6 +104,7 @@
   "Using an HTTP GET, get the conversation, and also the code, if any."
   ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
   ([pid cid]
+   (log! :info (str "chat/get-conversation: pid = " pid " cid = " cid))
    (-> (dba/get-conversation-http pid cid)
        (p/catch (fn [e] (log! :error (str "get-conversation failed: " e))))
        (p/then (fn [{:keys [conv cid code]}]
@@ -158,10 +159,13 @@
               (when (not-empty text)
                 (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)
                       [surrogate? product] (re-matches #"\s*SUR:(.*)" text)
+                      [sur+ map-str]       (re-matches #"\s*SUR\+:(.*)" text)
                       [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" text)
                       msg (cond  ask-llm?       {:dispatch-key :ask-llm :question question}
                                  surrogate?     {:dispatch-key :start-surrogate :product product}
+                                 sur+           {:dispatch-key :start-surrogate+ :map-str map-str} ; like :start-surrogate, but provide a map of stuff.
                                  sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:pid @common-info) :question q}
+
                                  :else          {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
                   ;; ToDo: Human-interjected questions, though some of them are stored, don't store the human-interjected annotation.
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.

@@ -54,7 +54,7 @@
                   :timestamp #inst "2024-12-05T21:39:38.200-00:00"}
           #:agent{:base-type :process-interview-agent,
                   :agent-type :shared-assistant,
-                  :thread-id "thread_drXA8991LyXRv7KQHYqurPe2",
+                  :thread-id "thread_Y6gpVnVwxlwZT3ZtMQb2rL8K",
                   :model-class :gpt,
                   :llm-provider :openai,
                   :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
@@ -112,13 +112,14 @@
                   :assistant-id "asst_jD6xz9YjfzqeDWnZAKTJgZvX",
                   :id :text-to-var-openai,
                   :timestamp #inst "2025-02-21T13:19:00.143-00:00"}
-          #:agent{:agent-type :shared-assistant,
-                  :assistant-id "asst_nPIdvlmvxiuVDVQGHTYOfdhc",
-                  :base-type :orchestrator-agent,
-                  :id :orchestrator-agent-openai,
-                  :llm-provider :openai,
+          #:agent{:base-type :orchestrator-agent,
+                  :agent-type :shared-assistant,
+                  :thread-id "thread_tva3Ui80mSstem032NLGNQgy",
                   :model-class :gpt,
-                  :timestamp #inst "2025-04-23T17:38:29.773-00:00"}],
+                  :llm-provider :openai,
+                  :assistant-id "asst_6VQhN6C2nf4rFQlZEIciqTJY",
+                  :id :orchestrator-agent-openai,
+                  :timestamp #inst "2025-04-28T18:13:02.195-00:00"}],
          :default-project-id :blank-project,
          :name "SYSTEM",
          :projects
@@ -227,9 +228,35 @@
                     :id :sur-plate-glass,
                     :name "SUR Plate Glass"}
           #:project{:dir
-                     "/opt/scheduling/projects/sur-plate-glass/db/"
+                    "/opt/scheduling/projects/sur-commemorative-coins/db/",
+                    :id :sur-commemorative-coins,
+                    :name "SUR Commemorative Coins"}
+          #:project{:dir
+                    "/opt/scheduling/projects/sur-music-school/db/",
+                    :id :sur-music-school,
+                    :name "Music School"}
+          #:project{:dir 
+                    "/opt/scheduling/projects/test-me/db/",
+                    :id :test-me,
+                    :name "Test me"}
+          #:project{:dir 
+                    "/opt/scheduling/projects/sur-plate-glass/db/"
                     :id :sur-foam-earplugs
-                    :name "SUR Foam Earplugs"}]}
+                    :name "SUR Foam Earplugs"}]}]}
+
+#:spec{:full :flow-shop/EADS-message}
+
+#:spec{:full :scheduling-problem-type/EADS-message}
+
+#:spec{:full :job-shop/EADS-message}
+
+#:spec{:full :job-shop--classifiable/EADS-message}
+
+#:spec{:full :timetabling/EADS-message}
+
+#:spec{:full :job-shop--unique/EADS-message}
+
+#:spec{:full :orm/EADS-message}
 
 #:spec{:full :flow-shop/EADS-message}
 
@@ -280,5 +307,35 @@
 #:spec{:full :timetabling/EADS-message}
 
 #:spec{:full :timetabling/EADS-message}
+
+#:spec{:full :flow-shop/EADS-message}
+
+#:spec{:full :job-shop/EADS-message}
+
+#:spec{:full :job-shop--classifiable/EADS-message}
+
+#:spec{:full :job-shop--unique/EADS-message}
+
+#:spec{:full :scheduling-problem-type/EADS-message}
+
+#:spec{:full :timetabling/EADS-message}
+
+#:spec{:full :scheduling-problem-type/EADS-message}
+
+#:spec{:full :job-shop--classifiable/EADS-message}
+
+#:spec{:full :flow-shop/EADS-message}
+
+#:spec{:full :job-shop--unique/EADS-message}
+
+#:spec{:full :timetabling/EADS-message}
+
+#:spec{:full :job-shop/EADS-message}
+
+#:spec{:full :orm/EADS-message}
+
+#:spec{:full :job-shop--unique/EADS-message}
+
+#:spec{:full :job-shop--unique/EADS-message}
 
 ]

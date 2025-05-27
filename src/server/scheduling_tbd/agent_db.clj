@@ -11,17 +11,25 @@
    [datahike.api            :as d]
    [datahike.pull-api       :as dp]
    [mount.core              :as mount :refer [defstate]]
-   [scheduling-tbd.db       :as db]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm default-llm-provider]]
    [scheduling-tbd.util     :as util]
    [taoensso.telemere       :as tel :refer [log!]]
    [wkok.openai-clojure.api :as openai]))
 
-;;; Much of the code here relies on agent-infos, a "database on an atom" that describes agent types. (See Clojure specs below.)
-;;; Where agent-type is :system, the values for agent-info are obtained from a .edn file on startup.
-;;; Also at startup, extant projects are scanned for surrogates, which are also added to the atom DB.
-;;; More entries can be made at run-time, for example, when a surrogate is created.
+;;; There are three types of agents (:agent-type):
+;;;   1) :system :  The agent and a single thread is shared by all projects
+;;;       -- It is entirely stored in the system db. Examples: response-analysis-agent, text-to-var.
+;;;   2) :project : It is the exclusive property of a project, such as the surrogate expert (only example, so far):
+;;;       -- It is entirely stored in the project. The base-type is the pid.
+;;;   3) :shared-assistant : All such agents use the same assistant (thus same instructions) but have a thread defined in the project.
+;;;       -- Thus :system DB has all agent information but the tid; the project DB has the same plus the tid.
+;;;          Examples: the interviewers.
+;;; If agent-type is :system, the information maintained for the agent is found in the the system DB.
+;;; If agent-type is :project, the information maintained for the agent is found in the the project DB.
+
+(s/def ::agent-id (s/or :system keyword? :project ::agent-id-map))
+(s/def ::agent-id-map (s/keys :req-un [::pid ::base-type]))
 
 ;;; Throughout the project:
 ;;;   pid = project-id, a keyword
@@ -29,19 +37,18 @@
 ;;;   aid = llm-provider's assistant-id, a string.
 ;;;   tid = llm-provider's thread-id, a string.
 
-;;; There are three types of agents (:agent-type):
-;;;   1) :system :  The agent and a single thread is shared by all projects
-;;;       -- It is entirely stored in the system db.
-;;;   2) :project : It is the exclusive property of a project, such as the surrogate expert (only example, so far):
-;;;       -- It is entirely stored in the project. The base-type is the pid.
-;;;   3) :shared-assistant : All such agents use the same assistant (thus same instructions) but have a thread defined in the project.
-;;;       -- Thus :system DB has all agent information but the tid; the project DB has the same plus the tid.
-
 ;;; Updating agents is a bit tricky. Obviously, if the llm-provider no longer possesses the assistant or thread
 ;;; a new agent needs to be created. New agents are also created for :system agent-type when the instructions
 ;;; files from which vector stores are created are updated. By default, outdated files is not sufficient reason
 ;;; to recreate :shared-assistant agents; if the assistant and thread still exist, it reflects an investment in
-;;; context that we don't want to lose.
+;;; context that we don't want to lose. This all goes out the window in 2026, when OpeanAI stops supporting threads.
+;;; Use of shared-assistants should probably go away, because threads and maybe even agent ids is going away.
+
+;;; ToDo: Given our desire to use LLMs other than just OpenAI/Azure, I think we should start using project agents everywhere.
+;;; Further, we probably will be using techniques like "conversation-history" and inserting instructions with each call
+;;; to meet the requirements of Anthropic-style interaction. Maybe as a step towards this, we'd make conversation-history an method.
+;;; The idea being that we'd call a conversation-history for surrogates, orchestrators, and interviewers, each of which would
+;;; pull different things out of the project DB.
 
 (def ^:diag diag (atom nil))
 
@@ -56,61 +63,31 @@
 (s/def ::tools (s/and vector? (s/coll-of ::tool)))
 (s/def ::tool (s/keys :req-un [::type]))
 (s/def ::vector-store-paths (s/coll-of string?))
+(s/def ::pid keyword?)
 
-(s/def ::agent-info-decl ; This is for checking what is on the agent-infos atom; they won't have PIDs.
+(s/def ::agent-info-base ; no PID
   (s/and (s/keys :req-un [::base-type ::agent-type]
                  :opt-un [::instruction-path ::instruction-string ::response-format-path ::llm-provider ::model-class
-                          ::tools ::tool-resources ::vector-store-paths ::expertise ::surrogate?])
-         (s/or  :system           (s/and #(= (:agent-type %) :system)  #(not (:surrogate? %)))
-                :project          #(= (:agent-type %) :project)
-                :shared-assistant #(= (:agent-type %) :shared-assistant))))
+                          ::tools ::tool-resources ::vector-store-paths ::expertise ::surrogate?])))
 
-;;; ToDo: Fix this!
-(s/def ::agent-info (s/and ::agent-info-decl
-                           #_(s/or  :system          #(= (:agent-type %) :system)
-                                    :project          (s/and #(= (:agent-type %) :project)          #(-> % :pid keyword?))
-                                    :shared-assistant (s/and #(= (:agent-type %) :shared-assistant) #(-> % :pid keyword?)))))
-(defn init-agent-infos
-  "Read the agent-infos file and complete it by:
-     1) updating the ork's vector-store to include all the EADS instructions used by interviewers."
-  []
-  (let [infos (reduce (fn [res info] (assoc res (:base-type info) info))
-                      {}
-                      (-> "agents/agent-infos.edn" io/resource slurp edn/read-string))
-        eads-json-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/"))
-        files (->> (.list (io/file eads-json-dir)) (map #(str eads-json-dir %)))]
-    (update-in infos [:orchestrator-agent :vector-store] into files)))
+(s/def ::agent-info (s/and ::agent-info-base
+                           (s/or  :system          #(= (:agent-type %) :system)
+                                  :project          (s/and #(= (:agent-type %) :project)          (s/keys :req-un [::pid]))
+                                  :shared-assistant (s/and #(= (:agent-type %) :shared-assistant) (s/keys :req-un [::pid])))))
 
-;;; Agent-infos (after processing the EDN file) is a map indexed by base-type of maps describing the agent,
-;;; including vector-store, agent-type, and LLM used.
-;;; It gets lots more entries from surrogates projects.
-(defonce agent-infos (atom (init-agent-infos)))
+(def agent-infos
+  "Used to keep information needed to create system agents and orchestrator agents.
+   See resources/agents/agent-infos.edn"
+  (atom nil))
 
 (defn agent-log
   "Log info-string to agent log"
-  [& args]
-  (let [date (str (java.util.Date.))]
-    (tel/with-kind-filter {:allow :agents}
-      (tel/signal!
-       {:kind :agents, :level :info, :msg (str "===== " date " " (apply str args))}))))
-
-(defn check-agent-infos
-  "Do s/valid? on ::agent-info-decl, an ::agent-info sans pid."
-  []
-  (doseq [[base-type info] (seq @agent-infos)]
-    (when-not (s/valid? ::agent-info-decl info)
-      (log! :error (str base-type " is not a valid agent-info:\n" (with-out-str (pprint info)))))))
-
-(defn put-agent-info!
-  "Add an agent info at the given base-type."
-  [base-type {:keys [surrogate? agent-type] :as info}]
-  (assert (#{:system :project :shared-assistant} agent-type))
-  (assert (keyword? base-type))
-  (let [info (cond-> (assoc info :base-type base-type)
-               surrogate? (assoc :pid base-type))]
-    (if (s/valid? ::agent-info info)
-      (swap! agent-infos #(assoc % base-type info))
-      (log! :error (str "Invalid agent-info: " info)))))
+  ([msg-text] (agent-log msg-text {}))
+  ([msg-text {:keys [console? level] :or {level :info}}]
+   (tel/with-kind-filter {:allow :agents}
+     (tel/signal!
+      {:kind :agents, :level :info, :msg msg-text}))
+   (when console? (log! level msg-text))))
 
 (defn agent-db2proj
   "Return a map of agent info translated to project attributes (aid, tid, base-type, expertise, surrogate?)."
@@ -118,10 +95,7 @@
   (reduce-kv (fn [m k v]
                (cond (= k :agent/assistant-id)         (assoc m :aid v)
                      (= k :agent/thread-id)            (assoc m :tid v)
-                     (= k :agent/base-type)            (assoc m :base-type v)
-                     (= k :agent/expertise)            (assoc m :expertise v)
-                     (= k :agent/surrogate?)           (assoc m :surrogate? true)
-                     :else m))
+                     :else                             (assoc m (-> k name keyword) v)))
              {}
              agent))
 
@@ -135,36 +109,27 @@
          [?e :agent/llm-provider ?llm-provider]]
        @conn-atm base-type llm-provider))
 
-(defn enrich-agent-info
-  "Calls to agent-status and put-agent! need the info argument to qualify as s/valid? ::agent-info.
-   Calls to ensure-agent! do not. This adds information from the agent-info, which must be in adb.agent-infos."
-  [{:keys [base-type] :as info}]
-  (assert base-type)
-  (let [more-info (get @agent-infos base-type)]
-    (when-not more-info
-      (throw (ex-info "Unknown agent base-type:" {:base-type base-type})))
-    (let [info (merge more-info info)
-          res (cond-> info
-                (:surrogate? info)   (assoc :pid base-type))]
-      (s/assert ::agent-info res)
-      res)))
-
 (defn get-agent
-  "Return the agent map in db attributes. If there is no eid, even though the pid is provided,
-   then it pulls from the system DB, if it is not there also, then it returns nil."
-  [{:keys [pid] :as agent-info}]
-  (let [{:keys [base-type llm-provider]
-         :or {llm-provider @default-llm-provider}} (enrich-agent-info agent-info)
-        eid (and pid (agent-eid base-type llm-provider (connect-atm pid)))
-        agent (or (and eid (not-empty (dp/pull @(connect-atm pid) '[*] eid)))
-                  (when-let [eid (agent-eid base-type llm-provider (connect-atm :system))]
-                    (dp/pull @(connect-atm :system) '[*] eid)))]
-      (when agent ; ToDo: This should probably be temporary, while migrating to projects with timestamps.
-        (cond-> agent
-          true                               (dissoc :db/id)
-          (-> agent :agent/timestamp not)    (assoc :agent/timestamp #inst "2024-12-08T16:12:48.505-00:00")))))
+  "Return the agent map in db attributes. Returns nil if it doesn't exist."
+  ([id] (get-agent id {}))
+  ([id {:keys [llm-provider] :or {llm-provider @default-llm-provider} :as opts}]
+   (s/valid? ::agent-id id)
+   (let [agent (if (keyword? id)
+                 (when-let [eid (agent-eid id llm-provider (connect-atm :system))]
+                   (dp/pull @(connect-atm :system) '[*] eid))
+                 (when-let [eid (agent-eid (:base-type id) llm-provider (connect-atm (:pid id)))]
+                   (dp/pull @(connect-atm (:pid id)) '[*] eid)))]
+     (when agent ; ToDo: This should probably be temporary, while migrating to projects with timestamps.
+       (cond-> agent
+         true                               (dissoc :db/id)
+         (-> agent :agent/timestamp not)    (assoc :agent/timestamp #inst "2024-12-08T16:12:48.505-00:00"))))))
 
-(def agent-db-info? (->> db/db-schema-agent+ keys (filter #(= "agent" (namespace %))) set))
+(def agent-db-info?
+  "I don't want to :require db.clj because it needs system-agents.clj, which uses agent-db.clj, so this list
+   will have to be updated by hand."
+  #{:agent/agent-type :agent/assistant-id :agent/base-type :agent/expertise :agent/id :agent/instruction-path
+    :agent/llm-provider :agent/model-class :agent/response-format-path :agent/surrogate? :agent/system-instruction
+    :agent/thread-id :agent/timestamp :agent/tools :agent/vector-store-paths})
 
 (defn put-agent!
   "Add the agent to one or more DBs."
@@ -189,7 +154,7 @@
            response-format-path vector-store-paths tools]
     :or {llm-provider @default-llm-provider
          model-class :gpt} :as agent-info}]
-  (log! :info (str "Creating agent: " base-type))
+  ;(log! :info (str "Creating agent: " base-type))
   (s/valid? ::agent-info agent-info)
   (let [user (-> (System/getenv) (get "USER"))
         a-name (-> base-type name (str "-" (name llm-provider)) keyword)
@@ -213,7 +178,7 @@
                        :agent/assistant-id aid}
                 surrogate?     (assoc :agent/surrogate? true)
                 expertise      (assoc :agent/expertise expertise))]
-    (agent-log "\n\n Creating agent (no thread yet) " base-type ":\n" (with-out-str (pprint agent)))
+    (agent-log (str "\n\n Creating agent (no thread yet) " base-type ":\n" (with-out-str (pprint agent))))
     agent))
 
 (defn newest-file-modification-date
@@ -224,6 +189,7 @@
                 instruction-path (conj instruction-path)
                 response-format-path (conj response-format-path)
                 vector-store-paths (into vector-store-paths))
+        zippy  (reset! diag files)
         newest (when (not-empty files)
                  (apply max (mapv #(->> % io/resource io/file .lastModified) files)))]
     (when newest
@@ -248,13 +214,13 @@
                                       (:thread missing-at-provider)         (assoc :make-thread? true)))]
     (when substitute-aid
       (log! :info (str "Agent " base-type " will use an updated assistant: " substitute-aid "."))
-      (agent-log "Agent " base-type " will use an updated assistant: " substitute-aid "."))
+      (agent-log (str "Agent " base-type " will use an updated assistant: " substitute-aid ".")))
     (when (:make-agent? res)
       (log! :info (str "Agent " base-type " will be created."))
-      (agent-log "\n Agent " base-type " will be recreated."))
+      (agent-log (str "\n Agent " base-type " will be recreated.")))
     (when (:make-thread? res) ; ToDo: Could pass in PID here and mention it.
       (log! :info (str "A thread will be made for agent " base-type " agent-type " agent-type "."))
-      (agent-log "\n\n A thread will be made for agent " base-type " agent type " agent-type "."))
+      (agent-log (str "\n\n A thread will be made for agent " base-type " agent type " agent-type ".")))
     res))
 
 (defn db-agents
@@ -312,8 +278,8 @@
 (defn agent-status-basic
   "Find the agent status information for :project and :system agents."
   [{:keys [base-type llm-provider pid]
-    :or {llm-provider @default-llm-provider} :as agent-info}]
-  (let [files-modify-date (newest-file-modification-date agent-info)
+    :or {llm-provider @default-llm-provider} :as agent}]
+  (let [files-modify-date (newest-file-modification-date agent)
         conn-atm (if pid (connect-atm pid) (connect-atm :system))
         eid (agent-eid base-type llm-provider conn-atm)
         {:agent/keys [timestamp assistant-id thread-id]} (when eid (dp/pull @conn-atm '[*] eid))
@@ -327,7 +293,7 @@
         missing-provider (cond-> #{}
                            (not provider-aid?)            (conj :assistant)
                            (and pid (not provider-tid?))  (conj :thread))
-        status (cond-> agent-info ; {:base-type base-type, :agent-type agent-type}
+        status (cond-> agent ; {:base-type base-type, :agent-type agent-type}
                  files-modify-date                      (assoc :files-data files-modify-date)
                  timestamp                              (assoc :agent-date timestamp)
                  outdated?                              (assoc :outdated? true)
@@ -335,6 +301,16 @@
                  (and eid (not-empty missing-here))     (assoc :missing-here missing-here)
                  (and eid (not-empty missing-provider)) (assoc :missing-at-provider missing-provider))]
     (remake-needs status)))
+
+(defn merge-with-agent-info-atom
+  "Merge the argument information about the agent with that about it on agent-infos,
+         with the argument taking precedence."
+  [info]
+  (assert (map? info))
+  (if-let [agent-info (not-empty (get @agent-infos (:base-type info)))]
+    (merge agent-info info)
+    (do (log! :warn (str "Nothing known about agent " (with-out-str (pprint info))))
+        info)))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
 (defn agent-status
@@ -348,11 +324,12 @@
       :agent-date -- if not missing?, the timepoint (Instant) when the agent was created.}
 
    :agent-date is not provided if the agent is not present in the any database we maintain."
-  [agent-info]
-  (let [{:keys [agent-type] :as info} (enrich-agent-info agent-info)]
-    (case agent-type
-      (:system :project) (agent-status-basic info)
-      :shared-assistant  (agent-status-shared-assistant info))))
+  [id]
+  (s/assert ::agent-id id)
+  (let [agent (-> id get-agent agent-db2proj)]
+    (case (:agent-type agent)
+      (:system :project) (agent-status-basic agent)
+      :shared-assistant  (agent-status-shared-assistant agent))))
 
 (defn make-agent-thread
   "Return a tid for the argument agent, which must have an assisatnt-id.
@@ -364,11 +341,11 @@
 
       :system
       (do (log! :info (str "Adding thread " tid " to system DB.\n" (with-out-str (pprint agent))))
-          (agent-log "\n\n Adding thread " tid " to system DB\n" (with-out-str (pprint agent))))
+          (agent-log (str "\n\n Adding thread " tid " to system DB\n" (with-out-str (pprint agent)))))
 
       (:project :shared-assistant)
       (log! :debug (str "Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
-      (agent-log "\n\n Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
+      (agent-log (str "\n\n Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent)))))
     tid))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
@@ -376,22 +353,28 @@
 (defn ensure-agent!
   "Return agent map with project keys (:aid, tid...)  if the agent exists.
    Otherwise create the agent, store it and return the info.
-   The argument agent-info need only contain one or two keys:
-     - For agents with agent-type = :system, it need only have :base-type.
-     - For agents of type :project or :shared-assistant it should additional have the pid.
-   The agent-info is 'enriched' here with information from the agent-infos map."
-  [info]
-  (let [info (if (keyword? info) (get @agent-infos info) info)
-        {:keys [make-agent? make-thread? substitute-aid] :as info} (-> info enrich-agent-info agent-status)
-        agent (if make-agent?
-                (make-agent-assistant info) ; Returns agent in DB attributes.
-                (get-agent info))           ; Returns agent in DB attributes.
-        agent  (merge info agent)           ; Gets pid, at least.
-        agent  (cond-> agent
-                 substitute-aid   (assoc :agent/assistant-id substitute-aid)
-                 make-thread?     (assoc :agent/thread-id (make-agent-thread info)))]
-    (put-agent! agent)
-    (agent-db2proj agent)))
+   The two ways to identify what agent you are looking for are:
+      1) a keyword uniquely naming the agent (if it is a system agent)
+      2) a map providing the :pid, :base-type (if it is a project agent).
+
+   In either case, you can provide a second argument, a map of options:
+      :make-agent? - true if start from scratch
+      :make-thread? - deprecated with migration from OpenAI assistants.
+      :substitute-aid - deprecated with migration from OpenAI assistants."
+  ([id] (ensure-agent! id {}))
+  ([id opts]
+   (s/assert ::agent-id id)
+   (let [needs (agent-status id)
+         {:keys [make-agent? make-thread? substitute-aid]} (merge needs opts)
+         agent (-> id get-agent agent-db2proj)
+         agent (if make-agent?
+                 (make-agent-assistant agent) ; Returns agent in DB attributes.
+                 (get-agent id))              ; Returns agent in DB attributes.
+         agent  (cond-> agent
+                  substitute-aid   (assoc :agent/assistant-id substitute-aid)
+                  make-thread?     (assoc :agent/thread-id (make-agent-thread agent)))]
+     (put-agent! agent)
+     (agent-db2proj agent))))
 
 ;;; ----------------------------------- Higher-level usages ------------------------------------------
 
@@ -466,8 +449,8 @@
   [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn asked-role asking-role]
       :or {test-fn (fn [_] true),
            preprocess-fn identity
-           asked-role :unknown
-           asking-role :unknown
+           ;asked-role :unknown
+           ;asking-role :unknown
            llm-provider @default-llm-provider
            timeout-secs 60
            role "user"} :as obj}]
@@ -477,10 +460,10 @@
     (assert (< (:tries obj) 10))
     (if (> (:tries obj) 0)
       (try
-        (agent-log "\n\n" (name asking-role) " ===> " query-text)
+        ;(agent-log (str "\n\n" (name asking-role) " ===> " query-text))
         (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
               res (preprocess-fn raw)]
-          (agent-log "\n" (name asked-role) " <=== " raw)
+          ;(agent-log (str "\n" (name asked-role) " <=== " raw))
           (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
         (catch Exception e
           (let [d-e (datafy e)]
@@ -499,7 +482,7 @@
        :asked-role - defaults to the base-type, so entirely unnecessary if agent-or-info is the agent keyword.
        :asking-role - useful for logging and debugging, typically some interviewer keyword."
   ([agent-or-info text] (query-agent agent-or-info text {}))
-  ([agent-or-info text {:keys [asked-role] :as opts-map}]
+  ([agent-or-info text opts-map]
    (try
      (let [agent (cond (keyword? agent-or-info)                   (ensure-agent! {:base-type agent-or-info})
                        (and (map? agent-or-info)
@@ -512,16 +495,22 @@
        (assert (string? tid))
        (query-on-thread (merge opts-map {:aid aid
                                          :tid tid
-                                         :query-text text
-                                         :asked-role (or asked-role base-type)})))
+                                         :query-text text})))
      (catch Exception e
        (log! :error (str "query-agent failed: " e))))))
 
 ;;; -------------------- Starting and stopping -------------------------
+(defn init-agent-infos-from-edn
+  "Set static information for agent-infos atom.
+   Other parts of the program, such as ork, will may add to it at startup."
+  []
+  (reset! agent-infos (-> "agents/agent-infos.edn" io/resource slurp edn/read-string)))
+
 (defn init-agents!
   "Things done on start and restart."
   []
-  (check-agent-infos))
+  (init-agent-infos-from-edn)
+  :ok)
 
-(defstate agents
+(defstate agent-db
   :start (init-agents!))

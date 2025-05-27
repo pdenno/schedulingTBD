@@ -7,7 +7,7 @@
   (:require
    [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
-   [scheduling-tbd.db]    ;for mount
+   [scheduling-tbd.db     :as db]
    [scheduling-tbd.sutil  :as sutil]))
 
 (s/def :job-shop-c/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
@@ -216,9 +216,9 @@
 (defn init-job-shop-c
   []
   (if (s/valid? :job-shop-c/EADS-message job-shop-c)
-    (when-not (sutil/same-eads-json? job-shop-c)
-      (sutil/update-eads-json! job-shop-c)
-      (sutil/update-system-eads! job-shop-c))
+    (when-not (db/same-EADS-instructions? job-shop-c)
+      (sutil/update-resources-EADS-json! job-shop-c)
+      (db/put-EADS-instructions! job-shop-c))
     (throw (ex-info "Invalid EADS message (job-shop-c)." {}))))
 
 (defstate job-shop-c-eads

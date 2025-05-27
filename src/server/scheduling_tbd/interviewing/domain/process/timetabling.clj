@@ -2,7 +2,7 @@
   (:require
    [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
-   [scheduling-tbd.db]    ;for mount
+   [scheduling-tbd.db     :as db]
    [scheduling-tbd.sutil  :as sutil]))
 
 (s/def :timetabling/EADS-message (s/keys :req-un [::interview-objective ::interviewer-agent ::EADS ::message-type]))
@@ -202,9 +202,9 @@
 (defn init-timetabling
   []
   (if (s/valid? :timetabling/EADS-message timetabling)
-    (when-not (sutil/same-eads-json? timetabling)
-      (sutil/update-eads-json! timetabling)
-      (sutil/update-system-eads! timetabling))
+    (when-not (db/same-EADS-instructions? timetabling)
+      (sutil/update-resources-EADS-json! timetabling)
+      (db/put-EADS-instructions! timetabling))
     (throw (ex-info "Invalid EADS message (timetabling)." {}))))
 
 (defstate timetabling-eads

@@ -181,7 +181,8 @@
             []
             template-maps)))
 
-(defn minimal-mzn-for-process
+;;; Need multiple of these. What is used depends on what EADS were pursued.
+#_(defn minimal-mzn-for-process
   "Return a complete but minimal MiniZinc specification for the project's process.
    It is minimal in the following sense:
     - It is for running one product or batch (i.e. one job).
@@ -192,7 +193,7 @@
    the minimal-process.edn key :test-data, the keys of which are :sub-keys."
   [pid]
   (let [template (-> "data/templates/minimal-process.edn" slurp edn/read-string)
-        procs (->> (db/get-process pid :initial-unordered)
+        procs (->> (db/get-process pid :initial-unordered) ; <================== Get it from :process/flow-shop EADS, etc.
                    :process/sub-processes
                    (remove #(:process/supply-chain? %))
                    vec)

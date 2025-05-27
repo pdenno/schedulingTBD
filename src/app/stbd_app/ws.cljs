@@ -49,15 +49,19 @@
 ;;; The ones here correspond to dispatch keys, but other might be used to break-out React hooks or avoid namespace cycles.
 (register-fn :clear-promise-keys    (fn [obj] (-> obj :promise-keys clear-promise-keys!)))
 
-(register-fn :alive?                (fn [_] (send-msg {:dispatch-key :alive-confirm})))
+(register-fn :alive?                (fn [_]
+                                      (log! :info "alive-confirm")
+                                      (send-msg {:dispatch-key :alive-confirm})))
 
 (register-fn :ping-confirm          (fn [_] :ok))
 
 ;;; The server uses this one after the client sends it :start-surrogate (which creates the surrogate's DB).
 (register-fn :load-proj             (fn [{:keys [new-proj-map]}] ; New projects start on :process
-                                      (update-common-info! (assoc new-proj-map :cid :process))
-                                      (when-let [f (lookup-fn :set-current-project)] (f new-proj-map))
-                                      (when-let [f (lookup-fn :get-conversation)]    (f :project/id new-proj-map))))
+                                      (let [{:project/keys [id name]} new-proj-map]
+                                        (log! :info (str "load-proj: new-proj-map = " new-proj-map))
+                                        (update-common-info! (assoc new-proj-map :cid :process))
+                                        (when-let [f (lookup-fn :set-current-project)] (f new-proj-map))
+                                        (when-let [f (lookup-fn :get-conversation)]    (f id name)))))
 
 (register-fn :domain-expert-submits-table (fn [table]
                                             (send-msg {:dispatch-key :domain-expert-says
@@ -148,17 +152,18 @@
 (def send-msg-type?
   #{:alive-confirm             ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected. ToDo: Remove it? Not implemented.
     :ask-llm                   ; User asked a "LLM:..." question at the chat prompt.
-    :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation
-    :surrogate-follow-up       ; User wrote "SUR?" <some question about dialog to date>
-    :start-conversation        ; Start a conversation. All that is needed is the client-id, I think.
-    :resume-conversation       ; Restart the planner. Done when client recieves a :load-proj, and when switches conversation.
     :close-channel             ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
-    :ping                      ; Ping server.
     :domain-expert-says        ; Human user wrote at the chat prompt (typically answering a question).
     :interviewer-busy?         ; Enable/disable various UI features depending on whether interviewer is busy.
+    :ping                      ; Ping server.
+    :resume-conversation       ; Restart interviewing. Done after client receives a :load-proj, and when switches conversation.
     :run-long                  ; diagnostic
-    :user-returns-table        ; User submitted table data
-    :throw-it})                ; diagnostic
+    :start-conversation        ; Start a conversation. All that is needed is the client-id, I think.
+    :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation
+    :start-surrogate+          ; User wrote "SUR+:" <map of various info> Start a surrogate with information from the map provided.
+    :surrogate-follow-up       ; User wrote "SUR?:" <some question about dialog to date>
+    :throw-it                  ; diagnostic
+    :user-returns-table})      ; User submitted table data
 
 (defn send-msg
   "Add client-id and send the message to the server over the websocket.

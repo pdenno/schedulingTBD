@@ -253,34 +253,21 @@
   [obj]
   (ches/generate-string obj {:pretty true}))
 
-(defn same-eads-json?
-  "Return true if the argument eads-instructions (an EDN object) is unchange since placed in ${SCHEDULING_TBD_DB}/etc/EADS."
+(defn same-EADS-instructions?
+  "Return true if the argument eads-instructions (an EDN object) is exactly what the system already maintains."
   [eads-instructions]
   (let [id (-> eads-instructions :EADS :EADS-id)
         [ns nam] ((juxt namespace name) id)]
     (assert (and ns nam))
-    (let [eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/" nam ".json"))
+    (let [eads-json-fname (str "resources/agents/iviewrs/EADS/" ns "/" nam ".edn")
           old-text (if (.exists (io/file eads-json-fname)) (slurp eads-json-fname) "")
           new-text (clj2json-pretty eads-instructions)]
       (= old-text new-text))))
 
-(defn update-system-eads!
-  "Update the system DB with a (presumably) new version of the argument EADS instructions."
+(defn update-resources-EADS-json!
+  "Update the resources/agents/iviewrs/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions.
+   These are needed by the orchestrator; they are put in its vector store."
   [eads-instructions]
   (let [id (-> eads-instructions :EADS :EADS-id)
-        [ns nam] ((juxt namespace name) id)
-        db-obj {:EADS/id id
-                :EADS/cid (keyword ns)
-                :EADS/specs #:spec{:full (keyword nam "EADS-message")}
-                :EADS/msg-str (str eads-instructions)}
-          conn (connect-atm :system)
-          eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
-    (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]}))
-  nil)
-
-(defn update-eads-json!
-  "Update the ${SCHEDULING_TBD_DB}/etc/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions."
-  [eads-instructions]
-  (let [id (-> eads-instructions :EADS :EADS-id)
-        eads-json-fname (-> (System/getenv) (get "SCHEDULING_TBD_DB") (str "/etc/EADS/" (name id) ".json"))]
+        eads-json-fname (str "resources/agents/iviewrs/EADS/" (name id) ".json")]
     (spit eads-json-fname (clj2json-pretty eads-instructions))))

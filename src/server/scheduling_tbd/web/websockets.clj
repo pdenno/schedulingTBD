@@ -4,6 +4,7 @@
   (:require
    [clojure.core.async       :as async :refer [<! >! go]]
    [clojure.edn              :as edn]
+   [clojure.pprint           :refer [pprint]]
    [clojure.spec.alpha       :as s]
    [mount.core               :as mount :refer [defstate]]
    [promesa.core             :as p]
@@ -93,7 +94,7 @@
 
 (defn ^:diag recent-client!
   "Return the client-id of the client that pinged most recently.
-   This should only used in development, I think!"
+   This should only used in development!"
   []
   (->> @ping-dates seq (sort-by second) reverse first first))
 
@@ -273,20 +274,23 @@
   "Send the argument structure to the client.
    If :promise?=true, return a promise that is resolved when the domain-expert responds to the message.
    The only keys of the argument map that are required are :client-id. and :dispatch-key.
-   :promise? defaults to true only when the dispatch key is :iviewr-says."
+   :promise? defaults to true only when the dispatch key is :iviewr-says.
+   If client-id = :console, it simply print to terminal."
   [{:keys [client-id promise? dispatch-key] :as content}]
   (s/assert ::spec/chat-msg-obj content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
-  (if-let [out (->> client-id (get @socket-channels) :out)]
-    (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))
-          msg-obj (cond-> content
-                    p-key               (assoc :p-key p-key)
-                    true                (assoc :timestamp (now)))]
-      (when-not (= :alive? dispatch-key)
-        (log! :debug (elide (str "send-to-client: msg-obj =" msg-obj) 130)))
-      (go (>! out (str msg-obj)))
-      prom)
-    (log! :error (str "Could not find out async channel for client " client-id))))
+  (if (= :client-id :console)
+    (log! :info (str "send-to-client (console): " (with-out-str (pprint content))))
+    (if-let [out (->> client-id (get @socket-channels) :out)]
+      (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))
+            msg-obj (cond-> content
+                      p-key               (assoc :p-key p-key)
+                      true                (assoc :timestamp (now)))]
+        (when-not (= :alive? dispatch-key)
+          (log! :debug (elide (str "send-to-client: msg-obj =" msg-obj) 130)))
+        (go (>! out (str msg-obj)))
+        prom)
+      (log! :error (str "Could not find out async channel for client " client-id)))))
 
 ;;; A map from keys to functions used to call responses from clients.
 ;;; This is defonce so that it doesn't get blown away when websockets.clj is reloaded.

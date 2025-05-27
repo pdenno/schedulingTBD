@@ -26,14 +26,14 @@
 ;;; {:conv-for id :conv [{:message/from :system :message/content [{:msg-text/string "You want to start a new project?"}]}]})
 (defn get-conversation-http
   "Return a promise that will resolve to the vector of a maps representing a conversation.
-   What conversation is returned depends on the value of :project/current-conversation in the DB; values are #{:process :data :resources :optimality}.
+   What conversation is returned depends on the value of :project/active-conversation in the DB; values are #{:process :data :resources :optimality}.
    Example of what the promise resolves to:
    {:project-id :sur-craft-beer :cid :process :conv [{:message/from :system :message/content [{:msg-text/string 'Hi!'}]}]}.
-   If the call provides cid, :project/current-conversation is set in the DB."
+   If the call provides cid, :project/active-conversation is set in the DB."
   ([pid] (get-conversation-http pid nil))
   ([pid cid]
    (assert (keyword? pid))
-   (log! :info (str "Call to get-conversation-http for " pid " cid = " cid))
+   (log! :info (str "Call to get-conversation-http for pid = " pid " cid = " cid))
    (let [prom (p/deferred)
          url (if cid
                (str "/api/get-conversation?project-id=" (name pid) "&cid=" (name cid) "&client-id=" ws/client-id)
@@ -48,12 +48,13 @@
 
 ;;; This is used by the server/planner to reload the conversation.
 ;;; Unlike chat/get-conversation, the function for (lookup-fn :get-conversation),
-;;; it doesn't resume-conversation because planning is already underway.
+;;; it doesn't resume-conversation because interviewing is already underway.
 (register-fn
  :update-conversation-text
  (fn [{:keys [pid cid pname]}]
    (assert (keyword? pid))
    (-> (get-conversation-http pid cid)
+       (p/catch (fn [err] (log! :error (str "Error in update-conversation text: " err))))
        (p/then (fn [resp]
                  (log! :info (str "update-conversation-text: msg count = " (-> resp :conv count)))
                  (update-common-info! resp)
