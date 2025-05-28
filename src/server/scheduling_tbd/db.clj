@@ -193,6 +193,9 @@
    :message/content
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string with optional html links."}
+   :message/data-structure
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string that can be edn/read-string into an EADS data structure inferred from conversation so far."}
    :message/EADS-data-structure
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string that can be edn/read-string into an EADS data structure inferred from conversation so far."}
@@ -220,6 +223,9 @@
         :doc "The time at which the message was sent."}
 
    ;; ---------------------- project
+   :project/code
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        
    :project/active-conversation
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "The conversation most recently busy. Note that several conversations can still need work, and there can be an "

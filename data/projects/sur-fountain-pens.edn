@@ -1,5 +1,47 @@
 [
-#:project{:conversations
+#:project{:agents
+          [#:agent{:agent-type :shared-assistant,
+                   :assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
+                   :base-type :process-interview-agent,
+                   :id :process-interview-agent-openai,
+                   :llm-provider :openai,
+                   :model-class :gpt,
+                   :thread-id "thread_78FyjeCJ32H0w2qYlWwWJ1s7"}
+           #:agent{:base-type :sur-fountain-pens,
+                   :agent-type :project,
+                   :thread-id "thread_dGPypen7TGZMyonWURXE9BBd",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes fountain pens.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :assistant-id "asst_I6brRBNe6fpzNebgUg9mznNd",
+                   :id :sur-fountain-pens-openai,
+                   :expertise "fountain pens",
+                   :timestamp #inst "2024-12-08T16:12:48.538-00:00"}],
+          :claims
+          [#:claim{:conversation-id :process,
+                   :question-type :production-system-type,
+                   :string "(flow-shop :sur-fountain-pens)"}
+           #:claim{:conversation-id :process,
+                   :string
+                   "(project-name :sur-fountain-pens \"SUR Fountain Pens\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :work-type,
+                   :string "(provides-product :sur-fountain-pens)"}
+           #:claim{:conversation-id :process,
+                   :string
+                   "(production-mode :sur-fountain-pens make-to-order)"}
+           #:claim{:conversation-id :process,
+                   :question-type :production-location,
+                   :string
+                   "(production-location :sur-fountain-pens factory)"}
+           #:claim{:conversation-id :process,
+                   :string "(project-id :sur-fountain-pens)"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-fountain-pens)"}],
+          :code
+          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {manufactureNibs, moldBarrels, moldCaps, assembleBodies, installNibs, fillWithInk, finalAssembly, qualityInspect, package};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 1.500, 1.000, 1.000, 0.500, 0.500, 1.000, 0.750, 0.500|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, manufactureNibs] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, manufactureNibs] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, manufactureNibs] == taskStarts[p, moldBarrels]);\nconstraint forall (p in Product) (taskEnds[p, moldBarrels] == taskStarts[p, moldCaps]);\nconstraint forall (p in Product) (taskEnds[p, moldCaps] == taskStarts[p, assembleBodies]);\nconstraint forall (p in Product) (taskEnds[p, assembleBodies] == taskStarts[p, installNibs]);\nconstraint forall (p in Product) (taskEnds[p, installNibs] == taskStarts[p, fillWithInk]);\nconstraint forall (p in Product) (taskEnds[p, fillWithInk] == taskStarts[p, finalAssembly]);\nconstraint forall (p in Product) (taskEnds[p, finalAssembly] == taskStarts[p, qualityInspect]);\nconstraint forall (p in Product) (taskEnds[p, qualityInspect] == taskStarts[p, package]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, package]);",
+          :conversations
           [#:conversation{:done? true,
                           :id :process,
                           :interviewer-budget 0.5,
@@ -217,49 +259,7 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:53.549-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {manufactureNibs, moldBarrels, moldCaps, assembleBodies, installNibs, fillWithInk, finalAssembly, qualityInspect, package};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 1.500, 1.000, 1.000, 0.500, 0.500, 1.000, 0.750, 0.500|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, manufactureNibs] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, manufactureNibs] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, manufactureNibs] == taskStarts[p, moldBarrels]);\nconstraint forall (p in Product) (taskEnds[p, moldBarrels] == taskStarts[p, moldCaps]);\nconstraint forall (p in Product) (taskEnds[p, moldCaps] == taskStarts[p, assembleBodies]);\nconstraint forall (p in Product) (taskEnds[p, assembleBodies] == taskStarts[p, installNibs]);\nconstraint forall (p in Product) (taskEnds[p, installNibs] == taskStarts[p, fillWithInk]);\nconstraint forall (p in Product) (taskEnds[p, fillWithInk] == taskStarts[p, finalAssembly]);\nconstraint forall (p in Product) (taskEnds[p, finalAssembly] == taskStarts[p, qualityInspect]);\nconstraint forall (p in Product) (taskEnds[p, qualityInspect] == taskStarts[p, package]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, package]);",
-          :agents
-          [#:agent{:agent-type :shared-assistant,
-                   :assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
-                   :base-type :process-interview-agent,
-                   :id :process-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_78FyjeCJ32H0w2qYlWwWJ1s7"}
-           #:agent{:base-type :sur-fountain-pens,
-                   :agent-type :project,
-                   :thread-id "thread_dGPypen7TGZMyonWURXE9BBd",
-                   :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes fountain pens.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                   :surrogate? true,
-                   :assistant-id "asst_I6brRBNe6fpzNebgUg9mznNd",
-                   :id :sur-fountain-pens-openai,
-                   :expertise "fountain pens",
-                   :timestamp #inst "2024-12-08T16:12:48.538-00:00"}],
           :current-conversation :process,
-          :claims
-          [#:claim{:conversation-id :process,
-                   :question-type :production-system-type,
-                   :string "(flow-shop :sur-fountain-pens)"}
-           #:claim{:conversation-id :process,
-                   :string
-                   "(project-name :sur-fountain-pens \"SUR Fountain Pens\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :work-type,
-                   :string "(provides-product :sur-fountain-pens)"}
-           #:claim{:conversation-id :process,
-                   :string
-                   "(production-mode :sur-fountain-pens make-to-order)"}
-           #:claim{:conversation-id :process,
-                   :question-type :production-location,
-                   :string
-                   "(production-location :sur-fountain-pens factory)"}
-           #:claim{:conversation-id :process,
-                   :string "(project-id :sur-fountain-pens)"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-fountain-pens)"}],
-          :name "SUR Fountain Pens",
-          :id :sur-fountain-pens}
+          :id :sur-fountain-pens,
+          :name "SUR Fountain Pens"}
 ]

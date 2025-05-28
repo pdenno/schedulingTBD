@@ -231,14 +231,18 @@
                     "/opt/scheduling/projects/sur-commemorative-coins/db/",
                     :id :sur-commemorative-coins,
                     :name "SUR Commemorative Coins"}
-          nil
           #:project{:dir
                     "/opt/scheduling/projects/sur-music-school/db/",
                     :id :sur-music-school,
                     :name "Music School"}
-          #:project{:dir "/opt/scheduling/projects/test-me/db/",
+          #:project{:dir 
+                    "/opt/scheduling/projects/test-me/db/",
                     :id :test-me,
-                    :name "Test me"}]}
+                    :name "Test me"}
+          #:project{:dir 
+                    "/opt/scheduling/projects/sur-plate-glass/db/"
+                    :id :sur-foam-earplugs
+                    :name "SUR Foam Earplugs"}]}]}
 
 #:spec{:full :flow-shop/EADS-message}
 
