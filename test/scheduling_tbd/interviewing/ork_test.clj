@@ -23,7 +23,7 @@
   "Run a surrogate with special instructions (using start-surrogate+)."
   []
   (sur/start-surrogate+
-   {:client-id (ws/recent-client!)
+   {:client-id :console
     :map-str (str {:pid :sur-music-school
                    :pname "Music School"
                    :sur-instructions (str "You run a music school. Until today you've been scheduling student lessons by fiddling with a spreadsheet.\n"
@@ -83,7 +83,7 @@
 
 (defn ^:diag try-ork
   []
-  (let [ork (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid :sur-plate-glass)))]
+  (let [ork (adb/ensure-agent! {:base-type :orchestrator-agent :pid :plate-glass-ork})]
     (doseq [msg [ch-1 sup-eads-1 ch-2 sup-eads-2]]
       (let [resp (->> msg msg2json-str (adb/query-agent ork) json-str2msg)]
         (log! :info (str "Response: " resp))))))

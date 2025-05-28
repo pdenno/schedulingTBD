@@ -47,3 +47,36 @@
                              #(if (#{:sur-says :iviewr-says :update-code} (:dispatch-key %))
                                 (s/valid? ::text (:text %))
                                 true)))
+
+(def agent-key?
+  "These are what are in the schema."
+  #{:agent/agent-id :agent/agent-type :agent/assistant-id :agent/base-type :agent/expertise :agent/instruction-path
+    :agent/llm-provider :agent/model-class :agent/response-format-path :agent/surrogate? :agent/system-instruction
+    :agent/thread-id :agent/timestamp :agent/tools :agent/vector-store-paths})
+
+(defn agent-keys?
+  "The keys of an agent object to be put in the DB include none that aren't in the schema."
+  [obj] (every? agent-key? (keys obj)))
+
+(s/def ::db-agent (s/and (s/keys :req [:agent/base-type :agent/agent-id :agent/agent-type]
+                                 :opt [:agent/assistant-id :agent/expertise :agent/instruction-path :agent/llm-provider
+                                       :agent/model-class :agent/response-format-path :agent/surrogate? :agent/system-instruction
+                                       :agent/thread-id :agent/timestamp :agent/tools :agent/vector-store-paths])
+                         #(agent-keys? %)))
+
+(s/def :agent/base-type keyword?)
+(s/def :agent/agent-id keyword?)
+(s/def :agent/agent-type #{:shared-assistant :project :system})
+
+(s/def :agent/assistant-id string?)
+(s/def :agent/expertise string?)
+(s/def :agent/instruction-path string?)
+(s/def :agent/llm-provider keyword?)
+(s/def :agent/model-class keyword?)
+(s/def :agent/response-format-path string?)
+(s/def :agent/surrogate? boolean?)
+(s/def :agent/system-instruction string?)
+(s/def :agent/thread-id string?)
+(s/def :agent/timestamp inst?)
+(s/def :agent/tools string?)
+(s/def :agent/vector-store-paths (s/coll-of string?))

@@ -13,6 +13,7 @@
    [datahike.api                  :as d]
    [datahike.pull-api             :as dp]
    [mount.core                    :as mount :refer [defstate]]
+   [scheduling-tbd.specs          :as specs]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
    [scheduling-tbd.util           :as util :refer [now]]
    [taoensso.telemere             :refer [log!]]))
@@ -20,7 +21,7 @@
 (def db-schema-agent+
   "Defines properties that can be used for agents, which can be stored either in the system DB or a project DB.
    This common information is merged into other system and project schema."
-  {:agent/id
+  {:agent/agent-id ; Yeah a redundant name, but I think it makes things easier in agent_db.clj, where I strip off the ns.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A unique ID for each agent to ensure only one of each type is available."}
    :agent/agent-type
@@ -270,7 +271,7 @@
 (def db-schema-proj (-> db-schema-proj+  (merge db-schema-agent+) datahike-schema))
 (def project-schema-key? (-> db-schema-proj+ (merge db-schema-agent+) keys set))
 
-;;; ------------------------------------------------- projects db generally ----------------------
+;;; ------------------------------------------------- projects ----------------------------------------------------
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
    (the entity id of the map containing :project/id in the database named by the argumen project-id)."
@@ -327,6 +328,308 @@
          sort
          vec))))
 
+(defn clean-project-for-schema
+  "Remove attributes that are no longer in the schema.
+   Remove nil values, these can show up after doing a :db/retract."
+  [proj]
+  (letfn [(cpfs [x]
+            (cond (map? x)      (reduce-kv (fn [m k v]
+                                             (if (project-schema-key? k)
+                                               (if (nil? v) m (assoc m k (cpfs v)))
+                                               (do (log! :warn (str "Dropping obsolete attr: " k)) m)))
+                                           {} x)
+                  (vector? x)   (->> (mapv cpfs x) (remove nil?) vec)
+                  :else         x))]
+    (cpfs proj)))
+
+(defn backup-proj-db
+  [id & {:keys [target-dir clean?] :or {target-dir "data/projects/" clean? true}}]
+  (let [filename (str target-dir (name id) ".edn")
+        proj (cond-> (get-project id)
+               clean? clean-project-for-schema)
+        s (with-out-str
+            (println "[")
+            (pprint proj)
+            (println "]"))]
+    (log! :info (str "Writing project to " filename))
+    (spit filename s)))
+
+(defn ^:admin backup-proj-dbs
+  "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir.
+   Example usage: (backup-proj-dbs)."
+  [& {:keys [target-dir] :or {target-dir "data/projects/"}}]
+  (doseq [id (list-projects)]
+    (backup-proj-db id {:target-dir target-dir})))
+
+(defn ^:admin unknown-projects
+  "Return a vector of directories that the system DB does not know."
+  []
+  (set/difference
+   (set (list-projects {:from-storage? true}))
+   (set (list-projects))))
+
+(defn unique-proj
+  "If necessary to ensure uniqueness, update the project name and id."
+  [proj-info]
+  (let [names (d/q '[:find [?name ...]
+                     :where [_ :project/name ?name]] @(connect-atm :system))
+        name (:project/name proj-info)]
+    (if (not-any? #(= name %) names)
+      proj-info
+      (let [pat (re-pattern (str "^" name ".*"))
+            similar-names (filter #(re-matches pat %) names)
+            pat (re-pattern (str "^" name "( \\d+)?"))
+            nums (map #(let [[success num] (re-matches pat %)]
+                         (when success (or num "0"))) similar-names)
+            num (->> nums (map read-string) (apply max) inc)
+            new-name (str name " " num)
+            new-id   (-> new-name str/lower-case (str/replace #"\s+" "-") keyword)]
+        (-> proj-info
+            (assoc :project/name new-name)
+            (assoc :project/id new-id))))))
+
+(defn add-project-to-system
+  "Add the argument project (a db-cfg map) to the system database."
+  [id project-name dir]
+  (let [conn-atm (connect-atm :system)
+        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn-atm)]
+    (d/transact conn-atm {:tx-data [{:db/id eid
+                                     :system/projects {:project/id id
+                                                       :project/name project-name
+                                                       :project/dir dir}}]})))
+
+(s/def ::project-info (s/keys :req [:project/id :project/name]))
+
+(def conversation-defaults
+  [{:conversation/id :process
+    :conversation/status :in-progress ; We assume things start here.
+    :conversation/interviewer-budget 1.0}
+   {:conversation/id :data
+    :conversation/status :not-started
+    :conversation/interviewer-budget 1.0}
+   {:conversation/id :resources
+    :conversation/status :not-started
+    :conversation/interviewer-budget 1.0}
+   {:conversation/id :optimality
+    :conversation/status :not-started
+    :conversation/interviewer-budget 1.0}])
+
+(declare add-conversation-intros get-system)
+
+;;; (db/create-proj-db! {:project/id :test :project/name "Test Project"} {} {:force-this-name? true})
+(defn create-proj-db!
+  "Create a project database for the argument project.
+   The project-info map must include :project/id and :project/name.
+     proj-info  - map containing at least :project/id and :project/name.
+     additional - a vector of maps to add to the database.
+     opts -  {:force-this-name? - overwrite project with same name}
+   This always destroys DBs with the same name as that calculated here.
+   Sets claims for project-id  to calculated PID and project-name.
+   Return the PID of the project, which may be different than the project/id argument
+   owing to the need for PIDs to be unique in the context of all projects managed by the system DB."
+  ([proj-info] (create-proj-db! proj-info {} {}))
+  ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
+  ([proj-info additional-info {:keys [in-mem? force-this-name?] :as _opts}]
+   (s/assert ::project-info proj-info)
+   (let [{id :project/id pname :project/name} (if force-this-name? proj-info (unique-proj proj-info))
+         cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
+         dir (-> cfg :store :path)
+         files-dir (-> cfg :base-dir (str "/projects/" pname  "/files"))]
+     (when-not in-mem?
+       (when-not (-> dir io/as-file .isDirectory)
+         (-> cfg :store :path io/make-parents)
+         (-> cfg :store :path io/as-file .mkdir))
+       (when-not (-> files-dir io/as-file .isDirectory)
+         (io/make-parents files-dir)
+         (-> files-dir io/as-file .mkdir))
+       (add-project-to-system id pname dir))
+     (when (d/database-exists? cfg) (d/delete-database cfg))
+     (d/create-database cfg)
+     (register-db id cfg)
+     ;; Add to project db
+     (d/transact (connect-atm id) db-schema-proj)
+     (d/transact (connect-atm id) {:tx-data [{:project/id id
+                                              :project/name pname
+                                              :project/agents (->> (get-system)
+                                                                   :system/agents
+                                                                   (filterv #(= (:agent/agent-type %) :shared-assistant)))
+                                              :project/active-conversation :process
+                                              :project/claims [{:claim/string (str `(~'project-id ~id))}
+                                                               {:claim/string (str `(~'project-name ~id ~pname))}]
+                                              :project/conversations conversation-defaults}]})
+     (add-conversation-intros id)
+     (when (not-empty additional-info)
+       (d/transact (connect-atm id) additional-info))
+     ;; Add knowledge of this project to the system db.
+     (log! :info (str "Created project database for " id))
+     id)))
+
+(defn ^:admin delete-project!
+  "Remove project from the system."
+  [pid]
+  (if (some #(= % pid) (list-projects))
+    (let [conn-atm (connect-atm :system)]
+      (when-let [s-eid (d/q '[:find ?e . :in $ ?pid :where [?e :project/id ?pid]] @conn-atm pid)]
+        (let [obj (resolve-db-id {:db/id s-eid} conn-atm)]
+          (d/transact (connect-atm :system) {:tx-data (for [[k v] obj] [:db/retract s-eid k v])})
+          (sutil/deregister-db pid)
+          nil)))
+    (log! :warn (str "Delete-project: Project not found: " pid))))
+
+(defn recreate-project-db!
+  "Recreate a DB for each project using EDN files."
+  [id]
+  (let [backup-file (format "data/projects/%s.edn" (name id))]
+    (if (.exists (io/file backup-file))
+      (let [cfg (db-cfg-map {:type :project :id id})
+            files-dir (-> cfg :base-dir (str "/projects/" (name id) "/files"))]
+        (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
+          (d/delete-database cfg))
+        (when-not (-> cfg :store :path io/as-file .isDirectory)
+          (-> cfg :store :path io/make-parents)
+          (-> cfg :store :path io/as-file .mkdir))
+        (d/create-database cfg)
+        (register-db id cfg)
+        (let [conn (connect-atm id)]
+          (d/transact conn db-schema-proj)
+          (d/transact conn (->> backup-file slurp edn/read-string)))
+        (when-not (-> files-dir io/as-file .isDirectory)
+          (-> files-dir io/as-file .mkdir))
+        cfg)
+    (log! :error (str "Not recreating DB because backup file does not exist: " backup-file)))))
+
+(defn ^:admin update-project-for-schema!
+  "This has the ADDITIONAL side-effect of writing a backup file."
+  [pid]
+  (backup-proj-db pid)
+  (recreate-project-db! pid))
+
+(defn ^:admin update-all-projects-for-schema!
+  []
+  (doseq [p (list-projects)]
+    (update-project-for-schema! p)))
+
+;;; --------------------------------------- System db -----------------------------------------------------------
+(defn  get-system
+  "Return the project structure.
+   Throw an error if :error is true (default) and project does not exist."
+  []
+  (let [conn-atm (connect-atm :system)]
+    (when-let [eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn-atm)]
+      (resolve-db-id {:db/id eid} conn-atm))))
+
+(defn ^:admin backup-system-db
+  "Backup the system database to an edn file."
+  [& {:keys [target-dir] :or {target-dir "data/"}}]
+      (let [conn-atm (connect-atm :system)
+            filename (str target-dir "system-db.edn")
+            s (with-out-str
+                (println "[")
+                (doseq [ent-id  (sutil/root-entities conn-atm)]
+                  (let [obj (resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
+                    ;; Write content except schema elements and transaction markers.
+                    (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
+                      (pprint obj)
+                      (println))))
+                (println "]"))]
+      (log! :info (str "Writing system DB to " filename))
+      (spit filename s)))
+
+(defn recreate-system-db!
+  "Recreate the system database from an EDN file
+   By default this creates new agents."
+  [& {:keys [target-dir]
+      :or {target-dir "data/"}}]
+  (if (.exists (io/file (str target-dir "system-db.edn")))
+    (let [cfg (db-cfg-map {:type :system})]
+      (log! :info "Recreating the system database.")
+      (when (d/database-exists? cfg) (d/delete-database cfg))
+      (d/create-database cfg)
+      (register-db :system cfg)
+      (let [conn (connect-atm :system)]
+        (d/transact conn db-schema-sys)
+        (d/transact conn (-> "data/system-db.edn" slurp edn/read-string))
+        cfg))
+      (log! :error "Not recreating system DB: No backup file.")))
+
+
+(def keep-db? #{:him})
+(defn ^:admin recreate-dbs!
+  "Recreate the system DB on storage from backup.
+   For each project it lists, recreate it from backup if such backup exists."
+  []
+  (swap! sutil/databases-atm
+         #(reduce-kv (fn [res k v] (if (keep-db? k) (assoc res k v) res)) {} %))
+  (recreate-system-db!)
+  (log! :info (str "Recreating these projects: " (list-projects)))
+  (doseq [pid (list-projects)]
+    (recreate-project-db! pid)))
+
+;;; ------------------ agents -----------------------------------------------------------------
+;;; Agent-id is always unique, even when have multiple llm-providers, but usually you want to refer
+;;; to it 'conceptually' as a system agent or project agent by the default llm provider.
+(s/def ::agent-id (s/or :system-agent keyword? :project-agent ::agent-id-map))
+(s/def ::agent-id-map (s/keys :req-un [::pid ::base-type]))
+
+(defn agent-exists?
+  "Return the eid of the argument agent-id (a keyword) if the agent exists, nil otherwise.
+   If the id argument is a keyword it names the :agent/base-type. If id is a map, the map provides :base-type.
+   Since the function doesn't actually search for :agent/agent-id, use the optional second argument, llm-provider,
+   (a keyword) if you want the agent from some llm other than the sutil/default-llm-provider."
+  ([agent-id] (agent-exists? agent-id @sutil/default-llm-provider))
+  ([agent-id llm-provider]
+   (s/valid? ::agent-id agent-id)
+   (let [db-id  (if (keyword? agent-id) :system (:pid agent-id))
+         base-type (if (keyword? agent-id) agent-id (:base-type agent-id))]
+     (d/q '[:find ?eid .
+            :in $ ?aid ?rel ?provider
+            :where
+            [?eid :agent/base-type ?aid]
+            [?eid :agent/llm-provider ?provider]]
+          @(connect-atm db-id)
+          base-type llm-provider))))
+
+(defn get-agent
+  "Get the argument agent, rehydrating :agent/tools."
+  [agent-id]
+  (s/valid? ::agent-id agent-id)
+  (let [db-id (if (keyword? agent-id) :system (:pid agent-id))]
+     (if-let [eid (agent-exists? agent-id)]
+       (as-> (resolve-db-id {:db/id eid} (connect-atm db-id)) ?x
+         (if (contains? ?x :agent/tools)
+           (update ?x :agent/tools edn/read-string)
+           ?x))
+       (log! :error (str "Agent not found: " agent-id)))))
+
+(defn update-agent!
+  "Update the agent information on the system DB, providing a map that includes either agent-id or base-type."
+  [agent-id agent-map]
+  (s/assert ::agent-id agent-id)
+  (s/assert ::specs/db-agent agent-map)
+  (assert (every? #(= "agent" %) (->> agent-map keys (map namespace))))
+  (if-let [eid (agent-exists? agent-id)]
+    (let [conn-atm (connect-atm :system)]
+      (d/transact conn-atm {:tx-data [(merge {:db/id eid} agent-map)]}))
+    (log! :error (str "No such agent: " agent-map))))
+
+(defn put-agent!
+  "Add the argument agent object to database corresponding to the agent-id.
+   Set the :agent/timestamp and llm-provider."
+  [agent-id agent-map]
+  (assert (every? #(= "agent" %) (->> agent-map keys (map namespace))))
+  (s/assert ::agent-id agent-id)
+  (let [agent-map (cond-> agent-map
+                    (not (contains? agent-map :agent/llm-provider))   (assoc :agent/llm-provider @sutil/default-llm-provider)
+                    true                                              (assoc :agent/timestamp (now))
+                    (contains? agent-map :agent/tools)                (update :agent/tools str))
+        conn-atm (connect-atm (if (keyword? agent-id) :system (:pid agent-id)))
+        rel (if (keyword? agent-id) :system/agents :project/agents)
+        eid (d/q '[:find ?eid . :where [?eid rel]] @conn-atm)]
+    (s/assert ::specs/db-agent agent-map)
+    (if eid
+      (d/transact conn-atm {:tx-data [{:db/id eid rel agent-map}]})
+      (log! :error (str "No such DB. agent-id = " agent-id)))))
+
 ;;; ----------------------------------- Claims -------------------------------------------------------------
 (defn get-claims
   "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
@@ -370,107 +673,6 @@
                                    q-type     (assoc :claim/question-type q-type)
                                    confidence (assoc :claim/confidence confidence))}]}))
   true)
-
-(defn clean-project-for-schema
-  "Remove attributes that are no longer in the schema.
-   Remove nil values, these can show up after doing a :db/retract."
-  [proj]
-  (letfn [(cpfs [x]
-            (cond (map? x)      (reduce-kv (fn [m k v]
-                                             (if (project-schema-key? k)
-                                               (if (nil? v) m (assoc m k (cpfs v)))
-                                               (do (log! :warn (str "Dropping obsolete attr: " k)) m)))
-                                           {} x)
-                  (vector? x)   (->> (mapv cpfs x) (remove nil?) vec)
-                  :else         x))]
-    (cpfs proj)))
-
-(defn backup-proj-db
-  [id & {:keys [target-dir clean?] :or {target-dir "data/projects/" clean? true}}]
-  (let [filename (str target-dir (name id) ".edn")
-        proj (cond-> (get-project id)
-               clean? clean-project-for-schema)
-        s (with-out-str
-            (println "[")
-            (pprint proj)
-            (println "]"))]
-    (log! :info (str "Writing project to " filename))
-    (spit filename s)))
-
-(defn ^:admin backup-proj-dbs
-  "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir.
-   Example usage: (backup-proj-dbs)."
-  [& {:keys [target-dir] :or {target-dir "data/projects/"}}]
-  (doseq [id (list-projects)]
-    (backup-proj-db id {:target-dir target-dir})))
-
-(defn ^:admin backup-system-db
-  "Backup the system database to an edn file."
-  [& {:keys [target-dir] :or {target-dir "data/"}}]
-      (let [conn-atm (connect-atm :system)
-            filename (str target-dir "system-db.edn")
-            s (with-out-str
-                (println "[")
-                (doseq [ent-id  (sutil/root-entities conn-atm)]
-                  (let [obj (resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
-                    ;; Write content except schema elements and transaction markers.
-                    (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
-                      (pprint obj)
-                      (println))))
-                (println "]"))]
-      (log! :info (str "Writing system DB to " filename))
-      (spit filename s)))
-
-(defn recreate-system-db!
-  "Recreate the system database from an EDN file
-   By default this creates new agents."
-  [& {:keys [target-dir]
-      :or {target-dir "data/"}}]
-  (if (.exists (io/file (str target-dir "system-db.edn")))
-    (let [cfg (db-cfg-map {:type :system})]
-      (log! :info "Recreating the system database.")
-      (when (d/database-exists? cfg) (d/delete-database cfg))
-      (d/create-database cfg)
-      (register-db :system cfg)
-      (let [conn (connect-atm :system)]
-        (d/transact conn db-schema-sys)
-        (d/transact conn (-> "data/system-db.edn" slurp edn/read-string))
-        cfg))
-      (log! :error "Not recreating system DB: No backup file.")))
-
-(defn recreate-project-db!
-  "Recreate a DB for each project using EDN files."
-  [id]
-  (let [backup-file (format "data/projects/%s.edn" (name id))]
-    (if (.exists (io/file backup-file))
-      (let [cfg (db-cfg-map {:type :project :id id})
-            files-dir (-> cfg :base-dir (str "/projects/" (name id) "/files"))]
-        (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
-          (d/delete-database cfg))
-        (when-not (-> cfg :store :path io/as-file .isDirectory)
-          (-> cfg :store :path io/make-parents)
-          (-> cfg :store :path io/as-file .mkdir))
-        (d/create-database cfg)
-        (register-db id cfg)
-        (let [conn (connect-atm id)]
-          (d/transact conn db-schema-proj)
-          (d/transact conn (->> backup-file slurp edn/read-string)))
-        (when-not (-> files-dir io/as-file .isDirectory)
-          (-> files-dir io/as-file .mkdir))
-        cfg)
-    (log! :error (str "Not recreating DB because backup file does not exist: " backup-file)))))
-
-(def keep-db? #{:him})
-(defn ^:admin recreate-dbs!
-  "Recreate the system DB on storage from backup.
-   For each project it lists, recreate it from backup if such backup exists."
-  []
-  (swap! sutil/databases-atm
-         #(reduce-kv (fn [res k v] (if (keep-db? k) (assoc res k v) res)) {} %))
-  (recreate-system-db!)
-  (log! :info (str "Recreating these projects: " (list-projects)))
-  (doseq [pid (list-projects)]
-    (recreate-project-db! pid)))
 
 ;;; --------------------------------------- Conversations ---------------------------------------------------------------------
 (def conversation-intros
@@ -707,7 +909,7 @@
    Of course, this is a development-time activity."
   [eads-instructions]
   (let [id (-> eads-instructions :EADS :EADS-id)
-        [ns nam] ((juxt namespace name) id)
+        [_ns nam] ((juxt namespace name) id)
         db-obj {:EADS/id id
                 :EADS/specs #:spec{:full (keyword nam "EADS-message")}
                 :EADS/msg-str (str eads-instructions)}
@@ -745,127 +947,6 @@
       (sutil/update-resources-EADS-json! eads-instructions)
       (log! :error (str "No such EADS instructions " eads-id)))))
 
-;;; ----------------------------------------- Project ---------------------------------------------
-(defn ^:admin unknown-projects
-  "Return a vector of directories that the system DB does not know."
-  []
-  (set/difference
-   (set (list-projects {:from-storage? true}))
-   (set (list-projects))))
-
-(defn unique-proj
-  "If necessary to ensure uniqueness, update the project name and id."
-  [proj-info]
-  (let [names (d/q '[:find [?name ...]
-                     :where [_ :project/name ?name]] @(connect-atm :system))
-        name (:project/name proj-info)]
-    (if (not-any? #(= name %) names)
-      proj-info
-      (let [pat (re-pattern (str "^" name ".*"))
-            similar-names (filter #(re-matches pat %) names)
-            pat (re-pattern (str "^" name "( \\d+)?"))
-            nums (map #(let [[success num] (re-matches pat %)]
-                         (when success (or num "0"))) similar-names)
-            num (->> nums (map read-string) (apply max) inc)
-            new-name (str name " " num)
-            new-id   (-> new-name str/lower-case (str/replace #"\s+" "-") keyword)]
-        (-> proj-info
-            (assoc :project/name new-name)
-            (assoc :project/id new-id))))))
-
-(defn add-project-to-system
-  "Add the argument project (a db-cfg map) to the system database."
-  [id project-name dir]
-  (let [conn-atm (connect-atm :system)
-        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn-atm)]
-    (d/transact conn-atm {:tx-data [{:db/id eid
-                                     :system/projects {:project/id id
-                                                       :project/name project-name
-                                                       :project/dir dir}}]})))
-
-(s/def ::project-info (s/keys :req [:project/id :project/name]))
-
-(def conversation-defaults
-  [{:conversation/id :process
-    :conversation/status :in-progress ; <==================
-    :conversation/interviewer-budget 1.0}
-   {:conversation/id :data
-    :conversation/status :not-started
-    :conversation/interviewer-budget 1.0}
-   {:conversation/id :resources
-    :conversation/status :not-started
-    :conversation/interviewer-budget 1.0}
-   {:conversation/id :optimality
-    :conversation/status :not-started
-    :conversation/interviewer-budget 1.0}])
-
-;;; (db/create-proj-db! {:project/id :test :project/name "Test Project"} {} {:force-this-name? true})
-(defn create-proj-db!
-  "Create a project database for the argument project.
-   The project-info map must include :project/id and :project/name.
-     proj-info  - map containing at least :project/id and :project/name.
-     additional - a vector of maps to add to the database.
-     opts -  {:force-this-name? - overwrite project with same name}
-   This always destroys DBs with the same name as that calculated here.
-   Sets claims for project-id  to calculated PID and project-name.
-   Return the PID of the project, which may be different than the project/id argument
-   owing to the need for PIDs to be unique in the context of all projects managed by the system DB."
-  ([proj-info] (create-proj-db! proj-info {} {}))
-  ([proj-info additional-info] (create-proj-db! proj-info additional-info {}))
-  ([proj-info additional-info {:keys [in-mem? force-this-name?] :as _opts}]
-   (s/assert ::project-info proj-info)
-   (let [{id :project/id pname :project/name} (if force-this-name? proj-info (unique-proj proj-info))
-         cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
-         dir (-> cfg :store :path)
-         files-dir (-> cfg :base-dir (str "/projects/" pname  "/files"))]
-     (when-not in-mem?
-       (when-not (-> dir io/as-file .isDirectory)
-         (-> cfg :store :path io/make-parents)
-         (-> cfg :store :path io/as-file .mkdir))
-       (when-not (-> files-dir io/as-file .isDirectory)
-         (io/make-parents files-dir)
-         (-> files-dir io/as-file .mkdir))
-       (add-project-to-system id pname dir))
-     (when (d/database-exists? cfg) (d/delete-database cfg))
-     (d/create-database cfg)
-     (register-db id cfg)
-     ;; Add to project db
-     (d/transact (connect-atm id) db-schema-proj)
-     (d/transact (connect-atm id) {:tx-data [{:project/id id
-                                              :project/name pname
-                                              :project/active-conversation :process
-                                              :project/claims [{:claim/string (str `(~'project-id ~id))}
-                                                               {:claim/string (str `(~'project-name ~id ~pname))}]
-                                              :project/conversations conversation-defaults}]})
-     (add-conversation-intros id)
-     (when (not-empty additional-info)
-       (d/transact (connect-atm id) additional-info))
-     ;; Add knowledge of this project to the system db.
-     (log! :info (str "Created project database for " id))
-     id)))
-
-(defn ^:admin delete-project!
-  "Remove project from the system."
-  [pid]
-  (if (some #(= % pid) (list-projects))
-    (let [conn-atm (connect-atm :system)]
-      (when-let [s-eid (d/q '[:find ?e . :in $ ?pid :where [?e :project/id ?pid]] @conn-atm pid)]
-        (let [obj (resolve-db-id {:db/id s-eid} conn-atm)]
-          (d/transact (connect-atm :system) {:tx-data (for [[k v] obj] [:db/retract s-eid k v])})
-          (sutil/deregister-db pid)
-          nil)))
-    (log! :warn (str "Delete-project: Project not found: " pid))))
-
-(defn ^:admin update-project-for-schema!
-  "This has the ADDITIONAL side-effect of writing a backup file."
-  [pid]
-  (backup-proj-db pid)
-  (recreate-project-db! pid))
-
-(defn ^:admin update-all-projects-for-schema!
-  []
-  (doseq [p (list-projects)]
-    (update-project-for-schema! p)))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs

@@ -6,17 +6,18 @@
    [clojure.pprint]
    [clojure.string]
    [clojure.spec.alpha :as s]
-   [clojure.tools.namespace.repl :as tools-ns :refer [disable-reload! refresh clear set-refresh-dirs]]
+   [clojure.tools.namespace.repl :as tools-ns :refer [set-refresh-dirs]]
    [develop.repl :refer [ns-setup! ns-fix-setup!]] ; for use at REPL.
    [develop.dutil]
    [expound.alpha :as expound]
    [mount.core :as mount]
    [lambdaisland.classpath.watch-deps :as watch-deps]      ; hot loading for deps.
    [scheduling-tbd.core :refer [server]]                   ; for mount.
-   [scheduling-tbd.llm  :as llm]                           ; Because of deep synchronization problems when this is from mount.
-   [scheduling-tbd.interviewing.interviewers :refer [iviewers]]         ; for mount
+   [scheduling-tbd.llm  :as llm :refer [llm-tools]]        ; Because of deep synchronization problems when this is from mount.
    [scheduling-tbd.web.handler]                            ; for mount, defines rm.server.config/config, and router stuff.
    [taoensso.telemere :as tel :refer [log!]]))
+
+[server llm-tools ns-setup! ns-fix-setup!] ; for mount
 
 ;;; If you get stuck do: (clojure.tools.namespace.repl/refresh)
 
@@ -29,7 +30,7 @@
 (s/check-asserts true) ; Error on s/assert, run s/valid? rather than just returning the argument.
 (tel/call-on-shutdown! tel/stop-handlers!)
 
-(defn start
+(defn ^:admin start
   "Start the web server"
   []
   (let [res (mount/start)
@@ -41,7 +42,7 @@
   []
   (mount/stop))
 
-(defn restart
+(defn ^:admin restart
   "Stop, reload code, and restart the server. If there is a compile error, use:
 
   ```

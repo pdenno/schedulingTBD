@@ -1,31 +1,22 @@
 [
-#:project{:agents
+#:project{:active-conversation :process,
+          :agents
           [#:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
                    :thread-id "thread_c9YOQ81VXXkZjh1aLawIo44x",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :assistant-id "asst_Pl17tnUkLXzg5299867RnOrw",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-04-28T18:19:45.753-00:00"}
-           #:agent{:base-type :sur-plate-glass,
-                   :agent-type :project,
-                   :thread-id "thread_WJlieqcmQCiois9mr58SqM5r",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :surrogate? true,
-                   :assistant-id "asst_H2WCcMxVIcqJzo8JvHbwnMGS",
-                   :id :sur-plate-glass-openai,
-                   :expertise "plate glass",
-                   :timestamp #inst "2025-03-05T15:06:39.496-00:00"}
+                   :timestamp #inst "2025-04-28T18:19:45.753-00:00",
+                   :agent-id :process-interview-agent-openai}
            #:agent{:base-type :orchestrator-agent,
-                   :agent-type :shared-assistant,
+                   :agent-type :project,
                    :thread-id "thread_GKtLw9DrTm9VV67s8imgFh8o",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :assistant-id "asst_6VQhN6C2nf4rFQlZEIciqTJY",
-                   :id :orchestrator-agent-openai,
-                   :timestamp #inst "2025-04-28T18:13:02.195-00:00"}
+                   :timestamp #inst "2025-04-28T18:13:02.195-00:00",
+                   :agent-id :orchestrator-agent-openai}
            #:agent{:base-type :plate-glass-ork,
                    :agent-type :project,
                    :thread-id "thread_FBtGuMH6Mmew5ZSG0cyxKyFq",
@@ -33,37 +24,45 @@
                    :llm-provider :openai,
                    :surrogate? true,
                    :assistant-id "asst_PxGr2JLa6C7B2RFzi9cCrggX",
-                   :id :plate-glass-ork-openai,
                    :expertise "plate glass",
-                   :timestamp #inst "2025-04-28T18:01:45.057-00:00"}],
+                   :timestamp #inst "2025-04-28T18:01:45.057-00:00",
+                   :agent-id :plate-glass-ork-openai}],
           :claims
           [#:claim{:string "(project-id :sur-plate-glass)"}
-           #:claim{:string "(project-name :sur-plate-glass \"SUR Plate Glass\")"}
-           #:claim{:conversation-id :process, :string "(surrogate :sur-plate-glass)"}
+           #:claim{:string
+                   "(project-name :sur-plate-glass \"SUR Plate Glass\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-plate-glass)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string "(scheduling-challenge :sur-plate-glass :delivery-schedules)"}
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :delivery-schedules)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string "(scheduling-challenge :sur-plate-glass :product-variation)"}
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :product-variation)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string "(scheduling-challenge :sur-plate-glass :raw-material-uncertainty)"}
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :raw-material-uncertainty)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string "(principal-expertise  :sur-plate-glass \"Plate Glass\")"}
+                   :string
+                   "(principal-expertise  :sur-plate-glass \"Plate Glass\")"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string "(scheduling-challenge :sur-plate-glass :equipment-availability)"}
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :equipment-availability)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string "(scheduling-challenge :sur-plate-glass :variation-in-demand)"}
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :variation-in-demand)"}
            #:claim{:conversation-id :process,
                    :question-type :process/warm-up,
-                   :string "(scheduling-challenge :sur-plate-glass :process-variation)"}],
+                   :string
+                   "(scheduling-challenge :sur-plate-glass :process-variation)"}],
           :conversations
           [#:conversation{:id :process,
-                          :status :in-process
                           :interviewer-budget 0.8999999999999999,
                           :messages
                           [#:message{:content
@@ -71,20 +70,23 @@
                                      :from :system,
                                      :id 1,
                                      :tags [:conversation-intro],
-                                     :time #inst "2025-03-05T15:06:37.184-00:00"}
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}
                            #:message{:content
                                      "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
                                      :from :system,
                                      :id 2,
                                      :tags [:query :warm-up],
-                                     :time #inst "2025-03-05T15:06:51.378-00:00"}
+                                     :time
+                                     #inst "2025-03-05T15:06:51.378-00:00"}
                            #:message{:answers-question 2,
                                      :content
                                      "\nWe produce plate glass, which includes standard, tempered, laminated, and specialty glass products. The scheduling challenge lies in coordinating production processes like glass melting, shaping, annealing, and finishing while ensuring supply chain alignment for raw materials and accommodating varying customer lead times. Demand variability and equipment availability add additional complexity to the process.",
                                      :from :surrogate,
                                      :id 3,
                                      :tags [:response :warm-up],
-                                     :time #inst "2025-03-05T15:06:51.397-00:00"}
+                                     :time
+                                     #inst "2025-03-05T15:06:51.397-00:00"}
                            #:message{:code
                                      "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {millGrains, mashing, lautering, boiling, fermentation, conditioning, filtering, carbonation, bottlingCanning, packaging};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|1.000, 1.500, 1.000, 1.000, 252.000, 60.000, 3.000, 24.000, 3.000, 3.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, millGrains] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, millGrains] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, millGrains] == taskStarts[p, mashing]);\nconstraint forall (p in Product) (taskEnds[p, mashing] == taskStarts[p, lautering]);\nconstraint forall (p in Product) (taskEnds[p, lautering] == taskStarts[p, boiling]);\nconstraint forall (p in Product) (taskEnds[p, boiling] == taskStarts[p, fermentation]);\nconstraint forall (p in Product) (taskEnds[p, fermentation] == taskStarts[p, conditioning]);\nconstraint forall (p in Product) (taskEnds[p, conditioning] == taskStarts[p, filtering]);\nconstraint forall (p in Product) (taskEnds[p, filtering] == taskStarts[p, carbonation]);\nconstraint forall (p in Product) (taskEnds[p, carbonation] == taskStarts[p, bottlingCanning]);\nconstraint forall (p in Product) (taskEnds[p, bottlingCanning] == taskStarts[p, packaging]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packaging]);",
                                      :content
@@ -92,13 +94,15 @@
                                      :from :system,
                                      :id 4,
                                      :tags [:info-to-user :minizinc],
-                                     :time #inst "2025-03-05T15:06:53.397-00:00"}
+                                     :time
+                                     #inst "2025-03-05T15:06:53.397-00:00"}
                            #:message{:content
                                      "\nDo all the types of plate glass you produce (standard, tempered, laminated, and specialty) follow the same general production process from melting to finishing, or do the steps vary significantly between types?",
                                      :from :system,
                                      :id 5,
                                      :tags [:query],
-                                     :time #inst "2025-04-28T18:04:31.681-00:00"}
+                                     :time
+                                     #inst "2025-04-28T18:04:31.681-00:00"}
                            #:message{:EADS-data-structure
                                      "{:EADS-ref :process/scheduling-problem-type, :message-type :DATA-STRUCTURE-REFINEMENT, :data-structure {\"continuous?\" {\"comment\" \"Product flows are not continuous but progress in batches with varying duration depending on quality or additional processing.\", \"val\" false}, \"cyclical?\" {\"comment\" \"Not cyclical due to demand variability and customization of specialty products.\", \"val\" false}, \"problem-type\" {\"comment\" \"Processes for the products follow shared early steps but diverge based on product requirements, fitting the job-shop scheduling paradigm.\", \"val\" \"JOB-SHOP-SCHEDULING-PROBLEM\"}}, :commit-notes \"Refined the problem-type as JOB-SHOP-SCHEDULING-PROBLEM. Processes include shared early stages (melting, shaping, and annealing) and diverging later steps for different glass products. Production processes are not continuous and not cyclical based on interviewee inputs.\"}",
                                      :answers-question 5,
@@ -107,9 +111,10 @@
                                      :from :surrogate,
                                      :id 6,
                                      :tags [:response],
-                                     :time #inst "2025-04-28T18:18:35.504-00:00"}]}
+                                     :time
+                                     #inst "2025-04-28T18:18:35.504-00:00"}],
+                          :status :in-process}
            #:conversation{:id :data,
-                          :status :not-started
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
@@ -117,9 +122,10 @@
                                      :from :system,
                                      :id 1,
                                      :tags [:conversation-intro],
-                                     :time #inst "2025-03-05T15:06:37.184-00:00"}]}
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}],
+                          :status :not-started}
            #:conversation{:id :resources,
-                          :status :not-started
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
@@ -127,9 +133,10 @@
                                      :from :system,
                                      :id 1,
                                      :tags [:conversation-intro],
-                                     :time #inst "2025-03-05T15:06:37.184-00:00"}]}
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}],
+                          :status :not-started}
            #:conversation{:id :optimality,
-                          :status :not-started
                           :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
@@ -137,8 +144,9 @@
                                      :from :system,
                                      :id 1,
                                      :tags [:conversation-intro],
-                                     :time #inst "2025-03-05T15:06:37.184-00:00"}]}],
-          :active-conversation :process,
+                                     :time
+                                     #inst "2025-03-05T15:06:37.184-00:00"}],
+                          :status :not-started}],
           :id :plate-glass-ork,
           :name "Plate Glass Ork"}
 ]

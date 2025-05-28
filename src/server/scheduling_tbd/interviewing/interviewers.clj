@@ -428,25 +428,22 @@
 (defn ctx-surrogate
   "Return context updated with surrogate info."
   [{:keys [pid cid force-new?] :as ctx}]
-  (let [interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
-                                                 (assoc :pid pid)))
-        surrogate-agent   (adb/ensure-agent! (-> (get @adb/agent-infos pid)
-                                                 (assoc :base-type pid)
-                                                 (assoc :force-new? force-new?)))
+  (let [interviewer-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
+        surrogate-agent   (adb/ensure-agent! {:base-type pid :pid pid} {:make-agent? force-new?})
         ctx (-> ctx
                 (assoc :responder-type :surrogate)
                 (assoc :interviewer-agent interviewer-agent)
                 (assoc :surrogate-agent surrogate-agent))]
     (if (s/valid? ::surrogate-ctx ctx)
       ctx
-      (throw (ex-info "Invalid surrogate context:" {:ctx ctx})))))
+      (do (reset! diag ctx)
+          (throw (ex-info "Invalid surrogate context:" {:ctx ctx}))))))
 
 (defn ctx-human
   "Return  part of context specific to humans."
   [{:keys [pid cid]}]
    {:responder-type :human
-    :interviewer-agent (adb/ensure-agent! (-> (get @adb/agent-infos (-> cid name (str "-interview-agent") keyword))
-                                              (assoc :pid pid)))})
+    :interviewer-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})})
 
 (defn start-human-project!
   "This does a few things to 'catch up' with the surrogate-mode of operation, which alreadys knows what the project is about.
@@ -466,7 +463,7 @@
         (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
                             :q-type :process/warm-up
                             :cid :process}))
-      (adb/ensure-agent! (-> (get @adb/agent-infos :orchestrator-agent) (assoc :pid pid)))
+      (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
       pid))
 
 (def iviewr-infos
@@ -497,14 +494,9 @@
   ([cid] (force-new-interviewer! cid nil))
   ([cid pid]
    (assert (#{:process :data :resources :optimality} cid))
-   (let [iviewr-info (not-empty (get iviewr-infos cid))
-         {:keys [base-type] :as info} (cond-> (dissoc iviewr-info :iviewr-name :focus :id :warm-up-question)
-                                        true (assoc :base-type (-> cid name (str "-interview-agent") keyword))
-                                        true (assoc :force-new? true)
-                                        pid  (assoc :pid pid))]
+   (let [base-type (-> cid name (str "-interview-agent") keyword)]
      (write-agent-instructions! cid)
-     (swap! adb/agent-infos #(assoc % base-type (dissoc info :pid)))
-     (when pid (adb/ensure-agent! info)))))
+     (when pid (adb/ensure-agent! {:base-type base-type :pid pid} {:new-agent? true})))))
 
 (defn put-EADS-ds-on-msg
   "Clean-up the EADS data structure and save it on a property :message/EADS-data-structure
@@ -570,7 +562,7 @@
          2) a change in interviewer, which occurs simply by changing :cid in the context; no initialization needed.
          3) a message to human interviewees to change conversations to what the ork wants to do,
          4) interviewing to stop (because ork conludes that no more eads-instructions apply, or forced by active? atom)."
-  [{:keys [pid cid make-ork-thread?] :as ctx}]
+  [{:keys [pid cid] :as ctx}]
   (ork/ensure-ork! pid)
   (let [budget (db/get-budget pid cid)
         active-eads-id (db/get-active-EADS-id pid cid)
@@ -668,5 +660,5 @@
   (ws/register-ws-dispatch :start-conversation start-conversation)
   (ws/register-ws-dispatch :resume-conversation resume-conversation))
 
-(defstate iviewers
+(defstate iviewrs
   :start (init-iviewers!))

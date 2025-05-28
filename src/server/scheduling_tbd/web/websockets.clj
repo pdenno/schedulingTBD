@@ -10,7 +10,7 @@
    [promesa.core             :as p]
    [promesa.exec             :as px]
    [ring.websocket.async     :as wsa]
-   [scheduling-tbd.specs     :as spec]
+   [scheduling-tbd.specs     :as specs]
    [scheduling-tbd.sutil     :as sutil :refer [elide]]
    [scheduling-tbd.util      :refer [now util-state]] ; util-state for mount
    [taoensso.telemere        :refer [log! event!]]))
@@ -252,7 +252,8 @@
     (let [msg {:dispatch-key :clear-promise-keys
                :promise-keys client-keys}]
       (go (>! out (str msg))))
-    (log! :error (str "Could not find out async channel for client " client-id))))
+    (when-not (= client-id :console)
+      (log! :error (str "Could not find out async channel for client " client-id)))))
 
 ;;;--------------------- Receiving a response from a client -----------------------
 (defn domain-expert-says
@@ -277,7 +278,7 @@
    :promise? defaults to true only when the dispatch key is :iviewr-says.
    If client-id = :console, it simply print to terminal."
   [{:keys [client-id promise? dispatch-key] :as content}]
-  (s/assert ::spec/chat-msg-obj content)
+  (s/assert ::specs/chat-msg-obj content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if (= :client-id :console)
     (log! :info (str "send-to-client (console): " (with-out-str (pprint content))))
@@ -290,7 +291,8 @@
           (log! :debug (elide (str "send-to-client: msg-obj =" msg-obj) 130)))
         (go (>! out (str msg-obj)))
         prom)
-      (log! :error (str "Could not find out async channel for client " client-id)))))
+      (when-not (= client-id :console)
+        (log! :error (str "Could not find out async channel for client " client-id))))))
 
 ;;; A map from keys to functions used to call responses from clients.
 ;;; This is defonce so that it doesn't get blown away when websockets.clj is reloaded.
@@ -348,7 +350,7 @@
   ;; The following have ws/register-ws-dispatch, which need to be re-established.
   (mount/start (find-var 'scheduling-tbd.llm/llm-tools))
   (mount/start (find-var 'scheduling-tbd.surrogate/surrogates))
-  (mount/start (find-var 'scheduling-tbd.interviewing.interviewers/iviewers))
+  (mount/start (find-var 'scheduling-tbd.interviewing.interviewers/iviewrs))
   [:socket-started])
 
 (defn wsock-stop []
@@ -360,7 +362,7 @@
   ;; The following have ws/register-ws-dispatch, which need to be re-established.
   (mount/stop (find-var 'scheduling-tbd.llm/llm-tools))
   (mount/stop (find-var 'scheduling-tbd.surrogate/surrogates))
-  (mount/stop (find-var 'scheduling-tbd.interviewing.interviewers/iviewers))
+  (mount/stop (find-var 'scheduling-tbd.interviewing.interviewers/iviewrs))
   (reset! promise-stack '())
   [:closed-sockets])
 

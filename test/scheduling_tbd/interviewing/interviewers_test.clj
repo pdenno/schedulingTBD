@@ -17,18 +17,6 @@
 ;; THIS is 2 (the other namespace I am hanging out in recently).
 ;;; Remember to db/backup-system-db once you get things straight.
 
-;;; (invt/recreate-agent! :response-analysis-agent)
-;;; (invt/recreate-agent! :process-interview-agent)
-;;; (invt/recreate-agent! :scheduling-challenges-agent)
-(defn ^:diag recreate-agent!
-  "This is used to experiment with different LLMs and value of flow-charts.
-   Use, for example process-read-the-flowchart.txt rather than the full instructions."
-  ([] (recreate-agent! :production-challenges-agent))
-  ([id]
-   (if-let [info (some #(when (= (:id %) id) %) adb/agent-infos)]
-     (adb/ensure-agent! info)
-     (log! :error (str "No such agent: " id)))))
-
 ;;; Used to query the flowchart using the process-interview-agent.
 (defonce process-interview-system-agent (atom {}))
 

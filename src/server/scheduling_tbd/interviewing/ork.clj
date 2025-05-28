@@ -22,7 +22,17 @@
    but want to start from scratch on the project."
   ([pid] (ensure-ork! pid {}))
   ([pid opts]
-   (adb/ensure-agent! nil (merge {:pid pid :base-type :orchestrator-agent} opts))))
+   (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid} opts)))
+
+
+;;;                  :thread-id "thread_tva3Ui80mSstem032NLGNQgy",
+;;;                  :assistant-id "asst_6VQhN6C2nf4rFQlZEIciqTJY",
+(defn ^:admin refresh-ork!
+  "I use this at the REPL to create a new ork in the system DB.
+   That is enough to cause it to be reused in NEW projects."
+  []
+  (adb/ensure-agent! :orchestrator-agent #_{:force-new? true}))
+
 
 ;;; ToDo: Find a better home for this.
 (def scheduling-challenge2-description
@@ -123,14 +133,15 @@
    Some interviewers are instructed to set a property 'exhausted?' to true (e.g. the orm interviewer does this),
    for other we check that all the properties of the EADS are used somewhere in the data structure."
   [pid cid eads-id]
-  (let [dstruct (as-> (db/get-EADS-dstructs pid cid) ?x
-                  (apply max-key :message/id ?x)
-                  (:message/EADS-data-structure ?x)
-                  (edn/read-string ?x))]
-    (if (:exhausted? dstruct)
+  (let [most-recent-ds (when-let [dstructs (not-empty (db/get-EADS-dstructs pid cid))]
+                         (as-> dstructs ?d
+                           (apply max-key :message/id ?d)
+                           (:message/EADS-data-structure ?d)
+                           (edn/read-string ?d)))]
+    (if (:exhausted? most-recent-ds) ; Only some have this; not to be confused with ork use of :exhausted?
       true
-      (let [ds-eads-ref (:based-on-EADS dstruct)
-            ds-keys (collect-keys dstruct)
+      (let [ds-eads-ref (:based-on-EADS most-recent-ds)
+            ds-keys (collect-keys most-recent-ds)
             eads-keys (-> (d/q '[:find ?str .
                                  :in $ ?eads-id
                                  :where
@@ -162,10 +173,10 @@
     (agent-log (str "[ork manager] (receives response form ork) " (with-out-str (pprint res))))
     res))
 
-;(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
-;(s/def ::message-type #(= % "PURSUE-EADS"))
-;(def eads-id? (-> (db/list-system-EADS) set))
-;(s/def ::EADS-id eads-id?)
+(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
+(s/def ::message-type #(= % "PURSUE-EADS"))
+(def eads-id? (-> (db/list-system-EADS) set))
+(s/def ::EADS-id eads-id?)
 
 (defn get-new-EADS-id
   "Update the project's orchestrator with CONVERSATION-HISTORY and do a SUPPLY-EADS request to the ork.

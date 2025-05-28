@@ -9,6 +9,8 @@
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.interviewing.interviewers :as inv]
    [scheduling-tbd.interviewing.response-utils :as ru]
+   [scheduling-tbd.sutil     :as sutil]
+   [scheduling-tbd.util      :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere        :refer [log!]]))
 
@@ -46,7 +48,7 @@
 
 ;;; (sur/start-surrogate! {:product "optical fiber" :client-id (ws/recent-client!)})
 (defn start-surrogate!
-   "Create a surrogate and ask client to :load-proj.
+   "Create a surrogate agent and ask client to :load-proj.
     :load-proj will cause the client to get-conversation (http and chat). The chat part will :resume-conversation (call back to server).
     product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
               Any of the :segment/name from the 'How it's Made' DB would work here.
@@ -60,15 +62,14 @@
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
         instructions (system-instruction expertise)]
     (agent-log (str "============= Start surrogate " pid " :process  ========================="))
-    ;(adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string instructions :surrogate? true :expertise expertise})
+    (adb/ensure-agent! {:base-type pid :pid pid} {:agent/system-instruction instructions :agent/surrogate? true :agent/expertise expertise})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
     (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
     (try ;; Now do the warm-up question.
       (let [ctx (inv/ctx-surrogate {:pid pid
                                     :cid :process
                                     :question (ru/get-warm-up-q :process)
-                                    :client-id client-id
-                                    :force-new? true}) ; This is about the agent; make a new project agent.
+                                    :client-id client-id})
             conversation (inv/get-an-answer ctx) ; get-an-answer also used by q-and-a, but here we have the q.
             response (-> conversation last :text)
             warm-up-claims (ru/analyze-warm-up :process response)
@@ -80,7 +81,7 @@
           (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
                               :q-type :process/warm-up
                               :cid :process}))
-        (adb/ensure-agent! nil {:base-type :orchestrator-agent :pid pid})
+        (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
         ;; This will cause a resume-conversation, which will start with a conversation-history, so the interviewer should see the warm-up question.
         (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
                             :new-proj-map {:project/name pname :project/id pid}}))
@@ -89,18 +90,18 @@
       (finally ; ToDo: Not sure this is needed.
         (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))))
 
-
-#_(sur/start-surrogate+
-   {:client-id (ws/recent-client!)
-    :map-str (str {:pid :sur-music-school
-                   :pname "Music School"
-                   :sur-instructions (str "You run a music school. Until today you've been scheduling student lessons by fiddling with a spreadsheet.\n"
-                                          "But that is error-prone and time consuming. The problem is that you need to bring each student together with their instructor\n"
-                                          "in a room having the right equipment. (Only some practice rooms have pianos or drums.) Of course, instructors don't want\n"
-                                          "to come in to teach just one student. Most instructors would like to do a block of a few hours of lessons on days they come in.\n"
-                                          "Lessons are either 30 min, 45, or an hour.")
-                   :warm-up-response "Thanks! Yes, we run a music school and we'd like a system that helps us schedule use of our practice rooms with students and instructors."
-                   :expertise "running a music school"})})
+(defn blank-surrogate
+  "Create an agent object for use as a surrogate.
+   It gets :agent/instructions and :agent/expertise elsewhere."
+  ([pid] (blank-surrogate pid @sutil/default-llm-provider))
+  ([pid llm-provider]
+   #:agent{:base-type pid
+           :agent-type :project,
+           :model-class :gpt,
+           :llm-provider :openai,
+           :surrogate? true,
+           :timestamp (now)
+           :agent-id (-> pid name (str "-" (name llm-provider)) keyword)}))
 
 (defn start-surrogate+
   "This is like start-surrogate! but the call to it is provided with the project name, challenge descriptiion,
@@ -119,11 +120,11 @@
           a-id (db/add-msg {:pid pid :cid :process :from :surrogate :tags [:response :warm-up] :text warm-up-response})]
       (db/update-msg pid :process a-id  {:message/answers-question q-id})
       (agent-log (str "============= Start surrogate+ " pid " :process  ========================="))
-      ;(adb/put-agent-info! pid {:base-type pid :agent-type :project :instruction-string sur-instructions :surrogate? true :expertise expertise})
-      (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
-      (inv/resume-conversation {:client-id :console :pid pid :cid :process :make-ork-thread? true})
-      #_(ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
-                          :new-proj-map {:project/name pname :project/id pid}}))))
+      (db/put-agent! {:base-type pid :pid pid} (blank-surrogate pid))
+      (reset! diag [{:base-type pid :pid pid} {:agent/system-instruction sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true}])
+      (adb/ensure-agent! {:base-type pid :pid pid} {:agent/system-instruction sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true})
+      (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid} {:make-agent? true}) ; This might update existing agent.
+      (inv/resume-conversation {:client-id :console :pid pid :cid :process}))))
 
 (defn surrogate-follow-up
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."

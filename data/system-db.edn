@@ -1,45 +1,37 @@
 [
 #:system{:EADS
          [#:EADS{:can-produce-visuals [:flow-shop/graph],
-                 :cid :process,
                  :id :process/flow-shop,
                  :msg-str
                  "{:message-type :EADS-INSTRUCTIONS, :interviewer-agent :process, :interview-objective \"This EADS assumes the interviewees' production processes are organized as a flow shop.\\nLearn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\\nWe might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\\nFor example, they might have in mind scheduling machine maintenance, not production.\\nThis fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\\nKnowledge of the processes might prove useful later.\", :EADS {:EADS-id :process/flow-shop, :process-id {:val \"pencil-manufacturing\", :comment \"This is the top-level process. You can name it as you see fit; don't ask the interviewees.\"}, :inputs {:val [\"graphite\" \"clay\" \"water\" \"cedar wood\" \"metal\" \"eraser material\" \"paint\"], :comment \"These are all the raw materials used to make the product. It is a collection of all the raw materials in subprocesses.\"}, :outputs {:val [{:item-id \"finished pencils\", :quantity {:units \"finished pencils\", :value-string \"100000\"}}], :comment \"inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.\"}, :resources {:val [\"extruder\" \"kiln\" \"milling machine\" \"glue applicator\" \"shaping machine\"], :comment \"Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer.\"}, :duration {:val {:units \"hours\", :value-string \"4\"}, :comment \"We use a string for 'value-string' in case interviewees answer it something like 'it varies'\"}, :subprocesses [{:process-id \"graphite-core-production\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"finished graphite rods\", :quantity {:units \"graphite cores\", :value-string \"100000\"}}], :resources [\"mixer\" \"extruder\" \"kiln\"], :subprocesses [{:process-id \"mix-graphite-and-clay\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite clay paste\", :quantity {:units \"liters\", :value-string \"100\"}}], :resources [\"mixer\"], :duration {:units \"hours\", :value-string \"1\"}, :subprocesses {:val [], :comment \"We use empty array val values to signify that we don't think there are any interesting subprocess from the standpoint of scheduling.\\nOf course, this could be updated later if subsequent discussion suggests we are wrong.\"}} {:process-id \"extrude-core\", :inputs [\"graphite clay paste\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"extruder\"], :duration {:units \"minutes\", :value-string \"20\"}, :subprocesses []} {:process-id \"dry-and-bake-core\", :inputs [\"extruded graphite rods\"], :outputs [{:item-id \"finished graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"kiln\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"wood-casing-production\", :inputs [\"cedar wood\"], :outputs [\"wood slats with grooves\"], :resources [\"milling machine\"], :subprocess-flow {:val \"individuals-from-batch\", :comment \"The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\\nyou can start 'cut-grooves-in-slats' as soon as the first slat is available.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses.\"}, :subprocesses [{:process-id \"mill-wood-slats\", :inputs [\"cedar wood\"], :outputs [\"milled wood slats\"], :resources [\"milling machine\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocess-flow {:val :individuals-from-batch, :comment \"'subprocess-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\\nThe string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\\ncan start as soon as the first slat is available.\"}, :subprocesses []} {:process-id \"cut-grooves-in-slats\", :inputs [\"milled wood slats\"], :outputs [\"wood slats with grooves\"], :resources [\"groove cutter\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"assemble\", :inputs {:val [{:item-id \"finished graphite rods\", :from \"graphite-core-production\"} {:item-id \"wood slats with grooves\", :from \"wood-casing-production\"} \"metal\" \"erasers\" \"paint\"], :comment \"The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\\nThe 'from' property is essential to understanding process ordering and potential for concurrency.\"}, :outputs [\"finished pencil\"], :resources [\"glue applicator\" \"shaping machine\"], :subprocesses [{:process-id \"insert-core-into-slats\", :inputs [\"graphite core\" \"wood slats with grooves\"], :outputs [\"pencil blanks\"], :resources [\"glue applicator\"], :subprocesses []} {:process-id \"shape-and-paint-pencil\", :inputs [\"pencil blanks\" \"paint\"], :outputs [\"shaped and painted pencils\"], :resources [\"shaping machine\" \"painting station\"], :subprocesses []} {:process-id \"attach-eraser\", :optional? {:val true, :comment \"'optional?' means that the process does not occur for every product. Not every pencil has an eraser.\"}, :inputs [\"shaped and painted pencils\" \"metal\" \"erasers\"], :outputs [\"finished pencils\"], :resources [\"crimping tool\"], :subprocesses []}]}]}}",
                  :specs #:spec{:full :flow-shop/EADS-message}}
-          #:EADS{:cid :process,
-                 :id :process/scheduling-problem-type,
+          #:EADS{:id :process/scheduling-problem-type,
                  :msg-str
                  "{:message-type :EADS-INSTRUCTIONS, :interview-objective \"Using the four property types 'problem-type', 'problem-components', 'continuous?', and 'cyclical?', determine the kind of production system and scheduling problem for which the interviewees seek a solution.\\nFor 'problem-type' you may only choose one of the following:\\n   1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of defining start times for jobs that all execute the same sequence of production steps across multiple machines or workstations.\\n   2) TIMETABLING-PROBLEM: the problem of assigning collections of resources to event time slots, ensuring that all the resources required for each event are available in its time slot.\\n   3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within an undertaking.\\n   4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which the jobs visit machines or workstations may vary as determined by the job type.\\n   5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources.\", :EADS {:EADS-id :process/scheduling-problem-type, :principal-problem-type {:val :FLOW-SHOP-SCHEDULING-PROBLEM, :comment \"The value here should be the problem-type that best characterizes the problem and system architecture.\\nWe asked interviewees a few questions about their operations (not shown here) and inferred that they operate a flow shop.\"}, :problem-components {:val [:FLOW-SHOP-SCHEDULING-PROBLEM :TIMETABLING-PROBLEM], :comment \"This should be a list of problem-type values that include all the problem types that seem relevant given your conversation so far.\\nFor example, whereas in this example the principal-problem-type is a flow-shop, conversation suggests that work might queue for a task the presents a timetabling problem.\"}, :continuous? {:val false, :comment \"continuous? refers to whether or not, in the principle-problem-type, product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.\\nThis might be apparent from the answers that determined the value of problem-type. If not, then you can ask.\"}, :cyclical? {:val false, :comment \"cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.\\nFor example, if the made the same collection of products in the same order each week, cylical? would be true.\"}}}",
                  :specs
                  #:spec{:full :scheduling-problem-type/EADS-message}}
-          #:EADS{:cid :process,
-                 :id :process/job-shop,
+          #:EADS{:id :process/job-shop,
                  :msg-str
                  "{:message-type :EADS-INSTRUCTIONS, :interviewer-agent :process, :interview-objective \"These EADS-INSTRUCTIONS assumes the interviewees' production processes are organized as a job shop.\\nWe have two separate approaches to model job shop scheduling problems: in one of these, the jobs are classified to match a small (less than a dozen or so)\\ndifferent process plans; in the other, a process plans will need to be specified for each job.\\nThe purpose of these EADS-INSTRUCTIONS is only to determine which of these two subclasses of job shop models should be pursued.\\nOnce this is determined, the orchestrator will likely then choose either EADS 'process/job-shop--classifiable' or 'process/job-shop--unique-order' corresponding\\nrespectively to the two separate approaches just described.\", :EADS {:EADS-id :process/job-shop, :classifiable-jobs? {:val true, :comment \"This property is true only in the case that it seems reasonable to pre-classify jobs as corresponding to a small collection (a dozen or so) process plans.\\nIf, in contrast, it seems more reasonable for the the firm to define a (possibly unique) production process for each job, classifiable-jobs? should be false.\\nIt is reasonable to ask whether defining a process plan for each job is part of their workflow.\"}}}",
                  :specs #:spec{:full :job-shop/EADS-message}}
-          #:EADS{:cid :process,
-                 :id :process/job-shop--classifiable,
+          #:EADS{:id :process/job-shop--classifiable,
                  :msg-str
                  "{:message-type :EADS-INSTRUCTIONS, :interviewer-agent :process, :interview-objective \"These EADS-INSTRUCTIONS assumes that\\n  (1) the interviewees' production processes are organized as a job shop, and\\n  (2) each of the jobs they undertake can be classified as following one of a small set of process plans.\\nThe purpose of these EADS-INSTRUCTIONS are to describe these process plans.\\nThere are a few ways to go about this:\\n  *  One way is to describe a single encompassing flow-shop-like process where some tasks are optional for some jobs.\\n     In this arrangement, we'd expect information about what processes are optional to accompany each job.\\n     In this arrangement, it is not your responsibility to relate jobs to processes; just capture the processes.\\n\\n  *  A second way is to describe a collection of distinct flow-shop-like process plans, one of which applies to every job they will encounter.\\n     You would choose this if there are permutations in the ordering of tasks among the jobs.\\n     (You will see from the EADS data structure below, that it does not provide a way describe these permuatations, thus the proliferation of process plans.)\\n     (By the way, you are free to mark tasks as optional in this approach, just as you might in the single encompassing flow-shop-like process described in the previous bullet.)\\n     You would choose this approach if, for example, they make a few very different products (like, for example, t-shirts and running shoes).\\n     It is possible that if they do make a few very different products, that they actually are talking about scheduling multiple production lines!\\n     There is a boolean in the EADS, 'multiple-production-lines?' that you can set to true if you learn that they have in mind scheduling multiple flow-shop-like production lines;\\n     We'll deal with this problem later, in the resources interview.\\nNote that the data structures used to define processes in these EADS instructions are like the one in the process/flow-shop EADS instructions.\\nThe principal differences are that (1) this one allows for multiple job-level processes, and (2) this one has the multiple-production-lines? property described above.\", :EADS {:EADS-id :process/job-shop--classifiable, :multiple-production-lines? {:val false, :comment \"This property is true only in the case that you learn that they run multiple flow-shop-like production lines that each support distinct process flows \\nappropriate for only some jobs.\"}, :job-level-processes {:comment \"This is a list of flow-shop-like processes as described in the interview-objectives above.\\nThe list only has one job-level process in it, but in your interveiw you can define many as described in the interview-objectives.\", :val [{:process-id {:val \"pencil-manufacturing\", :comment \"This is the top-level process. You can name it as you see fit; don't ask the interviewees.\"}, :inputs {:val [\"graphite\" \"clay\" \"water\" \"cedar wood\" \"metal\" \"eraser material\" \"paint\"], :comment \"These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes.\"}, :outputs {:val [{:item-id \"finished pencils\", :quantity {:units \"finished pencils\", :value-string \"100000\"}}], :comment \"inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.\"}, :resources {:val [\"extruder\" \"kiln\" \"milling machine\" \"glue applicator\" \"shaping machine\"], :comment \"Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer.\"}, :duration {:val {:units \"hours\", :value-string \"4\"}, :comment \"We use a string for 'value-string' in case interviewees answer it something like 'it varies'\"}, :subprocesses [{:process-id \"graphite-core-production\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite core\", :quantity {:units \"graphite cores\", :value-string \"100000\"}}], :resources [\"mixer\" \"extruder\" \"kiln\"], :subprocesses [{:process-id \"mix-graphite-and-clay\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite-clay paste\", :quantity {:units \"liters\", :value-string \"100\"}}], :resources [\"mixer\"], :duration {:units \"hours\", :value-string \"1\"}, :subprocesses {:val [], :comment \"We use empty array val values to signify that we don't think there are any interesting sub-process from the standpoint of scheduling.\\nOf course, this could be updated later if subsequent discussion suggests we are wrong.\"}} {:process-id \"extrude-core\", :inputs [\"graphite-clay paste\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"extruder\"], :duration {:units \"minutes\", :value-string \"20\"}, :subprocesses []} {:process-id \"dry-and-bake-core\", :inputs [\"extruded graphite rods\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"kiln\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"wood-casing-production\", :inputs [\"cedar wood\"], :outputs [\"wood slats with grooves\"], :resources [\"milling machine\"], :subprocess-flow {:val \"individuals-from-batch\", :comment \"The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\\nyou can start 'cut-grooves-in-slats' as soon as the first slat is available.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses.\"}, :subprocesses [{:process-id \"mill-wood-slats\", :inputs [\"cedar wood\"], :outputs [\"milled wood slats\"], :resources [\"milling machine\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocess-flow {:val :individuals-from-batch, :comment \"'sub-process-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\\nThe string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\\ncan start as soon as the first slat is available.\"}, :subprocesses []} {:process-id \"cut-grooves-in-slats\", :inputs [\"milled wood slats\"], :outputs [\"wood slats with grooves\"], :resources [\"groove cutter\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"assembly\", :inputs {:val [{:item-id \"graphite core\", :from \"graphite-core-production\"} {:item-id \"wood slats with grooves\", :from \"wood-casing-production\"} \"metal\" \"erasers\" \"paint\"], :comment \"The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\\nThe 'from' property is essential to understanding process ordering and potential for concurrency.\"}, :outputs [\"finished pencil\"], :resources [\"glue applicator\" \"shaping machine\"], :subprocesses [{:process-id \"insert-core-into-slats\", :inputs [\"graphite core\" \"wood slats with grooves\"], :outputs [\"pencil blanks\"], :resources [\"glue applicator\"], :subprocesses []} {:process-id \"shape-and-paint-pencil\", :inputs [\"pencil blanks\" \"paint\"], :outputs [\"shaped and painted pencils\"], :resources [\"shaping machine\" \"painting station\"], :subprocesses []} {:process-id \"attach-eraser\", :optional? {:val true, :comment \"'optional?' means that the process does not occur for every product. Not every pencil has an eraser.\"}, :inputs [\"shaped and painted pencils\" \"metal\" \"erasers\"], :outputs [\"finished pencils\"], :resources [\"crimping tool\"], :subprocesses []}]}]}]}}}",
                  :specs
                  #:spec{:full :job-shop--classifiable/EADS-message}}
-          #:EADS{:cid :process,
-                 :id :process/job-shop-unique,
+          #:EADS{:id :process/job-shop-unique,
                  :msg-str
                  "{:message-type :EADS-INSTRUCTIONS, :interviewer-agent :process, :interview-objective \"These EADS-INSTRUCTIONS assumes the interviewees' production operates as a 'true' job shop -- an arrangement where possibly every job has a unique process plan.\\nThe purpose of these EADS-INSTRUCTIONS are to describe unit processes of jobs, their inputs, outputs, resources, and (sometimes) typical duration.\\nA unit process (you might define this term in your interview) is a a fundamental step in the production chain where a specific transformation\\nor change is applied to a material or component.\\nThe property unit-processes is a list of all processes objects the interviewees deem relevant to production scheduling.\\nThese process objects are similar to those used in other EADS, such as process/flow-shop, except that they do not have a subprocesses property.\\nThe process objects will be referenced in the definition of the job's process plan,\\nbut the interview association with this EADS does not capture that relation between the job and the processes.\\n\\nThe examples in the EADS are from an automotive machine shop, a quintessential example of a job shop.\\nWe only include two unit processes in the example, but a typical machine shop might have about 50.\", :EADS {:EADS-id :process/job-shop--unique, :unit-processes [{:process-id {:val \"hone-cylinder-bores\", :comment \"Name processes as you see fit, but make sure there are no duplicate uses of the name as process-id.\\nThough there are subprocesses to honing cylinder bores (e.g. fixturing engine block, selecting honing tools, honing, inspection)\\nthe interviewees deemed honing cylinder bores a unit process. This is quite reasonable.\"}, :inputs {:val [\"engine block\"], :comment \"'inputs' is a list of all the raw materials used to make the product.\"}, :outputs {:val [{:item-id \"honed engine block\", :quantity {:units \"unit\", :value-string \"1\"}}], :comment \"Inputs and outputs can either be simple strings like we used with 'engine block', or objects like this, with an 'item-id' and 'quantity'.\\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.\"}, :resources {:val [\"honing machine\" \"honing tool\" \"fixture\"], :comment \"Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"We use a string for 'value-string' in case interviewees answer it something like 'it varies'.\\nYou might use a comment to describe the context of this value.\\nFor example, you could ask the interviewees about different durations for honing a straight 4 cylinder block versus a V8 and use their response\\nin a comment to elaborate important considerations about the unit process's duration.\"}} {:process-id \"aluminum-cylinder-head-resurfacing\", :inputs [\"cylinder head\"], :outputs [\"flat cylinder head\"], :resources {:val [\"milling machine\"], :comment \"We might have learned in the interview that they use a milling machine for resurfacing aluminum heads and a grinding machine for cast iron heads.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"The value here does not include leak testing, which is treated as a separate unit process that usually follows resurfacing.\"}}]}}",
                  :specs #:spec{:full :job-shop-u/EADS-message}}
-          #:EADS{:cid :process,
-                 :id :process/timetabling,
+          #:EADS{:id :process/timetabling,
                  :msg-str
                  "{:message-type :EADS-INSTRUCTIONS, :interviewer-agent :process, :interview-objective \"Whereas most other EADS-INSTRUCTIONS in the process interview focus on characterizing the processes by which the interviewees' enterprise produces product or delivers a service,\\nprocess/timetabling does not. Timetabling is about assigning limited resources, such as classrooms, teachers, or machinery, to events types that will occur in timeslots.\\nTimetabling interviews are about characterizing the resources, event types, and timeslots (ts), not how enterprise makes product or delivers a service.\\nA timetabling discussion mediated by these EADS-INSTRUCTIONS can occur as a focused examination of some subprocess of a larger process for which you have already had some discussion.\\nFor example, you might have pursued the process/flow-shop EADS, and learned that a particular subprocess in the flow uses timetabling.\\n\\nThe specifics of timetablings problems can vary widely depending on the enterprises's goals and circumstances.\\nFor example, in some cases, the time at which the event occurs can be chosen in light of opportunity.\\nFor example, one could timetable the use of a heat-treat oven based on having available a sufficient number of parts needing the same heat treat process.\\nLikewise one might timetable equipment maintenance opportunistically.\\nAnother opportunistic timetabling problem might involve perishable raw materials, such as food ingredients.\\nMany timetabling problems are not opportunistic, scheduling classes in a university, for example.\\n\\nThere are three kinds of event types in our formulation of timetabling:\\n    (1) regularly scheduled: they have property named 'periodicity',\\n    (2) one-time: their 'occurrence-assignment' property defines when they occur using a date, and,\\n    (3) opportunistic: their 'occurrence-assignment' property defines 'opportunistic? = true' and conditions (possibly including periodicity) in which they occur.\\n\\nYou can think of the information you are trying to capture in the interview as including descriptions of\\n   (1) a Cartesian product of resources needed for the event type to occur,\\n   (2) rules for what resources can, must, or must not occur together in instances of the Cartesian product, and\\n   (3) how instances of the Cartesian product can be assigned to timeslots.\\n\\nFinally, we must confess to not knowing too much about what to expected from timetabling interviews; we haven't studied this area as much as some of the others.\\nWith this in mind, feel free to use the 'invented' property discussed in the interviewer instructions whenever you think the EADS isn't capturing something important.\", :EADS {:EADS-id :process/timetabling, :event-types {:comment \"The event-types property is a list of objects that capture\\n   *  'event-resources'        : a Cartesian product of resources in the sense described in the interview objectives, and\\n   *  'periodicity'            : (optional) the interval and number of instances in which periodic events of this event type occur.\\n   *  'occurrence-assignment'  : the timeslots in which this event type are allowed to occur.\\nThis example is about timetabling classes at a community college for one semester.\", :val [{:event-type-name {:val \"lecture-class-30-90min-type\", :comment \"Note that we used the suffix '-type' in the name to emphasize that this defines the general form for instances of this class, not an instance occurrence.\\nExample lecture-class-types include chemistry lectures and physics lectures.\\nYou, the interviewer, decided on this naming convention in light of the conversation you had with interviewees.\"}, :event-resources {:comment \"These are the elements of the Cartesian product. When no quantity is specified, we assume exactly one is required.\", :val [{:resource-type {:val \"room-type-30\", :comment \"Note the -30 suffix here is because (as shown below) the room should have capacity for 30 people and the event is '-30-90min-type'.\\nSimilar to 'event-type-name', you devised this naming convention.\\nThe meaning of room-type-30 will be made clear in the resources interview, not here.\"}, :base-type {:val \"place\", :comment \"Possible values for this property are 'human', 'place', and 'equipment'.\"}} {:resource-type \"student-type\", :base-type \"human\", :quantity {:units \"person\", :value-string \"30\", :modifier \"up to\"}} {:resource-type \"instructor-type\", :base-type \"human\"}]}, :periodicity {:val {:interval {:units \"week\", :value-string \"1\"}, :occurrences {:value-string \"2\"}}, :comment \"This periodicity object describes the event type as (being periodic and) having two occurrence per week.\\nFor example, in this case, the interviewees suggested that many courses are taught as two 90-minute lectures per week.\"}, :occurrence-assignment {:val {:ts-type-refs [\"Tu-Th-90min\"], :constraints [\"same-time\" \"different-days\"]}, :comment \"'occurrence-assignment objects define a disjunction of possibilities of where in time the event can be assigned.\\nThe 'ts-type-refs' property is a list referring to timeslots. (These are defined below.)\\nThe 'constraints' property is a list of enumeration values. These define where in time these events can be assigned to occur.\\nsame-time indicates that events must be in the same periodicity interval must occur at the same time of day.\\ndifferent-days indicates that events in the same periodicity interval must be assigned to different days.\\nBecause there are only two days, Tuesday and Thursday, in the 'Tu-Th-90min' timeslot class, and the periodicity is 2 occurences per week,\\nit must be the case that one event occurs on Tuesday and the other on Thursday each week (and at the same time of day).\"}} {:event-type-name \"lecture-class-30-60min-type\", :event-resources [{:resource-type \"room-type-30\", :base-type \"place\"} {:resource-type \"student-type\", :base-type \"human\"} {:resource-type \"instructor-type\", :base-type \"human\"}], :periodicity {:interval {:units \"week\", :value-string \"1\"}, :occurrences {:value-string \"3\"}}, :occurrence-assignment {:ts-type-refs [\"Mon-Wed-Fri-90min\"], :constraints [\"same-time\" \"different-days\"]}} {:event-type-name \"lab-class\", :event-resources [{:resource-type \"room-type-lab\", :base-type \"place\"} {:resource-type \"student-type\", :base-type \"human\"} {:resource-type \"lab-assistant-type\", :base-type \"human\", :quantity {:units \"person\", :value-string \"2\"}}], :periodicity {:interval {:units \"week\", :value-string \"1\"}, :occurrences {:value-string \"1\"}}, :occurrence-assignment {:ts-type-refs [\"Three-hour-lab\"]}} {:event-type-name {:val \"instructor-break\", :comment \"This is an example of an opportunistic event with periodicity.\"}, :event-resources [{:resource-type \"instructor-type\", :base-type \"human\"}], :periodicity {:interval {:units \"day\", :value-string \"1\"}, :occurrences {:value-string \"1\"}}, :occurrence-assignment {:opportunistic? true, :constraints {:val [\"every-day\" \"once\"], :comment \"The purpose of this event type is to ensure the no instructor has to work every timeslot.\\nInterviewees stipulated this in the conversation.\"}, :ts-type-refs [\"Mon-Wed-Fri-60min\" \"Tu-Th-90min\" \"Three-hour-lab\"]}} {:event-type-name {:val \"spring-break\", :comment \"This is an example of a one-time event. It has no 'event-resources'; in this sense, it is a non-event!\"}, :occurrence-assignment {:ts-type-refs {:val [\"2025-03-17\" \"2025-03-18\" \"2025-03-19\" \"2025-03-20\" \"2025-03-21\"], :comment \"Instead of enumeration values, we put dates here.\"}}}]}, :timeslots [{:ts-type-id \"Mon-Wed-Fri-60min\", :spans [{:span-id \"Monday\", :periods [\"9:00-9:50\" \"10:00-10:50\" \"11:00-11:50\" \"13:00-13:50\" \"14:00-14:50\" \"15:00-15:50\" \"16:00-16:50\"]} {:span-id \"Wednesday\", :periods [\"9:00-9:50\" \"10:00-10:50\" \"11:00-11:50\" \"13:00-13:50\" \"14:00-14:50\" \"15:00-15:50\" \"16:00-16:50\"]} {:span-id \"Friday\", :periods [\"9:00-9:50\" \"10:00-10:50\" \"11:00-11:50\" \"13:00-13:50\" \"14:00-14:50\" \"15:00-15:50\" \"16:00-16:50\"]}]} {:ts-type-id \"Tu-Th-90min\", :spans [{:span-id \"Tuesday\", :periods {:val [\"9:00-10:20\" \"10:30-11:50\" \"13:00-14:20\" \"14:30-15:50\" \"16:00-17:20\"], :comment \"We asked the interviewees about the regularity of class events and came up with this formulation.\\nTry to stick to a common syntax for 'period' for all values in the 'period-values' property.\\nNote that our '90 minute' periods actually run 80 minutes to give people time to get to their next class, etc.\\n\"}} {:span-id \"Thursday\", :periods [\"9:00-10:20\" \"10:30-11:50\" \"13:00-14:20\" \"14:30-15:50\" \"16:00-17:20\"]}]} {:ts-type-id \"Three-hour-lab\", :spans [{:span-id \"Monday\", :periods [\"9:00-11:50\" \"13:00-15:50\"]} {:span-id \"Tuesday\", :periods [\"9:00-11:50\" \"13:00-15:50\"]} {:span-id \"Wednesday\", :periods [\"9:00-11:50\" \"13:00-15:50\"]} {:span-id \"Thursday\", :periods [\"9:00-11:50\" \"13:00-15:50\"]} {:span-id \"Friday\", :periods [\"9:00-11:50\" \"13:00-15:50\"]}]}]}}",
                  :specs #:spec{:full :timetabling/EADS-message}}
-          #:EADS{:cid :process,
-                 :id :process/job-shop--unique,
+          #:EADS{:id :process/job-shop--unique,
                  :msg-str
                  "{:message-type :EADS-INSTRUCTIONS, :interviewer-agent :process, :interview-objective \"These EADS-INSTRUCTIONS assumes the interviewees' production operates as a 'true' job shop -- an arrangement where possibly every job has a unique process plan.\\nThe purpose of these EADS-INSTRUCTIONS are to describe unit processes of jobs, their inputs, outputs, resources, and (sometimes) typical duration.\\nA unit process (you might define this term in your interview) is a a fundamental step in the production chain where a specific transformation\\nor change is applied to a material or component.\\nThe property unit-processes is a list of all processes objects the interviewees deem relevant to production scheduling.\\nThese process objects are similar to those used in other EADS, such as process/flow-shop, except that they do not have a subprocesses property.\\nThe process objects will be referenced in the definition of the job's process plan,\\nbut the interview association with this EADS does not capture that relation between the job and the processes.\\n\\nThe examples in the EADS are from an automotive machine shop, a quintessential example of a job shop.\\nWe only include two unit processes in the example, but a typical machine shop might have about 50.\", :EADS {:EADS-id :process/job-shop--unique, :unit-processes [{:process-id {:val \"hone-cylinder-bores\", :comment \"Name processes as you see fit, but make sure there are no duplicate uses of the name as process-id.\\nThough there are subprocesses to honing cylinder bores (e.g. fixturing engine block, selecting honing tools, honing, inspection)\\nthe interviewees deemed honing cylinder bores a unit process. This is quite reasonable.\"}, :inputs {:val [\"engine block\"], :comment \"'inputs' is a list of all the raw materials used to make the product.\"}, :outputs {:val [{:item-id \"honed engine block\", :quantity {:units \"unit\", :value-string \"1\"}}], :comment \"Inputs and outputs can either be simple strings like we used with 'engine block', or objects like this, with an 'item-id' and 'quantity'.\\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.\"}, :resources {:val [\"honing machine\" \"honing tool\" \"fixture\"], :comment \"Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"We use a string for 'value-string' in case interviewees answer it something like 'it varies'.\\nYou might use a comment to describe the context of this value.\\nFor example, you could ask the interviewees about different durations for honing a straight 4 cylinder block versus a V8 and use their response\\nin a comment to elaborate important considerations about the unit process's duration.\"}} {:process-id \"aluminum-cylinder-head-resurfacing\", :inputs [\"cylinder head\"], :outputs [\"flat cylinder head\"], :resources {:val [\"milling machine\"], :comment \"We might have learned in the interview that they use a milling machine for resurfacing aluminum heads and a grinding machine for cast iron heads.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"The value here does not include leak testing, which is treated as a separate unit process that usually follows resurfacing.\"}}]}}",
                  :specs #:spec{:full :job-shop--unique/EADS-message}}
-          #:EADS{:cid :data,
-                 :id :data/orm,
+          #:EADS{:id :data/orm,
                  :msg-str
                  "{:message-type :EADS-INSTRUCTIONS, :interviewer-agent :data, :interview-objective \"The data interview is about discovering and documenting the information that interviewees use to do their work (scheduling production or providing a service to customers).\\nMany small manufacturers use spreadsheets to run their company.\\nIt would seem expeditious, therefore, to have the interviewees upload their spreadsheets for discussion; but we are not going to do that.\\nInstead, we are going to learn characteristics of their data through your interview and create example data of the sorts that they described to you.\\nWe will use these data to run prototypes of the MiniZinc-based scheduling system that the humans and AI create together.\\n\\nThere are three principal tasks to be achieved in this interview:\\n   Task 1: determining the kinds and scope of data involved in decision making in the interviewees' work,\\n   Task 2a: determining the relationships and constraints among the data and expressing these as Object Role Modeling (ORM) fact types, and,\\n   Task 2b: for each ORM fact type, creating a table of example data that the interviewees would deem realistic.\\n\\nNotice that we used the terminology 'Task 2a' and 'Task 2b' rather than 'Task 2' and 'Task 3'.\\nThis is to emphasize that you should focus on completing the specification of each ORM fact (Task 2a) and the production of example data (Task 2b) before addressing the next fact type.\\nWorking this way, you will help keep the interviewees focused.\\n\\nIn Task 1, the goal is to categorize their quantitative and structured data into 'areas of inquiry'.\\nWe provide an enumeration of areas of inquiry in the EADS.\\nYou are encouraged to use this enumeration, but, as always, you can use EADS annotations to add categories or impart nuance using what you learn from the interviewees.\\n\\nIn Task 2a, we are particularly interested in capturing domain semantics of the data in the viewpoint of Object Role Modeling (ORM).\\nSpecifically, Task 2a is about defining all the ORM fact types of the subject area of inquiry.\\nThe best way to do this might be to first elicit from the interviewees all the concepts (ORM objects) relevant to the area of inquiry and then suggest to them (as verbalization of a \\nhypothesized fact types) how the concepts interrelate.\\nFor example, if interviewees have indicated that they maintain records of employee skills and skill certification dates, you might ask:\\n'As you have pointed out, in your business employees have an employee number. Do you similarly use a code of some sort to describe the skill?'\\nAlso you might ask: 'For each employee (employee number) and skill (skill code) do you keep every certification date, or just the most recent?\\nThen before initiating discussion of another fact type, do Task 2b on this one; suggest a table:\\n\\n'Does the following table of employee skill certification capture the sorts of information we have discussed? Feel free to edit the table.'\\n#+begin_src HTML\\n<table>\\n   <tr><th>Employee No.</th>        <th>Skill</th>               <th>Certification Date</th></tr>\\n   <tr><td>EN-123</td>              <td>Milling Centers</td>     <td>  2024-10-05           </tr>\\n   <tr><td>EN-098</td>              <td>Milling Centers</td>     <td>  2022-11-13           </tr>\\n   <tr><td>EN-891</td>              <td>EDM machines</td>        <td>  2023-03-28           </tr>\\n</table>\\n#+end_src\\nAs the example suggests, recall that you can include an HTML table in a question to the interviewees by wrapping the table in #+begin_src HTML ***your table*** #+end_src.\\nWe are able to read the tables you provide into a UI component that allows interviewees to edit the content of cells, and add and remove rows.\\n\\nORM allows expression of constraints typical of a predicate calculus representation, including quantification, subtyping, cardinality, functional relationship, domain of roles, and disjointedness.\\nAs you will see in the EADS below, our encoding of ORM fact types borrows from ORM's visual depiction.\\nFor example, for an n-ary fact type, we use arrays of n elements to associate property values matching each of the n compartments of the visual depiction of the fact type role box.\\nConsider, for example, the ternary fact type 'ACADEMIC obtained DEGREE from UNIVERSITY' in Figure 9 of 'Object-Role Modeling: an overview' (a paper provided to you).\\nWe would encode this fact type as:\\n\\n{\\n  \\\"fact-type-id\\\" : \\\"ACADEMIC-obtains-DEGREE-from-UNIVERSITY\\\",\\n  \\\"arity\\\" : 3,\\n  \\\"objects\\\" : [ \\\"academic\\\", \\\"degree\\\", \\\"university\\\" ],\\n  \\\"reference-modes\\\" : [ \\\"empNr\\\", \\\"code\\\", \\\"code\\\" ],\\n  \\\"deontic-keys\\\" : [ \\\"mandatory\\\", \\\"\\\", \\\"\\\" ],\\n  \\\"uniqueness\\\" : [ [ \\\"key1\\\", \\\"key1\\\", \\\"\\\" ] ]\\n}\\nHere the three object properties 'objects', 'reference-modes', and 'deontic' must each contain three elements because that is the arity of the fact type.\\nThe three positions correspond to the 'academic', 'degree' and 'university' compartments  respectively. (This is the order of the 'objects' property.)\\nThere can be multiple ORM 'uniqueness' constraints on a fact type; each array valued element must likewise contain the same number of elements as the arity and same ordering as the 'objects' property.\\nIn the above [ \\\"key1\\\", \\\"key1\\\", \\\"\\\" ] represents the idea that there is a functional relationship between tuples [academic, degree], as domain and univerity, as co-domain.\\nWere we to live in a world where people can get at most one degree at any university, we could specify another ORM uniqueness constraint [ \\\"key2\\\", \\\"\\\", \\\"key2\\\" ] which maps\\ntuples [academic, university] to a degree.\\nORM also has provision to express constraints across fact types, and between object types.\\nFigure 9 of the paper depicts that (1) an academic being tenured and being contracted are exclusive of each other, and (2) professor is a kind of academic.\\nWe represent these two constraints with the two following objects respectively:\\n\\n{\\n  \\\"inter-fact-type-id\\\" : \\\"tenured-or-contracted\\\",\\n  \\\"relation-type\\\" : \\\"exclusive-or\\\",\\n  \\\"fact-type-roles\\\" : [ {\\n    \\\"fact-type-ref\\\" : \\\"ACADEMIC-is-tenured\\\",\\n    \\\"role-position\\\" : 1\\n  }, {\\n    \\\"fact-type-ref\\\" : \\\"ACADEMIC-is-contracted-till\\\",\\n    \\\"role-position\\\" : 1\\n  } ]\\n}and\\n{\\n  \\\"inter-object-id\\\" : \\\"PROFESSOR-is-ACADEMIC\\\",\\n  \\\"relation-type\\\" : \\\"is-kind-of\\\",\\n  \\\"source-object\\\" : \\\"professor\\\",\\n  \\\"target-object\\\" : \\\"academic\\\"\\n}\\n\\nSUMMARY RECOMMENDATIONS\\nWe encourage you to start the interview (start Task 1) with an open-ended question about the kinds of data the interviewees use, for example, for interviewees involved in manufacturing you might ask:\\n\\n   'To get started, could you list the kinds of data that you use to schedule production?\\n    For example, do you have speadsheets containing customer orders, raw material delivery, process plans, materials on hand, task durations, worker skills, etc.?\\n\\nYou can then discuss each area of inquiry they mention (repeating Task 2a and Task 2b for each fact type of the area of inquiry) in whatever order you deem appropriate.When you have completed the detailed discussion of every area of inquiry they have thus far mentioned, you should ask them whether there is yet more areas to discuss.\\nIf they mention more, continue to apply the three tasks until all areas are discussed.\\nThe EADS has a property, 'exhausted?', you should set to true when you believe this interview can be concluded.\\n\\nORM is designed to encourage verbalization of fact types.\\nWe encourage you to use such verbalizations in Task 2a as follow-up questions when the interviewees' response leaves you uncertain what fact type is intended.\\nFor example, in Task 2a you might have discussed a fact type corresponding to the table above with rows 'Employee No.', 'Skill', and 'Certification Date' as described above.\\nBut it was unclear whether or not they were keeping a history of certification dates or just a single date. In this case you might ask:\\n'Is it the case that you associate at most one Certification Date with each employee and skill?'\\n\\nThe interview you conduct may prove to be rather complex and possibly long-running, but it is very important to our work, so we are giving you a big budget for question asking.\\nGood luck!\", :EADS {:EADS-id :data/orm, :exhausted? {:val \"false\", :comment \"You don't need to specify this property until you are ready to set its value to true, signifying that you believe that all areas of inquiry have been sufficiently investigated.\"}, :inquiry-areas [{:inquiry-area-ref {:val \"customer-orders\", :comment \"'customer-orders' is a value in an enumeration of areas of inquiry. The enumeration values are defined as follows:\\n\\n'customer-orders' - about products customers are ordering, their quantities, due dates, expected ship dates, etc..\\n'customers' - about the customers themselves, shipping address, their standing in the company's preferred customer program, etc. This could be quite diverse!\\n'materials' - about things that go into making products, including things on hand, en route to the facility, or on order, their expected delivery dates, etc..\\n'bill-of-materials' - about what materials go into creating a product of a given product type.\\n'finished-goods' - about finished goods inventory.\\n'WIP' - about work in process, its state of completion etc.\\n'processes' - about production processes and process plans, tasks, task durations, equipment used, etc..\\n'facilities' - about places where they make product or perform services, and what equipment is present in these places.\\n'equipment' - about machines and tools, their capabilities, capacity, and number.\\n'workforce' - about people, their skills, and other information about them relevant to scheduling.\\n'holidays' - about holidays and planned periods of plant shut down.\\n\\nThis enumeration might be incomplete. Whenever nothing here seems to fit, create another term and define it with an annotation comment.\\nWhen Task 1 is completed but you have not yet started Task 2a on any fact types, the 'inquiry-areas' property will contain a list of simple objects such as {\\n  \\\"inquiry-area-ref\\\" : \\\"customer-orders\\\"\\n} {\\n  \\\"inquiry-area-ref\\\" : \\\"WIP\\\"\\n} and so on.\"}, :inquiry-area-objects {:comment \"This property provides a list of objects (in the JSON sense) where each object names an object in the ORM sense (entities) and provides a definition for it.\\nThese represent the relevant entities of the universe of discourse of the area of inquiry.\", :val [{:object-id \"product\", :definition {:comment \"You don't have to ask the interviewees for a definition; if what is intended seems obvious just provide that.\\nObject-ids need only be unique within the context of an area of inquiry.\", :val \"a unique identifier for the product type.\"}} {:object-id \"order\", :definition \"a string unique to their operations for identifying an order.\"} {:object-id \"customer\", :definition \"the person or organization for which the product is being provided.\"} {:object-id \"promise-date\", :definition \"The date by which the firm promised to have delivered the product to the customer.\"} {:object-id \"quantity\", :definition \"An amount of something. (In the narrow context being defined, the quantity of product ordered.\"}]}, :fact-types {:comment \"This property provides a list of ORM fact type objects involving the inquiry-area-objects. Thus this captures actual Task 2 ORM modeling.\", :val [{:fact-type-id \"ORDER-has-PROMISE-DATE\", :arity 2, :objects [\"order\" \"promise-date\"], :reference-modes [\"order-number\" \"timepoint\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness {:val [[\"key1\" \"\"]], :comment \"Since every order participates in this relationship (mandatory), and order, through the order-number, uniquely identifies a promise date (uniqueness),\\nwe can infer that every order is associated with exactly one promise date.\"}, :examples {:comment \"Completing this is the work of Task 2b. We are showing only three rows of data in this example. Typically you might show ten or so.\", :val {:column-headings {:val [\"order-number\" \"promise-date\"], :comment \"The interviewer (you) used the reference-mode 'order-number' but the object name 'promise-date'.\\nThis is the most natural and meaningful naming for these data.\"}, :rows [[\"CO-865204\" \"2025-11-06\"] [\"CO-863393\" \"2025-11-13\"] [\"CO-865534\" \"2025-03-28\"]]}}} {:fact-type-id \"ORDER-has-PRODUCT-QUANTITY\", :arity 3, :objects [\"order\" \"product\" \"quantity\"], :reference-modes [\"order-number\" \"product-code\" \"quantity\"], :deontic-keys [\"mandatory\" \"\" \"\"], :uniqueness [[\"key1\" \"key1\" \"\"]], :examples {:column-headings [\"order-number\" \"product-code\" \"quantity\"], :rows [[\"CO-865204\" \"PN-38553\" \"1 unit\"] [\"CO-863393\" \"PN-37454\" \"7 unit\"] [\"CO-865534\" \"PN-73853\" \"2 family pack\"]]}} {:fact-type-id \"ORDER-is-for-CUSTOMER\", :arity 2, :objects [\"order\" \"customer\"], :reference-modes [\"order-number\" \"customer-id\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"order-number\" \"customer-id\"], :rows [[\"CO-865204\" \"CID-8811\"] [\"CO-863393\" \"CID-8955\"] [\"CO-865534\" \"CID-0013\"]]}}]}} {:inquiry-area-ref \"workforce\", :inquiry-area-objects [{:object-id \"employee\", :definition \"someone who works for the company.\"} {:object-id \"skill\", :definition \"a capability of an employee described by a skill code\"} {:object-id \"certification\", :definition \"the passing of a test about ones ability at a specific task.\"}], :fact-types [{:fact-type-id \"EMPLOYEE-certifies-SKILL-at-DATE\", :arity 3, :objects [\"employee\" \"skill\" \"certification\"], :reference-modes {:val [\"employee-number\" \"skill-code\" \"timepoint\"], :comment \"Regarding the 'timepoint' reference mode,  the interviewees use 'certification' and 'certification-date' interchangeably.\\nSimilarly, we conflate the concept with the time of the event.\"}, :uniqueness [[\"key1\" \"key1\" \"\"]], :examples {:column-headings [\"Employee No.\" \"Skill\" \"Certification Date\"], :rows [[\"EN-123\" \"Milling Centers\" \"2024-10-05\"] [\"EN-098\" \"Milling Centers\" \"2022-11-13\"] [\"EN-891\" \"EDM machines\" \"2023-03-28\"]]}}]}]}}",
                  :specs #:spec{:full :orm/EADS-message}}],
@@ -49,77 +41,110 @@
                   :thread-id "thread_sLkB7PdJlAgKzcD1keSEY7rB",
                   :model-class :gpt,
                   :llm-provider :openai,
+                  :instruction-path "agents/text-function-agent.txt",
                   :assistant-id "asst_goTNbqcqjK78EPbRMtNwL50S",
-                  :id :text-function-agent-openai,
-                  :timestamp #inst "2024-12-05T21:39:38.200-00:00"}
+                  :timestamp #inst "2024-12-05T21:39:38.200-00:00",
+                  :agent-id :text-function-agent-openai}
           #:agent{:base-type :process-interview-agent,
                   :agent-type :shared-assistant,
                   :thread-id "thread_Y6gpVnVwxlwZT3ZtMQb2rL8K",
                   :model-class :gpt,
                   :llm-provider :openai,
+                  :instruction-path
+                  "agents/iviewrs/process-iviewr-instructions.txt",
                   :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
-                  :id :process-interview-agent-openai,
-                  :timestamp #inst "2025-03-03T12:35:41.989-00:00"}
-          #:agent{:agent-type :system,
+                  :timestamp #inst "2025-03-03T12:35:41.989-00:00",
+                  :agent-id :process-interview-agent-openai}
+          #:agent{:agent-id :answers-the-question?-openai,
+                  :agent-type :system,
                   :assistant-id "asst_eaxRDWsEwmdWHObw5MjTiPQP",
                   :base-type :answers-the-question?,
-                  :id :answers-the-question?-openai,
                   :llm-provider :openai,
                   :model-class :gpt,
                   :thread-id "thread_2vhjT8fIazLPDOmTqD2Qc4Dj"}
-          #:agent{:agent-type :shared-assistant,
+          #:agent{:base-type :data-interview-agent,
+                  :agent-type :shared-assistant,
+                  :model-class :gpt,
+                  :llm-provider :openai,
+                  :vector-store-paths
+                  ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
+                  :instruction-path
+                  "agents/iviewrs/data-iviewr-instructions.txt",
                   :assistant-id "asst_vSisM8SZE7GGQT4bV1SFecJo",
-                  :base-type :data-interview-agent,
-                  :id :data-interview-agent-openai,
-                  :llm-provider :openai,
+                  :timestamp #inst "2025-03-13T15:30:33.782-00:00",
+                  :agent-id :data-interview-agent-openai}
+          #:agent{:base-type :resources-interview-agent,
+                  :agent-type :shared-assistant,
                   :model-class :gpt,
-                  :timestamp #inst "2025-03-13T15:30:33.782-00:00"}
-          #:agent{:agent-type :shared-assistant,
+                  :llm-provider :openai,
+                  :instruction-path
+                  "agents/iviewrs/resources-iviewr-instructions.txt",
                   :assistant-id "asst_LxGBspt7smk2HdE4lWjv6SGa",
-                  :base-type :resources-interview-agent,
-                  :id :resources-interview-agent-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2025-03-10T19:02:33.209-00:00"}
-          #:agent{:base-type :scheduling-challenges-agent,
-                  :agent-type :system,
-                  :thread-id "thread_lMfK0aSAlKC353YOUuao1HzS",
+                  :timestamp #inst "2025-03-10T19:02:33.209-00:00",
+                  :agent-id :resources-interview-agent-openai}
+          #:agent{:base-type :optimality-interview-agent,
+                  :agent-type :shared-assistant,
                   :model-class :gpt,
                   :llm-provider :openai,
-                  :assistant-id "asst_lK2bL9w4pGxxNtvAVob139Zy",
-                  :id :scheduling-challenges-agent-openai,
-                  :timestamp #inst "2025-04-19T14:15:02.496-00:00"}
-          #:agent{:agent-type :shared-assistant,
+                  :instruction-path
+                  "agents/iviewrs/optimality-iviewr-instructions.txt",
                   :assistant-id "asst_lpV7K13oZU2B5YfSyDLh0elm",
-                  :base-type :optimality-interview-agent,
-                  :id :optimality-interview-agent-openai,
-                  :llm-provider :openai,
-                  :model-class :gpt,
-                  :timestamp #inst "2025-03-10T19:03:22.239-00:00"}
+                  :timestamp #inst "2025-03-10T19:03:22.239-00:00",
+                  :agent-id :optimality-interview-agent-openai}
           #:agent{:base-type :response-analysis-agent,
                   :agent-type :system,
+                  :response-format-path
+                  "agents/response-analysis-format.edn",
                   :thread-id "thread_wDcvDiGb8ZbRrVANUuTLLCmk",
                   :model-class :gpt,
                   :llm-provider :openai,
+                  :instruction-path
+                  "agents/response-analysis-agent.txt",
                   :assistant-id "asst_VaeePwn9LHgSwQsh1gDgoNB4",
-                  :id :response-analysis-agent-openai,
-                  :timestamp #inst "2024-12-13T21:09:08.701-00:00"}
+                  :timestamp #inst "2024-12-13T21:09:08.701-00:00",
+                  :agent-id :response-analysis-agent-openai}
           #:agent{:base-type :text-to-var,
                   :agent-type :system,
+                  :response-format-path
+                  "agents/text-to-var-response-format.edn",
                   :thread-id "thread_GngjkcPOZH4prj4I08VyaBqF",
                   :model-class :mini,
                   :llm-provider :openai,
+                  :instruction-path "agents/text-to-var.txt",
                   :assistant-id "asst_jD6xz9YjfzqeDWnZAKTJgZvX",
-                  :id :text-to-var-openai,
-                  :timestamp #inst "2025-02-21T13:19:00.143-00:00"}
+                  :timestamp #inst "2025-02-21T13:19:00.143-00:00",
+                  :agent-id :text-to-var-openai}
           #:agent{:base-type :orchestrator-agent,
                   :agent-type :shared-assistant,
-                  :thread-id "thread_tva3Ui80mSstem032NLGNQgy",
+                  :tools "[{:type \"file_search\"}]",
+                  :thread-id "thread_JJgd4tDJBHFgOIB1ugt0b0LA",
                   :model-class :gpt,
                   :llm-provider :openai,
-                  :assistant-id "asst_6VQhN6C2nf4rFQlZEIciqTJY",
-                  :id :orchestrator-agent-openai,
-                  :timestamp #inst "2025-04-28T18:13:02.195-00:00"}],
+                  :vector-store-paths
+                  ["agents/iviewrs/EADS/flow-shop.json"
+                   "agents/iviewrs/EADS/job-shop--classifiable.json"
+                   "agents/iviewrs/EADS/job-shop--unique.json"
+                   "agents/iviewrs/EADS/job-shop.json"
+                   "agents/iviewrs/EADS/orm.json"
+                   "agents/iviewrs/EADS/scheduling-problem-type.json"
+                   "agents/iviewrs/EADS/timetabling.json"],
+                  :instruction-path "agents/orchestrator.txt",
+                  :assistant-id "asst_RUVueahUcOR7Wv3qJi6xVUsm",
+                  :timestamp #inst "2025-05-28T20:40:08.701-00:00",
+                  :agent-id :orchestrator-agent-openai}
+          #:agent{:agent-id :trivial-agent-openai,
+                  :agent-type :system,
+                  :base-type :trivial-agent,
+                  :llm-provider :openai,
+                  :timestamp #inst "2025-05-28T12:39:42.073-00:00"}
+          #:agent{:agent-id :scheduling-challenges-agent-openai,
+                  :agent-type :system,
+                  :base-type :scheduling-challenges-agent,
+                  :instruction-path "agents/scheduling-challenges.txt",
+                  :llm-provider :openai,
+                  :response-format-path
+                  "agents/scheduling-challenges-response-format.edn",
+                  :timestamp #inst "2025-05-28T12:52:13.232-00:00"}],
          :default-project-id :blank-project,
          :name "SYSTEM",
          :projects
@@ -190,9 +215,28 @@
           #:project{:dir "/opt/scheduling/projects/sur-key-blanks/db/",
                     :id :sur-key-blanks,
                     :name "SUR Key Blanks"}
-          #:project{:dir "/opt/scheduling/projects/sur-cheesecake/db/",
-                    :id :sur-cheesecake,
-                    :name "SUR Cheesecake"}
+          {:project/dir "/opt/scheduling/projects/sur-cheesecake/db/",
+           :project/id :sur-cheesecake,
+           :project/name "SUR Cheesecake",
+           :system/agents
+           [#:agent{:base-type :orchestrator-agent,
+                    :agent-type :shared-assistant,
+                    :tools "[{:type \"file_search\"}]",
+                    :thread-id "thread_JJgd4tDJBHFgOIB1ugt0b0LA",
+                    :model-class :gpt,
+                    :llm-provider :openai,
+                    :vector-store-paths
+                    ["agents/iviewrs/EADS/flow-shop.json"
+                     "agents/iviewrs/EADS/job-shop--classifiable.json"
+                     "agents/iviewrs/EADS/job-shop--unique.json"
+                     "agents/iviewrs/EADS/job-shop.json"
+                     "agents/iviewrs/EADS/orm.json"
+                     "agents/iviewrs/EADS/scheduling-problem-type.json"
+                     "agents/iviewrs/EADS/timetabling.json"],
+                    :instruction-path "agents/orchestrator.txt",
+                    :assistant-id "asst_RUVueahUcOR7Wv3qJi6xVUsm",
+                    :timestamp #inst "2025-05-28T20:40:08.701-00:00",
+                    :agent-id :orchestrator-agent-openai}]}
           #:project{:dir
                     "/opt/scheduling/projects/sur-fuel-and-radiator-hose/db/",
                     :id :sur-fuel-and-radiator-hose,
@@ -231,7 +275,6 @@
                     "/opt/scheduling/projects/sur-commemorative-coins/db/",
                     :id :sur-commemorative-coins,
                     :name "SUR Commemorative Coins"}
-          nil
           #:project{:dir
                     "/opt/scheduling/projects/sur-music-school/db/",
                     :id :sur-music-school,
@@ -239,99 +282,5 @@
           #:project{:dir "/opt/scheduling/projects/test-me/db/",
                     :id :test-me,
                     :name "Test me"}]}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :scheduling-problem-type/EADS-message}
-
-#:spec{:full :job-shop/EADS-message}
-
-#:spec{:full :job-shop--classifiable/EADS-message}
-
-#:spec{:full :timetabling/EADS-message}
-
-#:spec{:full :job-shop--unique/EADS-message}
-
-#:spec{:full :orm/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :scheduling-problem-type/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :job-shop/EADS-message}
-
-#:spec{:full :job-shop-c/EADS-message}
-
-#:spec{:full :job-shop-u/EADS-message}
-
-#:spec{:full :scheduling-problem-type/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :job-shop/EADS-message}
-
-#:spec{:full :job-shop-c/EADS-message}
-
-#:spec{:full :job-shop-u/EADS-message}
-
-#:spec{:full :scheduling-problem-type/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :job-shop/EADS-message}
-
-#:spec{:full :job-shop-c/EADS-message}
-
-#:spec{:full :job-shop-u/EADS-message}
-
-#:spec{:full :scheduling-problem-type/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :job-shop/EADS-message}
-
-#:spec{:full :job-shop-c/EADS-message}
-
-#:spec{:full :timetabling/EADS-message}
-
-#:spec{:full :timetabling/EADS-message}
-
-#:spec{:full :timetabling/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :job-shop/EADS-message}
-
-#:spec{:full :job-shop--classifiable/EADS-message}
-
-#:spec{:full :job-shop--unique/EADS-message}
-
-#:spec{:full :scheduling-problem-type/EADS-message}
-
-#:spec{:full :timetabling/EADS-message}
-
-#:spec{:full :scheduling-problem-type/EADS-message}
-
-#:spec{:full :job-shop--classifiable/EADS-message}
-
-#:spec{:full :flow-shop/EADS-message}
-
-#:spec{:full :job-shop--unique/EADS-message}
-
-#:spec{:full :timetabling/EADS-message}
-
-#:spec{:full :job-shop/EADS-message}
-
-#:spec{:full :orm/EADS-message}
-
-#:spec{:full :job-shop--unique/EADS-message}
-
-#:spec{:full :job-shop--unique/EADS-message}
 
 ]

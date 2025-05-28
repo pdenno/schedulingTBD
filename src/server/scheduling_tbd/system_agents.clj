@@ -1,32 +1,29 @@
 (ns scheduling-tbd.system-agents
   (:require
    [clojure.java.io         :as io]
-   [datahike.core           :as db]
    [mount.core              :as mount :refer [defstate]]
-   [scheduling-tbd.agent-db :as adb]
+   [scheduling-tbd.db       :as db]
    [scheduling-tbd.sutil    :as sutil]))
 
 (def system-agents-and-bases
-  { ;; ---------- project agents base-types -------------------------
+  { ;; ---------- project agents base-types (ToDo: This will eventually be :agent/agent-type :base-type.)  -------------------------
    :orchestrator-agent,
    {:base-type :orchestrator-agent,
-    :tools [{:type "file_search"}],
+    :tools "[{:type \"file_search\"}]"
     :model-class :gpt,
     :instruction-path "agents/orchestrator.txt",
     ;; The vector store includes all the EADS instructions for interviewers.
     :vector-store-paths (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "agents/iviewrs/EADS/" %)))
-    :agent-type :project}
+    :agent-type :shared-assistant}
 
    :process-interview-agent,
    {:base-type :process-interview-agent,
-    :tools [{:type "file_search"}],
     :model-class :gpt,
     :instruction-path "agents/iviewrs/process-iviewr-instructions.txt",
     :agent-type :shared-assistant}
 
    :data-interview-agent
    {:base-type  :data-interview-agent
-    :tools [{:type "file_search"}],
     :model-class :gpt,
     :instruction-path "agents/iviewrs/data-iviewr-instructions.txt",
     :vector-store-paths ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
@@ -34,14 +31,12 @@
 
    :resources-interview-agent,
    {:base-type :resources-interview-agent,
-    :tools [{:type "file_search"}],
     :model-class :gpt,
     :instruction-path "agents/iviewrs/resources-iviewr-instructions.txt",
     :agent-type :shared-assistant}
 
    :optimality-interview-agent,
    {:base-type :optimality-interview-agent,
-    :tools [{:type "file_search"}],
     :model-class :gpt,
     :instruction-path "agents/iviewrs/optimality-iviewr-instructions.txt",
     :agent-type :shared-assistant}
@@ -69,7 +64,11 @@
    :text-function-agent
    {:base-type :text-function-agent
     :agent-type :system
-    :instruction-path "agents/text-function-agent.txt"}})
+    :instruction-path "agents/text-function-agent.txt"}
+
+   :trivial-agent
+   {:base-type :trivial-agent
+    :agent-type :system} })
 
 (def sys-agent? (-> system-agents-and-bases keys set))
 
@@ -82,30 +81,31 @@
                   :id :response-analysis-agent-openai,
                   :timestamp #inst "2024-12-13T21:09:08.701-00:00"}
 
-
-(defn ensure-system-agent-basics
-  "Make sure the agents in the system db have the above basics. This is necessary for adb/ensure-agent! to work."
-  [agent-id]
-  (let [eid (d/q '[:find ?eid .
-                   :where [?eid :system/agents]]
-                 @(sutil/connect-atm :system))])) ;<==========================================================================
-
-
-
-(defn make-agent-db-info
-  "Make one agent using keyword agent-id and opts."
-  ([agent-id] (make-agent agent-id nil))
-  ([agent-id force-new?]
-   (assert (sys-agent? agent-id))
-   (adb/ensure-agent! agent-id
-                      (assoc (get system-agents-and-bases agent-id) :force-new? force-new?))))
+(def ^:diag diag (atom nil))
 
 ;;; ------------------------------- starting and stopping ---------------------------------
+;;; (sa/ensure-system-agent-basics :trivial-agent)
+(defn ensure-system-agent-basics
+  "Make sure the agents in the system db have the above basics. This is necessary for adb/ensure-agent! to work.
+   The argument is the :base-type name."
+  ([agent-id] (ensure-system-agent-basics agent-id @sutil/default-llm-provider))
+  ([agent-id llm-provider]
+   (assert (sys-agent? agent-id))
+   (reset! diag agent-id)
+   (let [{:keys [base-type] :as agent-map} (get system-agents-and-bases agent-id)
+         agent-map (-> agent-map
+                       (assoc :agent-id (-> base-type name (str "-" (name llm-provider)) keyword))
+                       (update-keys #(keyword "agent" (name %))))]
+     (if (db/agent-exists? agent-id llm-provider)
+       (db/update-agent! agent-id agent-map)
+       (db/put-agent! agent-id agent-map)))))
+
 (defn make-agents-and-bases!
-  "You can pick up :force-new? from the agent map above, or use force it on everything."
+  "Iterate through all agents in the systems-agents-and-bases map, ensuring the information
+   in those maps is also in the DB."
   []
-  (doseq [[k v] system-agents-and-bases]
-    (make-agent-db-info k v)))
+  (doseq [[k _v] system-agents-and-bases]
+    (ensure-system-agent-basics k)))
 
 (defn init-system-agents!
   []

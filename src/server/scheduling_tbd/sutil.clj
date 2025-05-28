@@ -6,7 +6,8 @@
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
-   [taoensso.telemere        :refer [log!]]))
+   [taoensso.telemere        :refer [log!]])
+  (:import java.time.Instant))
 
 (def ^:diag diag (atom nil))
 
@@ -253,7 +254,7 @@
   [obj]
   (ches/generate-string obj {:pretty true}))
 
-(defn same-EADS-instructions?
+#_(defn same-EADS-instructions?
   "Return true if the argument eads-instructions (an EDN object) is exactly what the system already maintains."
   [eads-instructions]
   (let [id (-> eads-instructions :EADS :EADS-id)

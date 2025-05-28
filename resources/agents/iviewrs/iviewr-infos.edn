@@ -4,9 +4,6 @@
 
 {:process {:id :process
            :base-type :process-interview-agent,
-           :agent-type :shared-assistant,
-           :model-class :gpt,
-           :tools [{:type "file_search"}],
            :iviewr-name "Process Interviewer"
            :focus "the processes used in their enterprise and the challenges they face in executing those processes."
            :warm-up-question "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
@@ -14,9 +11,6 @@
 
  :data {:id :data
         :base-type :data-interview-agent,
-        :agent-type :shared-assistant,
-        :model-class :gpt,
-        :tools [{:type "file_search"}],
         :iviewr-name "Data Interviewer"
         :focus "data they use in their work."
         :warm-up-question "To get started, please provide a short overview (a few sentences) about the data you use to do your work. Typically, and especially in small businesses, information about customer orders, inventory, resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you use. Once you provide this overview, we'll have more detailed discussions on each data source you mentioned."
@@ -25,9 +19,6 @@
 ;;; I think a resources interview might be superfluous in simple resource assignment problems such as music lessons.
  :resources {:id :resources
              :base-type :resources-interview-agent,
-             :agent-type :shared-assistant,
-             :model-class :gpt,
-             :tools [{:type "file_search"}],
              :iviewr-name "Resources Interviewer"
              :focus "the actual physical resources that they use to do their work, their numbers, and capabilities. For example, the number of workers with particular skills."
              :warm-up-question "To get started, please provide a short overview (a few sentences) about the resources your company use to get work done. This might include, for example, machines and workers. Once you've provided this overview, we'll dig into the details of the quantities, capabilities, and skills classifications etc. for each type of resource you mentioned."
@@ -35,9 +26,6 @@
 
  :optimality {:id :optimality
               :base-type :optimality-interview-agent,
-              :agent-type :shared-assistant,
-              :model-class :gpt,
-              :tools [{:type "file_search"}],
               :iviewr-name "Optimality Interviewer"
               :focus "what good schedules in the their enterprise achieve or avoid. For example, a schedule might seek to maximize utilization of expensive equipment or minimize late delivery of product."
               :warm-up-question "To get started, please provide a short overview (a few sentences) about what you expect of good schedules. In some domains, for example, it is important to maximize the utilization of an expensive resource, in others it is to minimize a certain kind of waste. Often, it is a combination of such things. After you've provided a short summary, we'll probably have some follow-up questions."
