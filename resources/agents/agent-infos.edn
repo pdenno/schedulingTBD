@@ -45,3 +45,5 @@
   :model-class :gpt,
   :instruction-path "agents/iviewrs/optimality-iviewr-instructions.txt",
   :agent-type :shared-assistant}
+
+}
