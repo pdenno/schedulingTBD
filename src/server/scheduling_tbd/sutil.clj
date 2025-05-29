@@ -119,21 +119,32 @@
   [form conn-atm & {:keys [keep-set drop-set]
                     :or {drop-set #{:db/id}
                          keep-set #{}}}]
-  (letfn [(resolve-aux [obj]
-            (cond
-              (db-ref? obj) (let [res (dp/pull @conn-atm '[*] (:db/id obj))]
-                              (if (= res obj) nil (resolve-aux res)))
-              (map? obj) (reduce-kv (fn [m k v]
-                                      (cond (drop-set k)                                    m
-                                            (and (not-empty keep-set) (not (keep-set k)))   m
-                                            :else                                           (assoc m k (resolve-aux v))))
-                                    {}
-                                    obj)
-              (vector? obj)      (mapv resolve-aux obj)
-              (set? obj)    (set (mapv resolve-aux obj))
-              (coll? obj)        (map  resolve-aux obj)
-              :else  obj))]
-    (resolve-aux form)))
+  (let [cyclical? (atom false)
+        visited? (atom #{})]
+    (letfn [(rem-nil [obj]
+              (cond (map? obj)      (reduce-kv (fn [m k v] (if (nil? v) m (assoc m k (rem-nil v)))) {} obj)
+                    (vector? obj)   (reduce (fn [res v] (if (nil? v) res (conj res (rem-nil v)))) [] obj)
+                    :else           obj))
+            (resolve-aux [obj]
+              (cond
+                (db-ref? obj) (if (@visited? (:db/id obj))
+                                (do (log! :warn (str "id " (:db/id obj) " has been visted already."))
+                                    (reset! cyclical? true))
+                                (let [res (dp/pull @conn-atm '[*] (:db/id obj))]
+                                  (swap! visited? conj (:db/id obj))
+                                  (if (= res obj) nil (resolve-aux res))))
+                (map? obj) (reduce-kv (fn [m k v]
+                                        (cond (drop-set k)                                    m
+                                              (and (not-empty keep-set) (not (keep-set k)))   m
+                                              :else                                           (assoc m k (resolve-aux v))))
+                                      {}
+                                      obj)
+                (vector? obj)      (mapv resolve-aux obj)
+                (set? obj)    (set (mapv resolve-aux obj))
+                (coll? obj)        (map  resolve-aux obj)
+                :else  obj))]
+      (let [res (resolve-aux form)]
+        (if @cyclical? (rem-nil res) res)))))
 
 (defn root-entities
   "Return a sorted vector of root entities (natural numbers) for all root entities of the DB."

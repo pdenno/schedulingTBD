@@ -613,22 +613,6 @@
          (log! :error (str "Agent not found: " agent-id))
          {})))))
 
-(defn update-agent!
-  "Update the agent information on the system DB, providing a map that includes either agent-id or base-type."
-  [agent-id agent-map]
-  (s/assert ::agent-id agent-id)
-  (reset! diag agent-map)
-  (s/assert ::specs/db-agent agent-map)
-  (if-let [eid (agent-exists? agent-id)]
-    (let [conn-atm (if (keyword? agent-id)
-                     (connect-atm :system)
-                     (connect-atm (:pid agent-id)))]
-      (d/transact conn-atm {:tx-data [(merge {:db/id eid} agent-map)]})
-      (when-not (s/valid? ::specs/db-agent (get-agent agent-id))    ; <======================================================= Temporary
-        (reset! diag (get-agent agent-id))
-        (throw (ex-info (str "Bad agent after update-agent! " (with-out-str (get-agent agent-id))) {}))))
-    (log! :error (str "No such agent: " agent-map))))
-
 (defn put-agent!
   "Add the argument agent object to database corresponding to the agent-id.
    Set the :agent/timestamp and llm-provider.
@@ -640,16 +624,14 @@
                     (not (contains? agent-map :agent/llm-provider))   (assoc :agent/llm-provider @sutil/default-llm-provider)
                     true                                              (assoc :agent/timestamp (now))
                     (contains? agent-map :agent/tools)                (update :agent/tools str))]
-    (if (agent-exists? agent-id)
-      (update-agent! agent-id agent-map)
-      (let [conn-atm (connect-atm (if (keyword? agent-id) :system (:pid agent-id)))
-            rel (if (keyword? agent-id) :system/agents :project/agents)
-            eid (d/q '[:find ?eid . :where [?eid rel]] @conn-atm)]
-        (reset! diag agent-map)
-        (s/assert ::specs/db-agent agent-map)
-        (if eid
-          (d/transact conn-atm {:tx-data [{:db/id eid rel agent-map}]})
-          (log! :error (str "No such DB. agent-id = " agent-id)))))))
+    (let [conn-atm (connect-atm (if (keyword? agent-id) :system (:pid agent-id)))
+          rel (if (keyword? agent-id) :system/agents :project/agents)
+          eid (d/q '[:find ?eid . :where [?eid rel]] @conn-atm)]
+      (reset! diag agent-map)
+      (s/assert ::specs/db-agent agent-map)
+      (if eid
+        (d/transact conn-atm {:tx-data [{:db/id eid rel agent-map}]})
+        (log! :error (str "No such DB. agent-id = " agent-id))))))
 
 ;;; ----------------------------------- Claims -------------------------------------------------------------
 (defn get-claims

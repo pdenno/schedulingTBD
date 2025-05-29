@@ -124,7 +124,7 @@
       (reset! diag [{:base-type pid :pid pid} {:agent/system-instruction sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true}])
       (adb/ensure-agent! {:base-type pid :pid pid} {:agent/system-instruction sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true})
       (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
-      #_(inv/resume-conversation {:client-id :console :pid pid :cid :process}))))
+      (inv/resume-conversation {:client-id :console :pid pid :cid :process}))))
 
 (defn surrogate-follow-up
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."

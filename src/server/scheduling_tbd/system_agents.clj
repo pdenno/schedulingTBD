@@ -85,9 +85,7 @@
          agent-map (-> agent-map
                        (assoc :agent-id (-> base-type name (str "-" (name llm-provider)) keyword))
                        (update-keys #(keyword "agent" (name %))))]
-     (if (db/agent-exists? agent-id llm-provider)
-       (db/update-agent! agent-id agent-map)
-       (db/put-agent! agent-id agent-map)))))
+       (db/put-agent! agent-id agent-map))))
 
 (defn make-agents-and-bases!
   "Iterate through all agents in the systems-agents-and-bases map, ensuring the information

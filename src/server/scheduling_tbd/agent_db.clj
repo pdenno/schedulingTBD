@@ -35,8 +35,14 @@
 
 (defn system-agent-id?
   "A system agent-id is a keyword; the others are maps with :pid and :base-type."
-  [id]
-  (keyword? id))
+  [agent-id]
+  (keyword? agent-id))
+
+(defn surrogate-agent-id?
+  "A surrogate agent id is an agent-id-map where the :base type and :pid are equal."
+  [agent-id]
+  (and (s/valid? ::agent-id-map agent-id)
+       (= (:pid agent-id) (:base-type agent-id))))
 
 ;;; Throughout the project:
 ;;;   pid = project-id, a keyword
@@ -100,6 +106,7 @@
                        instruction-string response-format-path vector-store-paths tools pid]
           :or {llm-provider @default-llm-provider model-class :gpt}} props
          pid (or pid (:pid agent-id)) ; Will still be nil if it is a template.
+         surrogate? (or surrogate? (surrogate-agent-id? agent-id))
          agent-type (if surrogate? :project agent-type)
          base-type (or btyp base-type)]
      (assert base-type)
