@@ -47,7 +47,6 @@
                   :agent-id :text-function-agent-openai}
           #:agent{:base-type :process-interview-agent,
                   :agent-type :shared-assistant,
-                  :thread-id "thread_Y6gpVnVwxlwZT3ZtMQb2rL8K",
                   :model-class :gpt,
                   :llm-provider :openai,
                   :instruction-path
@@ -117,7 +116,6 @@
           #:agent{:base-type :orchestrator-agent,
                   :agent-type :shared-assistant,
                   :tools "[{:type \"file_search\"}]",
-                  :thread-id "thread_JJgd4tDJBHFgOIB1ugt0b0LA",
                   :model-class :gpt,
                   :llm-provider :openai,
                   :vector-store-paths
@@ -132,11 +130,6 @@
                   :assistant-id "asst_RUVueahUcOR7Wv3qJi6xVUsm",
                   :timestamp #inst "2025-05-28T20:40:08.701-00:00",
                   :agent-id :orchestrator-agent-openai}
-          #:agent{:agent-id :trivial-agent-openai,
-                  :agent-type :system,
-                  :base-type :trivial-agent,
-                  :llm-provider :openai,
-                  :timestamp #inst "2025-05-28T12:39:42.073-00:00"}
           #:agent{:agent-id :scheduling-challenges-agent-openai,
                   :agent-type :system,
                   :base-type :scheduling-challenges-agent,
@@ -215,28 +208,6 @@
           #:project{:dir "/opt/scheduling/projects/sur-key-blanks/db/",
                     :id :sur-key-blanks,
                     :name "SUR Key Blanks"}
-          {:project/dir "/opt/scheduling/projects/sur-cheesecake/db/",
-           :project/id :sur-cheesecake,
-           :project/name "SUR Cheesecake",
-           :system/agents
-           [#:agent{:base-type :orchestrator-agent,
-                    :agent-type :shared-assistant,
-                    :tools "[{:type \"file_search\"}]",
-                    :thread-id "thread_JJgd4tDJBHFgOIB1ugt0b0LA",
-                    :model-class :gpt,
-                    :llm-provider :openai,
-                    :vector-store-paths
-                    ["agents/iviewrs/EADS/flow-shop.json"
-                     "agents/iviewrs/EADS/job-shop--classifiable.json"
-                     "agents/iviewrs/EADS/job-shop--unique.json"
-                     "agents/iviewrs/EADS/job-shop.json"
-                     "agents/iviewrs/EADS/orm.json"
-                     "agents/iviewrs/EADS/scheduling-problem-type.json"
-                     "agents/iviewrs/EADS/timetabling.json"],
-                    :instruction-path "agents/orchestrator.txt",
-                    :assistant-id "asst_RUVueahUcOR7Wv3qJi6xVUsm",
-                    :timestamp #inst "2025-05-28T20:40:08.701-00:00",
-                    :agent-id :orchestrator-agent-openai}]}
           #:project{:dir
                     "/opt/scheduling/projects/sur-fuel-and-radiator-hose/db/",
                     :id :sur-fuel-and-radiator-hose,

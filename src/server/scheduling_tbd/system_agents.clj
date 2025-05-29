@@ -72,26 +72,15 @@
 
 (def sys-agent? (-> system-agents-and-bases keys set))
 
-          #:agent{:base-type :response-analysis-agent,
-                  :agent-type :system,
-                  :thread-id "thread_wDcvDiGb8ZbRrVANUuTLLCmk",
-                  :model-class :gpt,
-                  :llm-provider :openai,
-                  :assistant-id "asst_VaeePwn9LHgSwQsh1gDgoNB4",
-                  :id :response-analysis-agent-openai,
-                  :timestamp #inst "2024-12-13T21:09:08.701-00:00"}
-
 (def ^:diag diag (atom nil))
 
 ;;; ------------------------------- starting and stopping ---------------------------------
-;;; (sa/ensure-system-agent-basics :trivial-agent)
 (defn ensure-system-agent-basics
   "Make sure the agents in the system db have the above basics. This is necessary for adb/ensure-agent! to work.
    The argument is the :base-type name."
   ([agent-id] (ensure-system-agent-basics agent-id @sutil/default-llm-provider))
   ([agent-id llm-provider]
    (assert (sys-agent? agent-id))
-   (reset! diag agent-id)
    (let [{:keys [base-type] :as agent-map} (get system-agents-and-bases agent-id)
          agent-map (-> agent-map
                        (assoc :agent-id (-> base-type name (str "-" (name llm-provider)) keyword))

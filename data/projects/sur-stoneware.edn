@@ -1,8 +1,6 @@
 [
 #:project{:conversations
-          [#:conversation{:done? true,
-                          :id :process,
-                          :interviewer-budget 0.5}
+          [#:conversation{:id :process, :interviewer-budget 0.5}
            #:conversation{:id :data,
                           :interviewer-budget 1.0,
                           :messages
@@ -54,7 +52,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:54.564-00:00"}]}],
-          :current-conversation :process,
           :id :sur-stoneware,
           :name "SUR Stoneware"}
 ]

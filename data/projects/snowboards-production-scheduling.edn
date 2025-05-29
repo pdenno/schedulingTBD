@@ -5,9 +5,10 @@
                    :thread-id "thread_S1XF8Pt52WwArOVTShtlOqOh",
                    :model-class :gpt,
                    :llm-provider :openai,
+                   :pid :snowboards-production-scheduling,
                    :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}],
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00",
+                   :agent-id :process-interview-agent-openai}],
           :conversations
           [#:conversation{:id :data,
                           :interviewer-budget 1.0,
@@ -26,8 +27,7 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:52.723-00:00"}]}
-           #:conversation{:done? true,
-                          :id :process,
+           #:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -82,7 +82,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:52.759-00:00"}]}],
-          :current-conversation :process,
           :id :snowboards-production-scheduling,
           :name "Snowboards production scheduling"}
 ]

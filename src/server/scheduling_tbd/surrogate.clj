@@ -123,8 +123,8 @@
       (db/put-agent! {:base-type pid :pid pid} (blank-surrogate pid))
       (reset! diag [{:base-type pid :pid pid} {:agent/system-instruction sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true}])
       (adb/ensure-agent! {:base-type pid :pid pid} {:agent/system-instruction sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true})
-      (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid} {:make-agent? true}) ; This might update existing agent.
-      (inv/resume-conversation {:client-id :console :pid pid :cid :process}))))
+      (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
+      #_(inv/resume-conversation {:client-id :console :pid pid :cid :process}))))
 
 (defn surrogate-follow-up
   "Handler for 'SUR?:' manual follow-up questions to a surrogate."
@@ -132,7 +132,7 @@
   (log! :info (str "SUR follow-up:" obj))
   (let [chat-args {:client-id client-id :dispatch-key :sur-says}
         cid (db/get-active-cid pid)]
-    (try (when-let [answer (adb/query-agent pid question {:asking-role :surrogate-follow-up})]
+    (try (when-let [answer (adb/query-agent {:base-type pid :pid pid} question)]
            (log! :info (str "SUR's answer:" answer))
            (when (string? answer)
              (ws/send-to-client (assoc chat-args :text answer))

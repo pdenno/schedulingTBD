@@ -1,7 +1,6 @@
 [
 #:project{:conversations
-          [#:conversation{:done? true,
-                          :id :process,
+          [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -140,7 +139,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:54.087-00:00"}]}],
-          :current-conversation :process,
           :id :sur-injection-molds,
           :name "SUR Injection Molds"}
 ]

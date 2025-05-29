@@ -1,13 +1,23 @@
 [
 #:project{:agents
-          [#:agent{:base-type :process-interview-agent,
+          [#:agent{:base-type :data-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_KHsUFunakrU0ghWBovCwyZIi",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :ice-cream,
+                   :assistant-id "asst_vSisM8SZE7GGQT4bV1SFecJo",
+                   :timestamp #inst "2025-03-13T15:30:33.782-00:00",
+                   :agent-id :data-interview-agent-openai}
+           #:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
                    :thread-id "thread_i3NxKAbu8ogyJZCdNH7JYDnh",
                    :model-class :gpt,
                    :llm-provider :openai,
+                   :pid :ice-cream,
                    :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-01-31T17:13:05.127-00:00"}],
+                   :timestamp #inst "2025-01-31T17:13:05.127-00:00",
+                   :agent-id :process-interview-agent-openai}],
           :claims
           [#:claim{:string "(project-id :ice-cream)"}
            #:claim{:string "(project-name :ice-cream \"Ice Cream\")"}
@@ -110,7 +120,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-01-31T18:58:55.621-00:00"}]}],
-          :current-conversation :process,
           :id :ice-cream,
           :name "Ice Cream"}
 ]

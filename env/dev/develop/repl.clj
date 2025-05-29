@@ -57,7 +57,7 @@
    'ru     'scheduling-tbd.interviewing.response-utils
    'mzn    'scheduling-tbd.minizinc
    'mznt   'scheduling-tbd.minizinc-test
-   'spec   'scheduling-tbd.specs
+   'specs  'scheduling-tbd.specs
    'sutil  'scheduling-tbd.sutil
    'sur    'scheduling-tbd.surrogate
    'surt   'scheduling-tbd.surrogate-test

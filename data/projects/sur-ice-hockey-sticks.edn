@@ -1,5 +1,106 @@
 [
-#:project{:conversations
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_yJtwU4aJAADL8FYbagYMJECc",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-ice-hockey-sticks,
+                   :assistant-id "asst_rfGIKnBEJ8vP7y6nAGlBxTLV",
+                   :timestamp #inst "2024-12-10T16:14:54.156-00:00",
+                   :agent-id :process-interview-agent-openai}
+           #:agent{:base-type :sur-ice-hockey-sticks,
+                   :agent-type :project,
+                   :thread-id "thread_TVp4oW46XRVWBgT5M0deQJ6A",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :pid :sur-ice-hockey-sticks,
+                   :assistant-id "asst_P2aOgb3uAUT2sKlJcZ08WsO3",
+                   :expertise "ice hockey sticks",
+                   :timestamp #inst "2024-12-12T13:24:27.002-00:00",
+                   :agent-id :sur-ice-hockey-sticks-openai}],
+          :claims
+          [#:claim{:string "(project-id :sur-ice-hockey-sticks)"}
+           #:claim{:string
+                   "(project-name :sur-ice-hockey-sticks \"SUR Ice Hockey Sticks\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-ice-hockey-sticks)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ice-hockey-sticks :equipment-changeover)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ice-hockey-sticks :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ice-hockey-sticks :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ice-hockey-sticks :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-ice-hockey-sticks \"Ice Hockey Sticks\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ice-hockey-sticks :variation-in-demand)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/work-type,
+                   :string "(provides-product :sur-ice-hockey-sticks)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-location,
+                   :string
+                   "(production-location :sur-ice-hockey-sticks factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-motivation,
+                   :string
+                   "(production-mode :sur-ice-hockey-sticks make-to-stock)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-system-type,
+                   :string "(flow-shop :sur-ice-hockey-sticks)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 1 \"Prepare Raw Materials\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 2 \"Laminate Layers\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 3 \"Shape and Cut Blades\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 4 \"Shape and Cut Shafts\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 5 \"Assemble Shaft and Blade\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 6 \"Apply Graphics and Branding\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 7 \"Finish and Lacquer\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 8 \"Quality Inspection\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ice-hockey-sticks 9 \"Package\")"}],
+          :conversations
           [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
@@ -201,108 +302,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-12-12T13:24:26.419-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {laminateLayers, shapeCutBlades, shapeCutShafts, assembleShaftBlade, applyGraphics, finishLacquer, qualityInspect};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.500, 1.000, 1.000, 2.000, 1.000, 2.000, 1.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, laminateLayers] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, laminateLayers] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, laminateLayers] == taskStarts[p, shapeCutBlades]);\nconstraint forall (p in Product) (taskEnds[p, shapeCutBlades] == taskStarts[p, shapeCutShafts]);\nconstraint forall (p in Product) (taskEnds[p, shapeCutShafts] == taskStarts[p, assembleShaftBlade]);\nconstraint forall (p in Product) (taskEnds[p, assembleShaftBlade] == taskStarts[p, applyGraphics]);\nconstraint forall (p in Product) (taskEnds[p, applyGraphics] == taskStarts[p, finishLacquer]);\nconstraint forall (p in Product) (taskEnds[p, finishLacquer] == taskStarts[p, qualityInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, qualityInspect]);",
-          :agents
-          [#:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_yJtwU4aJAADL8FYbagYMJECc",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_rfGIKnBEJ8vP7y6nAGlBxTLV",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-10T16:14:54.156-00:00"}
-           #:agent{:base-type :sur-ice-hockey-sticks,
-                   :agent-type :project,
-                   :thread-id "thread_TVp4oW46XRVWBgT5M0deQJ6A",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :surrogate? true,
-                   :assistant-id "asst_P2aOgb3uAUT2sKlJcZ08WsO3",
-                   :id :sur-ice-hockey-sticks-openai,
-                   :expertise "ice hockey sticks",
-                   :timestamp #inst "2024-12-12T13:24:27.002-00:00"}],
-          :current-conversation :process,
-          :claims
-          [#:claim{:string "(project-id :sur-ice-hockey-sticks)"}
-           #:claim{:string
-                   "(project-name :sur-ice-hockey-sticks \"SUR Ice Hockey Sticks\")"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-ice-hockey-sticks)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ice-hockey-sticks :equipment-changeover)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ice-hockey-sticks :delivery-schedules)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ice-hockey-sticks :product-variation)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ice-hockey-sticks :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(principal-expertise :sur-ice-hockey-sticks \"Ice Hockey Sticks\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ice-hockey-sticks :variation-in-demand)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string "(provides-product :sur-ice-hockey-sticks)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
-                   :string
-                   "(production-location :sur-ice-hockey-sticks factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-ice-hockey-sticks make-to-stock)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string "(flow-shop :sur-ice-hockey-sticks)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 1 \"Prepare Raw Materials\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 2 \"Laminate Layers\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 3 \"Shape and Cut Blades\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 4 \"Shape and Cut Shafts\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 5 \"Assemble Shaft and Blade\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 6 \"Apply Graphics and Branding\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 7 \"Finish and Lacquer\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 8 \"Quality Inspection\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ice-hockey-sticks 9 \"Package\")"}],
-          :name "SUR Ice Hockey Sticks",
-          :id :sur-ice-hockey-sticks}
+          :id :sur-ice-hockey-sticks,
+          :name "SUR Ice Hockey Sticks"}
 ]

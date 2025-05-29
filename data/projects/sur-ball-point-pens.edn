@@ -1,7 +1,125 @@
 [
-#:project{:conversations
-          [#:conversation{:done? true,
-                          :id :process,
+#:project{:agents
+          [#:agent{:base-type :resources-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_P9AAdW55lhiW8gWuAsQcpL9e",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-ball-point-pens,
+                   :assistant-id "asst_aaDLAj0gxcfigOPWPrO5dUrE",
+                   :timestamp #inst "2024-12-05T21:39:34.439-00:00",
+                   :agent-id :resources-interview-agent-openai}
+           #:agent{:base-type :optimality-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_mPZrdCPckXq40pvSZLx410Ab",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-ball-point-pens,
+                   :assistant-id "asst_Rx6NcEXEVGZi5WtBffD7umSF",
+                   :timestamp #inst "2024-12-05T21:39:34.846-00:00",
+                   :agent-id :optimality-interview-agent-openai}
+           #:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_HD2p52BLgzqD97arFPi0b3o8",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-ball-point-pens,
+                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00",
+                   :agent-id :process-interview-agent-openai}
+           #:agent{:base-type :sur-ball-point-pens,
+                   :agent-type :project,
+                   :thread-id "thread_siw2Utc74mYxmCDFjt7xCh0V",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :pid :sur-ball-point-pens,
+                   :assistant-id "asst_EsKSbkxEwbNkMqLnPINOLiQg",
+                   :expertise "ball point pens",
+                   :timestamp #inst "2025-01-17T18:58:02.288-00:00",
+                   :agent-id :sur-ball-point-pens-openai}],
+          :claims
+          [#:claim{:string "(project-id :sur-ball-point-pens)"}
+           #:claim{:string
+                   "(project-name :sur-ball-point-pens \"SUR Ball Point Pens\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-ball-point-pens)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ball-point-pens :resource-assignment)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ball-point-pens :equipment-changeover)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ball-point-pens :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ball-point-pens :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ball-point-pens :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-ball-point-pens :demand-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-ball-point-pens \"Ballpoint Pens\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/work-type,
+                   :string "(provides-product :sur-ball-point-pens)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-location,
+                   :string
+                   "(production-location :sur-ball-point-pens factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-motivation,
+                   :string
+                   "(production-mode :sur-ball-point-pens make-to-stock)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-system-type,
+                   :string "(flow-shop :sur-ball-point-pens)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ball-point-pens 1 \"Mold Pen Barrel\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ball-point-pens 2 \"Produce Ink\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ball-point-pens 3 \"Assemble Ink Cartridge\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ball-point-pens 4 \"Assemble Pen Components\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ball-point-pens 5 \"Add Grips and Clips\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ball-point-pens 6 \"Print Branding on Pens\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ball-point-pens 7 \"Quality Inspection\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-ball-point-pens 8 \"Package Pens\")"}],
+          :conversations
+          [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -182,8 +300,7 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-01-17T18:58:00.186-00:00"}]}
-           #:conversation{:done? true,
-                          :id :resources,
+           #:conversation{:id :resources,
                           :interviewer-budget 0.95,
                           :messages
                           [#:message{:content
@@ -207,8 +324,7 @@
                                      :tags [:response],
                                      :time
                                      #inst "2025-02-26T17:40:14.192-00:00"}]}
-           #:conversation{:done? true,
-                          :id :optimality,
+           #:conversation{:id :optimality,
                           :interviewer-budget 0.95,
                           :messages
                           [#:message{:content
@@ -232,124 +348,6 @@
                                      :tags [:response],
                                      :time
                                      #inst "2025-02-26T17:40:55.659-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {moldBarrel, assembleCartridge, assembleComponents, addGripsClips, printBranding, qualityInspect};\n% Durations are in units of minutes and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of int: taskDuration = [|30, 20, 25, 15, 10, 15|];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, moldBarrel] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, moldBarrel] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, moldBarrel] == taskStarts[p, assembleCartridge]);\nconstraint forall (p in Product) (taskEnds[p, assembleCartridge] == taskStarts[p, assembleComponents]);\nconstraint forall (p in Product) (taskEnds[p, assembleComponents] == taskStarts[p, addGripsClips]);\nconstraint forall (p in Product) (taskEnds[p, addGripsClips] == taskStarts[p, printBranding]);\nconstraint forall (p in Product) (taskEnds[p, printBranding] == taskStarts[p, qualityInspect]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, qualityInspect]);",
-          :agents
-          [#:agent{:base-type :resources-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_P9AAdW55lhiW8gWuAsQcpL9e",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_aaDLAj0gxcfigOPWPrO5dUrE",
-                   :id :resources-interview-agent-openai,
-                   :timestamp #inst "2024-12-05T21:39:34.439-00:00"}
-           #:agent{:base-type :optimality-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_mPZrdCPckXq40pvSZLx410Ab",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_Rx6NcEXEVGZi5WtBffD7umSF",
-                   :id :optimality-interview-agent-openai,
-                   :timestamp #inst "2024-12-05T21:39:34.846-00:00"}
-           #:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_HD2p52BLgzqD97arFPi0b3o8",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
-           #:agent{:base-type :sur-ball-point-pens,
-                   :agent-type :project,
-                   :thread-id "thread_siw2Utc74mYxmCDFjt7xCh0V",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :surrogate? true,
-                   :assistant-id "asst_EsKSbkxEwbNkMqLnPINOLiQg",
-                   :id :sur-ball-point-pens-openai,
-                   :expertise "ball point pens",
-                   :timestamp #inst "2025-01-17T18:58:02.288-00:00"}],
-          :current-conversation :process,
-          :claims
-          [#:claim{:string "(project-id :sur-ball-point-pens)"}
-           #:claim{:string
-                   "(project-name :sur-ball-point-pens \"SUR Ball Point Pens\")"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-ball-point-pens)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ball-point-pens :resource-assignment)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ball-point-pens :equipment-changeover)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ball-point-pens :delivery-schedules)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ball-point-pens :product-variation)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ball-point-pens :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-ball-point-pens :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(principal-expertise :sur-ball-point-pens \"Ballpoint Pens\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string "(provides-product :sur-ball-point-pens)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
-                   :string
-                   "(production-location :sur-ball-point-pens factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-ball-point-pens make-to-stock)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string "(flow-shop :sur-ball-point-pens)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ball-point-pens 1 \"Mold Pen Barrel\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ball-point-pens 2 \"Produce Ink\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ball-point-pens 3 \"Assemble Ink Cartridge\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ball-point-pens 4 \"Assemble Pen Components\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ball-point-pens 5 \"Add Grips and Clips\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ball-point-pens 6 \"Print Branding on Pens\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ball-point-pens 7 \"Quality Inspection\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-ball-point-pens 8 \"Package Pens\")"}],
-          :name "SUR Ball Point Pens",
-          :id :sur-ball-point-pens}
+          :id :sur-ball-point-pens,
+          :name "SUR Ball Point Pens"}
 ]

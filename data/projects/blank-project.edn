@@ -5,30 +5,43 @@
                    :thread-id "thread_drXA8991LyXRv7KQHYqurPe2",
                    :model-class :gpt,
                    :llm-provider :openai,
+                   :pid :blank-project,
                    :assistant-id "asst_c3TA0GTU156VFKOJROsKerc5",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-03-03T12:35:41.989-00:00"}
+                   :timestamp #inst "2025-03-03T12:35:41.989-00:00",
+                   :agent-id :process-interview-agent-openai}
            #:agent{:base-type :data-interview-agent,
                    :agent-type :shared-assistant,
                    :thread-id "thread_gE04PAvZZoFnbIvS3S6aijNY",
                    :model-class :gpt,
                    :llm-provider :openai,
+                   :pid :blank-project,
                    :assistant-id "asst_KpRIbqEZFNfRBVwiN79QTrh2",
-                   :id :data-interview-agent-openai,
-                   :timestamp #inst "2025-03-06T20:34:20.249-00:00"}],
+                   :timestamp #inst "2025-03-06T20:34:20.249-00:00",
+                   :agent-id :data-interview-agent-openai}
+           #:agent{:base-type :orchestrator-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_ydCLkBgAuVrwp4lvWuAYTi9b",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :blank-project,
+                   :assistant-id "asst_6VQhN6C2nf4rFQlZEIciqTJY",
+                   :timestamp #inst "2025-04-28T18:13:02.195-00:00",
+                   :agent-id :orchestrator-agent-openai}],
           :claims
           [#:claim{:string "(project-id :blank-project)"}
            #:claim{:string
                    "(project-name :blank-project \"Blank Project\")"}],
           :conversations
-          [#:conversation{:done? true,
-                          :id :process,
+          [#:conversation{:id :process,
                           :interviewer-budget 1.0,
                           :messages
-                          [#:message{:content
+                          [#:message{:EADS-data-structure
+                                     "{:process-id \"pencil-manufacturing\", :inputs [\"graphite\" \"clay\" \"water\" \"cedar wood\" \"metal\" \"eraser material\" \"paint\"], :outputs [{:item-id \"finished pencils\", :quantity {:units \"finished pencils\", :value-string \"100000\"}}], :resources [\"extruder\" \"kiln\" \"milling machine\" \"glue applicator\" \"shaping machine\"], :duration {:units \"hours\", :value-string \"4\"}, :subprocesses [{:process-id \"graphite-core-production\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"finished graphite rods\", :quantity {:units \"graphite cores\", :value-string \"100000\"}}], :resources [\"mixer\" \"extruder\" \"kiln\"], :subprocesses [{:process-id \"mix-graphite-and-clay\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite clay paste\", :quantity {:units \"liters\", :value-string \"100\"}}], :resources [\"mixer\"], :duration {:units \"hours\", :value-string \"1\"}, :subprocesses []} {:process-id \"extrude-core\", :inputs [\"graphite clay paste\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"extruder\"], :duration {:units \"minutes\", :value-string \"20\"}, :subprocesses []} {:process-id \"dry-and-bake-core\", :inputs [\"extruded graphite rods\"], :outputs [{:item-id \"finished graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"kiln\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"wood-casing-production\", :inputs [\"cedar wood\"], :outputs [\"wood slats with grooves\"], :resources [\"milling machine\"], :subprocess-flow \"individuals-from-batch\", :duration {:units \"hours\", :value-string \"2\"}, :subprocesses [{:process-id \"mill-wood-slats\", :inputs [\"cedar wood\"], :outputs [\"milled wood slats\"], :resources [\"milling machine\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocess-flow :individuals-from-batch, :subprocesses []} {:process-id \"cut-grooves-in-slats\", :inputs [\"milled wood slats\"], :outputs [\"wood slats with grooves\"], :resources [\"groove cutter\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"assemble\", :inputs [{:item-id \"finished graphite rods\", :from \"graphite-core-production\"} {:item-id \"wood slats with grooves\", :from \"wood-casing-production\"} \"metal\" \"erasers\" \"paint\"], :outputs [\"finished pencil\"], :resources [\"glue applicator\" \"shaping machine\"], :subprocesses [{:process-id \"insert-core-into-slats\", :inputs [\"graphite core\" \"wood slats with grooves\"], :outputs [\"pencil blanks\"], :resources [\"glue applicator\"], :subprocesses []} {:process-id \"shape-and-paint-pencil\", :inputs [\"pencil blanks\" \"paint\"], :outputs [\"shaped and painted pencils\"], :resources [\"shaping machine\" \"painting station\"], :subprocesses []} {:process-id \"attach-eraser\", :optional? true, :inputs [\"shaped and painted pencils\" \"metal\" \"erasers\"], :outputs [\"finished pencils\"], :resources [\"crimping tool\"], :subprocesses []}]}]}",
+                                     :content
                                      "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.<br/><br/><b>If you'd like to start a new project, hit the rocket icon.</b>",
                                      :from :system,
                                      :id 1,
+                                     :pursuing-EADS :process/flow-shop,
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-02-27T13:14:22.556-00:00"}]}
@@ -62,7 +75,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-02-27T13:14:22.616-00:00"}]}],
-          :current-conversation :process,
           :id :blank-project,
           :name "Blank Project"}
 ]

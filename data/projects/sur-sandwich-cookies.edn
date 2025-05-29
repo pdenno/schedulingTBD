@@ -1,7 +1,91 @@
 [
-#:project{:conversations
-          [#:conversation{:done? true,
-                          :id :process,
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_74hFTCCsVpdJX9bxIbZIoXgM",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-sandwich-cookies,
+                   :assistant-id "asst_2QErW3cf91GcIX95z0IfQtqJ",
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00",
+                   :agent-id :process-interview-agent-openai}
+           #:agent{:base-type :sur-sandwich-cookies,
+                   :agent-type :project,
+                   :thread-id "thread_K3CG6NfEq4OIO3kOZVgX3GYG",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :pid :sur-sandwich-cookies,
+                   :assistant-id "asst_9eGf687ZtteUsXT2KcP5FsPG",
+                   :expertise "sandwich cookies",
+                   :timestamp #inst "2025-03-19T20:45:42.529-00:00",
+                   :agent-id :sur-sandwich-cookies-openai}],
+          :claims
+          [#:claim{:string "(project-id :sur-sandwich-cookies)"}
+           #:claim{:string
+                   "(project-name :sur-sandwich-cookies \"SUR Sandwich Cookies\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-sandwich-cookies)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-sandwich-cookies :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-sandwich-cookies :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-sandwich-cookies :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-sandwich-cookies \"Sandwich Cookies\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-sandwich-cookies :equipment-utilization)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-sandwich-cookies :variation-in-demand)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/work-type,
+                   :string "(provides-product :sur-sandwich-cookies)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-location,
+                   :string
+                   "(production-location :sur-sandwich-cookies factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-motivation,
+                   :string
+                   "(production-mode :sur-sandwich-cookies make-to-stock)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-system-type,
+                   :string "(flow-shop :sur-sandwich-cookies)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-sandwich-cookies 1 \"Make Cookie Dough\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-sandwich-cookies 2 \"Make Filling\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-sandwich-cookies 3 \"Bake Cookie Wafers\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-sandwich-cookies 4 \"Assemble Cookies\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-sandwich-cookies 5 \"Package Cookies\")"}],
+          :conversations
+          [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -202,92 +286,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-01-27T18:58:28.157-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {makeDough, makeFilling, bakeWafers, assembleCookies};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|2.000, 1.500, 1.500, 1.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, makeDough] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, makeDough] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, makeDough] == taskStarts[p, makeFilling]);\nconstraint forall (p in Product) (taskEnds[p, makeFilling] == taskStarts[p, bakeWafers]);\nconstraint forall (p in Product) (taskEnds[p, bakeWafers] == taskStarts[p, assembleCookies]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, assembleCookies]);",
-          :agents
-          [#:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_LueUA4h9PZupwVaDe5uZxvWN",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
-           #:agent{:base-type :sur-sandwich-cookies,
-                   :agent-type :project,
-                   :thread-id "thread_knxHxXf5v8sb7VTocSmuYejb",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :surrogate? true,
-                   :assistant-id "asst_dJhHrBGTjTvVdsMyFSIuWDVC",
-                   :id :sur-sandwich-cookies-openai,
-                   :expertise "sandwich cookies",
-                   :timestamp #inst "2025-01-27T18:58:29.511-00:00"}],
-          :current-conversation :process,
-          :claims
-          [#:claim{:string "(project-id :sur-sandwich-cookies)"}
-           #:claim{:string
-                   "(project-name :sur-sandwich-cookies \"SUR Sandwich Cookies\")"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-sandwich-cookies)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-sandwich-cookies :delivery-schedules)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-sandwich-cookies :product-variation)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-sandwich-cookies :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(principal-expertise :sur-sandwich-cookies \"Sandwich Cookies\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-sandwich-cookies :equipment-utilization)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-sandwich-cookies :variation-in-demand)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string "(provides-product :sur-sandwich-cookies)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
-                   :string
-                   "(production-location :sur-sandwich-cookies factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-sandwich-cookies make-to-stock)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string "(flow-shop :sur-sandwich-cookies)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-sandwich-cookies 1 \"Make Cookie Dough\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-sandwich-cookies 2 \"Make Filling\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-sandwich-cookies 3 \"Bake Cookie Wafers\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-sandwich-cookies 4 \"Assemble Cookies\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-sandwich-cookies 5 \"Package Cookies\")"}],
-          :name "SUR Sandwich Cookies",
-          :id :sur-sandwich-cookies}
+          :id :sur-sandwich-cookies,
+          :name "SUR Sandwich Cookies"}
 ]

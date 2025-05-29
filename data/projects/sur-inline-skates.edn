@@ -1,9 +1,6 @@
 [
-#:project{:code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {};\n% Durations are in units of minutes and may be rounded.\narray [Product, Task] of int: taskDuration = [||];\n\nint : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nint : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var int:s1, int:d1, var int:s2, int:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, nil] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, nibManufacturing] > 0);\n\n% Every other task can start after the previous task ends.\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, nil]);",
-          :conversations
-          [#:conversation{:done? true,
-                          :id :process,
+#:project{:conversations
+          [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -190,7 +187,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:54.213-00:00"}]}],
-          :current-conversation :process,
           :id :sur-inline-skates,
           :name "SUR Inline Skates"}
 ]

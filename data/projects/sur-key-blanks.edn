@@ -5,19 +5,21 @@
                    :thread-id "thread_ivFfc3y9RaRucBmwaE8WatdR",
                    :model-class :gpt,
                    :llm-provider :openai,
+                   :pid :sur-key-blanks,
                    :assistant-id "asst_p9cnmj0rV7EYNMIeiqWm9ppf",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-03-05T15:05:59.648-00:00"}
+                   :timestamp #inst "2025-03-05T15:05:59.648-00:00",
+                   :agent-id :process-interview-agent-openai}
            #:agent{:base-type :sur-key-blanks,
                    :agent-type :project,
                    :thread-id "thread_MNw7H0kDEqK5KX7wgrDkdRNl",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :surrogate? true,
+                   :pid :sur-key-blanks,
                    :assistant-id "asst_OfnWZ468jHmTSyViJhClWGjG",
-                   :id :sur-key-blanks-openai,
                    :expertise "key blanks",
-                   :timestamp #inst "2025-03-06T16:42:36.049-00:00"}],
+                   :timestamp #inst "2025-03-06T16:42:36.049-00:00",
+                   :agent-id :sur-key-blanks-openai}],
           :claims
           [#:claim{:string "(project-id :sur-key-blanks)"}
            #:claim{:string
@@ -65,7 +67,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-03-06T16:42:32.175-00:00"}]}],
-          :current-conversation :process,
           :id :sur-key-blanks,
           :name "SUR Key Blanks"}
 ]

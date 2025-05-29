@@ -1,12 +1,14 @@
 [
 #:project{:agents
-          [#:agent{:agent-type :shared-assistant,
-                   :assistant-id "asst_EK84QXpYS5TIN9PqssvClSAk",
-                   :base-type :process-interview-agent,
-                   :id :process-interview-agent-openai,
-                   :llm-provider :openai,
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_3OC8gwKn0HECrTjlyznDLcf0",
                    :model-class :gpt,
-                   :thread-id "thread_oYrNhKNhQratke4QofD0spm0"}
+                   :llm-provider :openai,
+                   :pid :sur-canned-corn,
+                   :assistant-id "asst_2QErW3cf91GcIX95z0IfQtqJ",
+                   :timestamp #inst "2024-12-08T16:12:48.505-00:00",
+                   :agent-id :process-interview-agent-openai}
            #:agent{:base-type :sur-canned-corn,
                    :agent-type :project,
                    :thread-id "thread_PaNG176R7upH82TJEeDXsNVg",
@@ -14,15 +16,13 @@
                    :system-instruction
                    "You manage a company that makes canned corn.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
                    :surrogate? true,
+                   :pid :sur-canned-corn,
                    :assistant-id "asst_g91VMowymiHxQYwm3n3QAgsi",
-                   :id :sur-canned-corn-openai,
                    :expertise "canned corn",
-                   :timestamp #inst "2024-12-08T16:12:48.475-00:00"}],
-          :code
-          "enum Task = {receiving, husking, cleaning, blanching, cutting, filling, sealing, labeling};",
+                   :timestamp #inst "2024-12-08T16:12:48.475-00:00",
+                   :agent-id :sur-canned-corn-openai}],
           :conversations
-          [#:conversation{:done? true,
-                          :id :process,
+          [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -216,7 +216,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:53.034-00:00"}]}],
-          :current-conversation :process,
           :id :sur-canned-corn,
           :name "SUR Canned Corn"}
 ]

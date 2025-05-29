@@ -51,7 +51,7 @@
 (def agent-key?
   "These are what are in the schema."
   #{:agent/agent-id :agent/agent-type :agent/assistant-id :agent/base-type :agent/expertise :agent/instruction-path
-    :agent/llm-provider :agent/model-class :agent/response-format-path :agent/surrogate? :agent/system-instruction
+    :agent/llm-provider :agent/model-class :agent/pid :agent/response-format-path :agent/surrogate? :agent/system-instruction
     :agent/thread-id :agent/timestamp :agent/tools :agent/vector-store-paths})
 
 (defn agent-keys?
@@ -78,5 +78,5 @@
 (s/def :agent/system-instruction string?)
 (s/def :agent/thread-id string?)
 (s/def :agent/timestamp inst?)
-(s/def :agent/tools string?)
+(s/def :agent/tools (s/or :dehydrated string? :hydrated (s/coll-of map? :kind vector?)))
 (s/def :agent/vector-store-paths (s/coll-of string?))

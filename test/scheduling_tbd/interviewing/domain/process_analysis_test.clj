@@ -197,7 +197,7 @@
 (defn ^:diag ask-about-ice-cream-agent
   ([] (ask-about-ice-cream-agent "What are your instructions?"))
   ([q-txt]
-     (adb/query-agent :sur-ice-cream q-txt)))
+     (adb/query-agent {:base-type :sur-ice-cream :pid :sur-ice-cream} q-txt)))
 
 (def domain-problems ; I have removed from these descriptions text that gives away too much (e.g. 'we plan projects' for scheduling/project planning." I switched "scheduling problem" to "production problem"
   {:snack-food "We make snack food.

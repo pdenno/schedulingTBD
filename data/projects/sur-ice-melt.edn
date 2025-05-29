@@ -5,27 +5,30 @@
                    :thread-id "thread_1Qi1EWGNi4onv3yoHDGQEwYd",
                    :model-class :gpt,
                    :llm-provider :openai,
+                   :pid :sur-ice-melt,
                    :assistant-id "asst_p9cnmj0rV7EYNMIeiqWm9ppf",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-03-05T15:05:59.648-00:00"}
+                   :timestamp #inst "2025-03-05T15:05:59.648-00:00",
+                   :agent-id :process-interview-agent-openai}
            #:agent{:base-type :sur-ice-melt,
                    :agent-type :project,
                    :thread-id "thread_CuJPS5EnzgOVqIKAyPwJoo9P",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :surrogate? true,
+                   :pid :sur-ice-melt,
                    :assistant-id "asst_D9i6Kjjj5KL04OwmD7CD2kxU",
-                   :id :sur-ice-melt-openai,
                    :expertise "ice melt",
-                   :timestamp #inst "2025-03-06T19:12:14.283-00:00"}
+                   :timestamp #inst "2025-03-06T19:12:14.283-00:00",
+                   :agent-id :sur-ice-melt-openai}
            #:agent{:base-type :data-interview-agent,
                    :agent-type :shared-assistant,
                    :thread-id "thread_31xRv8vhdl71Pp5W3E5pwjrz",
                    :model-class :gpt,
                    :llm-provider :openai,
+                   :pid :sur-ice-melt,
                    :assistant-id "asst_plazLaeCKMI4ymgMehlVd415",
-                   :id :data-interview-agent-openai,
-                   :timestamp #inst "2025-03-06T19:21:21.408-00:00"}],
+                   :timestamp #inst "2025-03-06T19:21:21.408-00:00",
+                   :agent-id :data-interview-agent-openai}],
           :claims
           [#:claim{:string "(project-id :sur-ice-melt)"}
            #:claim{:string
@@ -49,10 +52,7 @@
                    :string
                    "(principal-expertise :sur-ice-melt \"Ice Melt Products\")"}],
           :conversations
-          [#:conversation{:EADS
-                          "{:message-type :PHASE-2-EADS, :EADS {:interview-objective \"Produce a data structure similar in form to the EADS in this object, but describing the interviewees' production processes.\", :EADS {:process-id {:val \"pencil-manufacturing\", :comment \"This is the top-level process. You can name it as you see fit; don't ask the interviewees.\"}, :inputs {:val [\"graphite\" \"clay\" \"water\" \"cedar wood\" \"metal\" \"eraser material\" \"paint\"], :comment \"These are all the raw materials used to make the product. You can figure this out by looking at all the raw materials in the leaf processes.\"}, :outputs {:val [{:item-id \"finished pencils\", :quantity {:units \"finished pencils\", :value-string \"100000\"}}], :comment \"inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows.\"}, :resources {:val [\"extruder\" \"kiln\" \"milling machine\" \"glue applicator\" \"shaping machine\"], :comment \"Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer.\"}, :duration {:val {:units \"hours\", :value-string \"4\"}, :comment \"We use a string for 'value-string' in case interviewees answer it something like 'it varies'\"}, :subprocesses [{:process-id \"graphite-core-production\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite core\", :quantity {:units \"graphite cores\", :value-string \"100000\"}}], :resources [\"mixer\" \"extruder\" \"kiln\"], :subprocesses [{:process-id \"mix-graphite-and-clay\", :inputs [\"graphite\" \"clay\" \"water\"], :outputs [{:item-id \"graphite-clay paste\", :quantity {:units \"liters\", :value-string \"100\"}}], :resources [\"mixer\"], :duration {:units \"hours\", :value-string \"1\"}, :subprocesses []} {:process-id \"extrude-core\", :inputs [\"graphite-clay paste\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"extruder\"], :duration {:units \"minutes\", :value-string \"20\"}, :subprocesses []} {:process-id \"dry-and-bake-core\", :inputs [\"extruded graphite rods\"], :outputs [{:item-id \"extruded graphite rods\", :quantity {:units \"extruded graphite core\", :value-string \"100000\"}}], :resources [\"kiln\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"wood-casing-production\", :inputs [\"cedar wood\"], :outputs [\"wood slats with grooves\"], :resources [\"milling machine\"], :subprocess-flow {:val \"individuals-from-batch\", :comment \"The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\\nyou can start 'cut-grooves-in-slats' as soon as the first slat is available.\"}, :duration {:val {:units \"hours\", :value-string \"2\"}, :comment \"Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses.\"}, :subprocesses [{:process-id \"mill-wood-slats\", :inputs [\"cedar wood\"], :outputs [\"milled wood slats\"], :resources [\"milling machine\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []} {:process-id \"cut-grooves-in-slats\", :inputs [\"milled wood slats\"], :outputs [\"wood slats with grooves\"], :resources [\"groove cutter\"], :duration {:units \"hours\", :value-string \"2\"}, :subprocesses []}]} {:process-id \"assembly\", :inputs {:val [{:item-id \"graphite core\", :from \"graphite-core-production\"} {:item-id \"wood slats with grooves\", :from \"wood-casing-production\"} \"metal\" \"erasers\" \"paint\"], :comment \"The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\\nThe 'from' property is essential to understanding process ordering and potential for concurrency.\"}, :outputs [\"finished pencil\"], :resources [\"glue applicator\" \"shaping machine\"], :subprocesses [{:process-id \"insert-core-into-slats\", :inputs [\"graphite core\" \"wood slats with grooves\"], :outputs [\"pencil blanks\"], :resources [\"glue applicator\"], :subprocesses []} {:process-id \"shape-and-paint-pencil\", :inputs [\"pencil blanks\" \"paint\"], :outputs [\"shaped and painted pencils\"], :resources [\"shaping machine\" \"painting station\"], :subprocesses []} {:process-id \"attach-eraser\", :optional? {:val true, :comment \"'optional?' means that the process does not occur for every product. Not every pencil has an eraser.\"}, :inputs [\"shaped and painted pencils\" \"metal\" \"erasers\"], :outputs [\"finished pencils\"], :resources [\"crimping tool\"], :subprocesses []}]}]}}}",
-                          :done? true,
-                          :id :process,
+          [#:conversation{:id :process,
                           :interviewer-budget -3.191891195797325E-16,
                           :messages
                           [#:message{:content
@@ -99,8 +99,6 @@
                                      #inst "2025-03-06T19:33:16.919-00:00"}
                            #:message{:content
                                      "\nOur production schedule is managed within the ERP system, which integrates directly with customer orders and inventory. Key fields in the production schedule module include:\n\n1. <b>Production Order Number:</b> Unique identifier for each production run.  \n2. <b>Product Description:</b> Details of the product being manufactured.  \n3. <b>Quantity:</b> Total quantity to be produced.  \n4. <b>Start Date:</b> Scheduled start date for production.  \n5. <b>End Date:</b> Estimated completion date.  \n6. <b>Assigned Equipment:</b> Equipment or production line allocated for the job.  \n7. <b>Status:</b> Current status (e.g., Scheduled, In Progress, Completed).  \n8. <b>Priority Level:</b> Indicates urgency or priority of the order.  \n\nFor ad-hoc analysis or collaboration, we occasionally export this data into a spreadsheet. Let me know if you'd like more details about any specific aspect!",
-                                     :data-structure
-                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-procurement-and-inspection\", \"description\" \"Procure and inspect rock salt and other ingredients for quality.\"} {\"process-id\" \"mixing\", \"description\" \"Mix rock salt and anti-caking agents for basic blends. Advanced formulations involve precise blending of specialty additives.\"} {\"process-id\" \"quality-control-testing\", \"description\" \"Test samples to ensure product meets performance and safety standards.\"} {\"process-id\" \"packaging\", \"description\" \"Package in bulk for industrial use or smaller bags for retail. Advanced formulations may require specialized lines.\"} {\"process-id\" \"storage-and-distribution\", \"description\" \"Store finished products in temperature-controlled facilities for order shipment.\"}], \"process-id\" \"ice-melt-production\"}, :commit-notes \"Initial commit based on the provided production process overview.\"}",
                                      :from :surrogate,
                                      :id 7,
                                      :tags [:response],
@@ -115,8 +113,6 @@
                                      #inst "2025-03-06T19:39:24.014-00:00"}
                            #:message{:content
                                      "\nYes, our ERP system integrates production schedules, orders, and inventory data seamlessly. When a customer order is placed, the system checks inventory levels for raw materials and finished goods. If inventory is insufficient to fulfill the order by the deadline, it triggers a production order within the scheduling module. Priority levels are set based on order deadlines, and the system allocates equipment and resources for production. Automated notifications and dashboards ensure that inventory availability, production progress, and order fulfillment timelines are continuously monitored to prevent delays.",
-                                     :data-structure
-                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"table-request\" \"Here is the partially completed table of your ice-melt production steps. Please fill in estimated durations for each step and indicate any changes or additions needed.\"}, :question \"Please fill in this table:\\n\\n#+begin_src HTML\\n<table>\\n<tr><th>Process Step</th><th>Estimated Duration</th></tr>\\n<tr><td>Raw Material Procurement and Inspection</td><td></td></tr>\\n<tr><td>Mixing</td><td></td></tr>\\n<tr><td>Quality Control Testing</td><td></td></tr>\\n<tr><td>Packaging</td><td></td></tr>\\n<tr><td>Storage and Distribution</td><td></td></tr>\\n</table>\\n#+end_src\", :commit-notes \"Sent back the table for the interviewee to update with step durations and any corrections.\"}",
                                      :from :surrogate,
                                      :id 9,
                                      :tags [:response],
@@ -435,8 +431,6 @@
                                      #inst "2025-03-06T19:33:16.919-00:00"}
                            #:message{:content
                                      "\nOur production schedule is managed within the ERP system, which integrates directly with customer orders and inventory. Key fields in the production schedule module include:\n\n1. <b>Production Order Number:</b> Unique identifier for each production run.  \n2. <b>Product Description:</b> Details of the product being manufactured.  \n3. <b>Quantity:</b> Total quantity to be produced.  \n4. <b>Start Date:</b> Scheduled start date for production.  \n5. <b>End Date:</b> Estimated completion date.  \n6. <b>Assigned Equipment:</b> Equipment or production line allocated for the job.  \n7. <b>Status:</b> Current status (e.g., Scheduled, In Progress, Completed).  \n8. <b>Priority Level:</b> Indicates urgency or priority of the order.  \n\nFor ad-hoc analysis or collaboration, we occasionally export this data into a spreadsheet. Let me know if you'd like more details about any specific aspect!",
-                                     :data-structure
-                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"subprocesses\" [{\"process-id\" \"raw-material-procurement-and-inspection\", \"description\" \"Procure and inspect rock salt and other ingredients for quality.\"} {\"process-id\" \"mixing\", \"description\" \"Mix rock salt and anti-caking agents for basic blends. Advanced formulations involve precise blending of specialty additives.\"} {\"process-id\" \"quality-control-testing\", \"description\" \"Test samples to ensure product meets performance and safety standards.\"} {\"process-id\" \"packaging\", \"description\" \"Package in bulk for industrial use or smaller bags for retail. Advanced formulations may require specialized lines.\"} {\"process-id\" \"storage-and-distribution\", \"description\" \"Store finished products in temperature-controlled facilities for order shipment.\"}], \"process-id\" \"ice-melt-production\"}, :commit-notes \"Initial commit based on the provided production process overview.\"}",
                                      :from :surrogate,
                                      :id 7,
                                      :tags [:response],
@@ -451,8 +445,6 @@
                                      #inst "2025-03-06T19:39:24.014-00:00"}
                            #:message{:content
                                      "\nYes, our ERP system integrates production schedules, orders, and inventory data seamlessly. When a customer order is placed, the system checks inventory levels for raw materials and finished goods. If inventory is insufficient to fulfill the order by the deadline, it triggers a production order within the scheduling module. Priority levels are set based on order deadlines, and the system allocates equipment and resources for production. Automated notifications and dashboards ensure that inventory availability, production progress, and order fulfillment timelines are continuously monitored to prevent delays.",
-                                     :data-structure
-                                     "{:message-type \"DATA-STRUCTURE-REFINEMENT\", :data-structure {\"table-request\" \"Here is the partially completed table of your ice-melt production steps. Please fill in estimated durations for each step and indicate any changes or additions needed.\"}, :question \"Please fill in this table:\\n\\n#+begin_src HTML\\n<table>\\n<tr><th>Process Step</th><th>Estimated Duration</th></tr>\\n<tr><td>Raw Material Procurement and Inspection</td><td></td></tr>\\n<tr><td>Mixing</td><td></td></tr>\\n<tr><td>Quality Control Testing</td><td></td></tr>\\n<tr><td>Packaging</td><td></td></tr>\\n<tr><td>Storage and Distribution</td><td></td></tr>\\n</table>\\n#+end_src\", :commit-notes \"Sent back the table for the interviewee to update with step durations and any corrections.\"}",
                                      :from :surrogate,
                                      :id 9,
                                      :tags [:response],
@@ -842,7 +834,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-03-06T19:12:12.777-00:00"}]}],
-          :current-conversation :process,
           :id :sur-ice-melt,
           :name "SUR Ice Melt"}
 ]

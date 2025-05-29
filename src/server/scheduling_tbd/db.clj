@@ -45,6 +45,9 @@
    :agent/model-class
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "One of the classes of LLM model defined in the system. See llm.clj."}
+   :agent/pid
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "This is used to distinguish runnable agents affiliated with projects from their templates in the system DB."}
    :agent/response-format-path
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "as it is used by OpenAI circa 2025."}
@@ -452,7 +455,8 @@
                                               :project/name pname
                                               :project/agents (->> (get-system)
                                                                    :system/agents
-                                                                   (filterv #(= (:agent/agent-type %) :shared-assistant)))
+                                                                   (filterv #(= (:agent/agent-type %) :shared-assistant))
+                                                                   (mapv #(assoc % :agent/pid id)))
                                               :project/active-conversation :process
                                               :project/claims [{:claim/string (str `(~'project-id ~id))}
                                                                {:claim/string (str `(~'project-name ~id ~pname))}]
@@ -478,25 +482,29 @@
 
 (defn recreate-project-db!
   "Recreate a DB for each project using EDN files."
-  [id]
-  (let [backup-file (format "data/projects/%s.edn" (name id))]
-    (if (.exists (io/file backup-file))
-      (let [cfg (db-cfg-map {:type :project :id id})
-            files-dir (-> cfg :base-dir (str "/projects/" (name id) "/files"))]
-        (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
-          (d/delete-database cfg))
-        (when-not (-> cfg :store :path io/as-file .isDirectory)
-          (-> cfg :store :path io/make-parents)
-          (-> cfg :store :path io/as-file .mkdir))
-        (d/create-database cfg)
-        (register-db id cfg)
-        (let [conn (connect-atm id)]
-          (d/transact conn db-schema-proj)
-          (d/transact conn (->> backup-file slurp edn/read-string)))
-        (when-not (-> files-dir io/as-file .isDirectory)
-          (-> files-dir io/as-file .mkdir))
-        cfg)
-    (log! :error (str "Not recreating DB because backup file does not exist: " backup-file)))))
+  ([id] (recreate-project-db! id nil))
+  ([id content]
+   (let [backup-file (format "data/projects/%s.edn" (name id))]
+     (if (or content (.exists (io/file backup-file)))
+       (let [cfg (db-cfg-map {:type :project :id id})
+             files-dir (-> cfg :base-dir (str "/projects/" (name id) "/files"))]
+         (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
+           (d/delete-database cfg))
+         (when-not (-> cfg :store :path io/as-file .isDirectory)
+           (-> cfg :store :path io/make-parents)
+           (-> cfg :store :path io/as-file .mkdir))
+         (d/create-database cfg)
+         (register-db id cfg)
+         (let [conn (connect-atm id)
+               content (if  content
+                         (vector content)
+                         (->> backup-file slurp edn/read-string))]
+           (d/transact conn db-schema-proj)
+           (d/transact conn content))
+         (when-not (-> files-dir io/as-file .isDirectory)
+           (-> files-dir io/as-file .mkdir))
+         cfg)
+       (log! :error (str "Not recreating DB because backup file does not exist: " backup-file))))))
 
 (defn ^:admin update-project-for-schema!
   "This has the ADDITIONAL side-effect of writing a backup file."
@@ -582,53 +590,66 @@
    (let [db-id  (if (keyword? agent-id) :system (:pid agent-id))
          base-type (if (keyword? agent-id) agent-id (:base-type agent-id))]
      (d/q '[:find ?eid .
-            :in $ ?aid ?rel ?provider
+            :in $ ?base-type ?provider
             :where
-            [?eid :agent/base-type ?aid]
+            [?eid :agent/base-type ?base-type]
             [?eid :agent/llm-provider ?provider]]
-          @(connect-atm db-id)
-          base-type llm-provider))))
+          @(connect-atm db-id) base-type llm-provider))))
 
 (defn get-agent
-  "Get the argument agent, rehydrating :agent/tools."
-  [agent-id]
-  (s/valid? ::agent-id agent-id)
-  (let [db-id (if (keyword? agent-id) :system (:pid agent-id))]
+  "Get the argument agent, rehydrating :agent/tools.
+   If error? = true and there is no such agent, generate an error message (but do not throw).
+   If error? = false and there is no such agent, return {}."
+  ([agent-id] (get-agent agent-id true))
+  ([agent-id error?]
+   (s/valid? ::agent-id agent-id)
+   (let [db-id (if (keyword? agent-id) :system (:pid agent-id))]
      (if-let [eid (agent-exists? agent-id)]
        (as-> (resolve-db-id {:db/id eid} (connect-atm db-id)) ?x
          (if (contains? ?x :agent/tools)
            (update ?x :agent/tools edn/read-string)
            ?x))
-       (log! :error (str "Agent not found: " agent-id)))))
+       (if error?
+         (log! :error (str "Agent not found: " agent-id))
+         {})))))
 
 (defn update-agent!
   "Update the agent information on the system DB, providing a map that includes either agent-id or base-type."
   [agent-id agent-map]
   (s/assert ::agent-id agent-id)
+  (reset! diag agent-map)
   (s/assert ::specs/db-agent agent-map)
-  (assert (every? #(= "agent" %) (->> agent-map keys (map namespace))))
   (if-let [eid (agent-exists? agent-id)]
-    (let [conn-atm (connect-atm :system)]
-      (d/transact conn-atm {:tx-data [(merge {:db/id eid} agent-map)]}))
+    (let [conn-atm (if (keyword? agent-id)
+                     (connect-atm :system)
+                     (connect-atm (:pid agent-id)))]
+      (d/transact conn-atm {:tx-data [(merge {:db/id eid} agent-map)]})
+      (when-not (s/valid? ::specs/db-agent (get-agent agent-id))    ; <======================================================= Temporary
+        (reset! diag (get-agent agent-id))
+        (throw (ex-info (str "Bad agent after update-agent! " (with-out-str (get-agent agent-id))) {}))))
     (log! :error (str "No such agent: " agent-map))))
 
 (defn put-agent!
   "Add the argument agent object to database corresponding to the agent-id.
-   Set the :agent/timestamp and llm-provider."
+   Set the :agent/timestamp and llm-provider.
+   This will do an update-agent of the agent already exists."
   [agent-id agent-map]
-  (assert (every? #(= "agent" %) (->> agent-map keys (map namespace))))
+  (reset! diag agent-map)
   (s/assert ::agent-id agent-id)
   (let [agent-map (cond-> agent-map
                     (not (contains? agent-map :agent/llm-provider))   (assoc :agent/llm-provider @sutil/default-llm-provider)
                     true                                              (assoc :agent/timestamp (now))
-                    (contains? agent-map :agent/tools)                (update :agent/tools str))
-        conn-atm (connect-atm (if (keyword? agent-id) :system (:pid agent-id)))
-        rel (if (keyword? agent-id) :system/agents :project/agents)
-        eid (d/q '[:find ?eid . :where [?eid rel]] @conn-atm)]
-    (s/assert ::specs/db-agent agent-map)
-    (if eid
-      (d/transact conn-atm {:tx-data [{:db/id eid rel agent-map}]})
-      (log! :error (str "No such DB. agent-id = " agent-id)))))
+                    (contains? agent-map :agent/tools)                (update :agent/tools str))]
+    (if (agent-exists? agent-id)
+      (update-agent! agent-id agent-map)
+      (let [conn-atm (connect-atm (if (keyword? agent-id) :system (:pid agent-id)))
+            rel (if (keyword? agent-id) :system/agents :project/agents)
+            eid (d/q '[:find ?eid . :where [?eid rel]] @conn-atm)]
+        (reset! diag agent-map)
+        (s/assert ::specs/db-agent agent-map)
+        (if eid
+          (d/transact conn-atm {:tx-data [{:db/id eid rel agent-map}]})
+          (log! :error (str "No such DB. agent-id = " agent-id)))))))
 
 ;;; ----------------------------------- Claims -------------------------------------------------------------
 (defn get-claims

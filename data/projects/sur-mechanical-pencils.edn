@@ -2,22 +2,24 @@
 #:project{:agents
           [#:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
-                   :thread-id "thread_WYszbXfPUzwIycub3BUqDfYT",
+                   :thread-id "thread_no0zXPCdRT4DddCzw4102df9",
                    :model-class :gpt,
                    :llm-provider :openai,
-                   :assistant-id "asst_eJ7AxECsRib6jGssqREMahgx",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2025-01-31T17:13:05.127-00:00"}
+                   :pid :sur-mechanical-pencils,
+                   :assistant-id "asst_2QErW3cf91GcIX95z0IfQtqJ",
+                   :timestamp #inst "2025-01-31T17:13:05.127-00:00",
+                   :agent-id :process-interview-agent-openai}
            #:agent{:base-type :sur-mechanical-pencils,
                    :agent-type :project,
-                   :thread-id "thread_4qyLK4Ik9t0a4zcgDmp8YcIc",
+                   :thread-id "thread_7OzZvUpsDpQvAYbQY6vgf44b",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :surrogate? true,
-                   :assistant-id "asst_YgPErvr9UIuJfCBTneIdGtLV",
-                   :id :sur-mechanical-pencils-openai,
+                   :pid :sur-mechanical-pencils,
+                   :assistant-id "asst_sN5a5pSkeUu0tpz4IurUJw23",
                    :expertise "mechanical pencils",
-                   :timestamp #inst "2025-02-26T17:15:35.599-00:00"}],
+                   :timestamp #inst "2025-03-19T20:45:35.333-00:00",
+                   :agent-id :sur-mechanical-pencils-openai}],
           :claims
           [#:claim{:string "(project-id :sur-mechanical-pencils)"}
            #:claim{:string
@@ -25,8 +27,7 @@
            #:claim{:conversation-id :process,
                    :string "(surrogate :sur-mechanical-pencils)"}],
           :conversations
-          [#:conversation{:done? true,
-                          :id :process,
+          [#:conversation{:id :process,
                           :interviewer-budget 0.95,
                           :messages
                           [#:message{:content
@@ -80,7 +81,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-02-26T17:15:35.085-00:00"}]}],
-          :current-conversation :process,
           :id :sur-mechanical-pencils,
           :name "SUR Mechanical Pencils"}
 ]

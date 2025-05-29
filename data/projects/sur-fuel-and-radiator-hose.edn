@@ -1,7 +1,96 @@
 [
-#:project{:conversations
-          [#:conversation{:done? true,
-                          :id :process,
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_WvUS79Sg8Nxr6NADP4lL4fgj",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-fuel-and-radiator-hose,
+                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
+                   :timestamp #inst "2024-12-12T17:11:46.805-00:00",
+                   :agent-id :process-interview-agent-openai}
+           #:agent{:base-type :sur-fuel-and-radiator-hose,
+                   :agent-type :project,
+                   :thread-id "thread_2BtBG98lwiSzSnb9LMhh10cw",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :pid :sur-fuel-and-radiator-hose,
+                   :assistant-id "asst_wC1xbxkvwcWt1SzH0f5H31uT",
+                   :expertise "fuel and radiator hose",
+                   :timestamp #inst "2025-01-15T23:17:53.758-00:00",
+                   :agent-id :sur-fuel-and-radiator-hose-openai}],
+          :claims
+          [#:claim{:string "(project-id :sur-fuel-and-radiator-hose)"}
+           #:claim{:string
+                   "(project-name :sur-fuel-and-radiator-hose \"SUR Fuel And Radiator Hose\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-fuel-and-radiator-hose)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-fuel-and-radiator-hose :planned-maintenance)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-fuel-and-radiator-hose :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-fuel-and-radiator-hose :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-fuel-and-radiator-hose :equipment-availability)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(scheduling-challenge :sur-fuel-and-radiator-hose :demand-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string
+                   "(principal-expertise :sur-fuel-and-radiator-hose \"Fuel And Radiator Hoses\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/work-type,
+                   :string
+                   "(provides-product :sur-fuel-and-radiator-hose)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-location,
+                   :string
+                   "(production-location :sur-fuel-and-radiator-hose factory)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-motivation,
+                   :string
+                   "(production-mode :sur-fuel-and-radiator-hose make-to-stock)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/production-system-type,
+                   :string "(flow-shop :sur-fuel-and-radiator-hose)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-fuel-and-radiator-hose 1 \"Extrude Hoses\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-fuel-and-radiator-hose 2 \"Cut Hoses to Length\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-fuel-and-radiator-hose 3 \"Apply Reinforcement Layers\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-fuel-and-radiator-hose 4 \"Cure Hoses\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-fuel-and-radiator-hose 5 \"Inspect and Test Hoses\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/process-steps,
+                   :string
+                   "(process-step :sur-fuel-and-radiator-hose 6 \"Package and Label Hoses\")"}],
+          :conversations
+          [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -202,97 +291,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-01-15T23:17:53.266-00:00"}]}],
-          :code
-          "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {extrudeHoses, cutHoses, applyLayers, cureHoses, inspectTest};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|3.000, 1.500, 4.000, 5.000, 2.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, extrudeHoses] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, extrudeHoses] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, extrudeHoses] == taskStarts[p, cutHoses]);\nconstraint forall (p in Product) (taskEnds[p, cutHoses] == taskStarts[p, applyLayers]);\nconstraint forall (p in Product) (taskEnds[p, applyLayers] == taskStarts[p, cureHoses]);\nconstraint forall (p in Product) (taskEnds[p, cureHoses] == taskStarts[p, inspectTest]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, inspectTest]);",
-          :agents
-          [#:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_WvUS79Sg8Nxr6NADP4lL4fgj",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :assistant-id "asst_BWn3beW1g1GjnjBc3twTSWAC",
-                   :id :process-interview-agent-openai,
-                   :timestamp #inst "2024-12-12T17:11:46.805-00:00"}
-           #:agent{:base-type :sur-fuel-and-radiator-hose,
-                   :agent-type :project,
-                   :thread-id "thread_2BtBG98lwiSzSnb9LMhh10cw",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :surrogate? true,
-                   :assistant-id "asst_wC1xbxkvwcWt1SzH0f5H31uT",
-                   :id :sur-fuel-and-radiator-hose-openai,
-                   :expertise "fuel and radiator hose",
-                   :timestamp #inst "2025-01-15T23:17:53.758-00:00"}],
-          :current-conversation :process,
-          :claims
-          [#:claim{:string "(project-id :sur-fuel-and-radiator-hose)"}
-           #:claim{:string
-                   "(project-name :sur-fuel-and-radiator-hose \"SUR Fuel And Radiator Hose\")"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-fuel-and-radiator-hose)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-fuel-and-radiator-hose :planned-maintenance)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-fuel-and-radiator-hose :delivery-schedules)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-fuel-and-radiator-hose :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-fuel-and-radiator-hose :equipment-availability)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(scheduling-challenge :sur-fuel-and-radiator-hose :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/warm-up,
-                   :string
-                   "(principal-expertise :sur-fuel-and-radiator-hose \"Fuel And Radiator Hoses\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/work-type,
-                   :string
-                   "(provides-product :sur-fuel-and-radiator-hose)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-location,
-                   :string
-                   "(production-location :sur-fuel-and-radiator-hose factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-motivation,
-                   :string
-                   "(production-mode :sur-fuel-and-radiator-hose make-to-stock)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/production-system-type,
-                   :string "(flow-shop :sur-fuel-and-radiator-hose)"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-fuel-and-radiator-hose 1 \"Extrude Hoses\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-fuel-and-radiator-hose 2 \"Cut Hoses to Length\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-fuel-and-radiator-hose 3 \"Apply Reinforcement Layers\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-fuel-and-radiator-hose 4 \"Cure Hoses\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-fuel-and-radiator-hose 5 \"Inspect and Test Hoses\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :process/process-steps,
-                   :string
-                   "(process-step :sur-fuel-and-radiator-hose 6 \"Package and Label Hoses\")"}],
-          :name "SUR Fuel And Radiator Hose",
-          :id :sur-fuel-and-radiator-hose}
+          :id :sur-fuel-and-radiator-hose,
+          :name "SUR Fuel And Radiator Hose"}
 ]

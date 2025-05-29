@@ -1,9 +1,6 @@
 [
-#:project{:code
-          "enum Task = {receiving, preparation, canning, sterilization, cooling, packing};",
-          :conversations
-          [#:conversation{:done? true,
-                          :id :process,
+#:project{:conversations
+          [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -183,7 +180,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:53.188-00:00"}]}],
-          :current-conversation :process,
           :id :sur-canned-vegetables,
           :name "SUR Canned Vegetables"}
 ]

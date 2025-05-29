@@ -150,7 +150,7 @@
                                @(connect-atm :system) eads-id)
                           edn/read-string
                           collect-keys)]
-        (when-not (= eads-id ds-eads-ref)
+        (when-not (= eads-id ds-eads-ref) ; Sometimes it just forgets to include this; not much of a problem.
           (log! :warn (str "Argument eads-id, " eads-id " does not match that of data structure, " ds-eads-ref)))
         (-> eads-keys
             (set/difference ds-keys)
@@ -194,8 +194,8 @@
                  {:console? true :level :warn}))
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
     (tell-ork (conversation-history pid) {:ork-agent ork})
-    (let [eads-msg (-> (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})
-                       (update :EADS-id keyword))]
-      (if (s/valid? ::pursue-eads eads-msg)
-        (:EADS-id eads-msg)
-        (log! :error (str "Invalid PURSUE-EADS message: " eads-msg))))))
+    (let [eads-msg-id (-> (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})
+                          (update :EADS-id keyword))]
+      (if (s/valid? ::pursue-eads eads-msg-id)
+        (:EADS-id eads-msg-id)
+        (log! :error (str "Invalid PURSUE-EADS message: " eads-msg-id))))))

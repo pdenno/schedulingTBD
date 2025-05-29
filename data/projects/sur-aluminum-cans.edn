@@ -1,7 +1,26 @@
 [
-#:project{:conversations
-          [#:conversation{:done? true,
-                          :id :process,
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :thread-id "thread_LcwdHUDRYqrjhYL81EULPDLh",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-aluminum-cans,
+                   :assistant-id "asst_Zz3XcnFcPnVJ622Z0RU5zCYJ",
+                   :timestamp #inst "2024-12-08T16:12:48.505-00:00",
+                   :agent-id :process-interview-agent-openai}
+           #:agent{:base-type :sur-aluminum-cans,
+                   :thread-id "thread_fEVzOdryRUjtVA38Q3IMiu6L",
+                   :llm-provider :openai,
+                   :system-instruction
+                   "You manage a company that makes aluminum cans.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
+                   :surrogate? true,
+                   :pid :sur-aluminum-cans,
+                   :assistant-id "asst_wMY6Ic3N9JThpv5Q08lw13NW",
+                   :expertise "aluminum cans",
+                   :timestamp #inst "2024-12-08T16:12:48.451-00:00",
+                   :agent-id :sur-aluminum-cans-openai}],
+          :conversations
+          [#:conversation{:id :process,
                           :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
@@ -181,27 +200,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2024-11-20T13:32:52.887-00:00"}]}],
-          :code
-          "enum Task = {material, coil, cupping, drawing, trimming, washing, internal, baking, printing, necking, packing};",
-          :agents
-          [#:agent{:assistant-id "asst_Zz3XcnFcPnVJ622Z0RU5zCYJ",
-                   :base-type :process-interview-agent,
-                   :id :process-interview-agent-openai,
-                   :llm-provider :openai,
-                   :model-class :gpt,
-                   :thread-id "thread_LcwdHUDRYqrjhYL81EULPDLh",
-                   :timestamp #inst "2024-12-08T16:12:48.505-00:00"}
-           #:agent{:base-type :sur-aluminum-cans,
-                   :thread-id "thread_fEVzOdryRUjtVA38Q3IMiu6L",
-                   :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes aluminum cans.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
-                   :surrogate? true,
-                   :assistant-id "asst_wMY6Ic3N9JThpv5Q08lw13NW",
-                   :id :sur-aluminum-cans-openai,
-                   :expertise "aluminum cans",
-                   :timestamp #inst "2024-12-08T16:12:48.451-00:00"}],
-          :current-conversation :process,
-          :name "SUR Aluminum Cans",
-          :id :sur-aluminum-cans}
+          :id :sur-aluminum-cans,
+          :name "SUR Aluminum Cans"}
 ]

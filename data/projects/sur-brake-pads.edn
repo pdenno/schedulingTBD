@@ -1,5 +1,15 @@
 [
-#:project{:claims
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_HpDQ5et9cuzeGwfe9SYbbnrl",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-brake-pads,
+                   :assistant-id "asst_2QErW3cf91GcIX95z0IfQtqJ",
+                   :timestamp #inst "2025-03-13T15:26:51.344-00:00",
+                   :agent-id :process-interview-agent-openai}],
+          :claims
           [#:claim{:string "(project-id :sur-brake-pads)"}
            #:claim{:string
                    "(project-name :sur-brake-pads \"SUR Brake Pads\")"}
@@ -46,7 +56,6 @@
                                      :tags [:conversation-intro],
                                      :time
                                      #inst "2025-03-02T20:49:01.056-00:00"}]}],
-          :current-conversation :process,
           :id :sur-brake-pads,
           :name "SUR Brake Pads"}
 ]
