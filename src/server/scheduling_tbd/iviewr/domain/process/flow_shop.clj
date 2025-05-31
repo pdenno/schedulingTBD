@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.process.flow-shop
+(ns scheduling-tbd.iviewr.domain.process.flow-shop
   "(1) Define the example annotated data structure (EADS) interviewer will use for questioning about a flow-shop scheduling problem.
        As the case is with flow-shop problems, this structure defines the flow of work through resources.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
@@ -6,8 +6,9 @@
    [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
    [scheduling-tbd.db     :as db]
-   [scheduling-tbd.interviewing.eads-util :refer [graph-semantics-ok?]]
-   [scheduling-tbd.sutil :as sutil]))
+   [scheduling-tbd.iviewr.eads-util :refer [graph-semantics-ok? ds-complete?]]
+   [scheduling-tbd.sutil :as sutil]
+   [taoensso.telemere :refer [log!]]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
@@ -201,6 +202,12 @@
                                     :outputs ["finished pencils"],
                                     :resources ["crimping tool"],
                                     :subprocesses []}]}]}})
+
+;;; ------------------------------- checking for completeness ---------------
+(defmethod ds-complete? :process/flow-shop
+  [eads-id ds]
+  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  true)
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-flow-shop

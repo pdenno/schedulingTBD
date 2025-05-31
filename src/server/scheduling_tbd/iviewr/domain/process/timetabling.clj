@@ -1,9 +1,11 @@
-(ns scheduling-tbd.interviewing.domain.process.timetabling
+(ns scheduling-tbd.iviewr.domain.process.timetabling
   (:require
-   [clojure.spec.alpha    :as s]
-   [mount.core :as mount  :refer [defstate]]
-   [scheduling-tbd.db     :as db]
-   [scheduling-tbd.sutil  :as sutil]))
+   [clojure.spec.alpha       :as s]
+   [mount.core :as mount     :refer [defstate]]
+   [scheduling-tbd.db        :as db]
+   [scheduling-tbd.sutil     :as sutil]
+   [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
+   [taoensso.telemere        :refer [log!]]))
 
 (s/def :timetabling/EADS-message (s/keys :req-un [::interview-objective ::interviewer-agent ::EADS ::message-type]))
 (s/def ::EADS (s/keys :req-un [::EADS-id ::event-types ::timeslots]))
@@ -197,6 +199,11 @@
                            {:span-id "Thursday"  :periods  ["9:00-11:50" "13:00-15:50"]}
                            {:span-id "Friday"    :periods  ["9:00-11:50" "13:00-15:50"]}]}]}})
 
+;;; ------------------------------- checking for completeness ---------------
+(defmethod ds-complete? :process/timetabling
+  [eads-id ds]
+  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  true)
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-timetabling

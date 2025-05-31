@@ -281,7 +281,7 @@
   (s/assert ::specs/chat-msg-obj content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if (= :client-id :console)
-    (log! :info (str "send-to-client (console): " (with-out-str (pprint content))))
+    (log! :info (str "send-to-client (console):\n" (with-out-str (pprint content))))
     (if-let [out (->> client-id (get @socket-channels) :out)]
       (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))
             msg-obj (cond-> content
@@ -350,7 +350,7 @@
   ;; The following have ws/register-ws-dispatch, which need to be re-established.
   (mount/start (find-var 'scheduling-tbd.llm/llm-tools))
   (mount/start (find-var 'scheduling-tbd.surrogate/surrogates))
-  (mount/start (find-var 'scheduling-tbd.interviewing.interviewers/iviewrs))
+  (mount/start (find-var 'scheduling-tbd.iviewr.interviewers/iviewrs))
   [:socket-started])
 
 (defn wsock-stop []
@@ -362,7 +362,7 @@
   ;; The following have ws/register-ws-dispatch, which need to be re-established.
   (mount/stop (find-var 'scheduling-tbd.llm/llm-tools))
   (mount/stop (find-var 'scheduling-tbd.surrogate/surrogates))
-  (mount/stop (find-var 'scheduling-tbd.interviewing.interviewers/iviewrs))
+  (mount/stop (find-var 'scheduling-tbd.iviewr.interviewers/iviewrs))
   (reset! promise-stack '())
   [:closed-sockets])
 

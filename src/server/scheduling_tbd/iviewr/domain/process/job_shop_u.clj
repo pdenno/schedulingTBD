@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.process.job-shop-u
+(ns scheduling-tbd.iviewr.domain.process.job-shop-u
   "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a job-shop scheduling problem where each job potentially follows a unique process.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
@@ -6,7 +6,9 @@
    [datahike.api          :as d]
    [mount.core :as mount :refer [defstate]]
    [scheduling-tbd.db     :as db]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
+   [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
+   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]
+   [taoensso.telemere               :refer [log!]]))
 
 (s/def :job-shop-u/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
@@ -110,6 +112,14 @@
                                   :comment "We might have learned in the interview that they use a milling machine for resurfacing aluminum heads and a grinding machine for cast iron heads."}
                       :duration {:val {:units "hours", :value-string "2"},
                                  :comment "The value here does not include leak testing, which is treated as a separate unit process that usually follows resurfacing."}}]}})
+
+;;; ------------------------------- checking for completeness ---------------
+(defmethod ds-complete? :process/job-shop--unique
+  [eads-id ds]
+  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  true)
+
+;;; -------------------- Starting and stopping -------------------------
 (defn init-job-shop-u
   []
   (if (s/valid? :job-shop-u/EADS-message job-shop-u)

@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.ork
+(ns scheduling-tbd.iviewr.ork
   "Code for working with the orchestrator agent."
   (:require
    [clojure.core.unify            :as uni]
@@ -9,7 +9,7 @@
    [datahike.api                  :as d]
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
-   [scheduling-tbd.interviewing.eads] ; for mount
+   [scheduling-tbd.iviewr.eads] ; for mount
    [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide output-struct2clj]]
    [taoensso.telemere             :as tel :refer [log!]]))
 
@@ -140,7 +140,7 @@
                            (edn/read-string ?d)))]
     (if (:exhausted? most-recent-ds) ; Only some have this; not to be confused with ork use of :exhausted?
       true
-      (let [ds-eads-ref (:based-on-EADS most-recent-ds)
+      (let [ds-eads-ref (:EADS-ref most-recent-ds)
             ds-keys (collect-keys most-recent-ds)
             eads-keys (-> (d/q '[:find ?str .
                                  :in $ ?eads-id
@@ -151,6 +151,7 @@
                           edn/read-string
                           collect-keys)]
         (when-not (= eads-id ds-eads-ref) ; Sometimes it just forgets to include this; not much of a problem.
+          (reset! diag {:eads-id eads-id :ds-eads-ref ds-eads-ref :most-recent-ds most-recent-ds})
           (log! :warn (str "Argument eads-id, " eads-id " does not match that of data structure, " ds-eads-ref)))
         (-> eads-keys
             (set/difference ds-keys)
@@ -164,24 +165,19 @@
    :aid and :tid in the ctx should be for the interviewer agent."
   [msg {:keys [ork-agent] :as ctx}]
   (when-not (s/valid? ::ork-msg msg) ; We don't s/assert here because old project might not be up-to-date.
-    (log! :warn (str "Invalid ork msg: " (with-out-str (pprint msg)))))
+    (log! :warn (str "Invalid ork msg:\n" (with-out-str (pprint msg)))))
   (log! :info (-> (str "Ork told: " msg) (elide 150)))
-  (agent-log (str "[ork manager] (tells ork) " (with-out-str (pprint msg))))
+  (agent-log (str "[ork manager] (tells ork)\n" (with-out-str (pprint msg))))
   (let [msg-string (clj2json-pretty msg)
         res (-> (adb/query-agent ork-agent msg-string ctx) output-struct2clj)]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
-    (agent-log (str "[ork manager] (receives response form ork) " (with-out-str (pprint res))))
+    (agent-log (str "[ork manager] (receives response form ork)\n" (with-out-str (pprint res))))
     res))
-
-(s/def ::pursue-eads (s/keys :req-un [::message-type ::EADS-id]))
-(s/def ::message-type #(= % "PURSUE-EADS"))
-(def eads-id? (-> (db/list-system-EADS) set))
-(s/def ::EADS-id eads-id?)
 
 (defn get-new-EADS-id
   "Update the project's orchestrator with CONVERSATION-HISTORY and do a SUPPLY-EADS request to the ork.
    If the ork returns {:message-type 'PURSUE-EDS', :EADS-id 'exhausted'} return nil to the caller,
-   otherwise, return the :EADS-id as a keyword."
+   otherwise, return the eads-instructions-id keyword."
   [pid]
   (let [ork (ensure-ork! pid)
         old-tid (d/q '[:find ?tid .
@@ -194,8 +190,9 @@
                  {:console? true :level :warn}))
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
     (tell-ork (conversation-history pid) {:ork-agent ork})
-    (let [eads-msg-id (-> (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})
-                          (update :EADS-id keyword))]
-      (if (s/valid? ::pursue-eads eads-msg-id)
-        (:EADS-id eads-msg-id)
-        (log! :error (str "Invalid PURSUE-EADS message: " eads-msg-id))))))
+    (let [pursue-msg (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})
+          eads-instructions-id (-> pursue-msg :EADS-id keyword)]
+      (if ((-> (db/list-system-EADS) set) eads-instructions-id)
+        eads-instructions-id
+        ;; Otherwise probably :exhausted. Return nil
+        (agent-log (str "PURSUE-EADS message: " pursue-msg) {:console? true :level :info})))))

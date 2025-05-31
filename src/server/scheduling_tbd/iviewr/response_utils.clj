@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.response-utils
+(ns scheduling-tbd.iviewr.response-utils
   "Implementation of the action of plans. These call the LLM, query the user, etc."
   (:refer-clojure :exclude [send])
   (:require
@@ -12,6 +12,7 @@
    [clojure.string                :as str]
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
+   [scheduling-tbd.specs          :as specs]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere             :as tel :refer [log!]]))
 
@@ -26,7 +27,7 @@
   "Send a message to the client to reload the conversation.
   Typically done with surrogate or starting a new project."
   [client-id pid cid]
-  (assert (string? client-id))
+  (s/assert ::specs/client-id client-id)
   (ws/send-to-client {:promise? false
                       :client-id client-id
                       :dispatch-key :update-conversation-text
@@ -71,7 +72,7 @@
                         (log! :warn (str "text-to-var failed\n "
                                          "\nmessage: " (-> d-e :via first :message)
                                          "\ncause: " (-> d-e :data :body)
-                                         "\ntrace: " (with-out-str (pprint (:trace d-e))))))))]
+                                         "\ntrace:\n" (with-out-str (pprint (:trace d-e))))))))]
        (s/assert ::text-to-var res)
        (:CORRESPONDING-VAR res)))))
 
@@ -123,6 +124,6 @@
     tag
     (throw (ex-info "Bad tag" {:tag tag}))))
 
-;;; The methods for this are in the interviewing/domain directory.
+;;; The methods for this are in the iviewr/domain directory.
 (defmulti analyze-warm-up        #'dispatch-by-cid)
 (defmulti conversation-complete? #'dispatch-by-cid)

@@ -3,14 +3,13 @@
   (:require
    [clojure.core.unify                     :as uni]
    [clojure.test                           :refer [deftest is testing]]
-   [clojure.spec.alpha                     :as s]
    [datahike.api                           :as d]
    [datahike.pull-api                      :as dp]
    [jsonista.core                          :as json]
    [scheduling-tbd.agent-db                :as adb]
    [scheduling-tbd.db                      :as db]
-   [scheduling-tbd.interviewing.domain.process-analysis :as pan]
-   [scheduling-tbd.interviewing.interviewers            :as inv :refer [tell-interviewer]]
+   [scheduling-tbd.iviewr.domain.process-analysis :as pan]
+   [scheduling-tbd.iviewr.interviewers            :as inv :refer [tell-interviewer]]
    [scheduling-tbd.llm                     :as llm :refer [query-llm]]
    [scheduling-tbd.response-utils          :as ru]
    [scheduling-tbd.util                    :as util]
@@ -21,71 +20,9 @@
 ;;; THIS is the namespace I am hanging out in recently.
 (def ^:diag diag (atom nil))
 
-(def alias? (atom (-> (ns-aliases *ns*) keys set)))
-
-(defn ^:diag ns-start-over!
-  "This one has been useful. If you get an error evaluate this ns, (the declaration above) run this and try again."
-  []
-  (map (partial ns-unalias *ns*) (keys (ns-aliases *ns*))))
-
-(defn ^:diag remove-alias
-  "This one has NOT been useful!"
-  [al ns-sym]
-  (swap! alias? (fn [val] (->> val (remove #(= % al)) set)))
-  (ns-unalias (find-ns ns-sym) al))
-
-(defn safe-alias
-  [al ns-sym]
-  (when (and (not (@alias? al))
-             (find-ns ns-sym))
-    (alias al ns-sym)))
-
-(defn ^:diag ns-setup!
-  "Use this to setup useful aliases for working in this NS."
-  []
-  (ns-start-over!)
-  (reset! alias? (-> (ns-aliases *ns*) keys set))
-  (safe-alias 'io     'clojure.java.io)
-  (safe-alias 's      'clojure.spec.alpha)
-  (safe-alias 'uni    'clojure.core.unify)
-  (safe-alias 'edn    'clojure.edn)
-  (safe-alias 'io     'clojure.java.io)
-  (safe-alias 'str    'clojure.string)
-  (safe-alias 'd      'datahike.api)
-  (safe-alias 'dp     'datahike.pull-api)
-  (safe-alias 'jt     'java-time.api)
-  (safe-alias 'json   'jsonista.core)
-  (safe-alias 'mount  'mount.core)
-  (safe-alias 'p      'promesa.core)
-  (safe-alias 'px     'promesa.exec)
-  (safe-alias 'adb    'scheduling-tbd.agent-db)
-  (safe-alias 'core   'scheduling-tbd.core)
-  (safe-alias 'pan    'scheduling-tbd.interviewing.domain.process-analysis)
-  (safe-alias 'pant   'scheduling-tbd.interviewing.domain.process-analysis-test)
-  (safe-alias 'db     'scheduling-tbd.db)
-  (safe-alias 'dbt    'scheduling-tbd.db-test)
-  (safe-alias 'how    'scheduling-tbd.how-made)
-  (safe-alias 'invt   'scheduling-tbd.interviewers-test)
-  (safe-alias 'llm    'scheduling-tbd.llm)
-  (safe-alias 'llmt   'scheduling-tbd.llm-test)
-  (safe-alias 'mzn    'scheduling-tbd.minizinc)
-  (safe-alias 'mznt   'scheduling-tbd.minizinc-test)
-  (safe-alias 'ou     'scheduling-tbd.op-utils)
-  (safe-alias 'opt    'scheduling-tbd.operators-test)
-  (safe-alias 'ru     'scheduling-tbd.response-utils)
-  (safe-alias 'spec   'scheduling-tbd.specs)
-  (safe-alias 'sutil  'scheduling-tbd.sutil)
-  (safe-alias 'sur    'scheduling-tbd.surrogate)
-  (safe-alias 'surt   'scheduling-tbd.surrogate-test)
-  (safe-alias 'util   'scheduling-tbd.util)
-  (safe-alias 'resp   'scheduling-tbd.web.controllers.respond)
-  (safe-alias 'ws     'scheduling-tbd.web.websockets)
-  (safe-alias 'tel    'taoensso.telemere)
-  (safe-alias 'openai 'wkok.openai-clojure.api))
-
 (deftest interviewer-question-ordering
   (testing "that interviews for flow-shop manufacturing follow the correct processes."
-    (let [aid (:aid (adb/get-agent :base-type :process-interview-agent))
+    (let [aid (:aid (db/get-agent :base-type :process-interview-agent))
           tid (:id (llm/make-thread {:assistant-id aid
                                      :llm-provider :openai
                                      :metadata {:usage :project-agent}}))

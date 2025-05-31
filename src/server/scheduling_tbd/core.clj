@@ -9,7 +9,7 @@
    [ring.adapter.jetty :as jetty]
    [scheduling-tbd.db   :refer [sys&proj-database-cfgs]]              ; for mount
    [scheduling-tbd.how-made :refer [him-cfg]]                         ; for mount
-   [scheduling-tbd.interviewing.interviewers :refer [iviewrs]]        ; for mount
+   [scheduling-tbd.iviewr.interviewers :refer [iviewrs]]        ; for mount
    [scheduling-tbd.surrogate :refer [surrogates]]                     ; for mount
    [scheduling-tbd.system-agents :refer [system-agents]]              ; for mount
    [scheduling-tbd.web.handler :refer [app]]                          ; for mount

@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.interviewers
+(ns scheduling-tbd.iviewr.interviewers
     "Runs an interview using an interview agent."
     (:require
      [cheshire.core                   :as ches]
@@ -15,13 +15,14 @@
      [scheduling-tbd.agent-db         :as adb :refer [agent-log]]
      [scheduling-tbd.db               :as db]
      [scheduling-tbd.llm              :as llm]
-     [scheduling-tbd.interviewing.eads] ; for mount
-     [scheduling-tbd.interviewing.ork :as ork]
-     [scheduling-tbd.interviewing.response-utils :as ru]
-     [scheduling-tbd.sutil            :as sutil :refer [elide output-struct2clj]]
-     [scheduling-tbd.web.websockets   :as ws]
-     [scheduling-tbd.datastructure2mermaid :as ds2m]
-     [taoensso.telemere               :as tel :refer [log!]]))
+     [scheduling-tbd.iviewr.eads] ; for mount
+     [scheduling-tbd.iviewr.eads-util      :as eads-util] ; for mount
+     [scheduling-tbd.iviewr.ork            :as ork]
+     [scheduling-tbd.iviewr.response-utils :as ru]
+     [scheduling-tbd.sutil                       :as sutil :refer [elide output-struct2clj]]
+     [scheduling-tbd.web.websockets              :as ws]
+     [scheduling-tbd.datastructure2mermaid       :as ds2m]
+     [taoensso.telemere                          :as tel :refer [log!]]))
 
 ;;; The usual way of interviews involves q-and-a called from resume-conversation.
 ;;; The alternative way, used only when the human or surrogate expert is starting, is to use get-an-answer.
@@ -42,8 +43,7 @@
 
 ;;; For use of chat-pair and other things defined below.
 (s/def ::chat-pair-ctx (s/and ::common-ctx
-                              (s/or :surrogate (s/and #(s/valid? ::surrogate-ctx %) #(s/valid? ::common-ctx %))
-                                    :human     (s/and #(s/valid? ::human-ctx %)     #(s/valid? ::common-ctx %)))))
+                              (s/or :surrogate ::surrogate-ctx :human ::human-ctx)))
 
 (s/def ::common-ctx    (s/keys :req-un [::client-id ::question]))
 (s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-type ::surrogate-agent ::interviewer-agent]))
@@ -71,7 +71,7 @@
    For human interactions, the response is based on :dispatch-key :domain-experts-says (See websockets/domain-expert-says)."
   [{:keys [question table table-text surrogate-agent responder-type preprocess-fn tries pid cid] :as ctx
     :or {tries 1  preprocess-fn identity}}]
-  (log! :debug (str "ctx in chat-pair-aux: " (with-out-str (pprint ctx))))
+  (log! :debug (str "ctx in chat-pair-aux:\n" (with-out-str (pprint ctx))))
    (let [prom (if (= :human responder-type)
                 (ws/send-to-client (-> ctx                        ; This cannot timeout.
                                        (assoc :text question)
@@ -80,7 +80,7 @@
                                        (assoc :dispatch-key :iviewr-says)))
                 (px/submit! (fn [] ; surrogate responder...
                               (try
-                                (agent-log (str "["(name cid) "interviewer] (asking interviewees): " question "\n\n" table-text))
+                                (agent-log (str "["(name cid) " interviewer] (asking interviewees): " question "\n\n" table-text))
                                 (adb/query-agent surrogate-agent  ; This can timeout.
                                                  (str question "\n\n" table-text)
                                                  {:tries tries
@@ -101,7 +101,7 @@
    If response is immoderate returns {:msg-type :immoderate}"
   [{:keys [responder-type client-id cid] :as ctx}]
   (let [response (chat-pair-aux ctx)]
-    (agent-log (str "["(name cid) "interviewer] (response from interviewees): " response))
+    (agent-log (str "["(name cid) " interviewer] (response from interviewees): " response))
     (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})
     (case responder-type
       :human (if (-> response :text llm/immoderate?)
@@ -170,8 +170,8 @@
   [msg {:keys [interviewer-agent cid] :as ctx}]
   (too-many-course-corrections! msg)
   (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
-    (log! :warn (str "Invalid interviewer-msg: " (with-out-str (pprint msg)))))
-  (agent-log (str "[interview manager] (tells " (name cid) " interviewer) " (with-out-str (pprint msg))))
+    (log! :warn (str "Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
+  (agent-log (str "[interview manager] (tells " (name cid) " interviewer)\n" (with-out-str (pprint msg))))
   (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
   (let [msg-string (ches/generate-string msg {:pretty true})
         res (-> (adb/query-agent interviewer-agent msg-string ctx) output-struct2clj)]
@@ -191,7 +191,7 @@
                 (update-keys str/lower-case)
                 (update-keys keyword)
                 (update-vals #(if (empty? %) false %)))]
-    (agent-log (str "[response analysis agent] (concludes): " (with-out-str (pprint res))))
+    (agent-log (str "[response analysis agent] (concludes):\n" (with-out-str (pprint res))))
     res))
 
 ;;; ToDo: Implement these (next three). They will probably involve some looping.
@@ -223,7 +223,10 @@
    Note that the first element of the conversation should be the question, and the last the answer.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
   [{:keys [question responder-type human-starting?] :as ctx}]
-  (when-not human-starting? (s/assert ::chat-pair-ctx ctx))
+  (when-not human-starting?
+    (when-not (s/valid? ::chat-pair-ctx ctx)
+      (reset! diag ctx)
+      (throw (ex-info "Invalid context in get-an-answer." {:ctx ctx}))))
   (let [conversation [{:text question :from :system :tags [:query]}]
         {:keys [full-text] :as response}  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
         answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
@@ -566,9 +569,9 @@
   (ork/ensure-ork! pid)
   (let [budget (db/get-budget pid cid)
         active-eads-id (db/get-active-EADS-id pid cid)
-        eads-id (when-not active-eads-id (ork/get-new-EADS-id pid))
-        eads-complete? (and eads-id (ork/EADS-complete? pid cid eads-id))
-        new-eads-id (when (or eads-complete? (<= budget 0))
+        eads-id (or active-eads-id (ork/get-new-EADS-id pid))
+        ds-complete? (and eads-id (eads-util/ds-complete? pid cid eads-id))
+        new-eads-id (when (or ds-complete? (<= budget 0))
                       (ork/get-new-EADS-id pid)) ; provides conversation, returns nil when exhausted.
         new-cid (when new-eads-id
                   (let [nspace (-> new-eads-id namespace keyword)]
@@ -579,10 +582,10 @@
     (when new-cid
       (agent-log (str "[ork manager] (in ork-review) changing conversation to " new-cid ".")))
     (cond-> ctx
-      (not @active?)           (assoc :force-stop? true)
-      (not new-eads-id)        (assoc :exhausted? true)
-      new-eads-id              (assoc :new-eads-id new-eads-id)
-      new-cid                  (assoc :new-cid? true :old-cid cid :cid new-cid))))
+      (not @active?)                    (assoc :force-stop? true)
+      (not (or new-eads-id eads-id))    (assoc :exhausted? true)
+      new-eads-id                       (assoc :new-eads-id new-eads-id)
+      new-cid                           (assoc :new-cid? true :old-cid cid :cid new-cid))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
@@ -602,13 +605,13 @@
         (loop [ctx ctx]
           (let [{:keys [exhausted? force-stop? new-eads-id cid old-cid new-cid?] :as ctx} (ork-review ctx)]
             (if (or exhausted? force-stop?)
-              (agent-log (str "resume-conversation exiting. ctx = " (with-out-str (pprint ctx))) {:console? true})
+              (agent-log (str "resume-conversation exiting. ctx:\n" (with-out-str (pprint ctx))) {:console? true})
               (do (when new-cid?
                     (db/put-conversation-status! pid old-cid :eads-exhausted)
                     (db/put-conversation-status! pid cid :in-progress))
                   (when new-eads-id
                     (db/put-active-EADS-id pid cid new-eads-id)
-                    (tell-interviewer (db/get-EADS-instructions new-eads-id) pid))
+                    (tell-interviewer (db/get-EADS-instructions new-eads-id) ctx))
                   (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                         expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
                         iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND" :response expert-response} ctx)]

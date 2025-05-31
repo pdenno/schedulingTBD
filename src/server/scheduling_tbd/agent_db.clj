@@ -44,6 +44,8 @@
   (and (s/valid? ::agent-id-map agent-id)
        (= (:pid agent-id) (:base-type agent-id))))
 
+(def passive? "Use this to run code without making LLM calls." false)
+
 ;;; Throughout the project:
 ;;;   pid = project-id, a keyword
 ;;;   cid = conversation id, a keyword #{:process :data :resources :optimality}
@@ -94,16 +96,14 @@
 (defn make-agent-basics
   "Create essential map attributes of an agent (everything but aid and tid) using a template (if available) and a props map.
    The props map contains agent-namespaced properties that have the same name as agent-db (namespaced) properties.
-   Options will override anything found in the template (if one is available)"
-  ([agent-id] (make-agent-basics agent-id {}))
-  ([agent-id props]
-   (reset! diag [agent-id props])
-   (assert (every? specs/agent-key? (keys props)))
-   (let [btyp (if (keyword? agent-id) agent-id (:base-type agent-id))
-         template (db/get-agent btyp nil)
-         props (merge template props)
-         {:agent/keys [base-type agent-type llm-provider model-class surrogate? expertise instruction-path
-                       instruction-string response-format-path vector-store-paths tools pid]
+   props will override anything found in the template (if one is available)"
+  [agent-id props]
+  (assert (every? specs/agent-key? (keys props)))
+  (let [btyp (if (keyword? agent-id) agent-id (:base-type agent-id))
+        template (db/get-agent btyp nil)
+        props (merge template props)
+        {:agent/keys [base-type agent-type llm-provider model-class surrogate? expertise instruction-path
+                      instruction-string response-format-path vector-store-paths tools pid]
           :or {llm-provider @default-llm-provider model-class :gpt}} props
          pid (or pid (:pid agent-id)) ; Will still be nil if it is a template.
          surrogate? (or surrogate? (surrogate-agent-id? agent-id))
@@ -124,33 +124,49 @@
        response-format-path  (assoc :agent/response-format-path response-format-path)
        vector-store-paths    (assoc :agent/vector-store-paths vector-store-paths)
        tools                 (assoc :agent/tools tools)
-       pid                   (assoc :agent/pid pid)))))
+       pid                   (assoc :agent/pid pid))))
+
+(defn ensure-agent-basics
+  "Retrieve or make basic properties of the agent. This might retrurn complete agent properties
+   if what is retrieved has :agent/assistant-id and :agent/thread-id. It won't have these two
+   properties if it is make through make-agent-basic."
+  ([agent-id] (ensure-agent-basics agent-id {}))
+  ([agent-id props]
+   (if-let [agent (not-empty (db/get-agent agent-id nil))]
+     (merge props agent)
+     (make-agent-basics agent-id props))))
 
 (defn get-llm-assistant-id
   "Create an agent sans :agent/thread-id (even if this will eventually be needed, (#{:project :system} agent-type).
    Returns the object in DB attributes."
   [{:agent/keys [base-type llm-provider model-class instruction-path instruction-string response-format-path vector-store-paths tools]
     :or {llm-provider @default-llm-provider
-         model-class :gpt} :as agent-info}]
+         model-class :gpt}}]
   (let [user (-> (System/getenv) (get "USER"))
         a-name (-> base-type name (str "-" (name llm-provider)) keyword)
-        file-objs (doall (mapv #(llm/upload-file {:fname %}) (map #(-> % io/resource io/file str) vector-store-paths)))
+        file-objs (if passive?
+                    []
+                    (doall (mapv #(llm/upload-file {:fname %}) (map #(-> % io/resource io/file str) vector-store-paths))))
         v-store (when (not-empty file-objs) (llm/make-vector-store {:file-ids (mapv :id file-objs)}))
-        assist (llm/make-assistant (cond-> {}
-                                     true                  (assoc :name a-name)
-                                     true                  (assoc :metadata {:usage :stbd-agent :user user :base-type base-type})
-                                     instruction-path      (assoc :instructions (-> instruction-path io/resource slurp))
-                                     instruction-string    (assoc :instructions instruction-string)
-                                     tools                 (assoc :tools tools)
-                                     response-format-path  (assoc :response-format (-> response-format-path io/resource slurp edn/read-string))
-                                     v-store               (assoc :tool-resources {"file_search" {"vector_store_ids" [(:id v-store)]}})))]
+        assist (when-not passive?
+                 (llm/make-assistant (cond-> {}
+                                       true                  (assoc :name a-name)
+                                       true                  (assoc :model-class model-class)
+                                       true                  (assoc :metadata {:usage :stbd-agent :user user :base-type base-type})
+                                       instruction-path      (assoc :instructions (-> instruction-path io/resource slurp))
+                                       instruction-string    (assoc :instructions instruction-string)
+                                       tools                 (assoc :tools tools)
+                                       response-format-path  (assoc :response-format (-> response-format-path io/resource slurp edn/read-string))
+                                       v-store               (assoc :tool-resources {"file_search" {"vector_store_ids" [(:id v-store)]}}))))]
     (agent-log (str "\n\n Added aid " (:id assist) " to agent " a-name))
-    (:id assist)))
+    (if passive? "passive: aid" (:id assist))))
 
 (defn assistant-creation-inst
   "Return the instant object marking when the OpenAI assistant was created."
   [aid]
-  (-> aid llm/get-assistant :created_at (* 1000) java.util.Date.))
+  (if passive?
+    (now)
+    (-> aid llm/get-assistant :created_at (* 1000) java.util.Date.)))
 
 (defn newest-file-modification-date
   "Return the modification date (instant object) of the most recently modified file used to define the agent."
@@ -210,10 +226,10 @@
         missing-here (cond-> #{}
                        (not project-aid)      (conj :assistant)
                        (not project-tid)      (conj :thread))
-        project-provider-aid? (llm/get-assistant project-aid)
-        system-provider-aid?  (llm/get-assistant system-aid)
+        project-provider-aid? (if passive? "passive: aid" (llm/get-assistant project-aid))
+        system-provider-aid?  (if passive? "passive: aid" (llm/get-assistant system-aid))
         substitute-aid        (when (and system-provider-aid? (not project-provider-aid?)) system-aid)
-        provider-tid?  (llm/get-thread project-tid) ;(when system-tid  (llm/get-thread project-tid))
+        provider-tid?  (if passive? "passive: aid" (llm/get-thread project-tid))
         missing-provider (cond-> #{}
                            (and (not system-provider-aid?)
                                 (not project-provider-aid?)) (conj :assistant)
@@ -237,8 +253,8 @@
         missing-here  (cond-> #{}
                         (not aid)      (conj :assistant)
                         (not tid)      (conj :thread))
-        provider-aid? (when aid (llm/get-assistant aid))
-        provider-tid? (when tid (llm/get-thread tid))
+        provider-aid? (when aid (if passive? "passive: aid" (llm/get-assistant aid)))
+        provider-tid? (when tid (if passive? "passive: tid" (llm/get-thread tid)))
         missing-provider (cond-> #{}
                            (not provider-aid?)            (conj :assistant)
                            (and pid (not provider-tid?))  (conj :thread))]
@@ -276,17 +292,17 @@
   "Return a tid for the argument agent, which must have an assisatnt-id.
    Write to the agent-log about it."
   [{:agent/keys [assistant-id pid agent-type] :as agent}]
-  (let [tid (-> (llm/make-thread :assistant-id assistant-id) :id)
+  (let [tid (if passive? "passive: tid" (-> (llm/make-thread :assistant-id assistant-id) :id))
         agent (assoc agent :agent/thread-id tid)]
     (case agent-type
 
       :system
-      (do (log! :info (str "Adding thread " tid " to system DB.\n" (with-out-str (pprint agent))))
-          (agent-log (str "\n\n Adding thread " tid " to system DB\n" (with-out-str (pprint agent)))))
+      (do (log! :info (str "Adding thread " tid " to system DB:\n" (with-out-str (pprint agent))))
+          (agent-log (str "\n\n Adding thread " tid " to system DB:\n" (with-out-str (pprint agent)))))
 
       (:project :shared-assistant)
-      (log! :debug (str "Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent))))
-      (agent-log (str "\n\n Adding thread " tid " to project " pid ".\n" (with-out-str (pprint agent)))))
+      (log! :debug (str "Adding thread " tid " to project " pid " :\n" (with-out-str (pprint agent))))
+      (agent-log (str "\n\n Adding thread " tid " to project " pid " :\n" (with-out-str (pprint agent)))))
     tid))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
@@ -314,7 +330,7 @@
          pid   (:pid agent-id)
          props (cond-> props pid (assoc :agent/pid pid))
          {:keys [make-assistant? make-thread?]} (agent-status agent-id)
-         agent (make-agent-basics agent-id props)
+         agent (ensure-agent-basics agent-id props)
          make-assistant? (and (or make-assistant? force-new?) (not substitute-aid))
          make-thread? (and (or make-thread? force-new?)      ; outdated, or forced...
                            (not (and (system-agent-id? agent-id)   ; ...but not the system 'template' for a shared assistant.
@@ -415,7 +431,7 @@
             (log! :warn (str "query-on-thread failed (tries = " (:tries obj) "):\n "
                              "\nmessage: " (-> d-e :via first :message)
                              "\ncause: " (-> d-e :data :body)
-                             "\ntrace: " (with-out-str (pprint (:trace d-e))))))
+                             "\ntrace:\n" (with-out-str (pprint (:trace d-e))))))
           (query-on-thread (update obj :tries dec))))
       (log! :warn "Query on thread exhausted all tries."))))
 

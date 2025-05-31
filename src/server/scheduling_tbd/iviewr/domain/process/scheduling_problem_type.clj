@@ -1,10 +1,12 @@
-(ns scheduling-tbd.interviewing.domain.process.scheduling-problem-type
+(ns scheduling-tbd.iviewr.domain.process.scheduling-problem-type
   "Define a EADS to elicit general information about the scheduling problem the interviewees are interested in solving."
   (:require
    [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
    [scheduling-tbd.db     :as db]
-   [scheduling-tbd.sutil  :as sutil]))
+   [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
+   [scheduling-tbd.sutil  :as sutil]
+   [taoensso.telemere     :refer [log!]]))
 
 ;;; ToDo: Because we use a central spec registry, the specs defined with short namespaces (e.g. :problem-type/val) might collide with specs from other domains.
 ;;;       The best solution might be not to use a central repository. These things won't be needed outside this file.
@@ -61,6 +63,13 @@
                       :comment  (str "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.\n"
                                      "For example, if the made the same collection of products in the same order each week, cylical? would be true.")}}})
 
+;;; ------------------------------- checking for completeness ---------------
+(defmethod ds-complete? :process/scheduling-problem-type
+  [eads-id ds]
+  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  true)
+
+;;; ------------------------------- starting and stopping ---------------
 (defn init-scheduling-problem-type
   []
   (if (s/valid? :scheduling-problem-type/EADS-message scheduling-problem-type)

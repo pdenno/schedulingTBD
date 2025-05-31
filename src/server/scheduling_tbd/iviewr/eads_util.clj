@@ -1,5 +1,7 @@
-(ns scheduling-tbd.interviewing.eads-util
+(ns scheduling-tbd.iviewr.eads-util
   (:require
+   [datahike.core           :as d]
+   [scheduling-tbd.sutil    :refer [connect-atm]]
    [taoensso.telemere       :refer [log!]]))
 
 ;;; ---------- These are used to check process EADS for valid graphs.
@@ -77,3 +79,11 @@
   [graph]
   (and (outputs-exist-where-inputs-claim? graph)
        (inputs-match-in-hierarchy? graph)))
+
+(defn dispatch-by-eads-id [eads-id & _]
+  (let [eads-id? (-> (d/q '[:find [?id ...] :where [_ :EADS/id ?id]] @(connect-atm :system)) set)]
+    (if (eads-id? eads-id)
+      eads-id
+      (throw (ex-info "Bad eads-id in dispatch for ds-complete?" {:eads-id eads-id})))))
+
+(defmulti ds-complete? #'dispatch-by-eads-id)

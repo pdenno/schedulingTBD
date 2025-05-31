@@ -223,7 +223,7 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}
 
-   ;; ---------------------- project
+   ;; ---------------------- project -- the top-level object in the db/file.
    :project/active-conversation
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "The conversation most recently busy. Note that several conversations can still need work, and there can be an "
@@ -620,18 +620,21 @@
   [agent-id agent-map]
   (reset! diag agent-map)
   (s/assert ::agent-id agent-id)
+  (s/assert ::specs/db-agent agent-map)
   (let [agent-map (cond-> agent-map
                     (not (contains? agent-map :agent/llm-provider))   (assoc :agent/llm-provider @sutil/default-llm-provider)
                     true                                              (assoc :agent/timestamp (now))
-                    (contains? agent-map :agent/tools)                (update :agent/tools str))]
-    (let [conn-atm (connect-atm (if (keyword? agent-id) :system (:pid agent-id)))
-          rel (if (keyword? agent-id) :system/agents :project/agents)
-          eid (d/q '[:find ?eid . :where [?eid rel]] @conn-atm)]
-      (reset! diag agent-map)
-      (s/assert ::specs/db-agent agent-map)
-      (if eid
-        (d/transact conn-atm {:tx-data [{:db/id eid rel agent-map}]})
-        (log! :error (str "No such DB. agent-id = " agent-id))))))
+                    (contains? agent-map :agent/tools)                (update :agent/tools str))
+        conn-atm (connect-atm (if (keyword? agent-id) :system (:pid agent-id)))
+        top-level-rel (if (keyword? agent-id) :system/name   :project/id)
+        target-rel    (if (keyword? agent-id) :system/agents :project/agents)
+        eid (d/q '[:find ?eid .
+                   :in $ ?rel
+                   :where [?eid ?rel]]
+                 @conn-atm top-level-rel)]
+    (if eid
+      (d/transact conn-atm {:tx-data [{:db/id eid target-rel agent-map}]})
+      (log! :error (str "No such DB. agent-id = " agent-id)))))
 
 ;;; ----------------------------------- Claims -------------------------------------------------------------
 (defn get-claims
@@ -927,6 +930,7 @@
    (the EDN structure from edn/read-string of :EADS/msg-str).
    Returns the empty string when the EADS ID is not known."
   [eads-id]
+  (assert (keyword? eads-id))
   (if-let [msg-str (d/q '[:find ?msg-str .
                           :in $ ?eads-id
                           :where
@@ -934,7 +938,7 @@
                           [?e :EADS/msg-str ?msg-str]]
                         @(connect-atm :system) eads-id)]
     (edn/read-string msg-str)
-    ""))
+    (throw (ex-info "No eads-id: " eads-id {:eads-id eads-id}))))
 
 (defn same-EADS-instructions?
   "Return true if the argument eads-instructions (an EDN object) is exactly what the system already maintains."

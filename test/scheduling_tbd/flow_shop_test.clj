@@ -4,8 +4,8 @@
    [clojure.spec.alpha            :as s]
    [develop.dutil                 [remove-annotations]]
    [develop.repl                  :refer [ns-setup! ns-fix-setup!]]
-   [scheduling-tbd.interviewing.domain.process.flow-shop :as fshop]
-   [scheduling-tbd.interviewing.eads-util                :as eadsu]))
+   [scheduling-tbd.iviewr.domain.process.flow-shop :as fshop]
+   [scheduling-tbd.iviewr.eads-util                :as eadsu]))
 
 (def example-flow-shop-graph "The EADS in flow_shop.clj is an example graph." (-> fshop/flow-shop :EADS remove-annotations (dissoc :EADS-id)))
 

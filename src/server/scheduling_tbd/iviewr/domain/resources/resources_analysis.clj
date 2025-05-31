@@ -1,7 +1,7 @@
-(ns scheduling-tbd.interviewing.domain.resources.resources-analysis
+(ns scheduling-tbd.iviewr.domain.resources.resources-analysis
   "Planning operators for the resource interview."
   (:require
-   [scheduling-tbd.interviewing.response-utils    :as ru :refer [analyze-warm-up]]
+   [scheduling-tbd.iviewr.response-utils    :as ru :refer [analyze-warm-up]]
    [taoensso.telemere                             :refer [log!]]))
 
 (def ^:diag diag (atom nil))

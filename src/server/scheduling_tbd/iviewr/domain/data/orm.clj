@@ -1,15 +1,16 @@
-(ns scheduling-tbd.interviewing.domain.data.orm
+(ns scheduling-tbd.iviewr.domain.data.orm
   "This provides EADS for an interview about data interviewees use in performing their work, the fundamental characteristics of those data.
    The interview creates example data from ORM fact types it formulates rather than upload their spreadsheets and talking about them.
    We work this way because we know that many people prioritize visual appeal over logical organization when using tools like Excel.
    Therefore, our plan is to use data to demonstrate the operation of the scheduling systems first, and worry about mapping their
    (possibly messy and illogical) spreadsheets into the scheduling systems later."
   (:require
-   [clojure.spec.alpha    :as s]
-   [datahike.api          :as d]
-   [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.db     :as db]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]))
+   [clojure.spec.alpha                    :as s]
+   [mount.core                            :as mount :refer [defstate]]
+   [scheduling-tbd.db                     :as db]
+   [scheduling-tbd.iviewr.eads-util       :refer [ds-complete?]]
+   [scheduling-tbd.sutil                  :as sutil :refer [clj2json-pretty]]
+   [taoensso.telemere                     :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -281,6 +282,12 @@
                                  :rows [["EN-123" "Milling Centers" "2024-10-05"]
                                         ["EN-098" "Milling Centers" "2022-11-13"]
                                         ["EN-891" "EDM machines"    "2023-03-28"]]}}]}]}})
+
+;;; ------------------------------- checking for completeness ---------------
+(defmethod ds-complete? :data/orm
+  [eads-id ds]
+  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  true)
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-orm

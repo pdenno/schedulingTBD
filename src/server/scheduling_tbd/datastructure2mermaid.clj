@@ -1,5 +1,5 @@
 (ns scheduling-tbd.datastructure2mermaid
-  (:require [scheduling-tbd.interviewing.eads-util :as eads-util]
+  (:require [scheduling-tbd.iviewr.eads-util :as eads-util]
             [scheduling-tbd.db :as db]
             [clojure.edn  :as edn]
             [clojure.data.json :as json]

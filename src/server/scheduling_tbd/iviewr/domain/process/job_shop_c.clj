@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.process.job-shop-c
+(ns scheduling-tbd.iviewr.domain.process.job-shop-c
   "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a job-shop scheduling problem with classifable job types.
        As the case is with job-shop problems, this structure defines work to be performed in typical job.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer.
@@ -8,7 +8,9 @@
    [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
    [scheduling-tbd.db     :as db]
-   [scheduling-tbd.sutil  :as sutil]))
+   [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
+   [scheduling-tbd.sutil  :as sutil]
+   [taoensso.telemere :refer [log!]]))
 
 (s/def :job-shop-c/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
@@ -212,6 +214,12 @@
                                                                  :outputs ["finished pencils"],
                                                                  :resources ["crimping tool"],
                                                                  :subprocesses []}]}]}]}}})
+
+(defmethod ds-complete? :process/job-shop--classifiable
+  [eads-id ds]
+  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  true)
+
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-job-shop-c
   []

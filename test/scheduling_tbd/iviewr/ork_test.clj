@@ -1,11 +1,11 @@
-(ns scheduling-tbd.interviewing.ork-test
+(ns scheduling-tbd.iviewr.ork-test
   (:require
    [clojure.data.json                        :as cdjson]
    [clojure.test                             :refer [deftest is testing]]
    [scheduling-tbd.agent-db                  :as adb]
    [scheduling-tbd.db                        :as db]
-   [scheduling-tbd.interviewing.interviewers :as inv]
-   [scheduling-tbd.interviewing.ork          :as ork]
+   [scheduling-tbd.iviewr.interviewers :as inv]
+   [scheduling-tbd.iviewr.ork          :as ork]
    [scheduling-tbd.surrogate                 :as sur]
    [scheduling-tbd.web.websockets            :as ws]
    [taoensso.telemere                        :as tel :refer [log!]]))

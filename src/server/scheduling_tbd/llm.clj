@@ -10,6 +10,7 @@
    [clojure.spec.alpha           :as s]
    [scheduling-tbd.sutil         :as sutil :refer [api-credentials default-llm-provider markdown2html]]
    [scheduling-tbd.util          :refer [now]]
+   [scheduling-tbd.specs         :as specs]
    [scheduling-tbd.web.websockets :as ws]
    [mount.core                   :as mount :refer [defstate]]
    [taoensso.telemere            :as tel :refer [log!]]
@@ -65,7 +66,7 @@
   "User can ask anything outside of session by starting the text with 'LLM:.
    This is a blocking call since the caller is a websocket thread and it responds with ws/send-to-client."
   [{:keys [client-id question]}]
-  (assert (string? client-id))
+  (s/assert ::specs/client-id client-id)
   (assert (string? question))
   (log! :info (str "llm-directly: " question))
   (let [chat-args {:client-id client-id :dispatch-key :iviewr-says :promise? false}]

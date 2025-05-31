@@ -3,15 +3,15 @@
   (:require
    [clojure.pprint :refer [pprint]]
    ;; require the -test.clj files and eads files to make ns-setup! work.
-   [scheduling-tbd.interviewing.domain.process.flow-shop]
-   [scheduling-tbd.interviewing.domain.process.job-shop]
-   [scheduling-tbd.interviewing.domain.process.job-shop-c]
-   [scheduling-tbd.interviewing.domain.process.job-shop-u]
-   [scheduling-tbd.interviewing.domain.process.scheduling-problem-type]
-   [scheduling-tbd.interviewing.domain.process.timetabling]
+   [scheduling-tbd.iviewr.domain.process.flow-shop]
+   [scheduling-tbd.iviewr.domain.process.job-shop]
+   [scheduling-tbd.iviewr.domain.process.job-shop-c]
+   [scheduling-tbd.iviewr.domain.process.job-shop-u]
+   [scheduling-tbd.iviewr.domain.process.scheduling-problem-type]
+   [scheduling-tbd.iviewr.domain.process.timetabling]
    [scheduling-tbd.llm-test]
    [scheduling-tbd.minizinc-test]
-   [scheduling-tbd.interviewing.ork-test]
+   [scheduling-tbd.iviewr.ork-test]
    [scheduling-tbd.surrogate-test]))
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
@@ -42,19 +42,19 @@
    ;'how    'scheduling-tbd.how-made
    'llm    'scheduling-tbd.llm
    'llmt   'scheduling-tbd.llm-test
-   'orm    'scheduling-tbd.interviewing.domain.data.orm
-   'fshop  'scheduling-tbd.interviewing.domain.process.flow-shop
-   'jshop  'scheduling-tbd.interviewing.domain.process.job-shop
-   'jshopc 'scheduling-tbd.interviewing.domain.process.job-shop-c
-   'jshopu 'scheduling-tbd.interviewing.domain.process.job-shop-u
-;  'pan    'scheduling-tbd.interviewing.domain.process.process-analysis
-   'sptype 'scheduling-tbd.interviewing.domain.process.scheduling-problem-type
-   'ttable 'scheduling-tbd.interviewing.domain.process.timetabling
-   'eadsu  'scheduling-tbd.interviewing.eads-util
-   'inv    'scheduling-tbd.interviewing.interviewers
-   'ork    'scheduling-tbd.interviewing.ork
-   'orkt   'scheduling-tbd.interviewing.ork-test
-   'ru     'scheduling-tbd.interviewing.response-utils
+   'orm    'scheduling-tbd.iviewr.domain.data.orm
+   'fshop  'scheduling-tbd.iviewr.domain.process.flow-shop
+   'jshop  'scheduling-tbd.iviewr.domain.process.job-shop
+   'jshopc 'scheduling-tbd.iviewr.domain.process.job-shop-c
+   'jshopu 'scheduling-tbd.iviewr.domain.process.job-shop-u
+;  'pan    'scheduling-tbd.iviewr.domain.process.process-analysis
+   'sptype 'scheduling-tbd.iviewr.domain.process.scheduling-problem-type
+   'ttable 'scheduling-tbd.iviewr.domain.process.timetabling
+   'eads-util  'scheduling-tbd.iviewr.eads-util
+   'inv    'scheduling-tbd.iviewr.interviewers
+   'ork    'scheduling-tbd.iviewr.ork
+   'orkt   'scheduling-tbd.iviewr.ork-test
+   'ru     'scheduling-tbd.iviewr.response-utils
    'mzn    'scheduling-tbd.minizinc
    'mznt   'scheduling-tbd.minizinc-test
    'specs  'scheduling-tbd.specs

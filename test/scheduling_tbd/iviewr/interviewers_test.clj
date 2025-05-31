@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.interviewers-test
+(ns scheduling-tbd.iviewr.interviewers-test
   (:require
    [clojure.pprint                :refer [pprint]]
    [clojure.spec.alpha            :as s]
@@ -6,7 +6,7 @@
    [datahike.api                  :as d]
    [scheduling-tbd.agent-db       :as adb]
    [scheduling-tbd.db             :as db]
-   [scheduling-tbd.interviewing.interviewers   :as inv]
+   [scheduling-tbd.iviewr.interviewers   :as inv]
    [scheduling-tbd.llm            :as llm]
    [scheduling-tbd.sutil          :as sutil :refer [connect-atm]]
    [scheduling-tbd.surrogate      :as sur]

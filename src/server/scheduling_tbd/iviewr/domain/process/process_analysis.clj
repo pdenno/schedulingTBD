@@ -1,4 +1,4 @@
-(ns scheduling-tbd.interviewing.domain.process.process-analysis
+(ns scheduling-tbd.iviewr.domain.process.process-analysis
   "Analysis of the process interview"
   (:require
    [cheshire.core                      :as ches]
@@ -8,7 +8,7 @@
    [scheduling-tbd.agent-db            :as adb :refer [agent-log]]
    [scheduling-tbd.db                  :as db]
    [scheduling-tbd.minizinc            :as mzn]
-   [scheduling-tbd.interviewing.response-utils :as ru :refer [analyze-warm-up conversation-complete?]]
+   [scheduling-tbd.iviewr.response-utils :as ru :refer [analyze-warm-up conversation-complete?]]
    [taoensso.telemere                  :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -31,11 +31,11 @@
                                               (update-keys str/lower-case)
                                               (update-keys keyword)
                                               (update :challenges #(mapv keyword %)))]
-    (agent-log (str "[scheduling-challenges-agent] (analysis of analyze interviewees' response): " (with-out-str (pprint response))))
+    (agent-log (str "[scheduling-challenges-agent] (analysis of analyze interviewees' response):\n" (with-out-str (pprint response))))
     (when (not-empty one-more-thing)
       (log! :info (str "one-more-thing: " one-more-thing))) ; This just to see whether another claim should be added to the agent.
     (when-not (s/valid? ::scheduling-challenges-response res)
-      (log! :error (str "Invalid scheduling-challenges-response: " (with-out-str (pprint res)))))
+      (log! :error (str "Invalid scheduling-challenges-response:\n" (with-out-str (pprint res)))))
     res))
 
 ;;;  "Analyze the response to the initial question.
