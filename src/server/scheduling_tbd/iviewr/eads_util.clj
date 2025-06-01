@@ -80,6 +80,9 @@
   (and (outputs-exist-where-inputs-claim? graph)
        (inputs-match-in-hierarchy? graph)))
 
+;;; --------------------------- The following are more generally applicable -----------------------------
+
+
 (defn dispatch-by-eads-id [eads-id & _]
   (let [eads-id? (-> (d/q '[:find [?id ...] :where [_ :EADS/id ?id]] @(connect-atm :system)) set)]
     (if (eads-id? eads-id)

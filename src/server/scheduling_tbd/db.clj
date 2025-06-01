@@ -841,41 +841,25 @@
       sort
       vec))
 
-;;; ToDo: I think maybe this isn't needed.
-(defn get-EADS-dstructs
-  "Return a vector of maps of data structures where :message/id is where the :message/data-structure was created."
-  [pid cid]
-  (->> (d/q '[:find ?id ?ds
-              :keys message/id message/EADS-data-structure
-              :in $ ?cid
-              :where
-              [?e :conversation/id ?cid]
-              [?conv :conversation/messages ?m]
-              [?m :message/EADS-data-structure ?ds]
-              [?m :message/id ?id]]
-            @(connect-atm pid) cid)
-       (mapv #(update % :message/EADS-data-structure edn/read-string))
-       not-empty))
-
-;;; ToDo: Merge this and the above.
 (defn get-EADS-ds
   "Return the most recent EADS string from messages in the argument conversation.
-   Return null string if no EADS found."
-  [pid cid]
-  (let [conn @(connect-atm pid)
-        eids (if (= cid :all)
-               (d/q '[:find [?eid ...] :where [?eid :message/EADS-data-structure]] conn)
-               (d/q '[:find [?eid ...]
-                      :in $ ?cid
-                      :where
-                      [?c-eid :conversation/id ?cid]
-                      [?c-eid :conversation/messages ?eid]
-                      [?eid :message/EADS-data-structure]]
-                    conn cid))
-        code-msgs (dp/pull-many conn '[*] eids)]
-    (if (not-empty code-msgs)
-      (-> (apply max-key #(-> % :message/time inst-ms) code-msgs) :message/EADS-data-structure)
-      "")))
+   Return an empty map if no EADS found."
+  ([pid cid] (get-EADS-ds pid cid nil))
+  ([pid cid eads-id] ; when eads-id is not specified, don't filter by it.
+   (let [ds-map (->> (d/q '[:find ?id ?ds
+                           :keys id ds ; message/id message/EADS-data-structure
+                           :in $ ?cid
+                           :where
+                           [?e :conversation/id ?cid]
+                           [?e :conversation/messages ?m]
+                           [?m :message/EADS-data-structure ?ds]
+                           [?m :message/id ?id]]
+                         @(connect-atm pid) cid)
+                     (mapv #(update % :ds edn/read-string)))
+         ds-maps (if eads-id (filter #(= (-> % :ds :EADS-ref) eads-id) ds-map) ds-map)]
+     (if (empty? ds-maps)
+       {}
+       (-> (apply max-key :id ds-maps) :ds)))))
 
 (defn put-EADS-ds!
   "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message.

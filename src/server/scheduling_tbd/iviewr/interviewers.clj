@@ -19,10 +19,10 @@
      [scheduling-tbd.iviewr.eads-util      :as eads-util] ; for mount
      [scheduling-tbd.iviewr.ork            :as ork]
      [scheduling-tbd.iviewr.response-utils :as ru]
-     [scheduling-tbd.sutil                       :as sutil :refer [elide output-struct2clj]]
-     [scheduling-tbd.web.websockets              :as ws]
-     [scheduling-tbd.datastructure2mermaid       :as ds2m]
-     [taoensso.telemere                          :as tel :refer [log!]]))
+     [scheduling-tbd.sutil                 :as sutil :refer [elide output-struct2clj]]
+     [scheduling-tbd.web.websockets        :as ws]
+     [scheduling-tbd.datastructure2mermaid :as ds2m]
+     [taoensso.telemere                    :as tel :refer [log!]]))
 
 ;;; The usual way of interviews involves q-and-a called from resume-conversation.
 ;;; The alternative way, used only when the human or surrogate expert is starting, is to use get-an-answer.
@@ -504,7 +504,7 @@
 (defn put-EADS-ds-on-msg
   "Clean-up the EADS data structure and save it on a property :message/EADS-data-structure
    of the interviewee response which is responsible for this update (the current response
-   in the argument conversation."
+   in the argument conversation)."
   [iviewr-response {:keys [pid cid] :as _ctx}]
   (letfn [(up-keys [obj]
             (cond (map? obj)     (reduce-kv (fn [m k v] (assoc m (keyword k) (up-keys v))) {} obj)
@@ -570,7 +570,7 @@
   (let [budget (db/get-budget pid cid)
         active-eads-id (db/get-active-EADS-id pid cid)
         eads-id (or active-eads-id (ork/get-new-EADS-id pid))
-        ds-complete? (and eads-id (eads-util/ds-complete? pid cid eads-id))
+        ds-complete? (and eads-id (eads-util/ds-complete? pid cid eads-id)) ; <==============================================================================================================================
         new-eads-id (when (or ds-complete? (<= budget 0))
                       (ork/get-new-EADS-id pid)) ; provides conversation, returns nil when exhausted.
         new-cid (when new-eads-id

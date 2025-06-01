@@ -109,8 +109,8 @@
   "Walk through the data structure, comparing it to the EADS and update map value strings to keywords where appropriate.
    The term 'data structure' refers to the map structure interviewers create from an EADS."
   [ds]
-  (let [msg (or (-> ds :EADS-used keyword db/get-eads not-empty)
-                (throw (ex-info "No such EADS:" {:name (:EADS-used ds)})))
+  (let [msg (or (-> ds :EADS-ref keyword db/get-eads not-empty)
+                (throw (ex-info "No such EADS:" {:name (:EADS-ref ds)})))
         key-val? (-> msg :EADS strip-annotations key-vals)]
     (letfn [(ds2 [obj]
               (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m k (if (key-val? k) (keyword v) (ds2 v)))) {} obj)

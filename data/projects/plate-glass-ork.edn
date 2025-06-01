@@ -76,6 +76,9 @@
                                      "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
                                      :from :system,
                                      :id 4,
+                                     :pursuing-EADS :process/scheduling-problem-type
+                                     :EADS-data-structure ; This one is just for test
+                                     "{:EADS-ref :process/scheduling-problem-type, :message-type :DATA-STRUCTURE-REFINEMENT, :data-structure {\"continuous?\" {\"comment\" \"Product flows are not continuous but progress in batches with varying duration depending on quality or additional processing.\", \"val\" false}, \"cyclical?\" {\"comment\" \"Not cyclical due to demand variability and customization of specialty products.\", \"val\" false}, \"problem-type\" {\"comment\" \"Processes for the products follow shared early steps but diverge based on product requirements, fitting the job-shop scheduling paradigm.\", \"val\" \"JOB-SHOP-SCHEDULING-PROBLEM\"}}, :commit-notes \"Refined the problem-type as JOB-SHOP-SCHEDULING-PROBLEM. Processes include shared early stages (melting, shaping, and annealing) and diverging later steps for different glass products. Production processes are not continuous and not cyclical based on interviewee inputs.\"}",
                                      :tags [:info-to-user :minizinc],
                                      :time
                                      #inst "2025-03-05T15:06:53.397-00:00"}
@@ -86,7 +89,8 @@
                                      :tags [:query],
                                      :time
                                      #inst "2025-04-28T18:04:31.681-00:00"}
-                           #:message{:EADS-data-structure
+                           #:message{:pursuing-EADS :process/scheduling-problem-type
+                                     :EADS-data-structure
                                      "{:EADS-ref :process/scheduling-problem-type, :message-type :DATA-STRUCTURE-REFINEMENT, :data-structure {\"continuous?\" {\"comment\" \"Product flows are not continuous but progress in batches with varying duration depending on quality or additional processing.\", \"val\" false}, \"cyclical?\" {\"comment\" \"Not cyclical due to demand variability and customization of specialty products.\", \"val\" false}, \"problem-type\" {\"comment\" \"Processes for the products follow shared early steps but diverge based on product requirements, fitting the job-shop scheduling paradigm.\", \"val\" \"JOB-SHOP-SCHEDULING-PROBLEM\"}}, :commit-notes \"Refined the problem-type as JOB-SHOP-SCHEDULING-PROBLEM. Processes include shared early stages (melting, shaping, and annealing) and diverging later steps for different glass products. Production processes are not continuous and not cyclical based on interviewee inputs.\"}",
                                      :answers-question 5,
                                      :content

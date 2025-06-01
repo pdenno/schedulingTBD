@@ -73,19 +73,22 @@
   ([pid] (conversation-history pid :all))
   ([pid cid]
    (assert (#{:all :process :data :resources :optimality} cid))
-   (letfn [(c-h-cid [cid]
+   (letfn [(history-cid [cid]
              (let [msgs (->> cid
-                             (db/get-conversation pid)
-                             :conversation/messages
-                             (sort-by :message/id)
-                             (mapv #(if-let [q-id (:message/answers-question %)]
-                                      (assoc % :message/q-a-pair
-                                             (let [q-msg (db/get-msg pid cid q-id)]
-                                               {:question (:message/content q-msg)
-                                                :answer   (:message/content %)})) ; ToDo: Might want to skip the answer if it is long.
+                            (db/get-conversation pid)
+                            :conversation/messages
+                            (sort-by :message/id)
+                            (mapv #(if-let [q-id (:message/answers-question %)]
+                                     (assoc % :message/q-a-pair
+                                            (let [q-msg (db/get-msg pid cid q-id)]
+                                              {:question (:message/content q-msg)
+                                               :answer   (:message/content %)})) ; ToDo: Ok to elide long answers?
                                       %)))
                    current-eads (atom nil)
-                   result (atom [])]
+                   result (atom [])
+                   max-ds (as-> msgs ?ds
+                            (filter #(contains? % :message/EADS-data-structure) ?ds)
+                            (apply max-key :message/id ?ds))]
                (doseq [m msgs]
                  (let [{:message/keys [id pursuing-EADS EADS-data-structure code code-execution q-a-pair]} m]
                    (when (and pursuing-EADS (not= pursuing-EADS @current-eads))
@@ -93,9 +96,10 @@
                      (swap! result conj {:pursuing-EADS (name pursuing-EADS)}))
                    (when q-a-pair (swap! result conj q-a-pair))
                    ;; We only want the last d-s for this pursuing-EADS.
-                   (when (and EADS-data-structure
-                              (= id (:message/id (apply max-key :message/id (filter #(= pursuing-EADS (:message/pursuing-EADS %)) msgs)))))
-                     (swap! result conj {:data-structure (clj2json-pretty EADS-data-structure)}))
+                   (when-let [ds (db/get-EADS-ds pid cid @current-eads)] ; <============================================================================== HERE!
+                     (= id (:message/id (apply max-key :message/id (filter #(= pursuing-EADS (:message/pursuing-EADS %)) msgs)))))
+                     (swap! result conj {:EADS-ref pursuing-EADS ; This is the arrangement in orchestrator.txt (agent instructions)
+                                         :data-structure (clj2json-pretty EADS-data-structure)}))
                    (when code           (swap! result conj {:code code}))
                    (when code-execution (swap! result conj {:code-execution code}))))
                @result))]
@@ -104,8 +108,8 @@
                            (mapv #(nth % 2))
                            (mapv #(get scheduling-challenge2-description %)))
            activities (if (= :all cid)
-                        (reduce (fn [res cid] (into res (c-h-cid cid))) [] [:process :data :resources :optimality])
-                        (c-h-cid cid))]
+                        (reduce (fn [res cid] (into res (history-cid cid))) [] [:process :data :resources :optimality])
+                        (history-cid cid))]
        (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
        (cond-> {:message-type "CONVERSATION-HISTORY"}
          challenges              (assoc :scheduling-challenges challenges)
@@ -133,7 +137,7 @@
    Some interviewers are instructed to set a property 'exhausted?' to true (e.g. the orm interviewer does this),
    for other we check that all the properties of the EADS are used somewhere in the data structure."
   [pid cid eads-id]
-  (let [most-recent-ds (when-let [dstructs (not-empty (db/get-EADS-dstructs pid cid))]
+  (let [most-recent-ds (when-let [dstructs (not-empty (db/get-EADS-ds pid cid))]
                          (as-> dstructs ?d
                            (apply max-key :message/id ?d)
                            (:message/EADS-data-structure ?d)
@@ -163,13 +167,13 @@
 (defn tell-ork
   "Send a message to an interviewer agent and wait for response; translate it.
    :aid and :tid in the ctx should be for the interviewer agent."
-  [msg {:keys [ork-agent] :as ctx}]
+  [msg ork-agent]
   (when-not (s/valid? ::ork-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid ork msg:\n" (with-out-str (pprint msg)))))
   (log! :info (-> (str "Ork told: " msg) (elide 150)))
   (agent-log (str "[ork manager] (tells ork)\n" (with-out-str (pprint msg))))
   (let [msg-string (clj2json-pretty msg)
-        res (-> (adb/query-agent ork-agent msg-string ctx) output-struct2clj)]
+        res (-> (adb/query-agent ork-agent msg-string) output-struct2clj)]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
     (agent-log (str "[ork manager] (receives response form ork)\n" (with-out-str (pprint res))))
     res))
@@ -189,8 +193,7 @@
       (agent-log "Project's ork thread has been updated; provide comprehensive history."
                  {:console? true :level :warn}))
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
-    (tell-ork (conversation-history pid) {:ork-agent ork})
-    (let [pursue-msg (tell-ork {:message-type "SUPPLY-EADS"} {:ork-agent ork})
+    (let [pursue-msg (tell-ork (conversation-history pid) ork)
           eads-instructions-id (-> pursue-msg :EADS-id keyword)]
       (if ((-> (db/list-system-EADS) set) eads-instructions-id)
         eads-instructions-id
