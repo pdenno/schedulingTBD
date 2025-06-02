@@ -162,15 +162,19 @@
     (if passive? "passive: aid" (:id assist))))
 
 (defn assistant-creation-inst
-  "Return the instant object marking when the OpenAI assistant was created."
+  "Return the instant object marking when the OpenAI assistant was created.
+   If there is not assistant, return epoch time 0 (Jan 1, 1970)."
   [aid]
   (if passive?
     (now)
-    (-> aid llm/get-assistant :created_at (* 1000) java.util.Date.)))
+    (if-let [cdate-secs (-> aid llm/get-assistant :created_at)]
+      (java.util.Date. (* 1000 cdate-secs))
+      (java.util.Date. 0))))
 
 (defn newest-file-modification-date
   "Return the modification date (instant object) of the most recently modified file used to define the agent."
   [agent-info]
+  ;(reset! diag agent-info)
   (let [{:keys [instruction-path response-format-path vector-store-paths]} agent-info
         files (cond-> []
                 instruction-path (conj instruction-path)
@@ -178,8 +182,9 @@
                 vector-store-paths (into vector-store-paths))
         newest (when (not-empty files)
                  (apply max (mapv #(->> % io/resource io/file .lastModified) files)))]
-    (when newest
-      (new java.util.Date newest))))
+    (if newest
+      (new java.util.Date newest)
+      (new java.util.Date 0))))
 
 (defn remake-needs
   "This makes PRAGMATIC and POLICY-BASED decisions on remaking an agent or creating a newest thread for it.

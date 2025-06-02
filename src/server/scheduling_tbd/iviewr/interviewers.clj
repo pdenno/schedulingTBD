@@ -20,6 +20,7 @@
      [scheduling-tbd.iviewr.ork            :as ork]
      [scheduling-tbd.iviewr.response-utils :as ru]
      [scheduling-tbd.sutil                 :as sutil :refer [elide output-struct2clj]]
+     [scheduling-tbd.util                  :as util :refer [now]]
      [scheduling-tbd.web.websockets        :as ws]
      [scheduling-tbd.datastructure2mermaid :as ds2m]
      [taoensso.telemere                    :as tel :refer [log!]]))
@@ -469,38 +470,6 @@
       (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
       pid))
 
-(def iviewr-infos
-  "These have all the info of agent-db/agent-infos entries and additional information for making instructions.
-   To add these to agent-db/agent-infos, use force-new-interviewer!."
-  (-> "agents/iviewrs/iviewr-infos.edn" io/resource slurp edn/read-string))
-
-(defn write-agent-instructions!
-  "Write the agent instructions to resources/agents/iviewrs/<cid>-iviewr-instructions.txt."
-  [cid]
-  (if-let [info (not-empty (get iviewr-infos cid))]
-    (let [{:keys [iviewr-name focus]} info
-          others (reduce (fn [r x] (if (= (:id x) cid) r (into r [(:iviewr-name x) (:focus x)]))) [] (vals iviewr-infos))
-          instructions (str "You are one of four interviewers engaging humans in conversations to elicit from them requirements for a scheduling system we humans and AI agents will be creating together using MiniZinc.\n"
-                            (format "You are the %s Agent; you ask questions about %s\n" iviewr-name focus)
-                            "The other three agents are:"
-                            (cl-format nil "~{~%     - a ~A Agent: that interviews about ~A~}" others)
-                            "\nIn as far as it is practical, you should avoid asking questions in the areas that are the responsibility of these other agents.\n\n"
-                            (-> "agents/iviewrs/base-iviewr-instructions.txt" io/resource slurp))]
-      (spit (str "resources/agents/iviewrs/" (name cid) "-iviewr-instructions.txt") instructions))
-    (log! :error (str "No conversation cid = " cid))))
-
-;;; ToDo: Should we add a creation policy for interviewers? We need to force new ones whenever we are working on the system instructions.
-(defn ^:admin force-new-interviewer!
-  "As a matter of policy, shared-assistant type agents such as surrogates and interviewers don't update the assistant just because
-   the instructions change. This is because we try to preserve the context already built up by the current agent.
-   Therefore, if you don't care about that context but you do care about seeing the effect of new instructions, you should call this."
-  ([cid] (force-new-interviewer! cid nil))
-  ([cid pid]
-   (assert (#{:process :data :resources :optimality} cid))
-   (let [base-type (-> cid name (str "-interview-agent") keyword)]
-     (write-agent-instructions! cid)
-     (when pid (adb/ensure-agent! {:base-type base-type :pid pid} {:new-agent? true})))))
-
 (defn put-EADS-ds-on-msg
   "Clean-up the EADS data structure and save it on a property :message/EADS-data-structure
    of the interviewee response which is responsible for this update (the current response
@@ -597,7 +566,8 @@
   (assert (s/valid? ::client-id client-id))
   (assert (s/valid? ::cid cid))
   (reset! course-correction-count 0)
-  (agent-log (str "============= resume-conversation: " pid  " " cid " ========================") {:console? true :level :debug})
+  (agent-log (str "============= resume-conversation: " pid  " " cid " " (now) " ========================")
+             {:console? true :level :debug})
   (if (ready-for-discussion? pid cid)
     (try
       (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
