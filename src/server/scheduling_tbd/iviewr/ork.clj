@@ -53,6 +53,75 @@
    :product-variation "They have many different products to make."
    :meeting-KPIs "They mention key performance indicators (KPIs) or difficulty performing to them."})
 
+(defn max-ds
+  "Return a map where keys are EADS ids and values are the EADS data structure from the
+   highest :message/id of messages pursuing that EADS."
+  [pid cid]
+  (let [msgs (->> cid
+                  (db/get-conversation pid)
+                  :conversation/messages
+                  (filter #(contains? % :message/EADS-data-structure)))
+        msg-grps (-> (group-by :message/pursuing-EADS msgs) (dissoc nil))]
+    (reduce-kv (fn [m k v]
+                 (assoc m k (-> (apply max-key :message/id v)
+                                :message/EADS-data-structure
+                                edn/read-string)))
+               {} msg-grps)))
+
+(defn add-ds-to-activities
+  "Iterate through the activities and just before changing to new pursuing-EADS add the
+   datastructure for the last one."
+  [pid cid activities]
+  (reset! diag activities)
+  (let [eads-max-ds-map (max-ds pid cid)
+        result (atom [])
+        current-eads (atom nil)]
+    (letfn [(make-ds-entry [eads-id]
+              (let [{:keys [EADS-ref data-structure commit-notes exhausted?] :as _diag} (get eads-max-ds-map eads-id)]
+                (reset! diag {:eads _diag :eads-id eads-id})
+                {:resulting-EADS
+                 (cond-> {:EADS-ref EADS-ref ; This is the arrangement in orchestrator.txt (agent instructions)
+                          :data-structure (clj2json-pretty data-structure)}
+                   commit-notes (assoc :commit-notes commit-notes)
+                   exhausted?   (assoc :exhausted? true))}))]
+      (doseq [act activities]
+        (if-let [eads-id (:pursuing-EADS act)]
+          (when (not= @current-eads eads-id)
+            (if @current-eads
+              (swap! result into [(make-ds-entry @current-eads) act])
+              (swap! result conj act))
+            (reset! current-eads eads-id))
+          (swap! result conj act)))
+      (conj @result (make-ds-entry @current-eads)))))
+
+(defn conversation-activity
+  "Create a chronologically-ordered vector of activities for the argument conversation, including q/a pairs,
+   changes in the EADS being pursued, and the EADS data structure resulting."
+  [pid cid]
+  (let [msgs (->> cid
+                  (db/get-conversation pid)
+                  :conversation/messages
+                  (sort-by :message/id)
+                  (mapv #(if-let [q-id (:message/answers-question %)]
+                             (assoc % :message/q-a-pair
+                                    (let [q-msg (db/get-msg pid cid q-id)]
+                                      {:question (:message/content q-msg)
+                                       :answer   (:message/content %)})) ; ToDo: Ok to elide long answers?
+                             %)))
+        current-eads (atom nil)
+        result (atom [])]
+    ;; Create the ordered activities vector in result
+    (doseq [m msgs]
+      (let [{:message/keys [pursuing-EADS code code-execution q-a-pair]} m]
+        (when (and pursuing-EADS (not= pursuing-EADS @current-eads)) ; changing EADS, write a new pursuing-EADS activity
+          (swap! result conj {:pursuing-EADS pursuing-EADS})
+          (swap! current-eads pursuing-EADS))
+        (when q-a-pair (swap! result conj q-a-pair))
+        (when code           (swap! result conj {:code code}))
+        (when code-execution (swap! result conj {:code-execution code}))))
+    (add-ds-to-activities pid cid @result)))
+
+
 ;;; ToDo: Check the :conversation/ork-tid versus the actual (once this doesn't provide the whole thing; so that you don't have to provide the whole thing to same ork.)
 ;;; ToDo: Currently this is very similar to inv/conversation-history.
 ;;; ToDo: Needs minizinc execution
@@ -73,47 +142,19 @@
   ([pid] (conversation-history pid :all))
   ([pid cid]
    (assert (#{:all :process :data :resources :optimality} cid))
-   (letfn [(history-cid [cid]
-             (let [msgs (->> cid
-                            (db/get-conversation pid)
-                            :conversation/messages
-                            (sort-by :message/id)
-                            (mapv #(if-let [q-id (:message/answers-question %)]
-                                     (assoc % :message/q-a-pair
-                                            (let [q-msg (db/get-msg pid cid q-id)]
-                                              {:question (:message/content q-msg)
-                                               :answer   (:message/content %)})) ; ToDo: Ok to elide long answers?
-                                      %)))
-                   current-eads (atom nil)
-                   result (atom [])
-                   max-ds (as-> msgs ?ds
-                            (filter #(contains? % :message/EADS-data-structure) ?ds)
-                            (apply max-key :message/id ?ds))]
-               (doseq [m msgs]
-                 (let [{:message/keys [id pursuing-EADS EADS-data-structure code code-execution q-a-pair]} m]
-                   (when (and pursuing-EADS (not= pursuing-EADS @current-eads))
-                     (reset! current-eads pursuing-EADS)
-                     (swap! result conj {:pursuing-EADS (name pursuing-EADS)}))
-                   (when q-a-pair (swap! result conj q-a-pair))
-                   ;; We only want the last d-s for this pursuing-EADS.
-                   (when-let [ds (db/get-EADS-ds pid cid @current-eads)] ; <============================================================================== HERE!
-                     (= id (:message/id (apply max-key :message/id (filter #(= pursuing-EADS (:message/pursuing-EADS %)) msgs)))))
-                     (swap! result conj {:EADS-ref pursuing-EADS ; This is the arrangement in orchestrator.txt (agent instructions)
-                                         :data-structure (clj2json-pretty EADS-data-structure)}))
-                   (when code           (swap! result conj {:code code}))
-                   (when code-execution (swap! result conj {:code-execution code}))))
-               @result))]
-     (let [challenges (->> (db/get-claims pid)
-                           (filter #(uni/unify '(scheduling-challenge ?pid ?challenge) %))
-                           (mapv #(nth % 2))
-                           (mapv #(get scheduling-challenge2-description %)))
-           activities (if (= :all cid)
-                        (reduce (fn [res cid] (into res (history-cid cid))) [] [:process :data :resources :optimality])
-                        (history-cid cid))]
-       (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
-       (cond-> {:message-type "CONVERSATION-HISTORY"}
-         challenges              (assoc :scheduling-challenges challenges)
-         (not-empty activities)  (assoc :activity activities))))))
+   (let [challenges (->> (db/get-claims pid)
+                         (filter #(uni/unify '(scheduling-challenge ?pid ?challenge) %))
+                         (mapv #(nth % 2))
+                         (mapv #(get scheduling-challenge2-description %)))
+         activities (if (= :all cid)
+                      (reduce (fn [res cid] (into res (conversation-activity pid cid)))
+                              []
+                              [:process :data :resources :optimality])
+                      (conversation-activity pid cid))]
+     (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
+     (cond-> {:message-type "CONVERSATION-HISTORY"}
+       (not-empty challenges)  (assoc :scheduling-challenges challenges)
+       (not-empty activities)  (assoc :activity activities)))))
 
 (defn collect-keys
   [obj]
@@ -173,7 +214,9 @@
   (log! :info (-> (str "Ork told: " msg) (elide 150)))
   (agent-log (str "[ork manager] (tells ork)\n" (with-out-str (pprint msg))))
   (let [msg-string (clj2json-pretty msg)
-        res (-> (adb/query-agent ork-agent msg-string) output-struct2clj)]
+        res (-> (adb/query-agent ork-agent msg-string) output-struct2clj)
+        res (cond-> res
+              (= (:message-type res) "PURSUE-EADS")      (update :EADS-id keyword))]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
     (agent-log (str "[ork manager] (receives response form ork)\n" (with-out-str (pprint res))))
     res))

@@ -570,7 +570,7 @@
   (let [budget (db/get-budget pid cid)
         active-eads-id (db/get-active-EADS-id pid cid)
         eads-id (or active-eads-id (ork/get-new-EADS-id pid))
-        ds-complete? (and eads-id (eads-util/ds-complete? pid cid eads-id)) ; <==============================================================================================================================
+        ds-complete? (and eads-id (eads-util/ds-complete? (db/get-EADS-ds pid cid eads-id)))
         new-eads-id (when (or ds-complete? (<= budget 0))
                       (ork/get-new-EADS-id pid)) ; provides conversation, returns nil when exhausted.
         new-cid (when new-eads-id

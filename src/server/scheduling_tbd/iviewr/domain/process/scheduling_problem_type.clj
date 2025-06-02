@@ -65,9 +65,11 @@
 
 ;;; ------------------------------- checking for completeness ---------------
 (defmethod ds-complete? :process/scheduling-problem-type
-  [eads-id ds]
-  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
-  true)
+  [refine-msg]
+  (log! :info (str "This is the ds-complete for refinement-msg = " refine-msg))
+  ;; This one is pretty simple:
+  (s/valid? :scheduling-problem-type/EADS-message refine-msg))
+
 
 ;;; ------------------------------- starting and stopping ---------------
 (defn init-scheduling-problem-type

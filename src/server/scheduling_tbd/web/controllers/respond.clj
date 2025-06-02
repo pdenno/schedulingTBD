@@ -2,8 +2,9 @@
   (:require
    [clojure.edn              :as edn]
    [clojure.java.io          :as io]
-   [ring.util.http-response  :as http]
+   [datahike.api             :as d]
    [mount.core               :as mount :refer [defstate]]
+   [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
    [taoensso.telemere        :refer[log!]])
@@ -13,8 +14,6 @@
 (def ^:diag diag (atom {}))
 
 ;;; (resp/get-conversation {:query-params {:project-id "sur-craft-beer"}})
-
-;;; I've replaced this with db/ws-get-conversation, but I'm leaving this and its reference in handler.clj around while evaluate the alternative.
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
    get-conversation always returns the conversation corresponding to :project/active-conversation in the project's DB.
@@ -23,7 +22,9 @@
   [request]
   (let [{:keys [project-id cid client-id]}  (-> request :query-params (update-keys keyword))
         pid (keyword project-id)
-        cid (if cid (keyword cid) (db/get-active-cid pid))]
+        cid (if cid (keyword cid) (db/get-active-cid pid))
+        eid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid))]
+    (d/transact (connect-atm pid) {:tx-data [{:db/id eid :project/active-conversation cid}]})
     (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
     (let [eid (db/project-exists? pid)
           pname (db/get-project-name pid)
@@ -35,10 +36,13 @@
      Note that the server doesn't have a notion of current-project. (How could it?) Thus current conversation is out the window too."
   [_request]
   (letfn [(resolve-proj-info [pid]
-            (resolve-db-id {:db/id (db/project-exists? pid)}
-                           (connect-atm pid)
-                           :keep-set #{:project/name :project/id :project/surrogate?}))]
-    (let [proj-infos (mapv resolve-proj-info (db/list-projects))
+            (when-let [eid (db/project-exists? pid)]
+              (resolve-db-id {:db/id eid}
+                             (connect-atm pid)
+                             :keep-set #{:project/name :project/id :project/surrogate?})))]
+    (let [proj-infos (->> (db/list-projects)
+                          (mapv resolve-proj-info)
+                          (remove nil?))
           {:project/keys [id] :as current} (db/default-project)
           cid (or (db/get-active-cid id) :process)
           others (filterv #(not= % current) proj-infos)]

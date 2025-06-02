@@ -75,7 +75,7 @@ We will start by discussing the CONVERSATION-HISTORY message, then talk about th
 The CONVERSATION-HISTORY message contains
   (a) 'data-structure' property': completed, or nearly completed DATA-STRUCTURE-REFINEMENT message, 
   (b) 'activity' property: question/answer pairs from the interviewer's interaction with the interviewees, leading to the DATA-STRUCTURE-REFINEMENT,
-  (c) 'scheduling-challenges' property:  which enumerates keywords associated with difficulties the interviewees have faced in the past in scheduling production or services,
+  (c) 'scheduling-challenges' property:  sentences describing difficulties the interviewees have faced in the past in scheduling production or services,
   (d) possible 'minizinc' property: the MiniZinc scheduling solution that we will create and refine with EADS-based data structures received from the interviewers, and
   (e) possible 'minizinc-execution' property: the execution of the MiniZinc scheduling solution.
 
@@ -141,7 +141,9 @@ After the example, we will describe the "message-types" used in the example.
 ========= EXAMPLE INTERACTIONS =====================================
 
    We: {"message-type": "CONVERSATION-HISTORY",
-        "scheduling-challenges": ["raw-material-uncertainty", "demand-uncertainty"],
+        "scheduling-challenges": ["They are having problems meeting delivery promise dates."
+                                  "They have slow periods and very busy periods. This is often the case, for example, when demand has seasonality."
+                                  "They have many different processes for making roughly the same class of products."],
         "activity": [{"question": "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
                        "answer": "We make sandwich cookies and sell them locally through our own stores and to a small collection of local grocery markets.
                                   Our principal challenge is in assuring that we have the ingredients needed to meet the demand for our various cookie products.
@@ -152,7 +154,9 @@ After the example, we will describe the "message-types" used in the example.
        "EADS-id": "process/scheduling-problem-type"}
 
    We: {"message-type": "CONVERSATION-HISTORY",
-        "scheduling-challenges": ["raw-material-uncertainty", "demand-uncertainty"],
+        "scheduling-challenges": ["They are having problems meeting delivery promise dates."
+                                  "They have slow periods and very busy periods. This is often the case, for example, when demand has seasonality."
+                                  "They have many different processes for making roughly the same class of products."],
         "activity": [{"question": "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
                        "answer": "We make sandwich cookies and sell them locally through our own stores and to a small collection of local grocery markets.
                                   Our principal challenge is in assuring that we have the ingredients needed to meet the demand for our various cookie products.
@@ -172,7 +176,9 @@ After the example, we will describe the "message-types" used in the example.
        "EADS-id": "process/flow-shop"}
 
   We: {"message-type": "CONVERSATION-HISTORY",
-       "scheduling-challenges": ["raw-material-uncertainty", "demand-uncertainty"],
+       "scheduling-challenges": ["They are having problems meeting delivery promise dates."
+                                 "They have slow periods and very busy periods. This is often the case, for example, when demand has seasonality."
+                                 "They have many different processes for making roughly the same class of products."],
        "activity": [{"pursuing-EADS" "process/flow-shop"},
                     {"question": "You mentioned some of your production equipment: mixers, a conveyor baking oven, wafer molding machines, coolers, cookie assembly machines, and packaging equipment.
                                   That suggests a process. Could you provide an overview of the complete process?"

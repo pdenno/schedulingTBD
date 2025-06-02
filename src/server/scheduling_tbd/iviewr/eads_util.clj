@@ -82,11 +82,12 @@
 
 ;;; --------------------------- The following are more generally applicable -----------------------------
 
-
-(defn dispatch-by-eads-id [eads-id & _]
-  (let [eads-id? (-> (d/q '[:find [?id ...] :where [_ :EADS/id ?id]] @(connect-atm :system)) set)]
-    (if (eads-id? eads-id)
-      eads-id
-      (throw (ex-info "Bad eads-id in dispatch for ds-complete?" {:eads-id eads-id})))))
+(defn dispatch-by-eads-id [obj]
+  (cond (and (map? obj) (empty? obj))     :null-map
+        (contains? obj :EADS-ref)         (:EADS-ref obj)
+        :else  (throw (ex-info "Bad eads-id in dispatch for ds-complete?" {:obj obj}))))
 
 (defmulti ds-complete? #'dispatch-by-eads-id)
+
+(defmethod ds-complete? :null-map [& _]
+  false)

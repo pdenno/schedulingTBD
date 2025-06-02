@@ -2,12 +2,10 @@
   "Server utilities."
   (:require
    [cheshire.core            :as ches]
-   [clojure.java.io          :as io]
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
-   [taoensso.telemere        :refer [log!]])
-  (:import java.time.Instant))
+   [taoensso.telemere        :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 

@@ -26,7 +26,9 @@
    {:client-id :console
     :map-str (str {:pid :sur-music-school
                    :pname "Music School"
-                   :sur-instructions (str "You run a music school. Until today you've been scheduling student lessons by fiddling with a spreadsheet.\n"
+                   :sur-instructions (str "You run a private music school. Mostly students of your school are from local middle schools and high schools.\n"
+                                          "Your task is to answer questions about scheduling lessons at this school, committing to realistic details you make up rather than speaking about music schools in general.\n"
+                                          "Until today you've been scheduling student lessons by fiddling with a spreadsheet.\n"
                                           "But that is error-prone and time consuming. The problem is that you need to bring each student together with their instructor\n"
                                           "in a room having the right equipment. (Only some practice rooms have pianos or drums.) Of course, instructors don't want\n"
                                           "to come in to teach just one student. Most instructors would like to do a block of a few hours of lessons on days they come in.\n"

@@ -226,8 +226,8 @@
    ;; ---------------------- project -- the top-level object in the db/file.
    :project/active-conversation
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc (str "The conversation most recently busy. Note that several conversations can still need work, and there can be an "
-                  ":conversation/active-EADS-id on several, however, this is the conversation to start if coming back to the project.")}
+        :doc (str "The conversation most recently busy, #{:process...}. Note that several conversations can still need work, and there can "
+                  "be an :conversation/active-EADS-id on several, however, this is the conversation to start if coming back to the project.")}
    :project/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "an agent (OpenAI Assistant, etc.) that outputs a vector of clojure maps in response to queries."}
@@ -704,7 +704,7 @@
         "The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did "
         "to define requirements, we think it will be successful.")})
 
-(declare add-msg)
+(declare add-msg get-active-EADS-id)
 
 (defn add-conversation-intros
   "Add an intro describing the topic and rationale of the conversation."
@@ -779,7 +779,8 @@
   (assert (#{:system :human :surrogate :developer-injected} from))
   (assert (string? text))
   (if-let [conn (connect-atm pid)]
-    (let [msg-id (inc (max-msg-id pid cid))]
+    (let [msg-id (inc (max-msg-id pid cid))
+          pursuing-EADS (or pursuing-EADS (get-active-EADS-id pid cid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
                                                             table            (assoc :message/table table)
@@ -884,7 +885,7 @@
          :in $ ?cid
          :where
          [?e :conversation/id ?cid]
-         [?e :conversation/active-EADS ?eads-id]]
+         [?e :conversation/active-EADS-id ?eads-id]]
        @(connect-atm pid) cid))
 
 (defn put-active-EADS-id
@@ -892,7 +893,7 @@
   [pid cid eads-id]
   (let [eid (conversation-exists? pid cid)]
     (d/transact @(connect-atm pid)
-                {:tx-data [{:db/id eid :conversation/active-eads eads-id}]})))
+                {:tx-data [{:db/id eid :conversation/active-EADS-id eads-id}]})))
 
 (defn put-EADS-instructions!
   "Update the system DB with a (presumably) new version of the argument EADS instructions.
