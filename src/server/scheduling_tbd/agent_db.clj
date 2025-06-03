@@ -137,8 +137,7 @@
      (make-agent-basics agent-id props))))
 
 (defn get-llm-assistant-id
-  "Create an agent sans :agent/thread-id (even if this will eventually be needed, (#{:project :system} agent-type).
-   Returns the object in DB attributes."
+  "Create an openai assistant, return its id (a string)."
   [{:agent/keys [base-type llm-provider model-class instruction-path instruction-string response-format-path vector-store-paths tools]
     :or {llm-provider @default-llm-provider
          model-class :gpt}}]
@@ -146,17 +145,17 @@
         a-name (-> base-type name (str "-" (name llm-provider)) keyword)
         file-objs (if passive?
                     []
-                    (doall (mapv #(llm/upload-file {:fname %}) (map #(-> % io/resource io/file str) vector-store-paths))))
+                    (doall (mapv #(llm/upload-file {:fname %}) (map #(-> % io/file str) vector-store-paths))))
         v-store (when (not-empty file-objs) (llm/make-vector-store {:file-ids (mapv :id file-objs)}))
         assist (when-not passive?
                  (llm/make-assistant (cond-> {}
                                        true                  (assoc :name a-name)
                                        true                  (assoc :model-class model-class)
                                        true                  (assoc :metadata {:usage :stbd-agent :user user :base-type base-type})
-                                       instruction-path      (assoc :instructions (-> instruction-path io/resource slurp))
+                                       instruction-path      (assoc :instructions (-> instruction-path slurp))
                                        instruction-string    (assoc :instructions instruction-string)
                                        tools                 (assoc :tools tools)
-                                       response-format-path  (assoc :response-format (-> response-format-path io/resource slurp edn/read-string))
+                                       response-format-path  (assoc :response-format (-> response-format-path slurp edn/read-string))
                                        v-store               (assoc :tool-resources {"file_search" {"vector_store_ids" [(:id v-store)]}}))))]
     (agent-log (str "\n\n Added aid " (:id assist) " to agent " a-name))
     (if passive? "passive: aid" (:id assist))))
@@ -174,14 +173,13 @@
 (defn newest-file-modification-date
   "Return the modification date (instant object) of the most recently modified file used to define the agent."
   [agent-info]
-  ;(reset! diag agent-info)
   (let [{:keys [instruction-path response-format-path vector-store-paths]} agent-info
         files (cond-> []
                 instruction-path (conj instruction-path)
                 response-format-path (conj response-format-path)
                 vector-store-paths (into vector-store-paths))
         newest (when (not-empty files)
-                 (apply max (mapv #(->> % io/resource io/file .lastModified) files)))]
+                 (apply max (mapv #(->> % io/file .lastModified) files)))]
     (if newest
       (new java.util.Date newest)
       (new java.util.Date 0))))
@@ -316,7 +314,7 @@
   "Return agent map with project keys (:aid, tid...)  if the agent exists.
    Otherwise create the agent, store it and return the same.
    The two ways to identify what agent you are looking for are:
-      1) a keyword uniquely naming the agent (if it is a system agent)
+      1) a keyword uniquely naming the agent base-type (if it is a system agent)
       2) a map providing the :pid, :base-type (if it is a project agent).
 
    In either case, you can provide a second argument, a map of options:

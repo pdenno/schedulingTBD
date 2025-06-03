@@ -39,6 +39,9 @@
    :agent/instruction-path
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "as it is used by OpenAI circa 2025."}
+   :agent/instruction-string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "This is only used with surrogates, it is the system instruction verbatim. Idea is I can't run SUR: for things like a music school."}
    :agent/llm-provider
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "Currently either :openai or :azure."}
@@ -54,9 +57,6 @@
    :agent/surrogate?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "True if the agent is a human surrogate."}
-   :agent/system-instruction
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "This is only used with surrogates, it is the system instruction verbatim. Idea is I can't run SUR: for things like a music school."}
    :agent/thread-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}

@@ -62,7 +62,7 @@
         pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
         instructions (system-instruction expertise)]
     (agent-log (str "============= Start surrogate " pid " :process  ========================="))
-    (adb/ensure-agent! {:base-type pid :pid pid} {:agent/system-instruction instructions :agent/surrogate? true :agent/expertise expertise})
+    (adb/ensure-agent! {:base-type pid :pid pid} {:agent/instruction-string instructions :agent/surrogate? true :agent/expertise expertise})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
     (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
     (try ;; Now do the warm-up question.
@@ -121,8 +121,8 @@
       (db/update-msg pid :process a-id  {:message/answers-question q-id})
       (agent-log (str "============= Start surrogate+ " pid " :process  ========================="))
       (db/put-agent! {:base-type pid :pid pid} (blank-surrogate pid))
-      (reset! diag [{:base-type pid :pid pid} {:agent/system-instruction sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true}])
-      (adb/ensure-agent! {:base-type pid :pid pid} {:agent/system-instruction sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true})
+      (reset! diag [{:base-type pid :pid pid} {:agent/instruction-string sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true}])
+      (adb/ensure-agent! {:base-type pid :pid pid} {:agent/instruction-string sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true})
       (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
       (inv/resume-conversation {:client-id :console :pid pid :cid :process}))))
 

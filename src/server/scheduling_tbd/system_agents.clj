@@ -1,15 +1,18 @@
 (ns scheduling-tbd.system-agents
   (:require
+   [clojure.edn             :as edn]
    [clojure.java.io         :as io]
    [clojure.pprint          :refer [cl-format]]
    [clojure.set             :as set]
+   [datahike.api            :as d]
    [mount.core              :as mount :refer [defstate]]
    [scheduling-tbd.agent-db :as adb]
    [scheduling-tbd.db       :as db]
-   [scheduling-tbd.sutil    :as sutil]))
+   [scheduling-tbd.sutil    :as sutil :refer [connect-atm]]
+   [taoensso.telemere       :refer [log!]]))
 
 (def system-agents-and-bases
-
+  "This is key information for the objects that actually gets used: actual-agents-and-bases."
   {;; ---------- project agents base-types (interviewers, orchestrator)  -------------------------
    ;; (ToDo: This will eventually be :agent/agent-type :base-type.)
    :orchestrator-agent,
@@ -18,7 +21,7 @@
     :instruction-path "agents/orchestrator.txt",
     ;; The vector store includes all the EADS instructions for interviewers.
     :tools "[{:type \"file_search\"}]"
-    :vector-store-paths (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "agents/iviewrs/EADS/" %)))
+    :vector-store-paths (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "resources/agents/iviewrs/EADS/" %)))
     :agent-type :shared-assistant}
 
    :process-interview-agent,
@@ -71,30 +74,26 @@
    :response-analysis-agent
    {:base-type :response-analysis-agent
     :agent-type :system
-    :instruction-path "agents/response-analysis-agent.txt"
-    :response-format-path "agents/response-analysis-format.edn"}
+    :instruction-path "resources/agents/response-analysis-agent.txt"
+    :response-format-path "resources/agents/response-analysis-format.edn"}
 
    :scheduling-challenges-agent
    {:base-type :scheduling-challenges-agent
     :agent-type :system
-    :instruction-path "agents/scheduling-challenges.txt"
-    :response-format-path "agents/scheduling-challenges-response-format.edn"}
+    :instruction-path "resources/agents/scheduling-challenges.txt"
+    :response-format-path "resources/agents/scheduling-challenges-response-format.edn"}
 
    :text-to-var
    {:base-type :text-to-var
     :agent-type :system
     :model-class :mini
-    :response-format-path "agents/text-to-var-response-format.edn"
-    :instruction-path "agents/text-to-var.txt"}
+    :response-format-path "resources/agents/text-to-var-response-format.edn"
+    :instruction-path "resources/agents/text-to-var.txt"}
 
    :text-function-agent
    {:base-type :text-function-agent
     :agent-type :system
-    :instruction-path "agents/text-function-agent.txt"}
-
-   :trivial-agent
-   {:base-type :trivial-agent
-    :agent-type :system} })
+    :instruction-path "resources/agents/text-function-agent.txt"}})
 
 (def sys-agent? (-> system-agents-and-bases keys set))
 
@@ -103,32 +102,83 @@
 (defn iviewr-instructions
   "Write the agent instructions to resources/agents/iviewrs/<cid>-iviewr-instructions.txt."
   [{:keys [iviewr-name cid focus]}]
-  (let [others (set/difference #{:process :data :resources :optimality} #{cid})]
+  (let [_others (set/difference #{:process :data :resources :optimality} #{cid})]
      (str "You are one of four interviewers engaging humans in conversations to elicit from them requirements for a scheduling system we humans and AI agents will be creating together using MiniZinc.\n"
           (format "You are the %s Agent; you ask questions about %s\n" iviewr-name focus)
-          "The other three agents are:"
-          (cl-format nil "~{~%     - a ~A Agent: that interviews about ~A~}" others)
+          ; ToDo: Add this?
+          #_"The other three agents are:"
+          #_(cl-format nil "~{~%     - a ~A Agent: that interviews about ~A~}" others (map (fn [o] (some #(when (= o (:cid %)) (:focus %)) (vals system-agents-and-bases))) others))
           "\nIn as far as it is practical, you should avoid asking questions in the areas that are the responsibility of these other agents.\n\n"
-          (-> "agents/iviewrs/base-iviewr-instructions.txt" io/resource slurp))))
+          (-> "resources/agents/iviewrs/base-iviewr-instructions.txt" slurp))))
 
-(defn update-iviewers
+(defn add-iviewrs-instructions
   "Return a version of system-agents-and-bases with :instruction-string set to
    the concatenation of things defined by make-iviewr-instructions (a string)."
-  [agent-maps]
-  (reduce-kv  (fn [m k v]
-                (if (:cid v)
-                  (assoc m k (assoc v :system-instructions (iviewr-instructions v)))
-                  (assoc m k v)))
-              []
-              agent-maps))
+  [agent-maps-map]
+  (.mkdir (java.io.File. "/tmp/stbd-agents"))
+  (reduce-kv  (fn [res k v]
+                (if (contains? v :iviewr-name)
+                  (let [fname (str "/tmp/stbd-agents/" (-> v :cid name) "-interviewer.txt")]
+                    (spit fname (iviewr-instructions v))
+                    (assoc res k (assoc v :instruction-path fname)))
+                  (assoc res k v)))
+              {}
+              agent-maps-map))
+
+(defn add-agent-id
+  [agent-maps-map]
+  (reduce-kv  (fn [res k v] (assoc res k (assoc v :agent-id k)))
+              {}
+              agent-maps-map))
+
+(defn drop-non-agent-keys
+  [agent-maps-map]
+  (reduce-kv (fn [res k v]
+               (assoc res k (dissoc v :focus :cid :warm-up-question :iviewr-name)))
+             {}
+             agent-maps-map))
+
+(defn keys-in-agent-ns
+  [agents-maps-map]
+  (reduce-kv (fn [m k v]
+               (assoc m k (reduce-kv (fn [mm kk vv] (assoc mm (keyword "agent" (name kk)) vv)) {} v)))
+             {}
+             agents-maps-map))
+
+(def actual-agents-and-bases
+  (-> system-agents-and-bases add-iviewrs-instructions add-agent-id drop-non-agent-keys keys-in-agent-ns))
+
+;;; (sa/force-new-system-agent! :data-interview-agent (get sa/actual-agents-and-bases :data-interview-agent))
+#_(defn force-new-system-agent!
+  "Put the agent in the DB and add an assistant to it."
+  [agent-id agent-map]
+  (db/put-agent! agent-id agent-map)
+  (let [agent-map (cond-> agent-map
+                    (-> agent-map :tools string?)   (assoc :tools (-> agent-map :tools edn/read-string)))
+        aid (adb/get-llm-assistant-id agent-map)]
+    (if (string? aid)
+      (if-let [eid (db/agent-exists? agent-id)]
+        (d/transact (connect-atm :system) {:tx-data [{:db/id eid :agent/assistant-id aid}]})
+        (log! :error (str "Could not find system db eid for " agent-id)))
+      (log! :error (str "Could not create assistant-id for " agent-id)))))
+
+;;; (sa/force-new-system-agent! :data-interview-agent (get sa/actual-agents-and-bases :data-interview-agent))
+(defn force-new-system-agent!
+  "Put the agent in the DB and add an assistant to it."
+  [agent-id agent-map]
+  (let [agent-map (cond-> agent-map
+                    (-> agent-map :agent/tools string?)
+                    (assoc :agent/tools (-> agent-map :agent/tools edn/read-string)))
+        aid (adb/get-llm-assistant-id agent-map)]
+    (if (string? aid)
+      (db/put-agent! agent-id (assoc agent-map :agent/assistant-id aid))
+      (log! :error (str "Could not create assistant-id for " agent-id)))))
 
 (defn ^:admin force-new-system-agents!
-  "This is to update the aid."
+  "This is to update agents (get new aid, possibly using new instructions)."
   []
-  (doseq [agent-id (keys system-agents-and-bases)]
-    (adb/ensure-agent! agent-id))) ; <======================================================================================== Finish this.
-
-
+  (doseq [[agent-id agent-map] actual-agents-and-bases]
+    (force-new-system-agent! agent-id agent-map)))
 
 ;;; ------------------------------- starting and stopping ---------------------------------
 (defn ensure-system-agent-basics
