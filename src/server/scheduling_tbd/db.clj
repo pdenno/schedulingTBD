@@ -760,6 +760,17 @@
     (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
 
 ;;; --------------------------------------- Messages ---------------------------------------------------------------------
+(defn message-exists?
+  "Return the :db/id if a message with the argument coordinates is found."
+  [pid cid mid]
+  (d/q '[:find ?eid .
+         :in $ ?cid ?mid
+         :where
+         [?c :conversation/id ?cid]
+         [?c :conversation/messages ?eid]
+         [?eid :message/id ?mid]]
+       @(connect-atm pid) cid mid))
+
 (defn max-msg-id
   "Return the current highest message ID used in the project."
   [pid cid]
@@ -805,11 +816,13 @@
 
 (defn update-msg
   "Update the message with given info (a merge)."
-  [pid cid mid info]
-  (let [msg (get-msg pid cid mid)]
-    (if (not-empty msg)
-      (d/transact (connect-atm pid) {:tx-data [(merge msg info)]})
-      (log! :warn (str "Could not find msg for update-msg: pid = " pid " cid = " cid " mid = " mid)))))
+  [pid cid mid {:message/keys [answers-question] :as info}]
+  (let [eid (message-exists? pid cid mid)]
+    (if (= mid answers-question)
+      (throw (ex-info "Attempting to mark a message as answer the question it raises." {:pid pid :cid cid :mid mid}))
+      (if eid
+        (d/transact (connect-atm pid) {:tx-data [(merge {:db/id eid} info)]})
+        (log! :warn (str "Could not find msg for update-msg: pid = " pid " cid = " cid " mid = " mid))))))
 
 ;;; ----------------------------------------- Budget ---------------------------------------------
 (defn get-budget
@@ -892,7 +905,7 @@
   "Set :conversation/active-EADS."
   [pid cid eads-id]
   (let [eid (conversation-exists? pid cid)]
-    (d/transact @(connect-atm pid)
+    (d/transact (connect-atm pid)
                 {:tx-data [{:db/id eid :conversation/active-EADS-id eads-id}]})))
 
 (defn put-EADS-instructions!

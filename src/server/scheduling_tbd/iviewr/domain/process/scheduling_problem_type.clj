@@ -1,15 +1,18 @@
 (ns scheduling-tbd.iviewr.domain.process.scheduling-problem-type
   "Define a EADS to elicit general information about the scheduling problem the interviewees are interested in solving."
   (:require
-   [clojure.spec.alpha    :as s]
-   [mount.core :as mount  :refer [defstate]]
-   [scheduling-tbd.db     :as db]
-   [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
-   [scheduling-tbd.sutil  :as sutil]
-   [taoensso.telemere     :refer [log!]]))
+   [clojure.pprint                  :refer [pprint]]
+   [clojure.spec.alpha              :as s]
+   [mount.core                      :as mount :refer [defstate]]
+   [scheduling-tbd.agent-db         :refer [agent-log]]
+   [scheduling-tbd.db               :as db]
+   [scheduling-tbd.iviewr.eads-util :as eads-util :refer [ds-complete?]]
+   [scheduling-tbd.sutil            :as sutil]))
 
 ;;; ToDo: Because we use a central spec registry, the specs defined with short namespaces (e.g. :problem-type/val) might collide with specs from other domains.
 ;;;       The best solution might be not to use a central repository. These things won't be needed outside this file.
+
+(def ^:diag diag (atom nil))
 
 (s/def :scheduling-problem-type/EADS-message (s/keys :req-un [::message-type ::interview-objective ::EADS]))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
@@ -63,13 +66,26 @@
                       :comment  (str "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.\n"
                                      "For example, if the made the same collection of products in the same order each week, cylical? would be true.")}}})
 
+
 ;;; ------------------------------- checking for completeness ---------------
+(defn ds-refine2EADS
+  "Translate the argument DATA-STRUCTURE-REFINEMENT message to EADS."
+  [refine-msg]
+  (-> refine-msg
+      :data-structure
+      eads-util/strip-annotations
+      (assoc :EADS-id (:EADS-ref refine-msg))
+      (dissoc :EADS-ref)
+      (update :principal-problem-type keyword)   ; These two owing to JSON translation.
+      (update :problem-components #(mapv keyword %))))
+
 (defmethod ds-complete? :process/scheduling-problem-type
   [refine-msg]
-  (log! :info (str "This is the ds-complete for refinement-msg = " refine-msg))
-  ;; This one is pretty simple:
-  (s/valid? :scheduling-problem-type/EADS-message refine-msg))
-
+  (let [s-msg (ds-refine2EADS refine-msg)
+        complete? (s/valid? ::EADS s-msg)]
+    (agent-log (str "This is the stripped DS for problem type (complete? = " complete? "):\n" (with-out-str (pprint s-msg)))
+               {:console? true :elide-console 130})
+    complete?))
 
 ;;; ------------------------------- starting and stopping ---------------
 (defn init-scheduling-problem-type

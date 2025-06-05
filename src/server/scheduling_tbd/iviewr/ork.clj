@@ -92,7 +92,9 @@
               (swap! result conj act))
             (reset! current-eads eads-id))
           (swap! result conj act)))
-      (conj @result (make-ds-entry @current-eads)))))
+      (if @current-eads
+        (conj @result (make-ds-entry @current-eads))
+        @result))))
 
 (defn conversation-activity
   "Create a chronologically-ordered vector of activities for the argument conversation, including q/a pairs,
@@ -101,6 +103,7 @@
   (let [msgs (->> cid
                   (db/get-conversation pid)
                   :conversation/messages
+                  (filter #(contains? % :message/answers-question))
                   (sort-by :message/id)
                   (mapv #(if-let [q-id (:message/answers-question %)]
                              (assoc % :message/q-a-pair
@@ -152,7 +155,7 @@
                               [:process :data :resources :optimality])
                       (conversation-activity pid cid))]
      (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
-     (cond-> {:message-type "CONVERSATION-HISTORY"}
+     (cond-> {:message-type :CONVERSATION-HISTORY}
        (not-empty challenges)  (assoc :scheduling-challenges challenges)
        (not-empty activities)  (assoc :activity activities)))))
 
@@ -216,7 +219,8 @@
   (let [msg-string (clj2json-pretty msg)
         res (-> (adb/query-agent ork-agent msg-string) output-struct2clj)
         res (cond-> res
-              (= (:message-type res) "PURSUE-EADS")      (update :EADS-id keyword))]
+              (contains? res :message-type)              (update :message-type keyword)
+              (= (:message-type res) :PURSUE-EADS)       (update :EADS-id keyword))]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
     (agent-log (str "[ork manager] (receives response form ork)\n" (with-out-str (pprint res))))
     res))

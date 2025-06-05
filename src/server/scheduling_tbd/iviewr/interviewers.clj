@@ -118,15 +118,15 @@
 ;;; To check the structure of messages to and from the interviewer:
 (s/def ::interviewer-msg (s/and (s/keys :req-un [:iviewr/message-type])
                                 (fn [msg]
-                                  (case (-> msg :message-type name)
-                                   "SUPPLY-QUESTION"                   (s/valid? :iviewr/supply-question msg)
-                                   "QUESTION-TO-ASK"                   (s/valid? :iviewr/question-to-ask msg)
-                                   "INTERVIEWEES-RESPOND"              (s/valid? :iviewr/interviewees-respond msg)
-                                   "DATA-STRUCTURE-REFINEMENT"         (s/valid? :iviewr/data-structure-refinement msg)
-                                   "CONVERSATION-HISTORY"              (s/valid? :iviewr/conversation-history msg)
-                                   "EADS-INSTRUCTIONS"                 (s/valid? :iviewr/eads-instructions msg)
-                                   "COURSE-CORRECTION"                 (s/valid? :iviewr/course-correction msg)
-                                   "STATUS"                            #(string? (get % :status))))))
+                                  (case (:message-type msg)
+                                   :SUPPLY-QUESTION                   (s/valid? :iviewr/supply-question msg)
+                                   :QUESTION-TO-ASK                   (s/valid? :iviewr/question-to-ask msg)
+                                   :INTERVIEWEES-RESPOND              (s/valid? :iviewr/interviewees-respond msg)
+                                   :DATA-STRUCTURE-REFINEMENT         (s/valid? :iviewr/data-structure-refinement msg)
+                                   :CONVERSATION-HISTORY              (s/valid? :iviewr/conversation-history msg)
+                                   :EADS-INSTRUCTIONS                 (s/valid? :iviewr/eads-instructions msg)
+                                   :COURSE-CORRECTION                 (s/valid? :iviewr/course-correction msg)
+                                   :STATUS                            #(string? (get % :status))))))
 
 (s/def :iviewr/supply-question (s/keys :req-un [:iviewr/budget]))
 
@@ -151,7 +151,7 @@
 
 (s/def :iviewr/eads-instructions (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
 (s/def :iviewr/interview-objective string?)
-(s/def :iviewr/EADS string?)
+(s/def :iviewr/EADS (s/or :dehydrated string? :hydrated map?))
 
 (s/def :iviewr/course-correction (s/keys :opt-un [:iviewr/advice :iviewr/question]))
 
@@ -160,7 +160,7 @@
 (defn too-many-course-corrections!
   "If many course-corrections have occurred, stop the conversation."
   [{:keys [message]}]
-  (when (= message "COURSE-CORRECTION")
+  (when (= message :COURSE-CORRECTION)
     (swap! course-correction-count inc))
   (when (> @course-correction-count 5)
     (reset! active? false)))
@@ -175,8 +175,11 @@
   (agent-log (str "[interview manager] (tells " (name cid) " interviewer)\n" (with-out-str (pprint msg))))
   (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
   (let [msg-string (ches/generate-string msg {:pretty true})
-        res (-> (adb/query-agent interviewer-agent msg-string ctx) output-struct2clj)]
+        res (-> (adb/query-agent interviewer-agent msg-string ctx) output-struct2clj)
+        res (cond-> res
+              (contains? res :message-type)     (update :message-type keyword))]
     (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
+    (agent-log (str "[interview manager] (receives from " (name cid) " interviewer)\n" (with-out-str (pprint res))))
     res))
 
 (defn response-analysis
@@ -226,7 +229,6 @@
   [{:keys [question responder-type human-starting?] :as ctx}]
   (when-not human-starting?
     (when-not (s/valid? ::chat-pair-ctx ctx)
-      (reset! diag ctx)
       (throw (ex-info "Invalid context in get-an-answer." {:ctx ctx}))))
   (let [conversation [{:text question :from :system :tags [:query]}]
         {:keys [full-text] :as response}  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
@@ -258,20 +260,22 @@
    (i.e. by OpenAI, because it is more than 30 days old) then the agent knows what has already been
    asked EXCEPT for the warm-up question (if any) which happens before the interview."
   [pid cid]
-  (let [msgs (-> (db/get-conversation pid cid) :conversation/messages)
-        answers (filter #(contains? % :message/answers-question) msgs)]
-    (cond-> {:message-type "CONVERSATION-HISTORY"
+  (let [answers (->> cid
+                     (db/get-conversation pid)
+                     :conversation/messages
+                     (filter #(contains? % :message/answers-question)))]
+    (cond-> {:message-type :CONVERSATION-HISTORY
              :interviewee-type (if (surrogate? pid) :machine :human)
              :budget (db/get-budget pid cid)}
       (not-empty answers)   (assoc :activity (mapv (fn [answer]
                                                      {:question (-> (db/get-msg pid cid (:message/answers-question answer)) :message/content)
-                                                      :answer  (-> answer :message/content)})
+                                                      :answer  (-> answer :message/content)}) ; ToDo: Is this inclusive of tables?
                                                    answers)))))
 
 (defn make-supply-question-msg
   "Create a supply question message for the conversation."
   [{:keys [pid cid] :as _ctx}]
-  {:message-type "SUPPLY-QUESTION" :budget (db/get-budget pid cid)})
+  {:message-type :SUPPLY-QUESTION :budget (db/get-budget pid cid)})
 
 (defn fix-off-course--question
   "Generate and communicate a COURSE-CORRECTION message based on the argument question."
@@ -336,7 +340,7 @@
       :table-html is the substring between the markers."
   [text]
   (let [in-table? (atom false)]
-    (loop [lines (str/split-lines text)
+    (loop [lines (str/split-lines text) ; <=======================================
            res {:full-text text :text "" :table-html ""}]
       (let [l (first lines)]
         (when (and l @in-table? (re-matches #"(?i)^\s*\#\+end_src\s*" l))  (reset! in-table? false))
@@ -376,7 +380,7 @@
   [{:keys [client-id responder-type] :as ctx}]
   (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
   (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
-                          (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type "QUESTION-TO-ASK", :question "...'}
+                          (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
                           (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
                           (fix-off-course--question ctx))]         ; Currently a no-op. Returns argument.
          (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
@@ -392,7 +396,7 @@
    discussion on the given topic."
   [pid cid]
   (letfn [(done? [status] (= status :eads-exhausted))]
-    (let [[pstat dstat rstat ostat]  (doall (for [c [:process :data :resources :optimality]]
+    (let [[pstat dstat rstat _ostat]  (doall (for [c [:process :data :resources :optimality]]
                                               (db/get-conversation-status pid c)))]
       (case cid
             :resources               (and (done? pstat) (done? dstat))
@@ -486,20 +490,24 @@
       (db/put-EADS-ds! pid cid obj))))
 
 (defn update-db-conversation!
-  "Write to the project DB messages that occurred inclusive of a q/a pair."
-  [pid cid new-msgs-vec]
+  "Write to the project DB messages that occurred inclusive of a q/a pair.
+   If there is a EADS being pursued, set the pursuing-EADS.
+   Mark the last message as answering the first.
+   Argument msgs-vec is a vector of maps having (possibly) :from :text :table :tags, and :question-type."
+  [pid cid msgs-vec]
+  (reset! diag msgs-vec)
   (let [msg-ids (atom [])
         EADS-id (db/get-active-EADS-id pid cid)]
-    (doseq [msg new-msgs-vec]
+    (doseq [msg msgs-vec]
       (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
-                                        EADS-id  (assoc :pursuing-EADS EADS-id))))
-      (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)}))))
+                                        EADS-id  (assoc :pursuing-EADS EADS-id)))))
+    (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})))
 
 (defn post-ui-actions
   "Send client actions to perform such as loading graphs or (for humans) changing conversations."
   [iviewr-response {:keys [pid cid new-cid? client-id responder-type] :as ctx}]
   (when (surrogate? pid) (ru/refresh-client client-id pid cid))
-  (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
+  (when (= :DATA-STRUCTURE-REFINEMENT (:message-type iviewr-response))
     ;; Using the data structure being pursued in some EADS instructions to show a FFBD of their processes.
     (when (#{:process/flow-shop :process/job-shop--classifiable} (db/get-active-EADS-id pid cid))
       (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
@@ -515,7 +523,7 @@
   "If the interviewer responded with a DATA-STRUCTURE-REFINEMENT (which is typical), associate the
    whole message as a string to the message which is an answer to the question."
   [iviewr-response ctx]
-  (when (= "DATA-STRUCTURE-REFINEMENT" (:message-type iviewr-response))
+  (when (= :DATA-STRUCTURE-REFINEMENT (:message-type iviewr-response))
     (put-EADS-ds-on-msg iviewr-response ctx)))
 
 (defn clear-ctx-ephemeral
@@ -534,27 +542,36 @@
          2) a change in interviewer, which occurs simply by changing :cid in the context; no initialization needed.
          3) a message to human interviewees to change conversations to what the ork wants to do,
          4) interviewing to stop (because ork conludes that no more eads-instructions apply, or forced by active? atom)."
-  [{:keys [pid cid] :as ctx}]
+  [pid cid]
   (ork/ensure-ork! pid)
-  (let [budget (db/get-budget pid cid)
+  (let [budget-ok? (> (db/get-budget pid cid) 0)
         active-eads-id (db/get-active-EADS-id pid cid)
-        eads-id (or active-eads-id (ork/get-new-EADS-id pid))
-        ds-complete? (and eads-id (eads-util/ds-complete? (db/get-EADS-ds pid cid eads-id)))
-        new-eads-id (when (or ds-complete? (<= budget 0))
-                      (ork/get-new-EADS-id pid)) ; provides conversation, returns nil when exhausted.
+        active-eads-complete? (or (not budget-ok?)
+                                  (and active-eads-id (eads-util/ds-complete? (db/get-EADS-ds pid cid active-eads-id))))
+        new-eads-id (when (or active-eads-complete? (not active-eads-id))
+                      (ork/get-new-EADS-id pid))
+        change-eads? new-eads-id
+        eads-id (or new-eads-id active-eads-id)
+        exhausted? (not eads-id)
         new-cid (when new-eads-id
-                  (let [nspace (-> new-eads-id namespace keyword)]
+                  (let [nspace (when eads-id (-> eads-id namespace keyword))]
                     (when (not= cid nspace) nspace)))]
-    (when (<= budget 0)
+    (when-not budget-ok?
       (agent-log (str "[ork manager] (in ork-review) switching to new EADS instructions " new-eads-id "  owing to budget.")
                  {:console? true :level :warn}))
     (when new-cid
       (agent-log (str "[ork manager] (in ork-review) changing conversation to " new-cid ".")))
-    (cond-> ctx
-      (not @active?)                    (assoc :force-stop? true)
-      (not (or new-eads-id eads-id))    (assoc :exhausted? true)
-      new-eads-id                       (assoc :new-eads-id new-eads-id)
-      new-cid                           (assoc :new-cid? true :old-cid cid :cid new-cid))))
+    (let [res (cond-> {}
+                (not @active?)                    (assoc :force-stop? true)
+                exhausted?                        (assoc :exhausted? true)
+                change-eads?                      (assoc :change-eads? true)
+                new-eads-id                       (assoc :new-eads-id new-eads-id)
+                new-cid                           (assoc :new-cid? true :old-cid cid :cid new-cid)
+                (not new-cid)                     (assoc :cid cid))]
+      (agent-log (str "[ork manager] (in ork-review) returning decision (has extra info):\n"
+                      (with-out-str (pprint res)))
+                 {:console? true})
+      res)))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
@@ -572,23 +589,24 @@
     (try
       (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
         (-> (conversation-history pid cid) (tell-interviewer ctx))
-        (loop [ctx ctx]
-          (let [{:keys [exhausted? force-stop? new-eads-id cid old-cid new-cid?] :as ctx} (ork-review ctx)]
+        (loop [ctx ctx] ; ToDo: currently not used!
+          (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?]} (ork-review pid cid)]
             (if (or exhausted? force-stop?)
               (agent-log (str "resume-conversation exiting. ctx:\n" (with-out-str (pprint ctx))) {:console? true})
               (do (when new-cid?
                     (db/put-conversation-status! pid old-cid :eads-exhausted)
                     (db/put-conversation-status! pid cid :in-progress))
-                  (when new-eads-id
-                    (db/put-active-EADS-id pid cid new-eads-id)
+                  (when change-eads?
+                    (log! :warn (str "Changing EADS, new-eads-id = " new-eads-id))
+                    (db/put-active-EADS-id pid cid new-eads-id) ; This will be used by :message/pursuing-EADS.
                     (tell-interviewer (db/get-EADS-instructions new-eads-id) ctx))
                   (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                         expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
-                        iviewr-response (tell-interviewer {:message-type "INTERVIEWEES-RESPOND" :response expert-response} ctx)]
+                        iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response} ctx)]
                     (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
                     (update-db-conversation! pid cid conversation)
                     (post-ui-actions  iviewr-response ctx)  ; show graphs and tables, tell humans to switch conv.
-                    (post-db-actions! iviewr-response ctx)) ; associate ds refinement with msg.
+                    (post-db-actions! iviewr-response ctx)) ; associate DS refinement with msg.
                   (recur (clear-ctx-ephemeral ctx)))))))
       (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))
     (find-appropriate-conv-and-redirect ctx)))

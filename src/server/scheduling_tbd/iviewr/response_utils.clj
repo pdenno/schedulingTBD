@@ -86,15 +86,8 @@
 (defn get-warm-up-q [cid]
   (-> cid get-iviewr-info :warm-up-question))
 
-(defn strip-annotations
-  "Remove the annotations from the EADS."
-  [obj]
-  (cond (and (map? obj) (contains? obj :val) (contains? obj :comment))  (:val obj)
-        (map? obj)                                                      (reduce-kv (fn [m k v] (assoc m k (strip-annotations v))) {} obj)
-        (vector? obj)                                                   (mapv strip-annotations obj)
-        :else                                                           obj))
 
-(defn key-vals
+#_(defn key-vals
   "Return a collection of keys for which the value is a key."
   [m]
   (let [res (atom #{})]

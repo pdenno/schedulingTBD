@@ -116,7 +116,7 @@
     (let [q-id (db/add-msg {:pid pid :cid :process :from :system :tags [:query :warm-up]
                          :text (str "We understand that you have a special request to us:\n"
                                     "You'd like to create a scheduling system, but you aren't a manufacturer.\n"
-                                    "OK, I think we can still help. What's the scheduling problem you are trying to solve.")})
+                                    "Okay, I think we can still help. What's the scheduling problem you are trying to solve?")})
           a-id (db/add-msg {:pid pid :cid :process :from :surrogate :tags [:response :warm-up] :text warm-up-response})]
       (db/update-msg pid :process a-id  {:message/answers-question q-id})
       (agent-log (str "============= Start surrogate+ " pid " :process  ========================="))

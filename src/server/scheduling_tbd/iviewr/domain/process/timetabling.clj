@@ -1,11 +1,16 @@
 (ns scheduling-tbd.iviewr.domain.process.timetabling
   (:require
+   [clojure.pprint           :refer [pprint]]
    [clojure.spec.alpha       :as s]
-   [mount.core :as mount     :refer [defstate]]
+   [mount.core               :as mount :refer [defstate]]
+   [scheduling-tbd.agent-db  :refer [agent-log]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil]
-   [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
+   [scheduling-tbd.iviewr.eads-util :as eads-util :refer [ds-complete?]]
    [taoensso.telemere        :refer [log!]]))
+
+;;; ToDo. We need a separate spec repository for each EADS, or better naming in order to avoid name collisions.
+;;;       Better naming: for example, preface all namespaces like 'units' with 'tt'. 'tt-units'.
 
 (s/def :timetabling/EADS-message (s/keys :req-un [::interview-objective ::interviewer-agent ::EADS ::message-type]))
 (s/def ::EADS (s/keys :req-un [::EADS-id ::event-types ::timeslots]))
@@ -16,75 +21,79 @@
 
 ;;; (dutil/make-specs ttable/timetabling "timetabling")
 ;;; Created Sat May 17 18:55:10 EDT 2025 using develop.dutil/make-spec."
- (s/def ::event-types (s/or :normal :event-types/val :annotated ::annotated-event-types))
- (s/def :event-types/val (s/coll-of ::event-type :kind vector?))
- (s/def ::event-type (s/keys :req-un [::occurrence-assignment ::event-type-name] :opt-un [::periodicity ::event-resources]))
- (s/def ::annotated-event-types (s/keys :req-un [::comment :event-types/val]))
- (s/def ::timeslots (s/or :normal :timeslots/val :annotated ::annotated-timeslots))
- (s/def :timeslots/val (s/coll-of ::timeslot :kind vector?))
- (s/def ::timeslot (s/keys :req-un [::spans ::ts-type-id]))
- (s/def ::annotated-timeslots (s/keys :req-un [::comment :timeslots/val]))
- (s/def ::event-resources (s/or :normal :event-resources/val :annotated ::annotated-event-resources))
- (s/def :event-resources/val (s/coll-of ::event-resource :kind vector?))
- (s/def ::event-resource (s/keys :req-un [::base-type ::resource-type] :opt-un [::quantity]))
- (s/def ::annotated-event-resources (s/keys :req-un [::comment :event-resources/val]))
- (s/def ::event-type-name (s/or :normal :event-type-name/val :annotated ::annotated-event-type-name))
- (s/def :event-type-name/val string?)
- (s/def ::annotated-event-type-name (s/keys :req-un [::comment :event-type-name/val]))
- (s/def ::occurrence-assignment (s/or :normal :occurrence-assignment/val :annotated ::annotated-occurrence-assignment))
- (s/def :occurrence-assignment/val (s/keys :req-un [::ts-type-refs]))
- (s/def ::annotated-occurrence-assignment (s/keys :req-un [::comment :occurrence-assignment/val]))
- (s/def ::periodicity (s/or :normal :periodicity/val :annotated ::annotated-periodicity))
- (s/def :periodicity/val (s/keys :req-un [::occurrences ::interval]))
- (s/def ::annotated-periodicity (s/keys :req-un [::comment :periodicity/val]))
- (s/def ::spans (s/or :normal :spans/val :annotated ::annotated-spans))
- (s/def :spans/val (s/coll-of ::span :kind vector?))
- (s/def ::span (s/keys :req-un [::periods ::span-id]))
- (s/def ::annotated-spans (s/keys :req-un [::comment :spans/val]))
- (s/def ::ts-type-id (s/or :normal :ts-type-id/val :annotated ::annotated-ts-type-id))
- (s/def :ts-type-id/val string?)
- (s/def ::annotated-ts-type-id (s/keys :req-un [::comment :ts-type-id/val]))
- (s/def ::base-type (s/or :normal :base-type/val :annotated ::annotated-base-type))
- (s/def :base-type/val string?)
- (s/def ::annotated-base-type (s/keys :req-un [::comment :base-type/val]))
- (s/def ::quantity (s/or :normal :quantity/val :annotated ::annotated-quantity))
- (s/def :quantity/val (s/keys :req-un [::value-string ::units]))
- (s/def ::annotated-quantity (s/keys :req-un [::comment :quantity/val]))
- (s/def ::resource-type (s/or :normal :resource-type/val :annotated ::annotated-resource-type))
- (s/def :resource-type/val string?)
- (s/def ::annotated-resource-type (s/keys :req-un [::comment :resource-type/val]))
- (s/def ::ts-type-refs (s/or :normal :ts-type-refs/val :annotated ::annotated-ts-type-refs))
- (s/def :ts-type-refs/val (s/coll-of ::ts-type-ref :kind vector?))
- (s/def ::ts-type-ref string?)
- (s/def ::annotated-ts-type-refs (s/keys :req-un [::comment :ts-type-refs/val]))
- (s/def ::interval (s/or :normal :interval/val :annotated ::annotated-interval))
- (s/def :interval/val (s/keys :req-un [::value-string ::units]))
- (s/def ::annotated-interval (s/keys :req-un [::comment :interval/val]))
- (s/def ::occurrences (s/or :normal :occurrences/val :annotated ::annotated-occurrences))
- (s/def :occurrences/val (s/keys :req-un [::value-string]))
- (s/def ::annotated-occurrences (s/keys :req-un [::comment :occurrences/val]))
- (s/def ::periods (s/or :normal :periods/val :annotated ::annotated-periods))
- (s/def :periods/val (s/coll-of ::period :kind vector?))
- (s/def ::period string?)
- (s/def ::annotated-periods (s/keys :req-un [::comment :periods/val]))
- (s/def ::span-id (s/or :normal :span-id/val :annotated ::annotated-span-id))
- (s/def :span-id/val string?)
- (s/def ::annotated-span-id (s/keys :req-un [::comment :span-id/val]))
- (s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
- (s/def :units/val string?)
- (s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
- (s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
- (s/def :value-string/val string?)
- (s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
- (s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
- (s/def :units/val string?)
- (s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
- (s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
- (s/def :value-string/val string?)
- (s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
- (s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
- (s/def :value-string/val string?)
- (s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
+(s/def ::event-types (s/or :normal :event-types/val :annotated ::annotated-event-types))
+(s/def :event-types/val (s/coll-of ::event-type :kind vector?))
+(s/def ::event-type (s/keys :req-un [::occurrence-assignment ::event-type-name] :opt-un [::periodicity ::event-resources]))
+(s/def ::annotated-event-types (s/keys :req-un [::comment :event-types/val]))
+(s/def ::timeslots (s/or :normal :timeslots/val :annotated ::annotated-timeslots))
+(s/def :timeslots/val (s/coll-of ::timeslot :kind vector?))
+(s/def ::timeslot (s/keys :req-un [::spans ::ts-type-id]))
+(s/def ::annotated-timeslots (s/keys :req-un [::comment :timeslots/val]))
+
+;;; We make event-resources mandatory, and hope the answer is 'none'.
+(s/def ::event-resources (s/or :normal :event-resources/val :annotated ::annotated-event-resources))
+(s/def :event-resources/val (s/or :normal (s/coll-of ::event-resource :kind vector?) :none string?))
+(s/def ::event-resource (s/keys :req-un [::base-type ::resource-type] :opt-un [::quantity]))
+(s/def ::annotated-event-resources (s/keys :req-un [::comment :event-resources/val]))
+(s/def ::event-type-name (s/or :normal :event-type-name/val :annotated ::annotated-event-type-name))
+(s/def :event-type-name/val string?)
+(s/def ::annotated-event-type-name (s/keys :req-un [::comment :event-type-name/val]))
+(s/def ::occurrence-assignment (s/or :normal :occurrence-assignment/val :annotated ::annotated-occurrence-assignment))
+(s/def :occurrence-assignment/val (s/keys :req-un [::ts-type-refs]))
+(s/def ::annotated-occurrence-assignment (s/keys :req-un [::comment :occurrence-assignment/val]))
+(s/def ::periodicity (s/or :normal :periodicity/val :annotated ::annotated-periodicity))
+
+;;; We make periodicity mandatory, and hope the answer is 'none'.
+(s/def :periodicity/val (s/or :normal (s/keys :req-un [::occurrences ::interval]) :none string?))
+(s/def ::annotated-periodicity (s/keys :req-un [::comment :periodicity/val]))
+(s/def ::spans (s/or :normal :spans/val :annotated ::annotated-spans))
+(s/def :spans/val (s/coll-of ::span :kind vector?))
+(s/def ::span (s/keys :req-un [::periods ::span-id]))
+(s/def ::annotated-spans (s/keys :req-un [::comment :spans/val]))
+(s/def ::ts-type-id (s/or :normal :ts-type-id/val :annotated ::annotated-ts-type-id))
+(s/def :ts-type-id/val string?)
+(s/def ::annotated-ts-type-id (s/keys :req-un [::comment :ts-type-id/val]))
+(s/def ::base-type (s/or :normal :base-type/val :annotated ::annotated-base-type))
+(s/def :base-type/val string?)
+(s/def ::annotated-base-type (s/keys :req-un [::comment :base-type/val]))
+(s/def ::quantity (s/or :normal :quantity/val :annotated ::annotated-quantity))
+(s/def :quantity/val (s/keys :req-un [::value-string ::units]))
+(s/def ::annotated-quantity (s/keys :req-un [::comment :quantity/val]))
+(s/def ::resource-type (s/or :normal :resource-type/val :annotated ::annotated-resource-type))
+(s/def :resource-type/val string?)
+(s/def ::annotated-resource-type (s/keys :req-un [::comment :resource-type/val]))
+(s/def ::ts-type-refs (s/or :normal :ts-type-refs/val :annotated ::annotated-ts-type-refs))
+(s/def :ts-type-refs/val (s/coll-of ::ts-type-ref :kind vector?))
+(s/def ::ts-type-ref string?)
+(s/def ::annotated-ts-type-refs (s/keys :req-un [::comment :ts-type-refs/val]))
+(s/def ::interval (s/or :normal :interval/val :annotated ::annotated-interval))
+(s/def :interval/val (s/keys :req-un [::value-string ::units]))
+(s/def ::annotated-interval (s/keys :req-un [::comment :interval/val]))
+(s/def ::occurrences (s/or :normal :occurrences/val :annotated ::annotated-occurrences))
+(s/def :occurrences/val (s/keys :req-un [::value-string]))
+(s/def ::annotated-occurrences (s/keys :req-un [::comment :occurrences/val]))
+(s/def ::periods (s/or :normal :periods/val :annotated ::annotated-periods))
+(s/def :periods/val (s/coll-of ::period :kind vector?))
+(s/def ::period string?)
+(s/def ::annotated-periods (s/keys :req-un [::comment :periods/val]))
+(s/def ::span-id (s/or :normal :span-id/val :annotated ::annotated-span-id))
+(s/def :span-id/val string?)
+(s/def ::annotated-span-id (s/keys :req-un [::comment :span-id/val]))
+(s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
+(s/def :units/val string?)
+(s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
+(s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
+(s/def :value-string/val string?)
+(s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
+(s/def ::units (s/or :normal :units/val :annotated ::annotated-units))
+(s/def :units/val string?)
+(s/def ::annotated-units (s/keys :req-un [::comment :units/val]))
+(s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
+(s/def :value-string/val string?)
+(s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
+(s/def ::value-string (s/or :normal :value-string/val :annotated ::annotated-value-string))
+(s/def :value-string/val string?)
+(s/def ::annotated-value-string (s/keys :req-un [::comment :value-string/val]))
 
 
 ;;; ToDo: add a timetabled? property to flow and job shop EADS processes ????
@@ -137,6 +146,7 @@
                                                                                   "The meaning of room-type-30 will be made clear in the resources interview, not here.")}
                                                     :base-type {:val "place" :comment "Possible values for this property are 'human', 'place', and 'equipment'."}}
                                                    {:resource-type "student-type"    :base-type "human" :quantity {:units "person" :value-string "30" :modifier "up to"}}
+                                                   {:resource-type "chalk-board" :base-type "equipment"}
                                                    {:resource-type "instructor-type" :base-type "human"}]}
                            :periodicity {:val {:interval {:units "week" :value-string "1"}
                                                :occurrences {:value-string "2"}}
@@ -160,10 +170,14 @@
                            :occurrence-assignment {:ts-type-refs ["Mon-Wed-Fri-90min"]
                                                    :constraints  ["same-time", "different-days"]}}
 
-                          {:event-type-name "lab-class"
-                           :event-resources [{:resource-type "room-type-lab"      :base-type "place"}
-                                             {:resource-type "student-type"       :base-type "human"}
-                                             {:resource-type "lab-assistant-type" :base-type "human" :quantity {:units "person" :value-string "2"}}]
+                          {:event-type-name "chem-lab-class"
+                           :event-resources {:val [{:resource-type "room-type-chem-lab" :base-type "place"}
+                                                   {:resource-type "fume hood"          :base-type "equipment" :quantity {:value-string "10" :units "instances"}}
+                                                   {:resource-type "student-type"       :base-type "human"}
+                                                   {:resource-type "student-type"       :base-type "human"}
+                                                   {:resource-type "lab-assistant-type" :base-type "human" :quantity {:units "person" :value-string "2"}}]
+                                             :comment (str "There is certainly more equipment required in a chemistry lab than just 'fume hood', but that resource alone should be sufficient\n"
+                                                           "to distinguish chemistry lab events from other kinds of other class events.")}
                            :periodicity {:interval {:units "week" :value-string "1"} :occurrences {:value-string "1"}}
                            :occurrence-assignment {:ts-type-refs ["Three-hour-lab"]}}
 
@@ -177,8 +191,15 @@
                                                   :ts-type-refs ["Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab"]}}
 
                           {:event-type-name {:val "spring-break" :comment "This is an example of a one-time event. It has no 'event-resources'; in this sense, it is a non-event!"}
+                           :event-resources {:val "none"
+                                             :comment (str "By the end of your interview, all event type objects should have 'event-type-name', 'event-resources', 'periodicity', and\n"
+                                                           "'occurrence-assignment'. Spring break does not require any resources, so we'll just say 'none' here.")}
                            :occurrence-assignment {:ts-type-refs {:val ["2025-03-17" "2025-03-18" "2025-03-19" "2025-03-20" "2025-03-21"]
-                                                                :comment "Instead of enumeration values, we put dates here."}}}]}
+                                                                  :comment "Instead of enumeration values, we put dates here."}}
+                           :periodicity {:val "none"
+                                         :comment (str "By the end of your interview, all event type objects should have 'event-type-name', 'event-resources', 'periodicity', and\n"
+                                                       "'occurrence-assignment'. Since in the context of one semester, spring break only occurs once, we'll just say 'none' here.\n"
+                                                       "By the way, we make things mandatory and allow 'none' so that we can check the data structure for completeness more thoroughly.")}}]}
 
       :timeslots [{:ts-type-id "Mon-Wed-Fri-60min"
                    :spans [{:span-id "Monday"    :periods  ["9:00-9:50" "10:00-10:50" "11:00-11:50" "13:00-13:50" "14:00-14:50" "15:00-15:50" "16:00-16:50"]}
@@ -200,16 +221,46 @@
                            {:span-id "Friday"    :periods  ["9:00-11:50" "13:00-15:50"]}]}]}})
 
 ;;; ------------------------------- checking for completeness ---------------
+
+;;; (-> ttable/timetabling :EADS eads-util/strip-annotations ttable/completeness-test)
+(defn completeness-test
+  "A timetabling DS is ds-complete? when (conjunctively):
+      - there is at least one event-type and all the event types have event-type-name, event-resources, periodicity, and occurrence-assignment,
+      - there is at least one value in timeslots and it has ts-type-id and and spans."
+  [eads]
+  (and (contains? eads :event-types)
+       (s/valid? ::event-types (:event-types eads))
+       (contains? eads :timeslots)
+       (s/valid? ::timeslots (:timeslots eads))))
+
+(defn ds-refine2ds
+  "Translate the argument DATA-STRUCTURE-REFINEMENT message to EADS."
+  [refine-msg]
+  (as-> refine-msg ?m
+    (:data-structure ?m)
+    (eads-util/strip-annotations ?m)
+    (if (contains? ?m :EADS-ref)
+      (assoc :EADS-id (:EADS-ref refine-msg))
+      ?m)
+    (dissoc ?m :EADS-ref)))
+
 (defmethod ds-complete? :process/timetabling
-  [eads-id ds]
-  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
-  true)
+  [refine-msg]
+  (let [ds (ds-refine2ds refine-msg)
+        complete? (completeness-test ds)]
+    (agent-log (str "This is the stripped DS for timetabling (complete? = " complete? "):\n" (with-out-str (pprint ds)))
+               {:console? true :elide-console 130})
+    (when-not (s/valid? ::EADS ds)
+      (agent-log (str "EADS is invalid:\n" (with-out-str (pprint ds)))
+                 {:console? true :level :warn :elide-console 130}))
+    complete?))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-timetabling
   []
   (if (s/valid? :timetabling/EADS-message timetabling)
     (when-not (db/same-EADS-instructions? timetabling)
+      (log! :info "Updating timetabling in resources and system DB.")
       (sutil/update-resources-EADS-json! timetabling)
       (db/put-EADS-instructions! timetabling))
     (throw (ex-info "Invalid EADS message (timetabling)." {}))))

@@ -85,9 +85,17 @@
 (defn dispatch-by-eads-id [obj]
   (cond (and (map? obj) (empty? obj))     :null-map
         (contains? obj :EADS-ref)         (:EADS-ref obj)
+        (contains? obj :EADS-id)          (:EADS-id  obj)
         :else  (throw (ex-info "Bad eads-id in dispatch for ds-complete?" {:obj obj}))))
 
 (defmulti ds-complete? #'dispatch-by-eads-id)
 
-(defmethod ds-complete? :null-map [& _]
-  false)
+(defmethod ds-complete? :null-map [& _] false)
+
+(defn strip-annotations
+  "Remove the annotations from the EADS."
+  [obj]
+  (cond (and (map? obj) (contains? obj :val) (contains? obj :comment))  (:val obj)
+        (map? obj)                                                      (reduce-kv (fn [m k v] (assoc m k (strip-annotations v))) {} obj)
+        (vector? obj)                                                   (mapv strip-annotations obj)
+        :else                                                           obj))

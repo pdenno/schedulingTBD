@@ -50,7 +50,7 @@
       (db/add-msg (merge {:pid pid :cid cid} msg)))
     (inv/analyze-response pid cid response)
     (do
-      (inv/tell-interviewer {:message-type "INTERVIEWEES-RESPOND"
+      (inv/tell-interviewer {:message-type :INTERVIEWEES-RESPOND
                              :response (:text response)} ctx)
       (ru/refresh-client client-id pid cid))))
 

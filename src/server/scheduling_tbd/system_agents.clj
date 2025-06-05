@@ -18,7 +18,7 @@
    :orchestrator-agent,
    {:base-type :orchestrator-agent,
     :model-class :gpt,
-    :instruction-path "agents/orchestrator.txt",
+    :instruction-path "resources/agents/orchestrator.txt",
     ;; The vector store includes all the EADS instructions for interviewers.
     :tools "[{:type \"file_search\"}]"
     :vector-store-paths (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "resources/agents/iviewrs/EADS/" %)))
@@ -147,20 +147,6 @@
 
 (def actual-agents-and-bases
   (-> system-agents-and-bases add-iviewrs-instructions add-agent-id drop-non-agent-keys keys-in-agent-ns))
-
-;;; (sa/force-new-system-agent! :data-interview-agent (get sa/actual-agents-and-bases :data-interview-agent))
-#_(defn force-new-system-agent!
-  "Put the agent in the DB and add an assistant to it."
-  [agent-id agent-map]
-  (db/put-agent! agent-id agent-map)
-  (let [agent-map (cond-> agent-map
-                    (-> agent-map :tools string?)   (assoc :tools (-> agent-map :tools edn/read-string)))
-        aid (adb/get-llm-assistant-id agent-map)]
-    (if (string? aid)
-      (if-let [eid (db/agent-exists? agent-id)]
-        (d/transact (connect-atm :system) {:tx-data [{:db/id eid :agent/assistant-id aid}]})
-        (log! :error (str "Could not find system db eid for " agent-id)))
-      (log! :error (str "Could not create assistant-id for " agent-id)))))
 
 ;;; (sa/force-new-system-agent! :data-interview-agent (get sa/actual-agents-and-bases :data-interview-agent))
 (defn force-new-system-agent!

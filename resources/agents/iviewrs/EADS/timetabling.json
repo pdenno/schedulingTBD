@@ -31,6 +31,9 @@
               "modifier" : "up to"
             }
           }, {
+            "resource-type" : "chalk-board",
+            "base-type" : "equipment"
+          }, {
             "resource-type" : "instructor-type",
             "base-type" : "human"
           } ]
@@ -80,21 +83,34 @@
           "constraints" : [ "same-time", "different-days" ]
         }
       }, {
-        "event-type-name" : "lab-class",
-        "event-resources" : [ {
-          "resource-type" : "room-type-lab",
-          "base-type" : "place"
-        }, {
-          "resource-type" : "student-type",
-          "base-type" : "human"
-        }, {
-          "resource-type" : "lab-assistant-type",
-          "base-type" : "human",
-          "quantity" : {
-            "units" : "person",
-            "value-string" : "2"
-          }
-        } ],
+        "event-type-name" : "chem-lab-class",
+        "event-resources" : {
+          "val" : [ {
+            "resource-type" : "room-type-chem-lab",
+            "base-type" : "place"
+          }, {
+            "resource-type" : "fume hood",
+            "base-type" : "equipment",
+            "quantity" : {
+              "value-string" : "10",
+              "units" : "instances"
+            }
+          }, {
+            "resource-type" : "student-type",
+            "base-type" : "human"
+          }, {
+            "resource-type" : "student-type",
+            "base-type" : "human"
+          }, {
+            "resource-type" : "lab-assistant-type",
+            "base-type" : "human",
+            "quantity" : {
+              "units" : "person",
+              "value-string" : "2"
+            }
+          } ],
+          "comment" : "There is certainly more equipment required in a chemistry lab than just 'fume hood', but that resource alone should be sufficient\nto distinguish chemistry lab events from other kinds of other class events."
+        },
         "periodicity" : {
           "interval" : {
             "units" : "week",
@@ -138,11 +154,19 @@
           "val" : "spring-break",
           "comment" : "This is an example of a one-time event. It has no 'event-resources'; in this sense, it is a non-event!"
         },
+        "event-resources" : {
+          "val" : "none",
+          "comment" : "By the end of your interview, all event type objects should have 'event-type-name', 'event-resources', 'periodicity', and\n'occurrence-assignment'. Spring break does not require any resources, so we'll just say 'none' here."
+        },
         "occurrence-assignment" : {
           "ts-type-refs" : {
             "val" : [ "2025-03-17", "2025-03-18", "2025-03-19", "2025-03-20", "2025-03-21" ],
             "comment" : "Instead of enumeration values, we put dates here."
           }
+        },
+        "periodicity" : {
+          "val" : "none",
+          "comment" : "By the end of your interview, all event type objects should have 'event-type-name', 'event-resources', 'periodicity', and\n'occurrence-assignment'. Since in the context of one semester, spring break only occurs once, we'll just say 'none' here.\nBy the way, we make things mandatory and allow 'none' so that we can check the data structure for completeness more thoroughly."
         }
       } ]
     },

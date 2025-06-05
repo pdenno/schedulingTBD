@@ -75,11 +75,14 @@
 (defn agent-log
   "Log info-string to agent log"
   ([msg-text] (agent-log msg-text {}))
-  ([msg-text {:keys [console? level] :or {level :info}}]
+  ([msg-text {:keys [console? level elide-console] :or {level :info}}]
    (tel/with-kind-filter {:allow :agents}
      (tel/signal!
       {:kind :agents, :level :info, :msg msg-text}))
-   (when console? (log! level msg-text))))
+   (when console? (log! level
+                        (if elide-console
+                          (sutil/elide msg-text elide-console)
+                          msg-text)))))
 
 (defn agent-db2proj
   "Return a map of agent info translated to project attributes (aid, tid, base-type, expertise, surrogate?)."

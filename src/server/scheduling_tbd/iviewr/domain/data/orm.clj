@@ -5,12 +5,14 @@
    Therefore, our plan is to use data to demonstrate the operation of the scheduling systems first, and worry about mapping their
    (possibly messy and illogical) spreadsheets into the scheduling systems later."
   (:require
-   [clojure.spec.alpha                    :as s]
-   [mount.core                            :as mount :refer [defstate]]
-   [scheduling-tbd.db                     :as db]
-   [scheduling-tbd.iviewr.eads-util       :refer [ds-complete?]]
-   [scheduling-tbd.sutil                  :as sutil :refer [clj2json-pretty]]
-   [taoensso.telemere                     :as tel :refer [log!]]))
+   [clojure.pprint                   :refer [pprint]]
+   [clojure.spec.alpha               :as s]
+   [mount.core                       :as mount :refer [defstate]]
+   [scheduling-tbd.agent-db          :refer [agent-log]]
+   [scheduling-tbd.db                :as db]
+   [scheduling-tbd.sutil             :as sutil]
+   [scheduling-tbd.iviewr.eads-util  :as eads-util :refer [ds-complete?]]
+   [taoensso.telemere                :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -26,7 +28,7 @@
 ;;; (dutil/make-specs datab/orm "orm")
 ;;; Created Wed May 21 11:09:18 EDT 2025 using develop.dutil/make-spec.
  (s/def ::exhausted? (s/or :normal :exhausted?/val :annotated ::annotated-exhausted?))
- (s/def :exhausted?/val string?)
+ (s/def :exhausted?/val boolean?)
  (s/def ::annotated-exhausted? (s/keys :req-un [::comment :exhausted?/val]))
  (s/def ::inquiry-areas (s/or :normal :inquiry-areas/val :annotated ::annotated-inquiry-areas))
  (s/def :inquiry-areas/val (s/coll-of ::inquiry-area :kind vector?))
@@ -188,8 +190,8 @@
           "Good luck!")
      :EADS
      {:EADS-id :data/orm
-      :exhausted? {:val "false"
-                   :comment "You don't need to specify this property until you are ready to set its value to true, signifying that you believe that all areas of inquiry have been sufficiently investigated."}
+      :exhausted? {:val false
+                   :comment "You don't need to specify this property until you are ready to set its value to true, signifying that you believe that all areas of inquiry have been sufficiently investigated.\n"}
       :inquiry-areas
       [{:inquiry-area-ref {:val "customer-orders"
                            :comment (str "'customer-orders' is a value in an enumeration of areas of inquiry. The enumeration values are defined as follows:\n"
@@ -209,7 +211,13 @@
                                          "This enumeration might be incomplete. Whenever nothing here seems to fit, create another term and define it with an annotation comment."
                                          "\n"
                                          "When Task 1 is completed but you have not yet started Task 2a on any fact types, the 'inquiry-areas' property will contain a list of simple objects such as "
-                                         (clj2json-pretty {:inquiry-area-ref "customer-orders"}) " " (clj2json-pretty {:inquiry-area-ref "WIP"}) " and so on.")}
+                                         (clj2json-pretty {:inquiry-area-ref "customer-orders"}) " " (clj2json-pretty {:inquiry-area-ref "WIP"}) " and so on.\n\n"
+                                         "It is important to keep in mind that we are developing the scheduling system incrementally.\n"
+                                         "The first few versions of it might be rudimentary and incomplete. This is intentional! We want to show the humans how MiniZinc works using these rudimentary versions.\n"
+                                         "How this affects your work is that, unless you have been specifically told otherwise, you should limit discussion to areas of inquiry that you think are essential to\n"
+                                         "creating the simplest complete scheduling system. Therefore, unless you have been specifically told otherwise, you should not encourage discussion of WIP, finished-goods,\n"
+                                         "facilities, and holidays (and others that might come to mind to you or the interviewees). But this is just a rule-of-thumb; use your best judgment.")}
+
         :inquiry-area-objects
         {:comment (str "This property provides a list of objects (in the JSON sense) where each object names an object in the ORM sense (entities) and provides a definition for it.\n"
                        "These represent the relevant entities of the universe of discourse of the area of inquiry.")
@@ -284,16 +292,41 @@
                                         ["EN-891" "EDM machines"    "2023-03-28"]]}}]}]}})
 
 ;;; ------------------------------- checking for completeness ---------------
+;;; (-> orm/orm :EADS eads-util/strip-annotations orm/completeness-test)
+(defn completeness-test
+  "The ORM ds is complete when the interviewer sets :exhausted to true.
+   We trust the interviewer on this one."
+  [eads]
+  (:exhausted? eads))
+
+(defn ds-refine2ds
+  "Translate the argument DATA-STRUCTURE-REFINEMENT message to EADS."
+  [refine-msg]
+  (as-> refine-msg ?m
+    (:data-structure ?m)
+    (eads-util/strip-annotations ?m)
+    (if (contains? ?m :EADS-ref)
+      (assoc :EADS-id (:EADS-ref refine-msg))
+      ?m)
+    (dissoc ?m :EADS-ref)))
+
 (defmethod ds-complete? :data/orm
-  [eads-id ds]
-  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
-  true)
+  [refine-msg]
+  (let [ds (ds-refine2ds refine-msg)
+        complete? (completeness-test ds)]
+    (agent-log (str "This is the stripped DS for ORM (complete? = " complete? "):\n" (with-out-str (pprint ds)))
+               {:console? true :elide-console 130})
+    (when-not (s/valid? ::EADS ds)
+      (agent-log (str "EADS is invalid:\n" (with-out-str (pprint ds)))
+                 {:console? true :level :warn :elide-console 130}))
+    complete?))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-orm
   []
   (if (s/valid? :orm/EADS-message orm)
     (when-not (db/same-EADS-instructions? orm)
+      (log! :info "Updating orm in resources and system DB.")
       (sutil/update-resources-EADS-json! orm)
       (db/put-EADS-instructions! orm))
     (throw (ex-info "Invalid EADS message (orm)." {}))))
