@@ -1,13 +1,17 @@
 (ns scheduling-tbd.iviewr.domain.process.timetabling
   (:require
+   [clojure.edn              :as edn]
    [clojure.pprint           :refer [pprint]]
    [clojure.spec.alpha       :as s]
+   [datahike.api             :as d]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.agent-db  :refer [agent-log]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil]
    [scheduling-tbd.iviewr.eads-util :as eads-util :refer [ds-complete?]]
    [taoensso.telemere        :refer [log!]]))
+
+(def ^:diag diag (atom nil))
 
 ;;; ToDo. We need a separate spec repository for each EADS, or better naming in order to avoid name collisions.
 ;;;       Better naming: for example, preface all namespaces like 'units' with 'tt'. 'tt-units'.
@@ -221,6 +225,21 @@
                            {:span-id "Friday"    :periods  ["9:00-11:50" "13:00-15:50"]}]}]}})
 
 ;;; ------------------------------- checking for completeness ---------------
+(defn combine-eads
+  "Combine EADS favoring recent over earlier versions.
+   This looks at all the timetabling data structure refinements that are in the DB at time of invocation."
+  [pid]
+  (let [msgs (->> (d/q '[:find ?ds ?id
+                        :keys ds msg-id
+                        :where
+                        [?e :message/EADS-data-structure ?ds]
+                        [?e :message/id ?id]]
+                       @(sutil/connect-atm pid))
+                  (map #(update % :ds edn/read-string))
+                  (filter #(= (-> % :ds :EADS-ref) :process/timetabling))
+                  (map #(update % :ds eads-util/strip-annotations)))]
+    msgs))
+
 
 ;;; (-> ttable/timetabling :EADS eads-util/strip-annotations ttable/completeness-test)
 (defn completeness-test
@@ -251,6 +270,7 @@
     (agent-log (str "This is the stripped DS for timetabling (complete? = " complete? "):\n" (with-out-str (pprint ds)))
                {:console? true :elide-console 130})
     (when-not (s/valid? ::EADS ds)
+      (reset! diag timetabling)
       (agent-log (str "EADS is invalid:\n" (with-out-str (pprint ds)))
                  {:console? true :level :warn :elide-console 130}))
     complete?))

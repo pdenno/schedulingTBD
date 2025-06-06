@@ -17,7 +17,7 @@
 (def ^:diag diag (atom nil))
 
 (s/def :orm/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
-(s/def ::EADS (s/keys :req-un [::EADS-id ::exhausted? ::inquiry-areas]))
+(s/def ::EADS (s/keys :req-un [::EADS-id ::exhausted? ::inquiry-areas ::areas-we-intend-to-discuss]))
 (s/def ::EADS-id #(= % :data/orm))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
 (s/def ::interview-objective string?)
@@ -27,63 +27,66 @@
 
 ;;; (dutil/make-specs datab/orm "orm")
 ;;; Created Wed May 21 11:09:18 EDT 2025 using develop.dutil/make-spec.
- (s/def ::exhausted? (s/or :normal :exhausted?/val :annotated ::annotated-exhausted?))
- (s/def :exhausted?/val boolean?)
- (s/def ::annotated-exhausted? (s/keys :req-un [::comment :exhausted?/val]))
- (s/def ::inquiry-areas (s/or :normal :inquiry-areas/val :annotated ::annotated-inquiry-areas))
- (s/def :inquiry-areas/val (s/coll-of ::inquiry-area :kind vector?))
- (s/def ::inquiry-area (s/keys :req-un [::fact-types ::inquiry-area-objects ::inquiry-area-ref]))
- (s/def ::annotated-inquiry-areas (s/keys :req-un [::comment :inquiry-areas/val]))
- (s/def ::fact-types (s/or :normal :fact-types/val :annotated ::annotated-fact-types))
- (s/def :fact-types/val (s/coll-of ::fact-type :kind vector?))
- (s/def ::fact-type (s/keys :req-un [::fact-type-id ::objects ::reference-modes ::uniqueness ::examples ::arity] :opt-un [::deontic-keys]))
- (s/def ::annotated-fact-types (s/keys :req-un [::comment :fact-types/val]))
- (s/def ::inquiry-area-objects (s/or :normal :inquiry-area-objects/val :annotated ::annotated-inquiry-area-objects))
- (s/def :inquiry-area-objects/val (s/coll-of ::inquiry-area-object :kind vector?))
- (s/def ::inquiry-area-object (s/keys :req-un [::definition ::object-id]))
- (s/def ::annotated-inquiry-area-objects (s/keys :req-un [::comment :inquiry-area-objects/val]))
- (s/def ::inquiry-area-ref (s/or :normal :inquiry-area-ref/val :annotated ::annotated-inquiry-area-ref))
- (s/def :inquiry-area-ref/val string?)
- (s/def ::annotated-inquiry-area-ref (s/keys :req-un [::comment :inquiry-area-ref/val]))
- (s/def ::arity (s/or :normal :arity/val :annotated ::annotated-arity))
- (s/def :arity/val number?)
- (s/def ::annotated-arity (s/keys :req-un [::comment :arity/val]))
- (s/def ::deontic-keys (s/or :normal :deontic-keys/val :annotated ::annotated-deontic-keys))
- (s/def :deontic-keys/val (s/coll-of ::deontic-key :kind vector?))
- (s/def ::deontic-key string?)
- (s/def ::annotated-deontic-keys (s/keys :req-un [::comment :deontic-keys/val]))
- (s/def ::examples (s/or :normal :examples/val :annotated ::annotated-examples))
- (s/def :examples/val (s/keys :req-un [::column-headings ::rows]))
- (s/def ::annotated-examples (s/keys :req-un [::comment :examples/val]))
- (s/def ::fact-type-id (s/or :normal :fact-type-id/val :annotated ::annotated-fact-type-id))
- (s/def :fact-type-id/val string?)
- (s/def ::annotated-fact-type-id (s/keys :req-un [::comment :fact-type-id/val]))
- (s/def ::objects (s/or :normal :objects/val :annotated ::annotated-objects))
- (s/def :objects/val (s/coll-of ::object :kind vector?))
- (s/def ::object string?)
- (s/def ::annotated-objects (s/keys :req-un [::comment :objects/val]))
- (s/def ::reference-modes (s/or :normal :reference-modes/val :annotated ::annotated-reference-modes))
- (s/def :reference-modes/val (s/coll-of ::reference-mode :kind vector?))
- (s/def ::reference-mode string?)
- (s/def ::annotated-reference-modes (s/keys :req-un [::comment :reference-modes/val]))
- (s/def ::uniqueness (s/or :normal :uniqueness/val :annotated ::annotated-uniqueness))
- (s/def :uniqueness/val (s/coll-of ::uniquenes :kind vector?)) ; Odd name, but we'll run with it!
- (s/def ::uniquenes (s/coll-of string? :kind vector?)) ; We wrote this one by hand (vector of vectors)
- (s/def ::annotated-uniqueness (s/keys :req-un [::comment :uniqueness/val]))
- (s/def ::definition (s/or :normal :definition/val :annotated ::annotated-definition))
- (s/def :definition/val string?)
- (s/def ::annotated-definition (s/keys :req-un [::comment :definition/val]))
- (s/def ::object-id (s/or :normal :object-id/val :annotated ::annotated-object-id))
- (s/def :object-id/val string?)
- (s/def ::annotated-object-id (s/keys :req-un [::comment :object-id/val]))
- (s/def ::column-headings (s/or :normal :column-headings/val :annotated ::annotated-column-headings))
- (s/def :column-headings/val (s/coll-of ::column-heading :kind vector?))
- (s/def ::column-heading string?)
- (s/def ::annotated-column-headings (s/keys :req-un [::comment :column-headings/val]))
- (s/def ::rows (s/or :normal :rows/val :annotated ::annotated-rows))
- (s/def :rows/val (s/coll-of ::row :kind vector?))
- (s/def ::row (s/coll-of string? :kind vector?)) ; We wrote this one by hand (vector of vectors).
- (s/def ::annotated-rows (s/keys :req-un [::comment :rows/val]))
+(s/def ::exhausted? (s/or :normal :exhausted?/val :annotated ::annotated-exhausted?))
+(s/def :exhausted?/val boolean?)
+(s/def ::annotated-exhausted? (s/keys :req-un [::comment :exhausted?/val]))
+(s/def ::areas-we-intend-to-discuss (s/or :normal :areas-we-intend-to-discuss/val :annotated ::annotated-areas-we-intend-to-discuss))
+(s/def :areas-we-intend-to-discuss/val (s/coll-of string? :kind vector?))
+(s/def ::annotated-areas-we-intend-to-discuss (s/keys :req-un [::comment :areas-we-intend-to-discuss/val]))
+(s/def ::inquiry-areas (s/or :normal :inquiry-areas/val :annotated ::annotated-inquiry-areas))
+(s/def :inquiry-areas/val (s/coll-of ::inquiry-area :kind vector?))
+(s/def ::inquiry-area (s/keys :req-un [::fact-types ::inquiry-area-objects ::inquiry-area-ref]))
+(s/def ::annotated-inquiry-areas (s/keys :req-un [::comment :inquiry-areas/val]))
+(s/def ::fact-types (s/or :normal :fact-types/val :annotated ::annotated-fact-types))
+(s/def :fact-types/val (s/coll-of ::fact-type :kind vector?))
+(s/def ::fact-type (s/keys :req-un [::fact-type-id ::objects ::reference-modes ::uniqueness ::examples ::arity] :opt-un [::deontic-keys]))
+(s/def ::annotated-fact-types (s/keys :req-un [::comment :fact-types/val]))
+(s/def ::inquiry-area-objects (s/or :normal :inquiry-area-objects/val :annotated ::annotated-inquiry-area-objects))
+(s/def :inquiry-area-objects/val (s/coll-of ::inquiry-area-object :kind vector?))
+(s/def ::inquiry-area-object (s/keys :req-un [::definition ::object-id]))
+(s/def ::annotated-inquiry-area-objects (s/keys :req-un [::comment :inquiry-area-objects/val]))
+(s/def ::inquiry-area-ref (s/or :normal :inquiry-area-ref/val :annotated ::annotated-inquiry-area-ref))
+(s/def :inquiry-area-ref/val string?)
+(s/def ::annotated-inquiry-area-ref (s/keys :req-un [::comment :inquiry-area-ref/val]))
+(s/def ::arity (s/or :normal :arity/val :annotated ::annotated-arity))
+(s/def :arity/val number?)
+(s/def ::annotated-arity (s/keys :req-un [::comment :arity/val]))
+(s/def ::deontic-keys (s/or :normal :deontic-keys/val :annotated ::annotated-deontic-keys))
+(s/def :deontic-keys/val (s/coll-of ::deontic-key :kind vector?))
+(s/def ::deontic-key string?)
+(s/def ::annotated-deontic-keys (s/keys :req-un [::comment :deontic-keys/val]))
+(s/def ::examples (s/or :normal :examples/val :annotated ::annotated-examples))
+(s/def :examples/val (s/keys :req-un [::column-headings ::rows]))
+(s/def ::annotated-examples (s/keys :req-un [::comment :examples/val]))
+(s/def ::fact-type-id (s/or :normal :fact-type-id/val :annotated ::annotated-fact-type-id))
+(s/def :fact-type-id/val string?)
+(s/def ::annotated-fact-type-id (s/keys :req-un [::comment :fact-type-id/val]))
+(s/def ::objects (s/or :normal :objects/val :annotated ::annotated-objects))
+(s/def :objects/val (s/coll-of ::object :kind vector?))
+(s/def ::object string?)
+(s/def ::annotated-objects (s/keys :req-un [::comment :objects/val]))
+(s/def ::reference-modes (s/or :normal :reference-modes/val :annotated ::annotated-reference-modes))
+(s/def :reference-modes/val (s/coll-of ::reference-mode :kind vector?))
+(s/def ::reference-mode string?)
+(s/def ::annotated-reference-modes (s/keys :req-un [::comment :reference-modes/val]))
+(s/def ::uniqueness (s/or :normal :uniqueness/val :annotated ::annotated-uniqueness))
+(s/def :uniqueness/val (s/coll-of ::uniquenes :kind vector?)) ; Odd name, but we'll run with it!
+(s/def ::uniquenes (s/coll-of string? :kind vector?)) ; We wrote this one by hand (vector of vectors)
+(s/def ::annotated-uniqueness (s/keys :req-un [::comment :uniqueness/val]))
+(s/def ::definition (s/or :normal :definition/val :annotated ::annotated-definition))
+(s/def :definition/val string?)
+(s/def ::annotated-definition (s/keys :req-un [::comment :definition/val]))
+(s/def ::object-id (s/or :normal :object-id/val :annotated ::annotated-object-id))
+(s/def :object-id/val string?)
+(s/def ::annotated-object-id (s/keys :req-un [::comment :object-id/val]))
+(s/def ::column-headings (s/or :normal :column-headings/val :annotated ::annotated-column-headings))
+(s/def :column-headings/val (s/coll-of ::column-heading :kind vector?))
+(s/def ::column-heading string?)
+(s/def ::annotated-column-headings (s/keys :req-un [::comment :column-headings/val]))
+(s/def ::rows (s/or :normal :rows/val :annotated ::annotated-rows))
+(s/def :rows/val (s/coll-of ::row :kind vector?))
+(s/def ::row (s/coll-of string? :kind vector?)) ; We wrote this one by hand (vector of vectors).
+(s/def ::annotated-rows (s/keys :req-un [::comment :rows/val]))
 
 (def orm
     {:message-type :EADS-INSTRUCTIONS
@@ -175,10 +178,16 @@
           "   'To get started, could you list the kinds of data that you use to schedule production?\n"
           "    For example, do you have speadsheets containing customer orders, raw material delivery, process plans, materials on hand, task durations, worker skills, etc.?\n"
           "\n"
+          "Given the response from this, you can set the 'areas-we-intend-to-discuss' property to a list of strings naming what areas the interviewees' response suggest are important to discuss.\n"
+          "\n"
           "You can then discuss each area of inquiry they mention (repeating Task 2a and Task 2b for each fact type of the area of inquiry) in whatever order you deem appropriate."
           "When you have completed the detailed discussion of every area of inquiry they have thus far mentioned, you should ask them whether there is yet more areas to discuss.\n"
           "If they mention more, continue to apply the three tasks until all areas are discussed.\n"
           "The EADS has a property, 'exhausted?', you should set to true when you believe this interview can be concluded.\n"
+          "\n"
+          "You have a choice as to how you communicate back to us in DATA-STRUCTURE-REFINEMENT (DSR) messages: you can accummulate results from several inquiry areas into one ever-growing DSR message, or\n"
+          "(probably easier for you) you can limit what is a DSR message to just one or a few inquiry areas (thue one or a few elements in the :areas-we-intend-to-discuss.\n"
+          "Just be sure to only set 'exhausted?' to true when you are finished with the last inquiry that you planned to discuss.\n"
           "\n"
           "ORM is designed to encourage verbalization of fact types.\n"
           "We encourage you to use such verbalizations in Task 2a as follow-up questions when the interviewees' response leaves you uncertain what fact type is intended.\n"
@@ -192,6 +201,7 @@
      {:EADS-id :data/orm
       :exhausted? {:val false
                    :comment "You don't need to specify this property until you are ready to set its value to true, signifying that you believe that all areas of inquiry have been sufficiently investigated.\n"}
+      :areas-we-intend-to-discuss ["customer-orders", "workforce"]
       :inquiry-areas
       [{:inquiry-area-ref {:val "customer-orders"
                            :comment (str "'customer-orders' is a value in an enumeration of areas of inquiry. The enumeration values are defined as follows:\n"
@@ -317,6 +327,7 @@
     (agent-log (str "This is the stripped DS for ORM (complete? = " complete? "):\n" (with-out-str (pprint ds)))
                {:console? true :elide-console 130})
     (when-not (s/valid? ::EADS ds)
+      (reset! diag orm)
       (agent-log (str "EADS is invalid:\n" (with-out-str (pprint ds)))
                  {:console? true :level :warn :elide-console 130}))
     complete?))
@@ -326,7 +337,7 @@
   []
   (if (s/valid? :orm/EADS-message orm)
     (when-not (db/same-EADS-instructions? orm)
-      (log! :info "Updating orm in resources and system DB.")
+      (log! :info "Updating orm in resources and system DB.") ; You won't see this!
       (sutil/update-resources-EADS-json! orm)
       (db/put-EADS-instructions! orm))
     (throw (ex-info "Invalid EADS message (orm)." {}))))

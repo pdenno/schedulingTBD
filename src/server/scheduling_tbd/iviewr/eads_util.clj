@@ -93,9 +93,19 @@
 (defmethod ds-complete? :null-map [& _] false)
 
 (defn strip-annotations
-  "Remove the annotations from the EADS."
+  "Transfom the EADS argument in the following ways:
+     1) Replace {:val v :comment c} maps with v.
+     2) Remove property :comment wherever it occurs.
+     3) Remove property :invented.
+   This is typically used to make s/valid?-dation easier."
   [obj]
-  (cond (and (map? obj) (contains? obj :val) (contains? obj :comment))  (:val obj)
-        (map? obj)                                                      (reduce-kv (fn [m k v] (assoc m k (strip-annotations v))) {} obj)
-        (vector? obj)                                                   (mapv strip-annotations obj)
-        :else                                                           obj))
+  (cond (and (map? obj)
+             (contains? obj :val)
+             (contains? obj :comment))          (:val obj)
+        (map? obj)                              (reduce-kv (fn [m k v]
+                                                             ;; Sometimes interviewers think we allow comment like this; we don't!
+                                                             (if (#{:comment :invented} k)
+                                                               m
+                                                               (assoc m k (strip-annotations v)))) {} obj)
+        (vector? obj)                           (mapv strip-annotations obj)
+        :else                                    obj))

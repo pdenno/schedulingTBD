@@ -10,6 +10,7 @@
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.iviewr.eads] ; for mount
+   [scheduling-tbd.iviewr.eads-util :as eads-util]
    [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide output-struct2clj]]
    [taoensso.telemere             :as tel :refer [log!]]))
 
@@ -72,7 +73,6 @@
   "Iterate through the activities and just before changing to new pursuing-EADS add the
    datastructure for the last one."
   [pid cid activities]
-  (reset! diag activities)
   (let [eads-max-ds-map (max-ds pid cid)
         result (atom [])
         current-eads (atom nil)]
@@ -81,7 +81,7 @@
                 (reset! diag {:eads _diag :eads-id eads-id})
                 {:resulting-EADS
                  (cond-> {:EADS-ref EADS-ref ; This is the arrangement in orchestrator.txt (agent instructions)
-                          :data-structure (clj2json-pretty data-structure)}
+                          :data-structure data-structure #_(eads-util/strip-annotations data-structure)} ; Jury is out on whether to strip.
                    commit-notes (assoc :commit-notes commit-notes)
                    exhausted?   (assoc :exhausted? true))}))]
       (doseq [act activities]
@@ -222,7 +222,7 @@
               (contains? res :message-type)              (update :message-type keyword)
               (= (:message-type res) :PURSUE-EADS)       (update :EADS-id keyword))]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
-    (agent-log (str "[ork manager] (receives response form ork)\n" (with-out-str (pprint res))))
+    (agent-log (str "[ork manager] (receives response from ork)\n" (with-out-str (pprint res))))
     res))
 
 (defn get-new-EADS-id
@@ -240,9 +240,10 @@
       (agent-log "Project's ork thread has been updated; provide comprehensive history."
                  {:console? true :level :warn}))
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
-    (let [pursue-msg (tell-ork (conversation-history pid) ork)
+    (let [pursue-msg (tell-ork (conversation-history pid) ork) ; conversation-history defaults to :all (all cids).
           eads-instructions-id (-> pursue-msg :EADS-id keyword)]
       (if ((-> (db/list-system-EADS) set) eads-instructions-id)
         eads-instructions-id
         ;; Otherwise probably :exhausted. Return nil
-        (agent-log (str "PURSUE-EADS message: " pursue-msg) {:console? true :level :info})))))
+        (do (agent-log (str "Exhausted or invalid PURSUE-EADS message: " pursue-msg) {:console? true :level :info})
+            (throw (ex-info "Exhausted or invalid PURSUE-EADS message:" {:pursue-msg pursue-msg})))))))

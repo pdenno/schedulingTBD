@@ -278,8 +278,19 @@ The EXAMPLE INTERACTIONS above used CONVERSATION-HISTORY, PURSUE-EADS but not BA
 This, as we have seen above, is a response from you to us for our CONVERSATION-HISTORY request.
 The only property of this message type is:
     'EADS-id' - which provides the name of one of the EADS structures in your vector store.
-    The value you choose for this property is the key response from you!
     This is where you use your understanding of scheduling, operations research and the conversations occurring!
+    The value you choose for this property is the key response from you!
+    The only values you can provide for EADS-id are strings in the property 'EADS-id' in the object in the 'EADS' property of the JSON object in the file.
+    Currently, these are:
+    "process/job-shop-unique"
+    "process/job-shop--classifiable"
+    "process/scheduling-problem-type"
+    "process/flow-shop"
+    "process/job-shop--unique"
+    "process/job-shop"
+    "process/timetabling", and 
+    "ata/orm".
+
 
 2) CONVERSATION-HISTORY
 

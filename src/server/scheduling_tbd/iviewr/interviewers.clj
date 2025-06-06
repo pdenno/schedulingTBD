@@ -167,15 +167,16 @@
 
 (defn tell-interviewer
   "Send a message to an interviewer agent and wait for response; translate it.
-   :aid and :tid in the ctx should be for the interviewer agent."
-  [msg {:keys [interviewer-agent cid] :as ctx}]
+   :aid and :tid in the opts should be for the interviewer agent."
+  [msg {:keys [interviewer-agent cid] :as opts}]
+  (reset! diag {:msg msg :opts opts})
   (too-many-course-corrections! msg)
   (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
   (agent-log (str "[interview manager] (tells " (name cid) " interviewer)\n" (with-out-str (pprint msg))))
   (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
   (let [msg-string (ches/generate-string msg {:pretty true})
-        res (-> (adb/query-agent interviewer-agent msg-string ctx) output-struct2clj)
+        res (-> (adb/query-agent interviewer-agent msg-string opts) output-struct2clj)
         res (cond-> res
               (contains? res :message-type)     (update :message-type keyword))]
     (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
@@ -602,7 +603,12 @@
                     (tell-interviewer (db/get-EADS-instructions new-eads-id) ctx))
                   (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                         expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
-                        iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response} ctx)]
+                        ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
+                        iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
+                                                          {:interviewer-agent (:interviewer-agent ctx)
+                                                           :cid cid
+                                                           :tries 2
+                                                           :test-fn output-struct2clj})]
                     (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
                     (update-db-conversation! pid cid conversation)
                     (post-ui-actions  iviewr-response ctx)  ; show graphs and tables, tell humans to switch conv.

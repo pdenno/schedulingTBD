@@ -37,7 +37,7 @@
    {:base-type  :data-interview-agent
     :cid :data
     :iviewr-name "Data Interviewer"
-    :focus "data they use in their work."
+    :focus "data they use in their work. You mostly work with the data/orm EADS instructions."
     :warm-up-question (str "To get started, please provide a short overview (a few sentences) about the data you use to do your work.\n"
                            "Typically, and especially in small businesses, information about customer orders, inventory, resources used to do the work, etc. are maintained in spreadsheets.\n"
                            "It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion.\n"
@@ -148,9 +148,11 @@
 (def actual-agents-and-bases
   (-> system-agents-and-bases add-iviewrs-instructions add-agent-id drop-non-agent-keys keys-in-agent-ns))
 
+;;;
 ;;; (sa/force-new-system-agent! :data-interview-agent (get sa/actual-agents-and-bases :data-interview-agent))
 (defn force-new-system-agent!
-  "Put the agent in the DB and add an assistant to it."
+  "Put the agent in the DB and add an assistant to it.
+   agent-map is 'agent' name-space qualified."
   [agent-id agent-map]
   (let [agent-map (cond-> agent-map
                     (-> agent-map :agent/tools string?)
