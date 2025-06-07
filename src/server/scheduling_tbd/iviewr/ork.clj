@@ -170,42 +170,6 @@
       (ck obj))
     @result-atm))
 
-(def EADS-ignore-keys "Ignore these in comparing EADS to a data structure"  #{:comment :val :EADS-id})
-
-;;; ToDo: At some point I hope to use the spec (or Malli) but for now I look at the EADS and see if there are values for all properties SOMEWHERE in the data structure.
-;;; ToDo: More thoughts on the above ToDo: It might be valuable to list what keys are optional. The specs can do this, of course, but can I use them?
-;;;       This would also be
-;;;(ork/eads-complete :plate-glass-ork :process
-(defn EADS-complete?
-  "Check whether the argument eads is complete.
-   Some interviewers are instructed to set a property 'exhausted?' to true (e.g. the orm interviewer does this),
-   for other we check that all the properties of the EADS are used somewhere in the data structure."
-  [pid cid eads-id]
-  (let [most-recent-ds (when-let [dstructs (not-empty (db/get-EADS-ds pid cid))]
-                         (as-> dstructs ?d
-                           (apply max-key :message/id ?d)
-                           (:message/EADS-data-structure ?d)
-                           (edn/read-string ?d)))]
-    (if (:exhausted? most-recent-ds) ; Only some have this; not to be confused with ork use of :exhausted?
-      true
-      (let [ds-eads-ref (:EADS-ref most-recent-ds)
-            ds-keys (collect-keys most-recent-ds)
-            eads-keys (-> (d/q '[:find ?str .
-                                 :in $ ?eads-id
-                                 :where
-                                 [?e :EADS/id ?eads-id]
-                                 [?e :EADS/msg-str ?str]]
-                               @(connect-atm :system) eads-id)
-                          edn/read-string
-                          collect-keys)]
-        (when-not (= eads-id ds-eads-ref) ; Sometimes it just forgets to include this; not much of a problem.
-          (reset! diag {:eads-id eads-id :ds-eads-ref ds-eads-ref :most-recent-ds most-recent-ds})
-          (log! :warn (str "Argument eads-id, " eads-id " does not match that of data structure, " ds-eads-ref)))
-        (-> eads-keys
-            (set/difference ds-keys)
-            (set/difference EADS-ignore-keys)
-            empty?)))))
-
 (s/def ::ork-msg map?) ; ToDo: Write specs for ork messages.
 
 (defn tell-ork
@@ -242,7 +206,7 @@
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
     (let [pursue-msg (tell-ork (conversation-history pid) ork) ; conversation-history defaults to :all (all cids).
           eads-instructions-id (-> pursue-msg :EADS-id keyword)]
-      (if ((-> (db/list-system-EADS) set) eads-instructions-id)
+      (if ((db/system-EADS?) eads-instructions-id)
         eads-instructions-id
         ;; Otherwise probably :exhausted. Return nil
         (do (agent-log (str "Exhausted or invalid PURSUE-EADS message: " pursue-msg) {:console? true :level :info})

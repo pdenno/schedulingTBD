@@ -17,7 +17,8 @@
 (def ^:diag diag (atom nil))
 
 (s/def :orm/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
-(s/def ::EADS (s/keys :req-un [::EADS-id ::exhausted? ::inquiry-areas ::areas-we-intend-to-discuss]))
+(s/def ::EADS (s/keys :req-un [::exhausted? ::inquiry-areas ::areas-we-intend-to-discuss]
+                      :opt-un [::duration ::msg-id ::EADS-ref ::EADS-id]))
 (s/def ::EADS-id #(= % :data/orm))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
 (s/def ::interview-objective string?)

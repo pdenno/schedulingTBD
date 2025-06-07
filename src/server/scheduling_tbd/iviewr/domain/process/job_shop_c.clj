@@ -19,7 +19,8 @@
 
 (s/def ::comment string?) ; About annotations
 
-(s/def ::EADS (s/keys :req-un [::EADS-id ::multiple-production-lines? ::job-level-processes]))
+(s/def ::EADS (s/keys :req-un [::multiple-production-lines? ::job-level-processes]
+                      :opt-un [::msg-id ::EADS-ref ::EADS-id]))
 (s/def ::EADS-id #(= % :process/job-shop--classifiable))
 (s/def ::multiple-production-lines? (s/or :normal :multiple-production-lines?/val :annotated ::annotated-multiple-production-lines?))
 (s/def :multiple-production-lines?/val boolean?)

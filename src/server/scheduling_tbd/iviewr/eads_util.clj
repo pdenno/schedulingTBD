@@ -1,7 +1,6 @@
 (ns scheduling-tbd.iviewr.eads-util
   (:require
-   [datahike.core           :as d]
-   [scheduling-tbd.sutil    :refer [connect-atm]]
+   [scheduling-tbd.db       :as db]
    [taoensso.telemere       :refer [log!]]))
 
 ;;; ---------- These are used to check process EADS for valid graphs.
@@ -81,16 +80,19 @@
        (inputs-match-in-hierarchy? graph)))
 
 ;;; --------------------------- The following are more generally applicable -----------------------------
+(defn dispatch-ds-complete?
+  [tag _pid]
+  (assert ((db/system-EADS?) tag))
+  tag)
 
-(defn dispatch-by-eads-id [obj]
-  (cond (and (map? obj) (empty? obj))     :null-map
-        (contains? obj :EADS-ref)         (:EADS-ref obj)
-        (contains? obj :EADS-id)          (:EADS-id  obj)
-        :else  (throw (ex-info "Bad eads-id in dispatch for ds-complete?" {:obj obj}))))
+(defmulti ds-complete? #'dispatch-ds-complete?)
 
-(defmulti ds-complete? #'dispatch-by-eads-id)
+(defn dispatch-combine-ds!
+  [tag _pid]
+  (assert ((db/system-EADS?) tag))
+  tag)
 
-(defmethod ds-complete? :null-map [& _] false)
+(defmulti combine-ds! #'dispatch-combine-ds!)
 
 (defn strip-annotations
   "Transfom the EADS argument in the following ways:
@@ -101,11 +103,12 @@
   [obj]
   (cond (and (map? obj)
              (contains? obj :val)
-             (contains? obj :comment))          (:val obj)
+             (contains? obj :comment))          (strip-annotations (:val obj))
         (map? obj)                              (reduce-kv (fn [m k v]
                                                              ;; Sometimes interviewers think we allow comment like this; we don't!
                                                              (if (#{:comment :invented} k)
                                                                m
-                                                               (assoc m k (strip-annotations v)))) {} obj)
+                                                               (assoc m k (strip-annotations v))))
+                                                           {} obj)
         (vector? obj)                           (mapv strip-annotations obj)
         :else                                    obj))

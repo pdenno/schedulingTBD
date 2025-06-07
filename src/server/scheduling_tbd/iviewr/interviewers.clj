@@ -4,9 +4,7 @@
      [cheshire.core                   :as ches]
      [clojure.core.unify              :as uni]
      [clojure.data.xml                :as xml]
-     [clojure.edn                     :as edn]
-     [clojure.pprint                  :refer [pprint cl-format]]
-     [clojure.java.io                 :as io]
+     [clojure.pprint                  :refer [pprint]]
      [clojure.spec.alpha              :as s]
      [clojure.string                  :as str]
      [mount.core                      :as mount :refer [defstate]]
@@ -16,7 +14,7 @@
      [scheduling-tbd.db               :as db]
      [scheduling-tbd.llm              :as llm]
      [scheduling-tbd.iviewr.eads] ; for mount
-     [scheduling-tbd.iviewr.eads-util      :as eads-util] ; for mount
+     [scheduling-tbd.iviewr.eads-util      :as eads-util :refer [combine-ds!]]
      [scheduling-tbd.iviewr.ork            :as ork]
      [scheduling-tbd.iviewr.response-utils :as ru]
      [scheduling-tbd.sutil                 :as sutil :refer [elide output-struct2clj]]
@@ -475,11 +473,11 @@
       (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
       pid))
 
-(defn put-EADS-ds-on-msg
+(defn put-EADS-ds-on-msg!
   "Clean-up the EADS data structure and save it on a property :message/EADS-data-structure
    of the interviewee response which is responsible for this update (the current response
    in the argument conversation)."
-  [iviewr-response {:keys [pid cid] :as _ctx}]
+  [pid cid iviewr-response]
   (letfn [(up-keys [obj]
             (cond (map? obj)     (reduce-kv (fn [m k v] (assoc m (keyword k) (up-keys v))) {} obj)
                   (vector? obj)  (mapv up-keys obj)
@@ -506,12 +504,12 @@
 
 (defn post-ui-actions
   "Send client actions to perform such as loading graphs or (for humans) changing conversations."
-  [iviewr-response {:keys [pid cid new-cid? client-id responder-type] :as ctx}]
+  [iviewr-response {:keys [pid cid new-cid? client-id responder-type] :as _ctx}]
   (when (surrogate? pid) (ru/refresh-client client-id pid cid))
   (when (= :DATA-STRUCTURE-REFINEMENT (:message-type iviewr-response))
     ;; Using the data structure being pursued in some EADS instructions to show a FFBD of their processes.
-    (when (#{:process/flow-shop :process/job-shop--classifiable} (db/get-active-EADS-id pid cid))
-      (let [graph-mermaid (ds2m/latest-datastructure2mermaid pid cid)]
+    (when-let [ds-id (#{:process/flow-shop :process/job-shop--classifiable} (db/get-active-EADS-id pid cid))]
+      (let [graph-mermaid (ds2m/ds2mermaid pid ds-id)]
         (ws/send-to-client {:client-id client-id :dispatch-key :load-graph :graph graph-mermaid}))))
   ;; Of course, we don't switch the conversation for humans; we have to tell them to switch.
   (when (and new-cid? (= :human responder-type))
@@ -523,9 +521,11 @@
 (defn post-db-actions!
   "If the interviewer responded with a DATA-STRUCTURE-REFINEMENT (which is typical), associate the
    whole message as a string to the message which is an answer to the question."
-  [iviewr-response ctx]
+  [iviewr-response {:keys [pid cid]}]
   (when (= :DATA-STRUCTURE-REFINEMENT (:message-type iviewr-response))
-    (put-EADS-ds-on-msg iviewr-response ctx)))
+    (put-EADS-ds-on-msg! pid cid iviewr-response)
+    (when-let [eads-id (db/get-active-EADS-id pid cid)]
+      (combine-ds! eads-id pid))))
 
 (defn clear-ctx-ephemeral
   "Some properties in the context map are only relevant in the current iteration of the interview loop.
@@ -548,7 +548,7 @@
   (let [budget-ok? (> (db/get-budget pid cid) 0)
         active-eads-id (db/get-active-EADS-id pid cid)
         active-eads-complete? (or (not budget-ok?)
-                                  (and active-eads-id (eads-util/ds-complete? (db/get-EADS-ds pid cid active-eads-id))))
+                                  (and active-eads-id (eads-util/ds-complete? active-eads-id pid)))
         new-eads-id (when (or active-eads-complete? (not active-eads-id))
                       (ork/get-new-EADS-id pid))
         change-eads? new-eads-id

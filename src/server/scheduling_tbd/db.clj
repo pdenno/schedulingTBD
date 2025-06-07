@@ -184,6 +184,14 @@
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages between the interviewer and interviewees of the conversation."}
 
+   ;; ---------------------- summary data structures
+   :dstruct/id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
+        :doc "the EADS-id uniquely identifying the summary data structure."}
+   :dstruct/str
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string that can be edn/read-string to the data structure."}
+
    ;; ---------------------- message
    :message/answers-question
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
@@ -240,6 +248,9 @@
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
+   :project/dstructures
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "'summary' data structures indexed by their EADS-id, :dstruct/id."}
    :project/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a lowercase kebab-case keyword naming a project; unique to the project."}
@@ -846,34 +857,34 @@
       (log! :error (str "No such conversation: " cid)))))
 
 ;;; ----------------------------------------- EADS ---------------------------------------------
-(defn ^:admin list-system-EADS
-  "Return a sorted vector of EADS-ids (keywords) known to the system db."
+(defn system-EADS?
+  "Return a set of EADS-ids (keywords) known to the system db. (Often used as a predicate.)"
   []
   (-> (d/q '[:find [?eads-id ...]
              :where [_ :EADS/id ?eads-id]]
            @(sutil/connect-atm :system))
-      sort
-      vec))
+      set))
 
-(defn get-EADS-ds
-  "Return the most recent EADS string from messages in the argument conversation.
-   Return an empty map if no EADS found."
-  ([pid cid] (get-EADS-ds pid cid nil))
-  ([pid cid eads-id] ; when eads-id is not specified, don't filter by it.
-   (let [ds-map (->> (d/q '[:find ?id ?ds
-                           :keys id ds ; message/id message/EADS-data-structure
-                           :in $ ?cid
-                           :where
-                           [?e :conversation/id ?cid]
-                           [?e :conversation/messages ?m]
-                           [?m :message/EADS-data-structure ?ds]
-                           [?m :message/id ?id]]
-                         @(connect-atm pid) cid)
-                     (mapv #(update % :ds edn/read-string)))
-         ds-maps (if eads-id (filter #(= (-> % :ds :EADS-ref) eads-id) ds-map) ds-map)]
-     (if (empty? ds-maps)
-       {}
-       (-> (apply max-key :id ds-maps) :ds)))))
+(defn get-msg-dstructs
+  "Return a vector of EADS data structure maps matching for the given project id and EADS-id.
+   Included in the maps are :msg-id where it was found and EADS-ref that it is about,
+   which is the same as the arguemnt eads-id."
+  [pid eads-id]
+  (when-let [res (d/q '[:find ?str ?msg-id
+                        :keys s msg-id
+                        :in $ ?eads-id
+                        :where
+                        [?e :message/pursuing-EADS ?eads-id]
+                        [?e :message/EADS-data-structure ?str]
+                        [?e :message/id ?msg-id]]
+                      @(connect-atm pid) eads-id)]
+    (reduce (fn [r {:keys [s msg-id]}]
+              (let [{:keys [data-structure EADS-ref]} (edn/read-string s)]
+                (conj r (-> data-structure
+                            (assoc :msg-id msg-id)
+                            (assoc :EADS-ref EADS-ref)))))
+            []
+            res)))
 
 (defn put-EADS-ds!
   "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message.
@@ -947,11 +958,42 @@
 (defn ^:admin update-all-EADS-json!
   "Copy JSON versions of the system DB's EADS instructions to the files in resources/agents/iviewrs/EADS."
   []
-  (doseq [eads-id (list-system-EADS)]
+  (doseq [eads-id (system-EADS?)]
     (if-let [eads-instructions (-> eads-id get-EADS-instructions not-empty)]
       (sutil/update-resources-EADS-json! eads-instructions)
       (log! :error (str "No such EADS instructions " eads-id)))))
 
+;;; -------------------- Summary data structures -----------------------
+(defn ^:admin summary-ds-exists? ; TooD :Keep this? Not used yet!
+  [pid eads-id]
+  (d/q '[:find ?eid .
+         :in $ ?eads-id
+         :where [?eid :dstruct/id ?eads-id]]
+       @(connect-atm pid) eads-id))
+
+(defn get-summary-ds
+  "Return the summary EADS data structure give the IDs for the project and EADS-id.
+   If no such data structure yet, returns {}."
+  [pid eads-id]
+  (if-let [str (d/q '[:find ?str .
+                      :in $ ?ds-id
+                      :where
+                      [?e :dstruct/id ?ds-id]
+                      [?e :dstruct/str ?str]]
+                    @(sutil/connect-atm pid) eads-id)]
+    (edn/read-string str)
+    {}))
+
+(defn put-summary-ds!
+  "Dehydrate the given summary data structure and write it to the project DB."
+  [pid eads-id dstruct]
+  (let [eid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid))]
+    (if eid
+      (d/transact (connect-atm pid)
+                  {:tx-data [{:db/id eid
+                              :project/dstructures {:dstruct/id eads-id
+                                                    :dstruct/str (str dstruct)}}]})
+      (throw (ex-info "No eid" {:pid pid :eid eid})))))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs

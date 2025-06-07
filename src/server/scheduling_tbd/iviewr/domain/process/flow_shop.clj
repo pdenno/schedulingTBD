@@ -22,7 +22,8 @@
 
 (s/def ::comment string?) ; About annotations
 
-(s/def ::EADS (s/keys :req-un [::EADS-id ::process-id ::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration]))
+(s/def ::EADS (s/keys :req-un [::process-id ::inputs ::outputs ::resources ::subprocesses]
+                      :opt-un [::duration ::msg-id ::EADS-ref ::EADS-id]))
 (s/def :flow-shop/graph (s/and graph-semantics-ok? (s/keys :req-un [::inputs ::outputs ::resources ::subprocesses] :opt-un [::duration])))
 (s/def ::EADS-id #(= % :process/flow-shop))
 

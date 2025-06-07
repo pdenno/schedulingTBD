@@ -17,7 +17,8 @@
 
 (s/def ::comment string?) ; About annotations
 
-(s/def ::EADS (s/keys :req-un [::EADS-id ::unit-processes]))
+(s/def ::EADS (s/keys :req-un [::unit-processes]
+                      :opt-un [::msg-id ::EADS-ref ::EADS-id]))
 (s/def ::EADS-id #(= % :process/job-shop--unique))
 (s/def ::unit-processes (s/coll-of ::process :kind vector?))
 

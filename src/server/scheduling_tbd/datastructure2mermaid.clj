@@ -1,9 +1,7 @@
 (ns scheduling-tbd.datastructure2mermaid
   (:require [scheduling-tbd.iviewr.eads-util :as eads-util]
             [scheduling-tbd.db :as db]
-            [clojure.edn  :as edn]
-            [clojure.data.json :as json]
-            [clojure.walk :as w]))
+            [clojure.data.json :as json]))
 
 (defn decompose-eads
   "This function takes in an EADS and simply splits processes and subprocess for better visual representation of what happens.
@@ -131,21 +129,15 @@
 (defn ^:diag parse-eads [eads-str]
   (json/read-str eads-str :key-fn keyword))
 
-(defn datastructure2mermaid [eads]
-    (when (eads-util/graph-semantics-ok? eads)
+(defn ds2mermaid [pid ds-id]
+  (assert (#{:process/flow-shop :process/job-shop--classifiable} ds-id))
+  (when-let [ds (db/get-summary-ds pid ds-id)]
+    (when (eads-util/graph-semantics-ok? ds)
       (str "flowchart TD\n"
-                  (decompose-eads eads)
-      (apply str (-> eads
-                            gather-connections
-                            find-connections
-                            combine-connections
-                            format-combined-connections
-                            format-connections)))))
-
-(defn latest-datastructure2mermaid [pid cid]
-  (let [latest-EADS-message (db/get-EADS-ds pid cid)]
-    (-> latest-EADS-message
-        edn/read-string
-        :data-structure
-        w/keywordize-keys
-        datastructure2mermaid)))
+           (decompose-eads ds)
+           (apply str (-> ds
+                          gather-connections
+                          find-connections
+                          combine-connections
+                          format-combined-connections
+                          format-connections))))))

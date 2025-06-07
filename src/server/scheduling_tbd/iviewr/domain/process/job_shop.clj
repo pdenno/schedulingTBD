@@ -19,7 +19,8 @@
 
 (s/def ::comment string?) ; About annotations
 
-(s/def ::EADS (s/keys :req-un [::EADS-id ::classifiable-jobs?]))
+(s/def ::EADS (s/keys :req-un [::classifiable-jobs?]
+                      :opt-un [::msg-id ::EADS-ref ::EADS-id]))
 (s/def ::EADS-id #(= % :process/job-shop))
 (s/def ::classifiable-jobs? (s/or :normal :classifiable-jobs?/val :annotated ::annotated-classifiable-jobs?))
 (s/def :classifiable-jobs?/val boolean?)

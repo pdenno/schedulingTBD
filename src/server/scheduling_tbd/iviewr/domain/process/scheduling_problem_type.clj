@@ -6,7 +6,7 @@
    [mount.core                      :as mount :refer [defstate]]
    [scheduling-tbd.agent-db         :refer [agent-log]]
    [scheduling-tbd.db               :as db]
-   [scheduling-tbd.iviewr.eads-util :as eads-util :refer [ds-complete?]]
+   [scheduling-tbd.iviewr.eads-util :as eads-util :refer [ds-complete? combine-ds!]]
    [scheduling-tbd.sutil            :as sutil]))
 
 ;;; ToDo: Because we use a central spec registry, the specs defined with short namespaces (e.g. :problem-type/val) might collide with specs from other domains.
@@ -19,7 +19,8 @@
 (s/def ::interview-objective string?)
 (s/def ::comment string?)
 
-(s/def ::EADS (s/keys :req-un [::EADS-id ::principal-problem-type ::problem-components ::continuous? ::cyclical?]))
+(s/def ::EADS (s/keys :req-un [::principal-problem-type ::problem-components ::continuous? ::cyclical?]
+                      :opt-un [::msg-id ::EADS-ref ::EADS-id])) ; ToDo: EADS-id should never be in here (as a matter of style).
 (s/def ::EADS-id #(= % :process/scheduling-problem-type))
 
 ;;; We use the 'trick' that :<some-property>/val can be used to signify a non-namespaced attribute 'val' and a reference to a spec for value of 'val'.
@@ -66,24 +67,24 @@
                       :comment  (str "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.\n"
                                      "For example, if the made the same collection of products in the same order each week, cylical? would be true.")}}})
 
-
 ;;; ------------------------------- checking for completeness ---------------
-(defn ds-refine2EADS
-  "Translate the argument DATA-STRUCTURE-REFINEMENT message to EADS."
-  [refine-msg]
-  (-> refine-msg
-      :data-structure
-      eads-util/strip-annotations
-      (assoc :EADS-id (:EADS-ref refine-msg))
-      (dissoc :EADS-ref)
-      (update :principal-problem-type keyword)   ; These two owing to JSON translation.
-      (update :problem-components #(mapv keyword %))))
+;;; Collect and combine :process/scheduling-problem-type ds refinements, favoring recent over earlier versions.
+(defmethod combine-ds! :process/scheduling-problem-type
+  [tag pid]
+  (let [merged (->> (db/get-msg-dstructs pid tag)
+                    (sort-by :msg-id)
+                    (reduce (fn [r m] (merge r m)) {})
+                    eads-util/strip-annotations)
+        merged (-> merged
+                   (update :principal-problem-type keyword)
+                   (update :problem-components (fn [pcomps] (mapv #(keyword %) pcomps))))]
+    (db/put-summary-ds! pid tag merged)))
 
 (defmethod ds-complete? :process/scheduling-problem-type
-  [refine-msg]
-  (let [s-msg (ds-refine2EADS refine-msg)
-        complete? (s/valid? ::EADS s-msg)]
-    (agent-log (str "This is the stripped DS for problem type (complete? = " complete? "):\n" (with-out-str (pprint s-msg)))
+  [tag pid]
+  (let [ds (-> (db/get-summary-ds pid tag) eads-util/strip-annotations)
+    complete? (s/valid? ::EADS ds)]
+    (agent-log (str "This is the stripped DS for problem type (complete? = " complete? "):\n" (with-out-str (pprint ds)))
                {:console? true :elide-console 130})
     complete?))
 
