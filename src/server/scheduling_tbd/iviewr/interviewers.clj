@@ -578,6 +578,7 @@
 ;;; start-conversation can make it happen by asking the client to load-project (with cid = :process).
 ;;; ToDo: Will need to keep track in the DB of the interviewer tid on which each element of conversation happened.
 ;;;       Use this to decide what to put into CONVERSATION-HISTORY messages.
+;;; (inv/resume-conversation {:client-id :console :pid :sur-music-school :cid :process})
 (defn resume-conversation
   "Resume the interview loop for an established project and given cid."
   [{:keys [client-id pid cid] :as ctx}]

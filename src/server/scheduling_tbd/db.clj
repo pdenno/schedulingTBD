@@ -867,24 +867,26 @@
 
 (defn get-msg-dstructs
   "Return a vector of EADS data structure maps matching for the given project id and EADS-id.
+   The vector returned is sorted by msg-id, so it is chronological (most recent last).
    Included in the maps are :msg-id where it was found and EADS-ref that it is about,
-   which is the same as the arguemnt eads-id."
+   which is the same as the argument eads-id."
   [pid eads-id]
-  (when-let [res (d/q '[:find ?str ?msg-id
-                        :keys s msg-id
-                        :in $ ?eads-id
-                        :where
-                        [?e :message/pursuing-EADS ?eads-id]
-                        [?e :message/EADS-data-structure ?str]
-                        [?e :message/id ?msg-id]]
-                      @(connect-atm pid) eads-id)]
-    (reduce (fn [r {:keys [s msg-id]}]
-              (let [{:keys [data-structure EADS-ref]} (edn/read-string s)]
-                (conj r (-> data-structure
-                            (assoc :msg-id msg-id)
-                            (assoc :EADS-ref EADS-ref)))))
-            []
-            res)))
+  (let [db-res (d/q '[:find ?str ?msg-id
+                      :keys s msg-id
+                      :in $ ?eads-id
+                      :where
+                      [?e :message/pursuing-EADS ?eads-id]
+                      [?e :message/EADS-data-structure ?str]
+                      [?e :message/id ?msg-id]]
+                    @(connect-atm pid) eads-id)
+        dstructs (reduce (fn [r {:keys [s msg-id]}]
+                           (let [{:keys [data-structure]} (edn/read-string s)]
+                             (conj r (-> data-structure
+                                         (assoc :msg-id msg-id)
+                                         (assoc :EADS-ref eads-id)))))
+                         []
+                         db-res)]
+    (->> dstructs (sort-by :msg-id) vec)))
 
 (defn put-EADS-ds!
   "Attach a stringified representation of the data structure (edn) the interviewer is building to the latest message.

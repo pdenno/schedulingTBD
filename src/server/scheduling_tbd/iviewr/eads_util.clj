@@ -112,3 +112,58 @@
                                                            {} obj)
         (vector? obj)                           (mapv strip-annotations obj)
         :else                                    obj))
+
+(defn collect-keys-vals
+  "Collect the values of the argument property, which is a key to some nested object in the argument obj."
+  [obj prop]
+  (let [result (atom #{})]
+    (letfn [(ck [obj]
+              (cond (map? obj)           (doseq [[k v] obj] (if (= k prop) (swap! result conj v) (ck v)))
+                    (vector? obj)        (doseq [v obj] (ck v))))]
+      (ck obj))
+    @result))
+
+
+
+(defn insert-by-id
+  "The argument obj has a key SOMEWHERE, prop, the value of which is a vector.
+   Conj the third argument object onto that vector.
+   Return the modified object."
+  [obj vec-prop add-this]
+  (letfn [(i-by-i [obj]
+            (map? obj)                  (reduce-kv (fn [m k v]
+                                                     (if (= k vec-prop)
+                                                       (assoc m k (conj v add-this))
+                                                       (assoc m k (i-by-i v))))
+                                                   {} obj)
+            (vector? obj)               (mapv i-by-i obj)
+            :else                       obj)]
+    (i-by-i obj)))
+
+(defn remove-by-id
+  "The argument obj has a key SOMEWHERE, vec-prop, the value of which is a vector.
+   There should be in that vector an element with that has and elem-prop of value elem-id.
+   Remove the object that has that elem id and return the modified top-level object, obj"
+  [obj vec-prop elem-prop elem-id]
+  (letfn [(r-by-i [obj]
+            (map? obj)                  (reduce-kv (fn [m k v]
+                                                     (if (= k vec-prop)
+                                                       (assoc m k (reduce (fn [rr vv]
+                                                                            (if (= elem-id (get vv elem-prop))
+                                                                              rr
+                                                                              (conj rr vv)))
+                                                                          [] v))
+                                                       (assoc m k (r-by-i v))))
+                                                   {} obj)
+            (vector? obj)               (mapv r-by-i obj)
+            :else                       obj)]
+    (r-by-i obj)))
+
+(defn replace-by-id
+  [obj vec-prop elem-prop add-this]
+  (if-let [elem-id (get add-this elem-prop)]
+    (-> obj
+        (remove-by-id vec-prop elem-prop elem-id)
+        (insert-by-id vec-prop add-this))
+    (throw (ex-info "Couldn't find the elem to replace."
+                    {:vec-prop elem-prop :add-this add-this}))))

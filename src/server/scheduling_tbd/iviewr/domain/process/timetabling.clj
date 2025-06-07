@@ -2,13 +2,14 @@
   (:require
    [clojure.edn              :as edn]
    [clojure.pprint           :refer [pprint]]
+   [clojure.set              :as set]
    [clojure.spec.alpha       :as s]
    [datahike.api             :as d]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.agent-db  :refer [agent-log]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm]]
-   [scheduling-tbd.iviewr.eads-util :as eads-util :refer [ds-complete? combine-ds!]]
+   [scheduling-tbd.iviewr.eads-util :as eu :refer [ds-complete? combine-ds!]]
    [taoensso.telemere        :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -28,7 +29,7 @@
 ;;; Created Sat May 17 18:55:10 EDT 2025 using develop.dutil/make-spec."
 (s/def ::event-types (s/or :normal :event-types/val :annotated ::annotated-event-types))
 (s/def :event-types/val (s/coll-of ::event-type :kind vector?))
-(s/def ::event-type (s/keys :req-un [::occurrence-assignment ::event-type-name] :opt-un [::periodicity ::event-constituents]))
+(s/def ::event-type (s/keys :req-un [::occurrence-assignment ::event-type-id] :opt-un [::periodicity ::event-constituents]))
 (s/def ::annotated-event-types (s/keys :req-un [::comment :event-types/val]))
 (s/def ::timeslots (s/or :normal :timeslots/val :annotated ::annotated-timeslots))
 (s/def :timeslots/val (s/coll-of ::timeslot :kind vector?))
@@ -40,9 +41,9 @@
 (s/def :event-constituents/val (s/or :normal (s/coll-of ::event-constituent :kind vector?) :none string?))
 (s/def ::event-constituent (s/keys :req-un [::base-type ::constituent-type] :opt-un [::quantity]))
 (s/def ::annotated-event-constituents (s/keys :req-un [::comment :event-constituents/val]))
-(s/def ::event-type-name (s/or :normal :event-type-name/val :annotated ::annotated-event-type-name))
-(s/def :event-type-name/val string?)
-(s/def ::annotated-event-type-name (s/keys :req-un [::comment :event-type-name/val]))
+(s/def ::event-type-id (s/or :normal :event-type-id/val :annotated ::annotated-event-type-id))
+(s/def :event-type-id/val string?)
+(s/def ::annotated-event-type-id (s/keys :req-un [::comment :event-type-id/val]))
 (s/def ::occurrence-assignment (s/or :normal :occurrence-assignment/val :annotated ::annotated-occurrence-assignment))
 (s/def :occurrence-assignment/val (s/keys :req-un [::ts-type-refs]))
 (s/def ::annotated-occurrence-assignment (s/keys :req-un [::comment :occurrence-assignment/val]))
@@ -140,8 +141,9 @@
           "\n"
           "You have a choice as to how you communicate back to us in DATA-STRUCTURE-REFINEMENT (DSR) messages: you can accummulate information from interviewing about 'event-types' and 'timeslots'\n"
           "into a single structure, such as shown in the EADS example below.\n"
-          "Alternatively, because we have code to combine the several DSRs you return in response to INTERVIEWEES-RESPOND, you can send back just what you learned from the last few questions.\n"
-          "For example, ask some questions that populate 'event-types', and with each DSR returned refine the event-types structures, then do something similar with 'timeslots'\n"
+          "Alternatively -- because we have code to combine the several DSRs you return in response to INTERVIEWEES-RESPOND -- you can send back just what you learned from the last few questions.\n"
+          "In this arrangement you would minimally be returning an object for which we can navigate event-types.event-type-id or timeslots.ts-type-id and what you provide will overwrite any\n"
+          "existing event-type object or timeslot-type object with that identifier."
           "The challenge remains, however, that the event-type's occurrence-assignment.ts-type-refs refers to a timeslot's ts-type-id.\n")
 
      ;"Finally, we must confess to not knowing too much about what to expected from timetabling interviews; we haven't studied this area as much as some of the others.\n"      ; <=== Probably temporary.
@@ -153,14 +155,14 @@
                                   "   *  'periodicity'            : (optional) the interval and number of instances in which periodic events of this event type occur.\n"
                                   "   *  'occurrence-assignment'  : the timeslots in which this event type are allowed to occur.\n"
                                   "This example is about timetabling classes at a community college for one semester.")
-                    :val [{:event-type-name {:val "lecture-class-30-90min-type"
+                    :val [{:event-type-id {:val "lecture-class-30-90min-type"
                                              :comment (str "Note that we used the suffix '-type' in the name to emphasize that this defines the general form for instances of this class, not an instance occurrence.\n"
                                                            "Example lecture-class-types include chemistry lectures and physics lectures.\n"
                                                            "You, the interviewer, decided on this naming convention in light of the conversation you had with interviewees.")}
                            :event-constituents {:comment "These are the elements of the Cartesian product. When no quantity is specified, we assume exactly one is required."
                                              :val [{:constituent-type {:val "room-type-30"
                                                                     :comment (str "Note the -30 suffix here is because (as shown below) the room should have capacity for 30 people and the event is '-30-90min-type'.\n"
-                                                                                  "Similar to 'event-type-name', you devised this naming convention.\n"
+                                                                                  "Similar to 'event-type-id', you devised this naming convention.\n"
                                                                                   "The meaning of room-type-30 will be made clear in the constituents interview, not here.")}
                                                     :base-type {:val "place" :comment "Possible values for this property are 'human', 'place', and 'equipment'."}}
                                                    {:constituent-type "student-type"    :base-type "human" :quantity {:units "person" :value-string "30" :modifier "up to"}}
@@ -180,7 +182,7 @@
                                                                   "Because there are only two days, Tuesday and Thursday, in the 'Tu-Th-90min' timeslot class, and the periodicity is 2 occurences per week,\n"
                                                                   "it must be the case that one event occurs on Tuesday and the other on Thursday each week (and at the same time of day).")}}
 
-                          {:event-type-name "lecture-class-30-60min-type"
+                          {:event-type-id "lecture-class-30-60min-type"
                            :event-constituents [{:constituent-type "room-type-30",   :base-type "place"}
                                              {:constituent-type "student-type",   :base-type "human"}
                                              {:constituent-type "instructor-type" :base-type "human"}]
@@ -188,7 +190,7 @@
                            :occurrence-assignment {:ts-type-refs ["Mon-Wed-Fri-90min"]
                                                    :constraints  ["same-time", "different-days"]}}
 
-                          {:event-type-name "chem-lab-class"
+                          {:event-type-id "chem-lab-class"
                            :event-constituents {:val [{:constituent-type "room-type-chem-lab" :base-type "place"}
                                                    {:constituent-type "fume hood"          :base-type "equipment" :quantity {:value-string "10" :units "instances"}}
                                                    {:constituent-type "student-type"       :base-type "human"}
@@ -199,7 +201,7 @@
                            :periodicity {:interval {:units "week" :value-string "1"} :occurrences {:value-string "1"}}
                            :occurrence-assignment {:ts-type-refs ["Three-hour-lab"]}}
 
-                          {:event-type-name {:val "instructor-break" :comment "This is an example of an opportunistic event with periodicity."}
+                          {:event-type-id {:val "instructor-break" :comment "This is an example of an opportunistic event with periodicity."}
                            :event-constituents [{:constituent-type "instructor-type" :base-type "human"}]
                            :periodicity {:interval {:units "day" :value-string "1"} :occurrences {:value-string "1"}}
                            :occurrence-assignment {:opportunistic? true,
@@ -208,14 +210,14 @@
                                                                               "Interviewees stipulated this in the conversation.")}
                                                   :ts-type-refs ["Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab"]}}
 
-                          {:event-type-name {:val "spring-break" :comment "This is an example of a one-time event. It has no 'event-constituents'; in this sense, it is a non-event!"}
+                          {:event-type-id {:val "spring-break" :comment "This is an example of a one-time event. It has no 'event-constituents'; in this sense, it is a non-event!"}
                            :event-constituents {:val "none"
-                                             :comment (str "By the end of your interview, all event type objects should have 'event-type-name', 'event-constituents', 'periodicity', and\n"
+                                             :comment (str "By the end of your interview, all event type objects should have 'event-type-id', 'event-constituents', 'periodicity', and\n"
                                                            "'occurrence-assignment'. Spring break does not require any constituents, so we'll just say 'none' here.")}
                            :occurrence-assignment {:ts-type-refs {:val ["2025-03-17" "2025-03-18" "2025-03-19" "2025-03-20" "2025-03-21"]
                                                                   :comment "Instead of enumeration values, we put dates here."}}
                            :periodicity {:val "none"
-                                         :comment (str "By the end of your interview, all event type objects should have 'event-type-name', 'event-constituents', 'periodicity', and\n"
+                                         :comment (str "By the end of your interview, all event type objects should have 'event-type-id', 'event-constituents', 'periodicity', and\n"
                                                        "'occurrence-assignment'. Since in the context of one semester, spring break only occurs once, we'll just say 'none' here.\n"
                                                        "By the way, we make things mandatory and allow 'none' so that we can check the data structure for completeness more thoroughly.")}}]}
 
@@ -240,21 +242,45 @@
 
 ;;; ------------------------------- checking for completeness ---------------
 ;;; Collect and combine :process/timetabling ds refinements, favoring recent over earlier versions.
-;;; Interviewer has been instructed that it is okay to do event types separate from
+;;; Interviewer has been instructed that it is okay to do :event-types separate from :timeslots, and in fact, it
+;;; is currently giving things *very piecemeal*, suggesting that I use :ts-type-id and :event-type-id to stitch together the result.
+(defn combine
+  "Accommodate information from the second argument map into the first argument map,
+   returning the modified first argument. We don't do upsert, just insert and replace
+   on timeslot-types (by :ts-type-id) and event-types (by :event-type-id)."
+  [best more]
+  (let [best-ts-type-ids    (eu/collect-keys-vals best :ts-type-id)
+        more-ts-type-ids    (eu/collect-keys-vals more :ts-type-id)
+        best-event-type-ids (eu/collect-keys-vals more :event-type-id)
+        more-event-type-ids (eu/collect-keys-vals more :event-type-id)
+        ts-inserts   (set/difference more-ts-type-ids best-ts-type-ids)
+        ts-replaces  (set/intersection best-ts-type-ids more-ts-type-ids)
+        ev-inserts   (set/difference more-event-type-ids best-event-type-ids)
+        ev-replaces  (set/intersection best-event-type-ids more-event-type-ids)]
+    ;; <============================================================================================= ToDo: (1) Make sure best has :event-types and :timeslots.
+    ;; <=============================================================================================       (2) Remove :event-types and :timeslots if they are empty when done.
+    (as-> best ?b
+      (reduce (fn [r new-id] (eu/insert-by-id r :timeslots   (eu/get-object more new-id))) ?b ts-inserts)
+      (reduce (fn [r new-id] (eu/insert-by-id r :event-types (eu/get-object more new-id))) ?b ev-inserts)
+      (reduce (fn [r new-id] (eu/replace-by-id r :timeslots   :ts-type-id    (eu/get-object more new-id))) ?b ts-replaces)
+      (reduce (fn [r new-id] (eu/replace-by-id r :event-types :event-type-id (eu/get-object more new-id))) ?b ev-replaces))))
+
+
 (defmethod combine-ds! :process/timetabling
   [tag pid]
-  (let [merged (->> (db/get-msg-dstructs pid tag)
-                    (map eads-util/strip-annotations) ; ToDo: make this optional?
-                    (sort-by :msg-id)
-                    (reduce (fn [r m] (merge r m)) {}))]
+  (let [msg-ds (->> (db/get-msg-dstructs pid tag)
+                    (mapv eu/strip-annotations))
+        merged (reduce (fn [r ds] (combine r ds))
+                       (first msg-ds) ; We start with earliest instance of the DS. <==== NOT GOOD: Maybe start with a full merge.
+                       (rest msg-ds))]
     (db/put-summary-ds! pid
                         :process/timetabling
                         (assoc merged :EADS-id tag))))
 
-;;; (-> ttable/timetabling :EADS eads-util/strip-annotations ttable/completeness-test)
+;;; (-> ttable/timetabling :EADS eu/strip-annotations ttable/completeness-test)
 (defn completeness-test
   "A timetabling DS is ds-complete? when (conjunctively):
-      - there is at least one event-type and all the event types have event-type-name, event-constituents, periodicity, and occurrence-assignment,
+      - there is at least one event-type and all the event types have event-type-id, event-constituents, periodicity, and occurrence-assignment,
       - there is at least one value in timeslots and it has ts-type-id and and spans."
   [eads]
   (and (contains? eads :event-types)
@@ -262,27 +288,12 @@
        (contains? eads :timeslots)
        (s/valid? ::timeslots (:timeslots eads))))
 
-(defn ds-refine2ds
-  "Translate the argument DATA-STRUCTURE-REFINEMENT message to EADS."
-  [refine-msg]
-  (as-> refine-msg ?m
-    (:data-structure ?m)
-    (eads-util/strip-annotations ?m)
-    (if (contains? ?m :EADS-ref)
-      (assoc :EADS-id (:EADS-ref refine-msg))
-      ?m)
-    (dissoc ?m :EADS-ref)))
-
 (defmethod ds-complete? :process/timetabling
-  [refine-msg]
-  (let [ds (ds-refine2ds refine-msg)
-        complete? (completeness-test ds)]
+  [tag pid]
+  (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
+    complete? (completeness-test ds)]
     (agent-log (str "This is the stripped DS for timetabling (complete? = " complete? "):\n" (with-out-str (pprint ds)))
                {:console? true :elide-console 130})
-    (when-not (s/valid? ::EADS ds)
-      (reset! diag timetabling)
-      (agent-log (str "EADS is invalid:\n" (with-out-str (pprint ds)))
-                 {:console? true :level :warn :elide-console 130}))
     complete?))
 
 ;;; -------------------- Starting and stopping -------------------------

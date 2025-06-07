@@ -10,7 +10,7 @@
    [mount.core                       :as mount :refer [defstate]]
    [scheduling-tbd.agent-db          :refer [agent-log]]
    [scheduling-tbd.db                :as db]
-   [scheduling-tbd.sutil             :as sutil]
+   [scheduling-tbd.sutil             :as sutil :refer [clj2json-pretty]]
    [scheduling-tbd.iviewr.eads-util  :as eads-util :refer [ds-complete?]]
    [taoensso.telemere                :as tel :refer [log!]]))
 
