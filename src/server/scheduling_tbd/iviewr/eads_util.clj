@@ -102,8 +102,7 @@
    This is typically used to make s/valid?-dation easier."
   [obj]
   (cond (and (map? obj)
-             (contains? obj :val)
-             (contains? obj :comment))          (strip-annotations (:val obj))
+             (contains? obj :val))              (strip-annotations (:val obj)) ; Sometimes they won't contain :comment.
         (map? obj)                              (reduce-kv (fn [m k v]
                                                              ;; Sometimes interviewers think we allow comment like this; we don't!
                                                              (if (#{:comment :invented} k)
@@ -123,21 +122,19 @@
       (ck obj))
     @result))
 
-
-
 (defn insert-by-id
   "The argument obj has a key SOMEWHERE, prop, the value of which is a vector.
    Conj the third argument object onto that vector.
    Return the modified object."
   [obj vec-prop add-this]
   (letfn [(i-by-i [obj]
-            (map? obj)                  (reduce-kv (fn [m k v]
-                                                     (if (= k vec-prop)
-                                                       (assoc m k (conj v add-this))
-                                                       (assoc m k (i-by-i v))))
-                                                   {} obj)
-            (vector? obj)               (mapv i-by-i obj)
-            :else                       obj)]
+            (cond (map? obj)                  (reduce-kv (fn [m k v]
+                                                           (if (= k vec-prop)
+                                                             (assoc m k (conj v add-this))
+                                                             (assoc m k (i-by-i v))))
+                                                         {} obj)
+                  (vector? obj)               (mapv i-by-i obj)
+                  :else                       obj))]
     (i-by-i obj)))
 
 (defn remove-by-id
@@ -146,17 +143,17 @@
    Remove the object that has that elem id and return the modified top-level object, obj"
   [obj vec-prop elem-prop elem-id]
   (letfn [(r-by-i [obj]
-            (map? obj)                  (reduce-kv (fn [m k v]
-                                                     (if (= k vec-prop)
-                                                       (assoc m k (reduce (fn [rr vv]
-                                                                            (if (= elem-id (get vv elem-prop))
-                                                                              rr
-                                                                              (conj rr vv)))
-                                                                          [] v))
-                                                       (assoc m k (r-by-i v))))
-                                                   {} obj)
-            (vector? obj)               (mapv r-by-i obj)
-            :else                       obj)]
+            (cond (map? obj)                  (reduce-kv (fn [m k v]
+                                                           (if (= k vec-prop)
+                                                             (assoc m k (reduce (fn [rr vv]
+                                                                                  (if (= elem-id (get vv elem-prop))
+                                                                                    rr
+                                                                                    (conj rr vv)))
+                                                                                [] v))
+                                                             (assoc m k (r-by-i v))))
+                                                         {} obj)
+                  (vector? obj)               (mapv r-by-i obj)
+                  :else                       obj))]
     (r-by-i obj)))
 
 (defn replace-by-id
@@ -167,3 +164,18 @@
         (insert-by-id vec-prop add-this))
     (throw (ex-info "Couldn't find the elem to replace."
                     {:vec-prop elem-prop :add-this add-this}))))
+
+(defn get-object
+  "The argument object obj, contains (somewhere) a key property prop having value k,
+   return the object at (prop = k)."
+  [obj prop kval]
+  (let [found (atom nil)]
+    (letfn [(somewhere [obj]
+              (or @found
+                  (cond  (map? obj)                (doseq [[k v] obj]
+                                                     (when (and (= k prop) (= v kval))
+                                                       (reset! found obj))
+                                                     (somewhere v))
+                         (vector? obj)             (doseq [x obj] (somewhere x)))))]
+      (somewhere obj)
+      @found)))

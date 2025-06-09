@@ -181,7 +181,7 @@
   (log! :info (-> (str "Ork told: " msg) (elide 150)))
   (agent-log (str "[ork manager] (tells ork)\n" (with-out-str (pprint msg))))
   (let [msg-string (clj2json-pretty msg)
-        res (-> (adb/query-agent ork-agent msg-string) output-struct2clj)
+        res (-> (adb/query-agent ork-agent msg-string {:tries 2}) output-struct2clj)
         res (cond-> res
               (contains? res :message-type)              (update :message-type keyword)
               (= (:message-type res) :PURSUE-EADS)       (update :EADS-id keyword))]

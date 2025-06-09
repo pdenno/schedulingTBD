@@ -204,6 +204,10 @@
                                     :resources ["crimping tool"],
                                     :subprocesses []}]}]}})
 
+;;; See if it compiles.
+(when-not (s/valid? :flow-shop/EADS-message flow-shop)
+  (throw (ex-info "Invalid EADS (flow-shop)" {})))
+
 ;;; ------------------------------- checking for completeness ---------------
 (defmethod ds-complete? :process/flow-shop
   [eads-id ds]

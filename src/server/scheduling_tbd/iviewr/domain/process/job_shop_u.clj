@@ -114,6 +114,10 @@
                       :duration {:val {:units "hours", :value-string "2"},
                                  :comment "The value here does not include leak testing, which is treated as a separate unit process that usually follows resurfacing."}}]}})
 
+;;; See if it compiles.
+(when-not (s/valid? :job-shop-u/EADS-message job-shop-u)
+  (throw (ex-info "Invalid EADS (job-shop--unique)" {})))
+
 ;;; ------------------------------- checking for completeness ---------------
 (defmethod ds-complete? :process/job-shop--unique
   [eads-id ds]

@@ -44,6 +44,10 @@
                                        "If, in contrast, it seems more reasonable for the the firm to define a (possibly unique) production process for each job, classifiable-jobs? should be false.\n"
                                        "It is reasonable to ask whether defining a process plan for each job is part of their workflow.")}}})
 
+;;; See if it compiles.
+(when-not (s/valid? :job-shop/EADS-message job-shop)
+  (throw (ex-info "Invalid EADS (job-shop)" {})))
+
 (defmethod ds-complete? :process/job-shop
   [eads-id ds]
   (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))

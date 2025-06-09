@@ -76,6 +76,9 @@
      - system-level agents
      - See also db-schema-agent+ which gets merged into this."
   {;; ------------------------------- EADS
+   :EADS/budget-decrement
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
+        :doc "The cost of each question, decrementing againt a budget for the entire conversation."}
    :EADS/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "A unique ID for each EADS. The namespace of the keyword is the cid, e.g. :process/flow-shop."}
@@ -85,10 +88,6 @@
    :EADS/can-produce-visuals
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
         :doc "Indicates the purpose and instructions given."}
-   :EADS/specs
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "An object where the keys name spec levels (e.g. full) and the values are keywords identifying the spec in the registry."}
-
    ;; ---------------------- project
    :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
@@ -924,13 +923,12 @@
 (defn put-EADS-instructions!
   "Update the system DB with a (presumably) new version of the argument EADS instructions.
    Of course, this is a development-time activity."
-  [eads-instructions]
-  (let [id (-> eads-instructions :EADS :EADS-id)
-        [_ns nam] ((juxt namespace name) id)
+  [{:keys [EADS budget-decrement] :as eads-instructions}]
+  (let [id (:EADS-id EADS)
         db-obj {:EADS/id id
-                :EADS/specs #:spec{:full (keyword nam "EADS-message")}
+                :EADS/budget-decrement (or budget-decrement 0.05)
                 :EADS/msg-str (str eads-instructions)}
-          conn (connect-atm :system)
+        conn (connect-atm :system)
         eid (d/q '[:find ?e . :where [?e :system/name "SYSTEM"]] @conn)]
     (log! :info (str "Writing EADS instructions to system DB: " id))
     (d/transact conn {:tx-data [{:db/id eid :system/EADS db-obj}]}))
@@ -950,6 +948,18 @@
                         @(connect-atm :system) eads-id)]
     (edn/read-string msg-str)
     (throw (ex-info "No eads-id: " eads-id {:eads-id eads-id}))))
+
+(defn get-EADS-budget-decrement
+  "Get from the system DB the amount by which the conversation budget is decrements for each question.
+   If this hasn't been set in the EADS, it returns the default value of 0.05."
+  [eads-id]
+  (let [res (d/q '[:find ?budget-dec .
+                   :in $ ?eads-id
+                   :where
+                   [?e :EADS/id ?eads-id]
+                   [?e :EADS/budget-decrement ?budget-dec]]
+                 @(connect-atm :system) eads-id)]
+    (or res 0.05)))
 
 (defn same-EADS-instructions?
   "Return true if the argument eads-instructions (an EDN object) is exactly what the system already maintains."

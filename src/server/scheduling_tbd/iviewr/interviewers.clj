@@ -595,22 +595,23 @@
           (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?]} (ork-review pid cid)]
             (if (or exhausted? force-stop?)
               (agent-log (str "resume-conversation exiting. ctx:\n" (with-out-str (pprint ctx))) {:console? true})
-              (do (when new-cid?
-                    (db/put-conversation-status! pid old-cid :eads-exhausted)
-                    (db/put-conversation-status! pid cid :in-progress))
-                  (when change-eads?
-                    (log! :warn (str "Changing EADS, new-eads-id = " new-eads-id))
-                    (db/put-active-EADS-id pid cid new-eads-id) ; This will be used by :message/pursuing-EADS.
+              (let [eads-id (or new-eads-id (db/get-active-EADS-id pid cid))]
+                (when new-cid?
+                  (db/put-conversation-status! pid old-cid :eads-exhausted)
+                  (db/put-conversation-status! pid cid :in-progress))
+                (when change-eads?
+                  (log! :warn (str "Changing EADS, new-eads-id = " new-eads-id))
+                  (db/put-active-EADS-id pid cid new-eads-id) ; This will be used by :message/pursuing-EADS.
                     (tell-interviewer (db/get-EADS-instructions new-eads-id) ctx))
-                  (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
-                        expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
-                        ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
-                        iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
-                                                          {:interviewer-agent (:interviewer-agent ctx)
-                                                           :cid cid
-                                                           :tries 2
-                                                           :test-fn output-struct2clj})]
-                    (db/put-budget! pid cid (- (db/get-budget pid cid) 0.05))
+                (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
+                      expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
+                      ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
+                      iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
+                                                        {:interviewer-agent (:interviewer-agent ctx)
+                                                         :cid cid
+                                                         :tries 2
+                                                         :test-fn output-struct2clj})]
+                    (db/put-budget! pid cid (- (db/get-budget pid cid) (db/get-EADS-budget-decrement eads-id)))
                     (update-db-conversation! pid cid conversation)
                     (post-ui-actions  iviewr-response ctx)  ; show graphs and tables, tell humans to switch conv.
                     (post-db-actions! iviewr-response ctx)) ; associate DS refinement with msg.

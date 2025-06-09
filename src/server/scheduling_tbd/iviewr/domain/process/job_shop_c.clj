@@ -215,6 +215,9 @@
                                                                  :outputs ["finished pencils"],
                                                                  :resources ["crimping tool"],
                                                                  :subprocesses []}]}]}]}}})
+;;; See if it compiles.
+(when-not (s/valid? :job-shop-c/EADS-message job-shop-c)
+  (throw (ex-info "Invalid EADS (flow-shop)" {})))
 
 (defmethod ds-complete? :process/job-shop--classifiable
   [eads-id ds]

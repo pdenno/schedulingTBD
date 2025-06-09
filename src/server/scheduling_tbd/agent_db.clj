@@ -417,28 +417,28 @@
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
     :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
-  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn asked-role asking-role]
+  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn asked-role asking-role tries]
       :or {test-fn (fn [_] true),
            preprocess-fn identity
            llm-provider @default-llm-provider
            timeout-secs 60
-           role "user"} :as obj}]
-  (let [obj (cond-> obj ; All recursive calls will contains? :tries.
-              (or (not (contains? obj :tries))
-                  (and (contains? obj :tries) (-> obj :tries nil?))) (assoc :tries 1))]
-    (assert (< (:tries obj) 10))
-    (if (> (:tries obj) 0)
+           role "user"} :as opts}]
+  (let [opts (cond-> opts ; All recursive calls will contains? :tries.
+              (or (not (contains? opts :tries))
+                  (and (contains? opts :tries) (-> opts :tries nil?))) (assoc :tries 1))]
+    (assert (< (:tries opts) 10))
+    (if (> (:tries opts) 0)
       (try
         (let [raw (query-on-thread-aux aid tid role query-text timeout-secs llm-provider)
               res (preprocess-fn raw)]
           (if (test-fn res) res (throw (ex-info "Try again" {:res res}))))
         (catch Exception e
           (let [d-e (datafy e)]
-            (log! :warn (str "query-on-thread failed (tries = " (:tries obj) "):\n "
+            (log! :warn (str "query-on-thread failed (tries = " (:tries opts) "):\n "
                              "\nmessage: " (-> d-e :via first :message)
                              "\ncause: " (-> d-e :data :body)
                              "\ntrace:\n" (with-out-str (pprint (:trace d-e))))))
-          (query-on-thread (update obj :tries dec))))
+          (query-on-thread (update opts :tries dec))))
       (log! :warn "Query on thread exhausted all tries."))))
 
 (defn query-agent

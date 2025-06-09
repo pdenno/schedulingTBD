@@ -67,6 +67,10 @@
                       :comment  (str "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.\n"
                                      "For example, if the made the same collection of products in the same order each week, cylical? would be true.")}}})
 
+;;; See if it compiles.
+(when-not (s/valid? :scheduling-problem-type/EADS-message scheduling-problem-type)
+  (throw (ex-info "Invalid EADS (scheduling problem type)" {})))
+
 ;;; ------------------------------- checking for completeness ---------------
 ;;; Collect and combine :process/scheduling-problem-type ds refinements, favoring recent over earlier versions.
 (defmethod combine-ds! :process/scheduling-problem-type

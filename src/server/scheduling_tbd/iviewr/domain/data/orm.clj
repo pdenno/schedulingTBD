@@ -6,12 +6,13 @@
    (possibly messy and illogical) spreadsheets into the scheduling systems later."
   (:require
    [clojure.pprint                   :refer [pprint]]
+   [clojure.set                      :as set]
    [clojure.spec.alpha               :as s]
    [mount.core                       :as mount :refer [defstate]]
    [scheduling-tbd.agent-db          :refer [agent-log]]
    [scheduling-tbd.db                :as db]
    [scheduling-tbd.sutil             :as sutil :refer [clj2json-pretty]]
-   [scheduling-tbd.iviewr.eads-util  :as eads-util :refer [ds-complete?]]
+   [scheduling-tbd.iviewr.eads-util  :as eu :refer [ds-complete? combine-ds!]]
    [taoensso.telemere                :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -36,7 +37,7 @@
 (s/def ::annotated-areas-we-intend-to-discuss (s/keys :req-un [::comment :areas-we-intend-to-discuss/val]))
 (s/def ::inquiry-areas (s/or :normal :inquiry-areas/val :annotated ::annotated-inquiry-areas))
 (s/def :inquiry-areas/val (s/coll-of ::inquiry-area :kind vector?))
-(s/def ::inquiry-area (s/keys :req-un [::fact-types ::inquiry-area-objects ::inquiry-area-ref]))
+(s/def ::inquiry-area (s/keys :req-un [::fact-types ::inquiry-area-objects ::inquiry-area-id]))
 (s/def ::annotated-inquiry-areas (s/keys :req-un [::comment :inquiry-areas/val]))
 (s/def ::fact-types (s/or :normal :fact-types/val :annotated ::annotated-fact-types))
 (s/def :fact-types/val (s/coll-of ::fact-type :kind vector?))
@@ -46,9 +47,9 @@
 (s/def :inquiry-area-objects/val (s/coll-of ::inquiry-area-object :kind vector?))
 (s/def ::inquiry-area-object (s/keys :req-un [::definition ::object-id]))
 (s/def ::annotated-inquiry-area-objects (s/keys :req-un [::comment :inquiry-area-objects/val]))
-(s/def ::inquiry-area-ref (s/or :normal :inquiry-area-ref/val :annotated ::annotated-inquiry-area-ref))
-(s/def :inquiry-area-ref/val string?)
-(s/def ::annotated-inquiry-area-ref (s/keys :req-un [::comment :inquiry-area-ref/val]))
+(s/def ::inquiry-area-id (s/or :normal :inquiry-area-id/val :annotated ::annotated-inquiry-area-id))
+(s/def :inquiry-area-id/val string?)
+(s/def ::annotated-inquiry-area-id (s/keys :req-un [::comment :inquiry-area-id/val]))
 (s/def ::arity (s/or :normal :arity/val :annotated ::annotated-arity))
 (s/def :arity/val number?)
 (s/def ::annotated-arity (s/keys :req-un [::comment :arity/val]))
@@ -180,15 +181,35 @@
           "    For example, do you have speadsheets containing customer orders, raw material delivery, process plans, materials on hand, task durations, worker skills, etc.?\n"
           "\n"
           "Given the response from this, you can set the 'areas-we-intend-to-discuss' property to a list of strings naming what areas the interviewees' response suggest are important to discuss.\n"
+          "Just be sure to only set 'exhausted?' to true (see the EADS below) when you are finished with the last inquiry that you planned to discuss.\n"
           "\n"
           "You can then discuss each area of inquiry they mention (repeating Task 2a and Task 2b for each fact type of the area of inquiry) in whatever order you deem appropriate."
           "When you have completed the detailed discussion of every area of inquiry they have thus far mentioned, you should ask them whether there is yet more areas to discuss.\n"
           "If they mention more, continue to apply the three tasks until all areas are discussed.\n"
           "The EADS has a property, 'exhausted?', you should set to true when you believe this interview can be concluded.\n"
           "\n"
-          "You have a choice as to how you communicate back to us in DATA-STRUCTURE-REFINEMENT (DSR) messages: you can accummulate results from several inquiry areas into one ever-growing DSR message, or\n"
-          "(probably easier for you) you can limit what is a DSR message to just one or a few inquiry areas (thue one or a few elements in the :areas-we-intend-to-discuss.\n"
-          "Just be sure to only set 'exhausted?' to true when you are finished with the last inquiry that you planned to discuss.\n"
+          "You have choices as to how you communicate back to us in DATA-STRUCTURE-REFINEMENT (DSR) messages. You can\n"
+          "   (1) accummulate results from several inquiry areas into one ever-growing DSR message, as is shown in the EADS below,\n"
+          "   (2) limit what is in a DSR message to just one or a few inquiry areas (thus one or a few elements in the :areas-we-intend-to-discuss), or\n"
+          "   (3) limit what is in a DSR message to just one or more fact-types in an inquiry area.\n"
+          "In order for us to index DSR message of type (3) into our database, it is essential that you provide the 'inquiry-area-id' to which you are committing a fact type.\n"
+          "For example, if you just wanted to commit the 'ORDER-is-for-CUSTOMER' fact type of the 'customer-orders' area of inquiry, in the EADS example below, 'data-structure' property of your DSR message would be:\n"
+          (clj2json-pretty
+           {:inquiry-area-id "customer-orders"
+            :fact-types [{:fact-type-id "ORDER-is-for-CUSTOMER"
+                          :arity 2,
+                          :objects ["order" "customer"]
+                          :reference-modes ["order-number" "customer-id"]
+                          :deontic-keys ["mandatory" ""]
+                          :uniqueness [["key1" ""]]
+                          :examples {:column-headings ["order-number" "customer-id"]
+                                     :rows [["CO-865204" "CID-8811"]
+                                            ["CO-863393" "CID-8955"]
+                                            ["CO-865534" "CID-0013"]]}}]})
+          "Note that\n"
+          "    (1) the example conforms to the structure of the complete EADS defined below, for example 'fact-types' is a list even though only one is provided, and,\n"
+          "    (2) the example assumes that 'customer-orders' already defined the 'order' and 'customer' objects in its 'inquiry-area-objects'.\n"
+          "    (3) if you every need to reassess a fact type (for example if you now think it was represented wrong in prior discussion) just send the new one in your DSR message; it will overwrite the current one.\n"
           "\n"
           "ORM is designed to encourage verbalization of fact types.\n"
           "We encourage you to use such verbalizations in Task 2a as follow-up questions when the interviewees' response leaves you uncertain what fact type is intended.\n"
@@ -204,7 +225,7 @@
                    :comment "You don't need to specify this property until you are ready to set its value to true, signifying that you believe that all areas of inquiry have been sufficiently investigated.\n"}
       :areas-we-intend-to-discuss ["customer-orders", "workforce"]
       :inquiry-areas
-      [{:inquiry-area-ref {:val "customer-orders"
+      [{:inquiry-area-id {:val "customer-orders"
                            :comment (str "'customer-orders' is a value in an enumeration of areas of inquiry. The enumeration values are defined as follows:\n"
                                          "\n"
                                          "'customer-orders' - about products customers are ordering, their quantities, due dates, expected ship dates, etc..\n"
@@ -222,7 +243,7 @@
                                          "This enumeration might be incomplete. Whenever nothing here seems to fit, create another term and define it with an annotation comment."
                                          "\n"
                                          "When Task 1 is completed but you have not yet started Task 2a on any fact types, the 'inquiry-areas' property will contain a list of simple objects such as "
-                                         (clj2json-pretty {:inquiry-area-ref "customer-orders"}) " " (clj2json-pretty {:inquiry-area-ref "WIP"}) " and so on.\n\n"
+                                         (clj2json-pretty {:inquiry-area-id "customer-orders"}) " " (clj2json-pretty {:inquiry-area-id "WIP"}) " and so on.\n\n"
                                          "It is important to keep in mind that we are developing the scheduling system incrementally.\n"
                                          "The first few versions of it might be rudimentary and incomplete. This is intentional! We want to show the humans how MiniZinc works using these rudimentary versions.\n"
                                          "How this affects your work is that, unless you have been specifically told otherwise, you should limit discussion to areas of inquiry that you think are essential to\n"
@@ -283,7 +304,7 @@
                                   ["CO-863393" "CID-8955"]
                                   ["CO-865534" "CID-0013"]]}}]}}
 
-       {:inquiry-area-ref "workforce"
+       {:inquiry-area-id "workforce"
         :inquiry-area-objects [{:object-id "employee"
                                 :definition "someone who works for the company."}
                                {:object-id "skill"
@@ -302,8 +323,43 @@
                                         ["EN-098" "Milling Centers" "2022-11-13"]
                                         ["EN-891" "EDM machines"    "2023-03-28"]]}}]}]}})
 
+;;; (s/explain :orm/EADS-message orm)
+(when-not (s/valid? :orm/EADS-message orm)
+  (throw (ex-info "Invalid EADS (ORM)" {})))
+
+(defn combine
+  "Accommodate information from the second argument map into the first argument map,
+   returning the modified first argument. We don't do upsert, just insert and replace
+   on timeslot-types (by :ts-type-id) and event-types (by :event-type-id).
+   In these DRMs it is possible to add new areas of inquiry (inquiry-area-id) and add new fact types (fact-type-id).
+   Thus we first combine areas of inquiry, and then, for each area, combine fact-types."
+  [best more]
+  (reduce (fn [best area-id]
+            (let [best-area (eu/get-object best :inquiry-area-id area-id)
+                  more-area (eu/get-object more :inquiry-area-id area-id)
+                  best-fact-ids (eu/collect-keys-vals best-area :fact-type-id)
+                  more-fact-ids (eu/collect-keys-vals more-area :fact-type-id)
+                  fact-inserts   (set/difference more-fact-ids best-fact-ids)
+                  fact-replaces  (set/intersection best-fact-ids more-fact-ids)]
+              (as-> best ?b
+                (reduce (fn [r new-id] (eu/insert-by-id  r :fact-types (eu/get-object more :fact-type-id new-id))) ?b fact-inserts)
+                (reduce (fn [r new-id] (eu/replace-by-id r :fact-types :fact-type-id (eu/get-object more :fact-type-id new-id))) ?b fact-replaces))))
+          best
+          (eu/collect-keys-vals more :inquiry-area-id)))
+
+(defmethod combine-ds! :data/orm
+  [tag pid]
+  (let [msg-ds (->> (db/get-msg-dstructs pid tag)
+                    (mapv eu/strip-annotations))
+        start-arg (reduce (fn [r m] (merge r m)) {} msg-ds)
+        merged (reduce (fn [r ds] (combine r ds)) start-arg msg-ds)]
+    (db/put-summary-ds! pid
+                        :data/orm
+                        (assoc merged :EADS-id tag))
+    merged))
+
 ;;; ------------------------------- checking for completeness ---------------
-;;; (-> orm/orm :EADS eads-util/strip-annotations orm/completeness-test)
+;;; (-> orm/orm :EADS eu/strip-annotations orm/completeness-test)
 (defn completeness-test
   "The ORM ds is complete when the interviewer sets :exhausted to true.
    We trust the interviewer on this one."
@@ -315,7 +371,7 @@
   [refine-msg]
   (as-> refine-msg ?m
     (:data-structure ?m)
-    (eads-util/strip-annotations ?m)
+    (eu/strip-annotations ?m)
     (if (contains? ?m :EADS-ref)
       (assoc :EADS-id (:EADS-ref refine-msg))
       ?m)

@@ -50,7 +50,7 @@
 ;  'pan    'scheduling-tbd.iviewr.domain.process.process-analysis
    'sptype 'scheduling-tbd.iviewr.domain.process.scheduling-problem-type
    'ttable 'scheduling-tbd.iviewr.domain.process.timetabling
-   'eads-util  'scheduling-tbd.iviewr.eads-util
+   'eu     'scheduling-tbd.iviewr.eads-util
    'inv    'scheduling-tbd.iviewr.interviewers
    'ork    'scheduling-tbd.iviewr.ork
    'orkt   'scheduling-tbd.iviewr.ork-test
