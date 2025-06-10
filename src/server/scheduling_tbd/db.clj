@@ -98,12 +98,6 @@
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string, same as the :project/name in the project's DB."}
-
-   ;; ------------------------- specs
-   :spec/full
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "a keyword identifying the full spec in the clojure spec registry. Used, for example, to check an EADS data structure."}
-
 ;;; ---------------------- system
    :system/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
@@ -176,9 +170,6 @@
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword uniquely identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
-   #_#_:conversation/interviewer-budget
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
-        :doc "the budget a number (0 <= budget <= 1) indicating how much more resources the interviewer is allowed to expend."}
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages between the interviewer and interviewees of the conversation."}
@@ -190,9 +181,9 @@
    :dstruct/str
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string that can be edn/read-string to the data structure."}
-   :dstruct/budget
+   :dstruct/budget-left
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
-        :doc "a string that can be edn/read-string to the data structure."}
+        :doc "the amount of budget left for questioning."}
 
    ;; ---------------------- message
    :message/answers-question
@@ -253,7 +244,7 @@
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
-   :project/dstructures
+   :project/summary-dstructs
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "'summary' data structures indexed by their EADS-id, :dstruct/id."}
    :project/id
@@ -421,17 +412,13 @@
 
 (def conversation-defaults
   [{:conversation/id :process
-    :conversation/status :in-progress ; We assume things start here.
-    #_#_:conversation/interviewer-budget 1.0}
+    :conversation/status :in-progress} ; We assume things start here.
    {:conversation/id :data
-    :conversation/status :not-started
-    #_#_:conversation/interviewer-budget 1.0}
+    :conversation/status :not-started}
    {:conversation/id :resources
-    :conversation/status :not-started
-    :conversation/interviewer-budget 1.0}
+    :conversation/status :not-started}
    {:conversation/id :optimality
-    :conversation/status :not-started
-    #_#_:conversation/interviewer-budget 1.0}])
+    :conversation/status :not-started}])
 
 (declare add-conversation-intros get-system)
 
@@ -555,6 +542,7 @@
        @(connect-atm pid)))
 
 (declare system-EADS?)
+
 (defn put-project-active-EADS-id!
   [pid eads-id]
   (assert ((system-EADS?) eads-id))
@@ -865,7 +853,7 @@
         (log! :warn (str "Could not find msg for update-msg: pid = " pid " cid = " cid " mid = " mid))))))
 
 ;;; ----------------------------------------- Budget ---------------------------------------------
-(defn get-budget
+#_(defn get-budget
   "Return the :conversation/interviewer-budget."
   [pid cid]
    (d/q '[:find ?budget .
@@ -875,7 +863,7 @@
           [?e :conversation/interviewer-budget ?budget]]
         @(connect-atm pid) cid))
 
-(defn put-budget!
+#_(defn put-budget!
   [pid cid val]
   (let [conn-atm (connect-atm pid)
         eid (d/q '[:find ?eid .
@@ -980,18 +968,6 @@
     (edn/read-string msg-str)
     (throw (ex-info "No eads-id: " eads-id {:eads-id eads-id}))))
 
-(defn get-EADS-budget-decrement
-  "Get from the system DB the amount by which the conversation budget is decrements for each question.
-   If this hasn't been set in the EADS, it returns the default value of 0.05."
-  [eads-id]
-  (let [res (d/q '[:find ?budget-dec .
-                   :in $ ?eads-id
-                   :where
-                   [?e :EADS/id ?eads-id]
-                   [?e :EADS/budget-decrement ?budget-dec]]
-                 @(connect-atm :system) eads-id)]
-    (or res 0.05)))
-
 (defn same-EADS-instructions?
   "Return true if the argument eads-instructions (an EDN object) is exactly what the system already maintains."
   [eads-instructions]
@@ -1007,12 +983,59 @@
       (log! :error (str "No such EADS instructions " eads-id)))))
 
 ;;; -------------------- Summary data structures -----------------------
-(defn ^:admin summary-ds-exists? ; TooD :Keep this? Not used yet!
+(defn summary-ds-exists?
   [pid eads-id]
   (d/q '[:find ?eid .
          :in $ ?eads-id
          :where [?eid :dstruct/id ?eads-id]]
        @(connect-atm pid) eads-id))
+
+(defn put-new-summary-ds!
+  "Add a summary data-structure with the given eads-id an budget = 1.0 to the argument project."
+  [pid eads-id]
+  (if-let [eid (project-exists? pid)]
+    (d/transact (connect-atm pid) {:tx-data [{:db/id eid
+                                              :project/summary-dstructs
+                                              {:dstruct/id eads-id
+                                               :dstruct/budget-left 1.0}}]})
+    (log! :error (str "Project not found " pid))))
+
+(defn get-questioning-budget-left!
+  "The project contains dstruct objects for everything that has been started.
+   If one can't be found (it hasn't started) this returns 1.0, otherwise it
+   returns the value of :dstruct/budget-left for the given eads-id.
+   This will create the summary data structure if it doesn't exist."
+  [pid eads-id]
+  (assert (or (nil? eads-id)((system-EADS?) eads-id)))
+  (if-let [eid (summary-ds-exists? pid eads-id)]
+    (d/q '[:find ?left . :in $ ?eid :where [?eid :dstruct/budget-left ?left]] @(connect-atm pid) eid)
+    (do (when eads-id (put-new-summary-ds! pid eads-id))
+        1.0)))
+
+(def default-EADS-budget-decrement 0.5)
+
+(defn reduce-questioning-budget!
+  "The system stores EADS-instructions that may or may not have an :EADS/budget-decrement.
+   If it does, decrement the same-named summary structure objec by that value.
+   Otherwise, decrement the same-named object by the db/default-EADS-budget-decrement."
+  [pid eads-id]
+  (assert ((system-EADS?) eads-id))
+  (let [val (get-questioning-budget-left! pid eads-id)
+        dec-val (or (d/q '[:find ?dec-val .
+                           :in $ ?eads-id
+                           :where
+                           [?e :EADS/id ?eads-id]
+                           [?e :EADS/budget-decrement ?dec-val]]
+                         @(connect-atm :system) eads-id)
+                    default-EADS-budget-decrement)
+        eid (d/q '[:find ?eid .
+                   :in $ ?eads-id
+                   :where
+                   [?eid :dstruct/id ?eads-id]]
+                 @(connect-atm pid) eads-id)]
+    (when eid
+      (d/transact (connect-atm pid) {:tx-data [{:db/id eid :dstruct/budget-left (- val dec-val)}]})
+      (log! :error (str "No summary structure for EADS id " eads-id)))))
 
 (defn get-summary-ds
   "Return the summary EADS data structure give the IDs for the project and EADS-id.
@@ -1034,8 +1057,8 @@
     (if eid
       (d/transact (connect-atm pid)
                   {:tx-data [{:db/id eid
-                              :project/dstructures {:dstruct/id eads-id
-                                                    :dstruct/str (str dstruct)}}]})
+                              :project/summary-dstructs {:dstruct/id eads-id
+                                                         :dstruct/str (str dstruct)}}]})
       (throw (ex-info "No eid" {:pid pid :eid eid})))))
 
 ;;; -------------------- Starting and stopping -------------------------

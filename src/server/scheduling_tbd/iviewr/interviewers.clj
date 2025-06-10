@@ -127,16 +127,12 @@
                                    :STATUS                            #(string? (get % :status))))))
 
 (s/def :iviewr/supply-question (s/keys :req-un [:iviewr/budget]))
-
 (s/def :iviewr/question-to-ask (s/keys :req-un [:iviewr/question]))
-
 (s/def :iviewr/interviewees-respond (s/keys :req-un [:iviewr/response]))
 (s/def :iviewr/response string?)
-
 (s/def :iviewr/data-structure-refinement (s/keys :req-un [:iviewr/commit-notes :iviewr/data-structure]))
 (s/def :iviewr/commit-notes string?)
 (s/def :iviewr/data-structure map?)
-
 (s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/budget :iviewr/activity :iviewr/interviewee-type] :opt-un [:iviewr/data-structure :iviewr/EADS]))
 (s/def :iviewr/budget number?)
 (s/def :iviewr/interviewee-type #(#{:human :machine} %))
@@ -146,7 +142,6 @@
 (s/def :iviewr/answer string?)
 (s/def :iviewr/data-structure map?)
 (s/def :iviewr/EADS map?) ; ToDo: Tie in the EADSs?
-
 (s/def :iviewr/eads-instructions (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
 (s/def :iviewr/interview-objective string?)
 (s/def :iviewr/EADS (s/or :dehydrated string? :hydrated map?))
@@ -254,7 +249,7 @@
                      (filter #(contains? % :message/answers-question)))]
     (cond-> {:message-type :CONVERSATION-HISTORY
              :interviewee-type (if (surrogate? pid) :machine :human)
-             :budget (db/get-budget pid cid)}
+             :budget (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid))}
       (not-empty answers)   (assoc :activity (mapv (fn [answer]
                                                      {:question (-> (db/get-msg pid cid (:message/answers-question answer)) :message/content)
                                                       :answer  (-> answer :message/content)}) ; ToDo: Is this inclusive of tables?
@@ -262,8 +257,8 @@
 
 (defn make-supply-question-msg
   "Create a supply question message for the conversation."
-  [pid cid]
-  {:message-type :SUPPLY-QUESTION :budget (db/get-budget pid cid)})
+  [pid]
+  {:message-type :SUPPLY-QUESTION :budget (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid))})
 
 ;;; --------------- Handle tables from interviewer --------------------------------------
 (defn table-xml2clj
@@ -362,7 +357,7 @@
    The first element in the vector should be the question object, and the last the answer object."
   [iviewr-agent pid cid {:keys [client-id responder-type] :as ctx}]
   (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-  (try (let [iviewr-q (-> (make-supply-question-msg pid cid) ; This just makes a SUPPLY-QUESTION message-type.
+  (try (let [iviewr-q (-> (make-supply-question-msg pid) ; This just makes a SUPPLY-QUESTION message-type.
                           (tell-interviewer iviewr-agent cid)         ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
                           (separate-table))]               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
          (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
@@ -528,7 +523,7 @@
          4) interviewing to stop (because ork conludes that no more eads-instructions apply, or forced by active? atom)."
   [pid cid]
   (ork/ensure-ork! pid)
-  (let [budget-ok? (> (db/get-budget pid cid) 0)
+  (let [budget-ok? (> (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid)) 0)
         active-eads-id (db/get-project-active-EADS-id pid)
         active-eads-complete? (or (not budget-ok?)
                                   (and active-eads-id (eu/ds-complete? active-eads-id pid)))
@@ -584,6 +579,7 @@
                   (db/put-conversation-status! pid cid :in-progress))
                 (when change-eads?
                   (log! :warn (str "Changing EADS, new-eads-id = " new-eads-id))
+                  (db/put-new-summary-ds! pid new-eads-id)
                   (db/put-project-active-EADS-id! pid new-eads-id) ; This will be used by :message/pursuing-EADS.
                   (db/put-active-EADS-id pid cid new-eads-id) ; This will be used by :message/pursuing-EADS.
                   (tell-interviewer (db/get-EADS-instructions new-eads-id) iviewr-agent cid))
@@ -595,7 +591,7 @@
                                                         cid
                                                         {:tries 2
                                                          :test-fn output-struct2clj})]
-                    (db/put-budget! pid cid (- (db/get-budget pid cid) (db/get-EADS-budget-decrement eads-id)))
+                    (db/reduce-questioning-budget! pid eads-id)
                     (update-db-conversation! pid cid conversation)
                     (post-ui-actions  iviewr-response pid cid ctx)  ; show graphs and tables, tell humans to switch conv.
                     (post-db-actions! iviewr-response pid cid)) ; associate DS refinement with msg.
