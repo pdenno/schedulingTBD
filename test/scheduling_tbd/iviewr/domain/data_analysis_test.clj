@@ -1,19 +1,8 @@
 (ns scheduling-tbd.domain.data-analysis-test
   (:require
-   [clojure.core.unify                     :as uni]
-   [clojure.test                           :refer [deftest is testing]]
-   [clojure.spec.alpha                     :as s]
-   [datahike.api                           :as d]
-   [datahike.pull-api                      :as dp]
-   [jsonista.core                          :as json]
-   [scheduling-tbd.agent-db                :as adb]
    [scheduling-tbd.db                      :as db]
-   [scheduling-tbd.iviewr.domain.process-analysis :as pan]
    [scheduling-tbd.iviewr.interviewers            :as inv :refer [tell-interviewer]]
-   [scheduling-tbd.llm                     :as llm :refer [query-llm]]
    [scheduling-tbd.response-utils          :as ru]
-   [scheduling-tbd.util                    :as util]
-   [scheduling-tbd.sutil                   :as sutil]
    [scheduling-tbd.web.websockets          :as ws]
    [taoensso.telemere                      :as tel :refer [log!]]))
 

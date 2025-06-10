@@ -91,9 +91,10 @@
 (s/def ::annotated-rows (s/keys :req-un [::comment :rows/val]))
 
 (def orm
-    {:message-type :EADS-INSTRUCTIONS
-     :interviewer-agent :data
-     :interview-objective
+  {:message-type :EADS-INSTRUCTIONS
+   :budget-decrement 0.05
+   :interviewer-agent :data
+   :interview-objective
      (str "The data interview is about discovering and documenting the information that interviewees use to do their work (scheduling production or providing a service to customers).\n"
           "Many small manufacturers use spreadsheets to run their company.\n"
           "It would seem expeditious, therefore, to have the interviewees upload their spreadsheets for discussion; but we are not going to do that.\n"
@@ -378,15 +379,11 @@
     (dissoc ?m :EADS-ref)))
 
 (defmethod ds-complete? :data/orm
-  [refine-msg]
-  (let [ds (ds-refine2ds refine-msg)
-        complete? (completeness-test ds)]
-    (agent-log (str "This is the stripped DS for ORM (complete? = " complete? "):\n" (with-out-str (pprint ds)))
+  [tag pid]
+  (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
+    complete? (completeness-test ds)]
+    (agent-log (str "This is the stripped DS for timetabling (complete? = " complete? "):\n" (with-out-str (pprint ds)))
                {:console? true :elide-console 130})
-    (when-not (s/valid? ::EADS ds)
-      (reset! diag orm)
-      (agent-log (str "EADS is invalid:\n" (with-out-str (pprint ds)))
-                 {:console? true :level :warn :elide-console 130}))
     complete?))
 
 ;;; -------------------- Starting and stopping -------------------------

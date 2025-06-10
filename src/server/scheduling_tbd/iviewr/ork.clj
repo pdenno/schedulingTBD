@@ -4,13 +4,11 @@
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
    [clojure.pprint                :refer [pprint]]
-   [clojure.set                   :as set]
    [clojure.spec.alpha            :as s]
    [datahike.api                  :as d]
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.iviewr.eads] ; for mount
-   [scheduling-tbd.iviewr.eads-util :as eads-util]
    [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide output-struct2clj]]
    [taoensso.telemere             :as tel :refer [log!]]))
 
@@ -25,15 +23,11 @@
   ([pid opts]
    (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid} opts)))
 
-
-;;;                  :thread-id "thread_tva3Ui80mSstem032NLGNQgy",
-;;;                  :assistant-id "asst_6VQhN6C2nf4rFQlZEIciqTJY",
 (defn ^:admin refresh-ork!
   "I use this at the REPL to create a new ork in the system DB.
    That is enough to cause it to be reused in NEW projects."
   []
   (adb/ensure-agent! :orchestrator-agent #_{:force-new? true}))
-
 
 ;;; ToDo: Find a better home for this.
 (def scheduling-challenge2-description
@@ -77,11 +71,10 @@
         result (atom [])
         current-eads (atom nil)]
     (letfn [(make-ds-entry [eads-id]
-              (let [{:keys [EADS-ref data-structure commit-notes exhausted?] :as _diag} (get eads-max-ds-map eads-id)]
-                (reset! diag {:eads _diag :eads-id eads-id})
+              (let [{:keys [EADS-ref data-structure commit-notes exhausted?]} (get eads-max-ds-map eads-id)]
                 {:resulting-EADS
-                 (cond-> {:EADS-ref EADS-ref ; This is the arrangement in orchestrator.txt (agent instructions)
-                          :data-structure data-structure #_(eads-util/strip-annotations data-structure)} ; Jury is out on whether to strip.
+                 ;; This is the arrangement in orchestrator.txt (agent instructions). Jury is out on whether to strip.
+                 (cond-> {:EADS-ref EADS-ref :data-structure data-structure}
                    commit-notes (assoc :commit-notes commit-notes)
                    exhausted?   (assoc :exhausted? true))}))]
       (doseq [act activities]
@@ -124,7 +117,6 @@
         (when code-execution (swap! result conj {:code-execution code}))))
     (add-ds-to-activities pid cid @result)))
 
-
 ;;; ToDo: Check the :conversation/ork-tid versus the actual (once this doesn't provide the whole thing; so that you don't have to provide the whole thing to same ork.)
 ;;; ToDo: Currently this is very similar to inv/conversation-history.
 ;;; ToDo: Needs minizinc execution
@@ -158,17 +150,6 @@
      (cond-> {:message-type :CONVERSATION-HISTORY}
        (not-empty challenges)  (assoc :scheduling-challenges challenges)
        (not-empty activities)  (assoc :activity activities)))))
-
-(defn collect-keys
-  [obj]
-  (let [result-atm (atom #{})]
-    (letfn [(ck [obj]
-              (cond (map? obj)            (doseq [[k v] obj]
-                                            (swap! result-atm conj k)
-                                            (ck v))
-                    (vector? obj)         (doseq [o obj] (ck o))))]
-      (ck obj))
-    @result-atm))
 
 (s/def ::ork-msg map?) ; ToDo: Write specs for ork messages.
 
@@ -209,5 +190,4 @@
       (if ((db/system-EADS?) eads-instructions-id)
         eads-instructions-id
         ;; Otherwise probably :exhausted. Return nil
-        (do (agent-log (str "Exhausted or invalid PURSUE-EADS message: " pursue-msg) {:console? true :level :info})
-            (throw (ex-info "Exhausted or invalid PURSUE-EADS message:" {:pursue-msg pursue-msg})))))))
+       (agent-log (str "Exhausted or invalid PURSUE-EADS message: " pursue-msg) {:console? true :level :info})))))

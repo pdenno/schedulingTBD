@@ -1,4 +1,4 @@
-(ns scheduling-tbd.iviewr.interviewers
+:inter(ns scheduling-tbd.iviewr.interviewers
     "Runs an interview using an interview agent."
     (:require
      [cheshire.core                   :as ches]
@@ -14,7 +14,7 @@
      [scheduling-tbd.db               :as db]
      [scheduling-tbd.llm              :as llm]
      [scheduling-tbd.iviewr.eads] ; for mount
-     [scheduling-tbd.iviewr.eads-util      :as eads-util :refer [combine-ds!]]
+     [scheduling-tbd.iviewr.eads-util      :as eu :refer [combine-ds!]]
      [scheduling-tbd.iviewr.ork            :as ork]
      [scheduling-tbd.iviewr.response-utils :as ru]
      [scheduling-tbd.sutil                 :as sutil :refer [elide output-struct2clj]]
@@ -45,10 +45,10 @@
                               (s/or :surrogate ::surrogate-ctx :human ::human-ctx)))
 
 (s/def ::common-ctx    (s/keys :req-un [::client-id ::question]))
-(s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-type ::surrogate-agent ::interviewer-agent]))
-(s/def ::human-ctx     (s/keys :req-un [:hum/responder-type ::interviewer-agent]))
+(s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-type ::surrogate-agent ::iviewr-agent]))
+(s/def ::human-ctx     (s/keys :req-un [:hum/responder-type ::iviewr-agent]))
 (s/def ::basic-agent (s/keys :req-un [::aid ::tid ::base-type]))
-(s/def ::interviewer-agent ::basic-agent)
+(s/def ::iviewr-agent ::basic-agent)
 (s/def ::surrogate-agent ::basic-agent)
 (s/def ::aid string?)
 (s/def ::tid string?)
@@ -153,33 +153,22 @@
 
 (s/def :iviewr/course-correction (s/keys :opt-un [:iviewr/advice :iviewr/question]))
 
-(def course-correction-count (atom 0))
-
-(defn too-many-course-corrections!
-  "If many course-corrections have occurred, stop the conversation."
-  [{:keys [message]}]
-  (when (= message :COURSE-CORRECTION)
-    (swap! course-correction-count inc))
-  (when (> @course-correction-count 5)
-    (reset! active? false)))
-
 (defn tell-interviewer
   "Send a message to an interviewer agent and wait for response; translate it.
    :aid and :tid in the opts should be for the interviewer agent."
-  [msg {:keys [interviewer-agent cid] :as opts}]
-  (reset! diag {:msg msg :opts opts})
-  (too-many-course-corrections! msg)
-  (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
-    (log! :warn (str "Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
-  (agent-log (str "[interview manager] (tells " (name cid) " interviewer)\n" (with-out-str (pprint msg))))
-  (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
-  (let [msg-string (ches/generate-string msg {:pretty true})
-        res (-> (adb/query-agent interviewer-agent msg-string opts) output-struct2clj)
-        res (cond-> res
-              (contains? res :message-type)     (update :message-type keyword))]
-    (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
-    (agent-log (str "[interview manager] (receives from " (name cid) " interviewer)\n" (with-out-str (pprint res))))
-    res))
+  ([msg iviewr-agent cid] (tell-interviewer msg iviewr-agent cid {}))
+  ([msg iviewr-agent cid opts]
+   (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
+     (log! :warn (str "Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
+   (agent-log (str "[interview manager] (tells " (name cid) " interviewer)\n" (with-out-str (pprint msg))))
+   (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
+   (let [msg-string (ches/generate-string msg {:pretty true})
+         res (-> (adb/query-agent iviewr-agent msg-string opts) output-struct2clj)
+         res (cond-> res
+               (contains? res :message-type)     (update :message-type keyword))]
+     (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
+     (agent-log (str "[interview manager] (receives from " (name cid) " interviewer)\n" (with-out-str (pprint res))))
+     res)))
 
 (defn response-analysis
   "Return a map of booleans including
@@ -273,12 +262,8 @@
 
 (defn make-supply-question-msg
   "Create a supply question message for the conversation."
-  [{:keys [pid cid] :as _ctx}]
+  [pid cid]
   {:message-type :SUPPLY-QUESTION :budget (db/get-budget pid cid)})
-
-(defn fix-off-course--question
-  "Generate and communicate a COURSE-CORRECTION message based on the argument question."
-  [q _ctx] q) ; ToDo: NYI
 
 ;;; --------------- Handle tables from interviewer --------------------------------------
 (defn table-xml2clj
@@ -367,7 +352,6 @@
            (catch Throwable _e (assoc res :status :invalid-table)))
       res)))
 
-(s/def ::q-and-a (s/keys :req-un [::question ::client-id]))
 (s/def ::question string?)
 
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
@@ -376,12 +360,11 @@
   "Call interviewer to supply a question; call get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
    Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :text :table...).
    The first element in the vector should be the question object, and the last the answer object."
-  [{:keys [client-id responder-type] :as ctx}]
+  [iviewr-agent pid cid {:keys [client-id responder-type] :as ctx}]
   (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-  (try (let [iviewr-q (-> (make-supply-question-msg ctx) ; This just makes a SUPPLY-QUESTION message-type.
-                          (tell-interviewer ctx)         ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
-                          (separate-table)               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
-                          (fix-off-course--question ctx))]         ; Currently a no-op. Returns argument.
+  (try (let [iviewr-q (-> (make-supply-question-msg pid cid) ; This just makes a SUPPLY-QUESTION message-type.
+                          (tell-interviewer iviewr-agent cid)         ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
+                          (separate-table))]               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
          (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
          ;; This returns a VECTOR of statements from the interviewees and interviewer.
          (get-an-answer (cond-> ctx
@@ -435,11 +418,11 @@
 (defn ctx-surrogate
   "Return context updated with surrogate info."
   [{:keys [pid cid force-new?] :as ctx}]
-  (let [interviewer-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
+  (let [iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
         surrogate-agent   (adb/ensure-agent! {:base-type pid :pid pid} {:make-agent? force-new?})
         ctx (-> ctx
                 (assoc :responder-type :surrogate)
-                (assoc :interviewer-agent interviewer-agent)
+                (assoc :iviewr-agent iviewr-agent)
                 (assoc :surrogate-agent surrogate-agent))]
     (if (s/valid? ::surrogate-ctx ctx)
       ctx
@@ -450,7 +433,7 @@
   "Return  part of context specific to humans."
   [{:keys [pid cid]}]
    {:responder-type :human
-    :interviewer-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})})
+    :iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})})
 
 (defn start-human-project!
   "This does a few things to 'catch up' with the surrogate-mode of operation, which alreadys knows what the project is about.
@@ -504,7 +487,7 @@
 
 (defn post-ui-actions
   "Send client actions to perform such as loading graphs or (for humans) changing conversations."
-  [iviewr-response {:keys [pid cid new-cid? client-id responder-type] :as _ctx}]
+  [iviewr-response pid cid {:keys [new-cid? client-id responder-type] :as _ctx}]
   (when (surrogate? pid) (ru/refresh-client client-id pid cid))
   (when (= :DATA-STRUCTURE-REFINEMENT (:message-type iviewr-response))
     ;; Using the data structure being pursued in some EADS instructions to show a FFBD of their processes.
@@ -521,7 +504,7 @@
 (defn post-db-actions!
   "If the interviewer responded with a DATA-STRUCTURE-REFINEMENT (which is typical), associate the
    whole message as a string to the message which is an answer to the question."
-  [iviewr-response {:keys [pid cid]}]
+  [iviewr-response pid cid]
   (when (= :DATA-STRUCTURE-REFINEMENT (:message-type iviewr-response))
     (put-EADS-ds-on-msg! pid cid iviewr-response)
     (when-let [eads-id (db/get-active-EADS-id pid cid)]
@@ -546,9 +529,9 @@
   [pid cid]
   (ork/ensure-ork! pid)
   (let [budget-ok? (> (db/get-budget pid cid) 0)
-        active-eads-id (db/get-active-EADS-id pid cid)
+        active-eads-id (db/get-project-active-EADS-id pid)
         active-eads-complete? (or (not budget-ok?)
-                                  (and active-eads-id (eads-util/ds-complete? active-eads-id pid)))
+                                  (and active-eads-id (eu/ds-complete? active-eads-id pid)))
         new-eads-id (when (or active-eads-complete? (not active-eads-id))
                       (ork/get-new-EADS-id pid))
         change-eads? new-eads-id
@@ -584,37 +567,38 @@
   [{:keys [client-id pid cid] :as ctx}]
   (assert (s/valid? ::client-id client-id))
   (assert (s/valid? ::cid cid))
-  (reset! course-correction-count 0)
   (agent-log (str "============= resume-conversation: " pid  " " cid " " (now) " ========================")
              {:console? true :level :debug})
   (if (ready-for-discussion? pid cid)
     (try
-      (let [ctx (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
-        (-> (conversation-history pid cid) (tell-interviewer ctx))
+      (let [{:keys [iviewr-agent] :as ctx} (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))]
+        (-> (conversation-history pid cid) (tell-interviewer iviewr-agent cid))
         (loop [ctx ctx] ; ToDo: currently not used!
           (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?]} (ork-review pid cid)]
             (if (or exhausted? force-stop?)
               (agent-log (str "resume-conversation exiting. ctx:\n" (with-out-str (pprint ctx))) {:console? true})
               (let [eads-id (or new-eads-id (db/get-active-EADS-id pid cid))]
                 (when new-cid?
+                  (db/put-active-cid! pid cid)
                   (db/put-conversation-status! pid old-cid :eads-exhausted)
                   (db/put-conversation-status! pid cid :in-progress))
                 (when change-eads?
                   (log! :warn (str "Changing EADS, new-eads-id = " new-eads-id))
+                  (db/put-project-active-EADS-id! pid new-eads-id) ; This will be used by :message/pursuing-EADS.
                   (db/put-active-EADS-id pid cid new-eads-id) ; This will be used by :message/pursuing-EADS.
-                    (tell-interviewer (db/get-EADS-instructions new-eads-id) ctx))
-                (let [conversation (q-and-a ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
+                  (tell-interviewer (db/get-EADS-instructions new-eads-id) iviewr-agent cid))
+                (let [conversation (q-and-a iviewr-agent pid cid ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                       expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
                       ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
                       iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
-                                                        {:interviewer-agent (:interviewer-agent ctx)
-                                                         :cid cid
-                                                         :tries 2
+                                                        iviewr-agent
+                                                        cid
+                                                        {:tries 2
                                                          :test-fn output-struct2clj})]
                     (db/put-budget! pid cid (- (db/get-budget pid cid) (db/get-EADS-budget-decrement eads-id)))
                     (update-db-conversation! pid cid conversation)
-                    (post-ui-actions  iviewr-response ctx)  ; show graphs and tables, tell humans to switch conv.
-                    (post-db-actions! iviewr-response ctx)) ; associate DS refinement with msg.
+                    (post-ui-actions  iviewr-response pid cid ctx)  ; show graphs and tables, tell humans to switch conv.
+                    (post-db-actions! iviewr-response pid cid)) ; associate DS refinement with msg.
                   (recur (clear-ctx-ephemeral ctx)))))))
       (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))
     (find-appropriate-conv-and-redirect ctx)))

@@ -165,9 +165,9 @@
    :conversation/active-EADS-id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "The id of the EADS instructions which is currently being pursued in this conversation.\n"
-                  "If the conversation doesn't have one, functions such as ork/get-EADS-id can make one using the project's orchestrator agent."
+                  "If the conversation doesn't have one, functions such as ork/get-EADS-id can determine it using the project's orchestrator agent."
                   "Though only one EADS can truely be active at a time, we index the active-EADS-id by [pid, cid] because other conversations "
-                  "could still need work.")}
+                  "could still need work. See also :project/active-EADS-id")}
    :conversation/status
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "A keyword that specifies the status of the conversation. Thus far, the only values are :eads-exhausted :in-progress, and "
@@ -176,7 +176,7 @@
    :conversation/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a keyword uniquely identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
-   :conversation/interviewer-budget
+   #_#_:conversation/interviewer-budget
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
         :doc "the budget a number (0 <= budget <= 1) indicating how much more resources the interviewer is allowed to expend."}
    :conversation/messages
@@ -189,6 +189,9 @@
         :doc "the EADS-id uniquely identifying the summary data structure."}
    :dstruct/str
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "a string that can be edn/read-string to the data structure."}
+   :dstruct/budget
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
         :doc "a string that can be edn/read-string to the data structure."}
 
    ;; ---------------------- message
@@ -235,6 +238,9 @@
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "The conversation most recently busy, #{:process...}. Note that several conversations can still need work, and there can "
                   "be an :conversation/active-EADS-id on several, however, this is the conversation to start if coming back to the project.")}
+   :project/active-EADS-id
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The most recently purused EADS in the project. See also :conversation/active-EADS-id."}
    :project/agents
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
         :doc "an agent (OpenAI Assistant, etc.) that outputs a vector of clojure maps in response to queries."}
@@ -416,16 +422,16 @@
 (def conversation-defaults
   [{:conversation/id :process
     :conversation/status :in-progress ; We assume things start here.
-    :conversation/interviewer-budget 1.0}
+    #_#_:conversation/interviewer-budget 1.0}
    {:conversation/id :data
     :conversation/status :not-started
-    :conversation/interviewer-budget 1.0}
+    #_#_:conversation/interviewer-budget 1.0}
    {:conversation/id :resources
     :conversation/status :not-started
     :conversation/interviewer-budget 1.0}
    {:conversation/id :optimality
     :conversation/status :not-started
-    :conversation/interviewer-budget 1.0}])
+    #_#_:conversation/interviewer-budget 1.0}])
 
 (declare add-conversation-intros get-system)
 
@@ -526,6 +532,36 @@
   []
   (doseq [p (list-projects)]
     (update-project-for-schema! p)))
+
+(defn get-active-cid
+  "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
+  [pid]
+  (or (d/q '[:find ?cid . :where [_ :project/active-conversation ?cid]] @(connect-atm pid))
+      :process))
+
+(defn put-active-cid!
+  [pid cid]
+  (assert (#{:process :data :resources :optimality} cid))
+  (if-let [eid (project-exists? pid)]
+    (d/transact (connect-atm pid) {:tx-data [{:db/id eid
+                                              :project/active-conversation cid}]})
+    (log! :error "Could not put-active-cid!")))
+
+(defn get-project-active-EADS-id
+  [pid]
+  (d/q '[:find ?eads-id .
+         :where
+         [_ :project/active-EADS-id ?eads-id]]
+       @(connect-atm pid)))
+
+(declare system-EADS?)
+(defn put-project-active-EADS-id!
+  [pid eads-id]
+  (assert ((system-EADS?) eads-id))
+  (if-let [eid (project-exists? pid)]
+    (d/transact (connect-atm pid) {:tx-data [{:db/id eid
+                                              :project/active-EADS-id eads-id}]})
+    (log! :error "Project does not exist.")))
 
 ;;; --------------------------------------- System db -----------------------------------------------------------
 (defn  get-system
@@ -722,12 +758,6 @@
   (doseq [cid [:process :data :resources :optimality]]
     (add-msg  {:pid pid :cid cid :from :system :text (get conversation-intros cid) :tags [:conversation-intro]})))
 
-(defn get-active-cid
-  "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
-  [pid]
-  (or (d/q '[:find ?cid . :where [_ :project/active-conversation ?cid]] @(connect-atm pid))
-      :process))
-
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
   [pid cid]
@@ -904,7 +934,8 @@
       (log! :error (str "No such conversation: " cid)))))
 
 (defn get-active-EADS-id
-  "Return the EADS-id (keyword) for whatever EADS is active in the given project and conversation."
+  "Return the EADS-id (keyword) for whatever EADS is active in the given project and conversation.
+   See also get-project-active-EADS-id."
   [pid cid]
   (d/q '[:find ?eads-id .
          :in $ ?cid
@@ -914,7 +945,7 @@
        @(connect-atm pid) cid))
 
 (defn put-active-EADS-id
-  "Set :conversation/active-EADS."
+  "Set :conversation/active-EADS. See also put-project-active-EADS-id"
   [pid cid eads-id]
   (let [eid (conversation-exists? pid cid)]
     (d/transact (connect-atm pid)

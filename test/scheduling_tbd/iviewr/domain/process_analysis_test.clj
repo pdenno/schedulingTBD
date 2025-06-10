@@ -26,9 +26,10 @@
           tid (:id (llm/make-thread {:assistant-id aid
                                      :llm-provider :openai
                                      :metadata {:usage :project-agent}}))
-          ctx {:iview-aid aid :iview-tid tid}
+          iviewr-agent {:iview-aid aid :iview-tid tid}
           result (atom [])]
-      (letfn [(tell-inv [cmd] (swap! result conj (-> (tell-interviewer cmd ctx) (dissoc :question :iview-aid :iview-tid))))]
+      (letfn [(tell-inv [cmd] (swap! result conj (-> (tell-interviewer cmd iviewr-agent :process)
+                                                     (dissoc :question :iview-aid :iview-tid))))]
         (tell-inv {:command  "ANALYSIS-CONCLUDES", :conclusions "1) You are talking to surrogate humans (machine agents)."})
         (tell-inv {:command  "CONVERSATION-HISTORY"  :already-answered [] :responses []})
         (tell-inv {:command  "SUPPLY-QUESTION"})
