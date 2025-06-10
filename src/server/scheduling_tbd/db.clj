@@ -84,6 +84,9 @@
    :EADS/specs
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "An object where the keys name spec levels (e.g. full) and the values are keywords identifying the spec in the registry."}
+   :EADS/cid
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc "The conversation for which this EADS is used"}
 
    ;; ---------------------- project
    :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
@@ -165,6 +168,9 @@
                   "If the conversation doesn't have one, functions such as ork/get-EADS-id can make one using the project's orchestrator agent."
                   "Though only one EADS can truely be active at a time, we index the active-EADS-id by [pid, cid] because other conversations "
                   "could still need work.")}
+   :conversation/EADS
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "Legacy EADS attribute (needed to recreate old dbs)"}
    :conversation/status
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "A keyword that specifies the status of the conversation. Thus far, the only values are :eads-exhausted :in-progress, and "
@@ -179,6 +185,9 @@
    :conversation/messages
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "the messages between the interviewer and interviewees of the conversation."}
+   :conversation/done?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "boolean that asserts whether the conversation is done"}
 
    ;; ---------------------- message
    :message/answers-question
@@ -224,9 +233,13 @@
 
    ;; ---------------------- project
    :project/code
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string}
         
    :project/active-conversation
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc (str "The conversation most recently busy. Note that several conversations can still need work, and there can be an "
+                  ":conversation/active-EADS-id on several, however, this is the conversation to start if coming back to the project.")}
+   :project/current-conversation
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc (str "The conversation most recently busy. Note that several conversations can still need work, and there can be an "
                   ":conversation/active-EADS-id on several, however, this is the conversation to start if coming back to the project.")}

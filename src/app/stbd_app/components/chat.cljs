@@ -15,12 +15,17 @@
    ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default"                 :as Sidebar]
    ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
    ["@mui/material/Box$default" :as Box]
+   ["@mui/material/Button$default" :as Button]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
+   ["@mui/material/IconButton$default" :as IconButton]
+   ["@mui/icons-material/TableChart$default" :as TableChart]
+   ["@mui/icons-material/Polyline$default" :as Polyline]
    [promesa.core    :as p]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
+   [cljs.core.async :refer [<! go]]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
    [stbd-app.ws         :as ws :refer [remember-promise]]
    [taoensso.telemere          :as tel :refer-macros [log!]]))
@@ -66,19 +71,26 @@
     (reduce (fn [r msg]
               (let [{:message/keys [content from time] :or {time (js/Date. (.now js/Date))}} msg
                     content (msg-with-title content from)
-                    msg-date (-> time inst2date (subs 0 15))]
+                    msg-date (-> time inst2date (subs 0 15))
+                    ]
                 (as-> r ?r
                   (if (= @new-date msg-date)
                     ?r
                     (do (reset! new-date msg-date)
                         (conj ?r ($ MessageSeparator {:key (new-key)} msg-date))))
-                  (conj ?r ($ Message
-                              {:key (new-key)
-                               :model #js {:position "single" ; "single" "normal", "first" and "last"
-                                           :direction (if (#{:system :developer-interjected} from) "incoming" "outgoing") ; From perspective of user.
-                                           :type "html"
-                                           :payload content}}
-                              ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))})))))) ;  They only appear for Interviewer, which is probably good!
+                  (conj ?r ($ Stack {:direction "row"}
+                              ($ Box 
+                                 ($ Message
+                                    {:key (new-key)
+                                     :model #js {:position "single" ; "single" "normal", "first" and "last"
+                                                 :direction (if (#{:system :developer-interjected} from) "incoming" "outgoing") ; From perspective of user.
+                                                 :type "html"
+                                                 :payload content}}
+                                    ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))})
+                                    ($ IconButton {:onClick (log! :info "graph artifact")} ($ Polyline))) ;  They only appear for Interviewer, which is probably good!
+                                   ;"table" ($ IconButton {:onClick (log! :info "table artifact")} ($ TableChart))
+                                  ) 
+                             )))))            
             []
             msgs)))
 
@@ -122,10 +134,12 @@
   "Add messages to the msgs-atm.
    This is typically used for individual messages that come through :iviewr-says or :sur-says,
    as opposed to bulk update through get-conversation."
-  [text from]
+  [text from & {:keys [artifact-type artifact-value] :as artifact-info}]
   (assert (#{:system :surrogate :human :developer-interjected} from))
   (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))]
-    (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
+    (if (nil? artifact-info)
+      (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
+      (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))} :artifact-type artifact-type :artifact-value artifact-value))
     ((lookup-fn :set-cs-msg-list) @msgs-atm)))
 
 (register-fn :interviewer-busy?     (fn [{:keys [value]}]
@@ -136,6 +150,10 @@
                                       (add-msg text :system)
                                       (when table
                                         ((lookup-fn :set-table) table))))
+
+(register-fn :new-artifact (fn [{:keys [p-key text artifact-type artifact-value]}]
+                             (when p-key (remember-promise p-key))
+                             (add-msg text :system {:artifact-type artifact-type :artifact-value artifact-value})))
 
 (register-fn :sur-says              (fn [{:keys [p-key msg]}]
                                       (when p-key (remember-promise p-key))
