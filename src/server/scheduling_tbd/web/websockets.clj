@@ -2,18 +2,18 @@
   "Set up a websockets and message routing for async communication with the client using ring.websocket.async."
   (:refer-clojure :exclude [send])
   (:require
-   [clojure.core.async       :as async :refer [<! >! go]]
-   [clojure.edn              :as edn]
-   [clojure.pprint           :refer [pprint]]
-   [clojure.spec.alpha       :as s]
-   [mount.core               :as mount :refer [defstate]]
-   [promesa.core             :as p]
-   [promesa.exec             :as px]
-   [ring.websocket.async     :as wsa]
-   [scheduling-tbd.specs     :as specs]
-   [scheduling-tbd.sutil     :as sutil :refer [elide]]
-   [scheduling-tbd.util      :refer [now util-state]] ; util-state for mount
-   [taoensso.telemere        :refer [log! event!]]))
+   [clojure.core.async :as async :refer [<! >! go]]
+   [clojure.edn :as edn]
+   [clojure.pprint :refer [pprint]]
+   [clojure.spec.alpha :as s]
+   [mount.core :as mount :refer [defstate]]
+   [promesa.core :as p]
+   [promesa.exec :as px]
+   [ring.websocket.async :as wsa]
+   [scheduling-tbd.specs :as specs]
+   [scheduling-tbd.sutil :as sutil :refer [elide]]
+   [scheduling-tbd.util :refer [now util-state]] ; util-state for mount
+   [taoensso.telemere :refer [log! event!]]))
 
 (def ^:diag diag (atom {}))
 (def socket-channels "Indexed by a unique client-id provided by the client." (atom {}))
@@ -22,15 +22,15 @@
 (defn make-ws-channels
   "Create channels and store them keyed by the unique ID provided by the client."
   [id]
-  (let [chans {:in  (async/chan)
+  (let [chans {:in (async/chan)
                :out (async/chan)
                :err (async/chan)
                ;; alive? is occassionally set to false by close-inactive-channels, e.g. when connection to new clients is made.
                ;; close-inactive-channels then wait for an ack (:confirm-alive) which sets it back to true
                ;; ...or if no timely response, closes the channel.
                :alive? true
-               :exit? false}]     ; Used to exit from go loops. Important!
-    (swap! socket-channels  #(assoc % id chans))
+               :exit? false}] ; Used to exit from go loops. Important!
+    (swap! socket-channels #(assoc % id chans))
     chans))
 
 (defn exiting? [client-id] (get-in @socket-channels [client-id :exit?]))
@@ -65,7 +65,7 @@
 
 (declare clear-promises! clear-keys select-promise)
 
-(def ping-dates  "Indexed by client-id, value is last time it pinged. Possibly only useful for diagnostics"
+(def ping-dates "Indexed by client-id, value is last time it pinged. Possibly only useful for diagnostics"
   (atom {}))
 
 (defn forget-client
@@ -99,15 +99,31 @@
   (->> @ping-dates seq (sort-by second) reverse first first))
 
 (defn close-inactive-channels
-  "Close channels that don't respond to :alive? with an :alive-confirm."
+  "Close channels that don't respond to :alive? with an :alive-confirm.
+   Improved version with per-client timeouts and better handling.
+   Log detailed reports for each client."
   []
-  (let [clients (keys @socket-channels)]
+  (let [clients (keys @socket-channels)
+        timeout-ms 600000] ; Increase to 10 minutes
+    (log! :debug (str "Checking " (count clients) " clients for activity with timeout: " timeout-ms))
     (doseq [client-id clients]
-      (swap! socket-channels #(assoc-in % [client-id :alive?] false))
-      (send-to-client {:client-id client-id :dispatch-key :alive?}))
-    (Thread/sleep 300000) ; 5 minutes to respond.
+      ;; Only check clients that haven't been pinged recently
+      (let [last-ping (get @ping-dates client-id)
+            now-time (java.util.Date.)
+            time-since-ping (when last-ping (- (.getTime now-time) (.getTime last-ping)))]
+        (when (or (nil? time-since-ping) (> time-since-ping timeout-ms))
+          (log! :debug (str "Sending alive check to client " client-id))
+          (swap! socket-channels #(assoc-in % [client-id :alive?] false))
+          (send-to-client {:client-id client-id :dispatch-key :alive?}))))
+
+    ;; Wait for responses - but shorter time
+    (Thread/sleep 30000) ; 30 seconds to respond
+
+    ;; Check for non-responsive clients
     (doseq [client-id clients]
-      (when-not (get-in @socket-channels [client-id :alive?])
+      (when (and (contains? @socket-channels client-id)
+                 (not (get-in @socket-channels [client-id :alive?])))
+        (log! :info (str "Closing inactive client: " client-id))
         (forget-client client-id)))))
 
 (defn error-listener
@@ -148,7 +164,7 @@
       (loop []
         (when-let [msg (<! in)] ; Listen for messages.
           (let [msg (edn/read-string msg)]
-            (when-not (#{:ping :alive-confirm} (:dispatch-key msg)) (log! :debug (str "Received message: "  msg)))
+            (when-not (#{:ping :alive-confirm} (:dispatch-key msg)) (log! :debug (str "Received message: " msg)))
             (if (= :stop (:dispatch-key msg))
               (swap! socket-channels #(assoc-in % [client-id :exit?] true))
               (let [prom (px/submit! (fn [] (dispatch msg)))]
@@ -174,11 +190,15 @@
    Returns a map with value for key :ring.websocket/listener."
   [request]
   (log! :debug (str "Establishing ws handler for " (-> request :query-params (update-keys keyword) :client-id)))
-  (when-not @inactive-channels-process (reset! inactive-channels-process (future (close-inactive-channels))))
+  ;; Only start inactive channel monitoring if none is running and we have clients
+  ;; This prevents the issue where every new connection triggers cleanup of existing connections
+  (when (and (not @inactive-channels-process)
+             (seq @socket-channels))
+    (reset! inactive-channels-process (future (close-inactive-channels))))
   (if-let [client-id (-> request :query-params (update-keys keyword) :client-id)]
     (let [{:keys [in out err]} (make-ws-channels client-id)]
       (swap! ping-dates #(assoc % client-id (now)))
-      (error-listener client-id)   ; This and next are go loops,
+      (error-listener client-id) ; This and next are go loops,
       (dispatching-loop client-id) ; which means they are non-blocking.
       {:ring.websocket/listener (wsa/websocket-listener in out err)})
     (log! :error "Websocket client did not provide id.")))
@@ -266,7 +286,7 @@
     (do (log! :debug (str "Before resolve!: prom-obj = " prom-obj))
         (p/resolve! (:prom prom-obj) (cond-> {:msg-type :expert-response}
                                        msg-text (assoc :text msg-text)
-                                       table    (assoc :table table)))
+                                       table (assoc :table table)))
         (clear-keys client-id [(:p-key prom-obj)]))
     (log! :error "domain-expert-says: no p-key (e.g. no question in play)")))
 
@@ -285,8 +305,8 @@
     (if-let [out (->> client-id (get @socket-channels) :out)]
       (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))
             msg-obj (cond-> content
-                      p-key               (assoc :p-key p-key)
-                      true                (assoc :timestamp (now)))]
+                      p-key (assoc :p-key p-key)
+                      true (assoc :timestamp (now)))]
         (when-not (= :alive? dispatch-key)
           (log! :debug (elide (str "send-to-client: msg-obj =" msg-obj) 130)))
         (go (>! out (str msg-obj)))
@@ -321,20 +341,20 @@
        :surrogate-call           sur/start-surrogate
        :ask-llm                  llm/llm-directly."
   []
-  (reset! dispatch-table {:ping                 ping-confirm
-                          :domain-expert-says   domain-expert-says
-                          :alive-confirm        client-confirms-alive
-                          :close-channel        close-channel}))
+  (reset! dispatch-table {:ping ping-confirm
+                          :domain-expert-says domain-expert-says
+                          :alive-confirm client-confirms-alive
+                          :close-channel close-channel}))
 
 ;;; When you recompile this, recompile surrogate.clj, interviewers.clj and llm.clj.
 (defn dispatch [{:keys [dispatch-key] :as msg}]
   (when-not (#{:ping :alive-confirm} dispatch-key)
     (log! :info (elide (str "Received msg: " msg) 130)))
-  (let [res (cond (= dispatch-key :stop)                        nil ; What needs to be done has already been done.
-                  (contains? @dispatch-table dispatch-key)      ((get @dispatch-table dispatch-key) msg)
-                  :else                                         (log! :error (str "No dispatch function for " msg "."
-                                                                                  " Functions were unregistered? "
-                                                                                  " Search for 'register-ws-dispatch' and recompile.")))]
+  (let [res (cond (= dispatch-key :stop) nil ; What needs to be done has already been done.
+                  (contains? @dispatch-table dispatch-key) ((get @dispatch-table dispatch-key) msg)
+                  :else (log! :error (str "No dispatch function for " msg "."
+                                          " Functions were unregistered? "
+                                          " Search for 'register-ws-dispatch' and recompile.")))]
     (when (map? res)
       (when-not (= (:dispatch-key res) :ping-confirm)
         (event! ::response-from-dispatch {:level :debug :msg (str "dispatch: Sending response: " res)}))
@@ -369,4 +389,4 @@
 (defstate wsock
   "Reitit Ring handler (a self-sufficient 'app' sans listening on port)."
   :start (wsock-start)
-  :stop  (wsock-stop))
+  :stop (wsock-stop))

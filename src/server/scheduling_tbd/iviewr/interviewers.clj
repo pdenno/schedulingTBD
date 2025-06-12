@@ -145,7 +145,6 @@
 (s/def :iviewr/eads-instructions (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
 (s/def :iviewr/interview-objective string?)
 (s/def :iviewr/EADS (s/or :dehydrated string? :hydrated map?))
-
 (s/def :iviewr/course-correction (s/keys :opt-un [:iviewr/advice :iviewr/question]))
 
 (defn tell-interviewer

@@ -48,7 +48,14 @@
                                            org.clojure/java.classpath      {:mvn/version "1.1.0"}
                                            org.clojure/tools.namespace     {:mvn/version "1.5.0"}}}
 
-           :test       {:extra-paths    ["src/server" "test" "env/dev"]
+           ;; clojure-mpc: nREPL server for AI to connect to
+           ;; Include all paths you want available for development
+           :nrepl {:extra-paths ["test"] 
+                   :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
+                   :jvm-opts ["-Djdk.attach.allowAttachSelf"]
+                   :main-opts ["-m" "nrepl.cmdline" "--port" "7888"]}
+           
+            :test       {:extra-paths    ["src/server" "test" "env/dev"]
                         :main-opts      ["-m" "kaocha.runner"]
                         :extra-deps     {lambdaisland/kaocha          {:mvn/version "1.91.1392"}
                                          ;; Since I'm running from the command line, bin/koacha, need to repeat these.
