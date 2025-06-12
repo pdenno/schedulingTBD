@@ -50,18 +50,26 @@
   (when (contains? @socket-channels client-id)
     (let [{:keys [in out err]} (get @socket-channels client-id)]
       (log! :debug (str "Closing websocket channels for inactive client " client-id " " (now)))
-      ;; Set exit? and send something so go loop will be jogged and see it.
+      ;; Set exit? first to signal go loop to exit
       (swap! socket-channels #(assoc-in % [client-id :exit?] true))
-      ;;(go (>! in (str {:dispatch-key :stop}))) ; <======== ToDo: Needs investigation.
-      ;; Keep delay high to be sure :stop is seen. (p/submit! is probably helpful here; promises are executed async and out of order.
-      (-> (p/delay 3000)
+
+      ;; Send stop message to ensure go loop sees the exit signal
+      ;; This fixes the race condition where channels were closed before loop could exit cleanly
+      (try
+        (go (>! in (str {:dispatch-key :stop})))
+        (catch Exception e
+          (log! :warn (str "Failed to send stop message to " client-id ": " e))))
+
+      ;; Delay to allow go loop to process exit signal before closing channels
+      (-> (p/delay 1000) ; Reduced from 3000ms - 1 second should be sufficient
           (p/then (fn [_]
                     (async/close! in)
                     (async/close! out)
                     (async/close! err)
-                    (Thread/sleep 1000)
+                    (Thread/sleep 500) ; Reduced sleep time
                     (swap! socket-channels #(dissoc % client-id))
-                    (reset! inactive-channels-process nil)))))))
+                    (reset! inactive-channels-process nil)
+                    (log! :debug (str "Completed cleanup for client " client-id))))))))
 
 (declare clear-promises! clear-keys select-promise)
 
