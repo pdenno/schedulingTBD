@@ -76,7 +76,7 @@
 (def ping-dates "Indexed by client-id, value is last time it pinged. Possibly only useful for diagnostics"
   (atom {}))
 
-q(defn forget-client
+(defn forget-client
   "Close the channel and forget the promises associated with the client.
    This is typically from a client unmount."
   [client-id]
