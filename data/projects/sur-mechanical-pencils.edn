@@ -28,7 +28,6 @@
                    :string "(surrogate :sur-mechanical-pencils)"}],
           :conversations
           [#:conversation{:id :process,
-                          :interviewer-budget 0.95,
                           :messages
                           [#:message{:content
                                      "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
@@ -52,7 +51,6 @@
                                      :time
                                      #inst "2025-02-26T17:15:59.739-00:00"}]}
            #:conversation{:id :data,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -62,7 +60,6 @@
                                      :time
                                      #inst "2025-02-26T17:15:35.037-00:00"}]}
            #:conversation{:id :resources,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
@@ -72,7 +69,6 @@
                                      :time
                                      #inst "2025-02-26T17:15:35.060-00:00"}]}
            #:conversation{:id :optimality,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",

@@ -38,8 +38,6 @@
                    :thread-id "thread_NWUZpDgDHIBxJkCAE0yL2YwG",
                    :model-class :gpt,
                    :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes carpet.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
                    :surrogate? true,
                    :pid :sur-carpet,
                    :assistant-id "asst_tH5Nl01AEhlG0DDzPT7OVFjN",
@@ -115,7 +113,6 @@
                    "(fails-query production-location :sur-carpet)"}],
           :conversations
           [#:conversation{:id :process,
-                          :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
                                      "You are at the right start point. This is where we discuss how product gets made, or in the cases of services, how the the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
@@ -288,7 +285,6 @@
                                      :time
                                      #inst "2024-11-20T22:20:41.747-00:00"}]}
            #:conversation{:id :data,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -314,7 +310,6 @@
                                      :time
                                      #inst "2024-11-20T22:29:24.626-00:00"}]}
            #:conversation{:id :resources,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
@@ -340,7 +335,6 @@
                                      :time
                                      #inst "2024-11-20T22:31:29.647-00:00"}]}
            #:conversation{:id :optimality,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",

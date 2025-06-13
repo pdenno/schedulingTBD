@@ -1,5 +1,6 @@
 [
-#:project{:agents
+#:project{:active-conversation :process,
+          :agents
           [#:agent{:base-type :data-interview-agent,
                    :agent-type :shared-assistant,
                    :thread-id "thread_iNOxAhgojkmQjveiQvEEI6y8",
@@ -11,16 +12,15 @@
                    :agent-id :data-interview-agent-openai}
            #:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
-                   :thread-id "thread_BwdKUa5L4h4YCsQSJ5qmZ513",
+                   :thread-id "thread_rFA7GHuAzY0SriwHZ2wX85Ke",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :pid :craft-beer-brewery-scheduling,
                    :assistant-id "asst_8Qrs0sxMJDU5EJNaSJZJm3Uo",
-                   :timestamp #inst "2024-12-12T16:46:07.389-00:00",
+                   :timestamp #inst "2025-06-12T23:19:18.362-00:00",
                    :agent-id :process-interview-agent-openai}],
           :conversations
           [#:conversation{:id :data,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -37,7 +37,6 @@
                                      :time
                                      #inst "2024-11-20T13:32:52.602-00:00"}]}
            #:conversation{:id :process,
-                          :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
                                      "Describe your most significant scheduling problem in a few sentences or <a href=\"http://localhost:3300/learn-more\">learn more about how this works</a>.",
@@ -58,7 +57,6 @@
                                      :time
                                      #inst "2023-11-11T10:12:49.671-00:00"}]}
            #:conversation{:id :resources,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
@@ -75,7 +73,6 @@
                                      :time
                                      #inst "2024-11-20T13:32:52.621-00:00"}]}
            #:conversation{:id :optimality,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",

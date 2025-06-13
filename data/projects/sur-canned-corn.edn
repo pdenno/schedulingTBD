@@ -13,8 +13,6 @@
                    :agent-type :project,
                    :thread-id "thread_PaNG176R7upH82TJEeDXsNVg",
                    :llm-provider :openai,
-                   :system-instruction
-                   "You manage a company that makes canned corn.\n   You are an expert in production and manage your company's supply chains.\n   You help me by answering questions that will allow us to collaborate in building a scheduling systems for your company.\n   Your answers typically are short, just a few sentences each.\n   If you don’t have information to answer my questions, you provide a plausible answer nonetheless.",
                    :surrogate? true,
                    :pid :sur-canned-corn,
                    :assistant-id "asst_g91VMowymiHxQYwm3n3QAgsi",
@@ -23,7 +21,6 @@
                    :agent-id :sur-canned-corn-openai}],
           :conversations
           [#:conversation{:id :process,
-                          :interviewer-budget 0.5,
                           :messages
                           [#:message{:content
                                      "Describe your most significant scheduling problem in a few sentences.",
@@ -166,7 +163,6 @@
                                      :time
                                      #inst "2024-11-06T13:09:49.226-00:00"}]}
            #:conversation{:id :data,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
@@ -183,7 +179,6 @@
                                      :time
                                      #inst "2024-11-20T13:32:52.981-00:00"}]}
            #:conversation{:id :resources,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
@@ -200,7 +195,6 @@
                                      :time
                                      #inst "2024-11-20T13:32:53.011-00:00"}]}
            #:conversation{:id :optimality,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",

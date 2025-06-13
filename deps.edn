@@ -50,11 +50,11 @@
 
            ;; clojure-mpc: nREPL server for AI to connect to
            ;; Include all paths you want available for development
-           :nrepl {:extra-paths ["test"] 
+           :nrepl {:extra-paths ["test"]
                    :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
                    :jvm-opts ["-Djdk.attach.allowAttachSelf"]
                    :main-opts ["-m" "nrepl.cmdline" "--port" "7888"]}
-           
+
             :test       {:extra-paths    ["src/server" "test" "env/dev"]
                         :main-opts      ["-m" "kaocha.runner"]
                         :extra-deps     {lambdaisland/kaocha          {:mvn/version "1.91.1392"}

@@ -28,7 +28,6 @@
                    :string "(surrogate :sur-key-blanks)"}],
           :conversations
           [#:conversation{:id :process,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
@@ -38,7 +37,6 @@
                                      :time
                                      #inst "2025-03-06T16:42:32.175-00:00"}]}
            #:conversation{:id :data,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
@@ -48,7 +46,6 @@
                                      :time
                                      #inst "2025-03-06T16:42:32.175-00:00"}]}
            #:conversation{:id :resources,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
@@ -58,7 +55,6 @@
                                      :time
                                      #inst "2025-03-06T16:42:32.175-00:00"}]}
            #:conversation{:id :optimality,
-                          :interviewer-budget 1.0,
                           :messages
                           [#:message{:content
                                      "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
