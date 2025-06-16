@@ -19,7 +19,10 @@
     :instruction-path "resources/agents/orchestrator.txt",
     ;; The vector store includes all the EADS instructions for interviewers.
     :tools "[{:type \"file_search\"}]"
-    :vector-store-paths (->> (.list (io/file "resources/agents/iviewrs/EADS/")) (mapv #(str "resources/agents/iviewrs/EADS/" %)))
+    :vector-store-paths (reduce (fn [res dir]
+                                  (into res (->> (.listFiles (io/file (str "resources/agents/iviewrs/EADS/" dir "/"))) (map str))))
+                                []
+                                ["process" "data" "resources" "optimality"])
     :agent-type :shared-assistant}
 
    :process-interview-agent,

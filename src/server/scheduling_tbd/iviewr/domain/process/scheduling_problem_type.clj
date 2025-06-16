@@ -1,12 +1,12 @@
 (ns scheduling-tbd.iviewr.domain.process.scheduling-problem-type
   "Define a EADS to determine the scheduling problem type."
   (:require
-   [clojure.pprint                  :refer [pprint]]
+   [clojure.pprint                  :refer [cl-format pprint]]
    [clojure.spec.alpha              :as s]
    [mount.core                      :as mount :refer [defstate]]
    [scheduling-tbd.agent-db         :refer [agent-log]]
    [scheduling-tbd.db               :as db]
-   [scheduling-tbd.iviewr.eads-util :as eads-util :refer [ds-complete? combine-ds!]]
+   [scheduling-tbd.iviewr.eads-util :as eu :refer [ds-complete? combine-ds!]]
    [scheduling-tbd.sutil            :as sutil]))
 
 ;;; ToDo: Because we use a central spec registry, the specs defined with short namespaces (e.g. :problem-type/val) might collide with specs from other domains.
@@ -102,12 +102,15 @@
                    (update :problem-components (fn [pcomps] (mapv #(keyword %) pcomps))))]
     (db/put-summary-ds! pid tag merged)))
 
+(defn completeness-test [_ds] true)
+
 (defmethod ds-complete? :process/scheduling-problem-type
   [tag pid]
-  (let [ds (-> (db/get-summary-ds pid tag) eads-util/strip-annotations)
-    complete? (s/valid? ::EADS ds)]
-    (agent-log (str "This is the stripped DS for problem type (complete? = " complete? "):\n" (with-out-str (pprint ds)))
-               {:console? true #_#_:elide-console 130})
+  (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
+        complete? (completeness-test ds)]
+    (agent-log (cl-format nil "{:log-comment \"This is the summary DS for ~A  (complete? =  ~A):~%~S\"}"
+                          tag complete? (with-out-str (pprint ds)))
+               {:console? true :elide-console 130})
     complete?))
 
 ;;; (sptype/init-scheduling-problem-type)

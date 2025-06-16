@@ -3,12 +3,13 @@
        As the case is with flow-shop problems, this structure defines the flow of work through resources.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
-   [clojure.pprint                  :refer [pprint]]
+   [clojure.pprint                  :refer [cl-format pprint]]
+   [clojure.set                     :as set]
    [clojure.spec.alpha              :as s]
    [mount.core                      :as mount  :refer [defstate]]
    [scheduling-tbd.agent-db         :refer [agent-log]]
    [scheduling-tbd.db               :as db]
-   [scheduling-tbd.iviewr.eads-util :refer [graph-semantics-ok? ds-complete?]]
+   [scheduling-tbd.iviewr.eads-util :as eu :refer [combine-ds! ds-complete? graph-semantics-ok? ]]
    [scheduling-tbd.sutil            :as sutil]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
@@ -93,15 +94,23 @@
    We aren't sure this makes sense, and it is likely that there are shortcomings in using matching on inputs and outputs to decide concurrency/sequentiality.
    For the time being we'll live with it. Maybe the ability to edit charts with help from an AI agent can be used to fix bugs."
   {:message-type :EADS-INSTRUCTIONS
+   :budget-decrement 0.10
    :interviewer-agent :process
    :interview-objective (str "This EADS assumes the interviewees' production processes are organized as a flow shop.\n"
-                             "Learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\n"
+                             "Use this EADS to learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\n"
+                             "We use the information you gather to create functional flow block (FFB) diagrams of their processes that interviewees can review.\n"
                              "We might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\n"
                              "For example, they might have in mind scheduling machine maintenance, not production.\n"
                              "This fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\n"
-                             "Knowledge of the processes might prove useful later.")
+                             "Knowledge of the processes might prove useful later.\n"
+                             "Unlike many EADS where we accumulate results from your DATA-STRUCTURE-REFINEMENT messages, we'd like you to do that; grow the DSR with each question.")
    :EADS
    {:EADS-id :process/flow-shop
+    :exhausted? {:val true
+                 :comment (str
+                           "When you think you have all the key processes documented, including their 'inputs' 'outputs' 'resources' and 'durations', set this to true.\n"
+                           "The EADS example here is complete in that sense, so we set it to true.\n"
+                           "You don't need to include this until you are ready to set it to true.")}
     :process-id {:val "pencil-manufacturing",
                  :comment "This is the top-level process. You can name it as you see fit; don't ask the interviewees."}
 
@@ -205,19 +214,57 @@
                                     :resources ["crimping tool"],
                                     :subprocesses []}]}]}})
 
+;;; ------------------------------- combining content from interviewer refinement messages  ---------------
+;;; Collect and combine :process/flow-shop ds refinements, favoring recent over earlier versions.
+;;; Interviewer has been instructed that it is okay to do :event-types separate from :timeslots, and in fact, it
+;;; is currently giving things *very piecemeal*, suggesting that I use :ts-type-id and :event-type-id to stitch together the result.
+(defn combine
+  "Accommodate information from the second argument map into the first argument map,
+   returning the modified first argument. We don't do upsert, just insert and replace
+   on timeslot-types (by :ts-type-id) and event-types (by :event-type-id)."
+  [best more]
+  (let [best-ts-type-ids    (eu/collect-keys-vals best :ts-type-id)
+        more-ts-type-ids    (eu/collect-keys-vals more :ts-type-id)
+        best-event-type-ids (eu/collect-keys-vals best :event-type-id)
+        more-event-type-ids (eu/collect-keys-vals more :event-type-id)
+        ts-inserts   (set/difference more-ts-type-ids best-ts-type-ids)
+        ts-replaces  (set/intersection best-ts-type-ids more-ts-type-ids)
+        ev-inserts   (set/difference more-event-type-ids best-event-type-ids)
+        ev-replaces  (set/intersection best-event-type-ids more-event-type-ids)]
+    (as-> best ?b
+      (reduce (fn [r new-id] (eu/insert-by-id r :timeslots   (eu/get-object more :ts-type-id new-id))) ?b ts-inserts)
+      (reduce (fn [r new-id] (eu/insert-by-id r :event-types (eu/get-object more :event-type-id new-id))) ?b ev-inserts)
+      (reduce (fn [r new-id] (eu/replace-by-id r :timeslots   :ts-type-id    (eu/get-object more :ts-type-id new-id))) ?b ts-replaces)
+      (reduce (fn [r new-id] (eu/replace-by-id r :event-types :event-type-id (eu/get-object more :event-type-id new-id))) ?b ev-replaces))))
+
+;;; We don't offer accumulation in the :process/flow-shop EADS.
+(defmethod combine-ds! :process/flow-shop
+  [tag pid]
+  (when-let [msg-ds (db/get-msg-dstructs pid tag)]
+    (let [ds (apply max-key :msg-id msg-ds)]
+      (db/put-summary-ds! pid
+                          :process/flow-shop
+                          (assoc ds :EADS-id tag))
+      ds)))
+
 ;;; See if it compiles.
 (when-not (s/valid? :flow-shop/EADS-message flow-shop)
   (throw (ex-info "Invalid EADS (flow-shop)" {})))
 
+(defn completeness-test [{:keys [exhausted?]}] exhausted?)
+
 ;;; ------------------------------- checking for completeness ---------------
 (defmethod ds-complete? :process/flow-shop
   [tag pid]
-  (agent-log :info (str ";;; This is the the summary DS for " tag ":\n"
-                        (with-out-str (pprint (db/get-summary-ds pid tag))))
-             {:console? true :elide-console 130})
-  true)
+  (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
+        complete? (completeness-test ds)]
+    (agent-log (cl-format nil "{:log-comment \"This is the summary DS for ~A  (complete? =  ~A):~%~S\"}"
+                          tag complete? (with-out-str (pprint ds)))
+               {:console? true #_#_:elide-console 130})
+    complete?))
 
 ;;; -------------------- Starting and stopping -------------------------
+;;; (fshop/init-flow-shop)
 (defn init-flow-shop
   []
   (if (s/valid? :flow-shop/EADS-message flow-shop)

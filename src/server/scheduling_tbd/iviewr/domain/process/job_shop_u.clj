@@ -2,13 +2,13 @@
   "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a job-shop scheduling problem where each job potentially follows a unique process.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
-   [clojure.pprint        :refer [pprint]]
-   [clojure.spec.alpha    :as s]
-   [mount.core :as mount :refer [defstate]]
-   [scheduling-tbd.agent-db :refer [agent-log]]
-   [scheduling-tbd.db     :as db]
-   [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
-   [scheduling-tbd.sutil  :as sutil]))
+   [clojure.pprint                  :refer [cl-format pprint]]
+   [clojure.spec.alpha              :as s]
+   [mount.core                      :as mount :refer [defstate]]
+   [scheduling-tbd.agent-db         :refer [agent-log]]
+   [scheduling-tbd.db               :as db]
+   [scheduling-tbd.iviewr.eads-util :as eu :refer [ds-complete?]]
+   [scheduling-tbd.sutil            :as sutil]))
 
 (s/def :job-shop-u/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
@@ -118,13 +118,17 @@
 (when-not (s/valid? :job-shop-u/EADS-message job-shop-u)
   (throw (ex-info "Invalid EADS (job-shop--unique)" {})))
 
+(defn completeness-test [_ds] true)
+
 ;;; ------------------------------- checking for completeness ---------------
 (defmethod ds-complete? :process/job-shop--unique
   [tag pid]
-  (agent-log :info (str ";;; This is the the summary DS for " tag ":\n"
-                        (with-out-str (pprint (db/get-summary-ds pid tag))))
-             {:console? true :elide-console 130})
-  true)
+  (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
+        complete? (completeness-test ds)]
+    (agent-log (cl-format nil "{:log-comment \"This is the summary DS for ~A  (complete? =  ~A):~%~S\"}"
+                          tag complete? (with-out-str (pprint ds)))
+               {:console? true #_#_:elide-console 130})
+    complete?))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-job-shop-u

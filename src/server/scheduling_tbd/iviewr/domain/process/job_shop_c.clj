@@ -5,12 +5,12 @@
 
    Note: We don't load this code at system startup. When you compile it, it writes the EADS to resources/EADS/job-shop-c.txt"
   (:require
-   [clojure.pprint                  :refer [pprint]]
+   [clojure.pprint                  :refer [cl-format pprint]]
    [clojure.spec.alpha              :as s]
    [mount.core                      :as mount  :refer [defstate]]
    [scheduling-tbd.agent-db         :refer [agent-log]]
    [scheduling-tbd.db               :as db]
-   [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
+   [scheduling-tbd.iviewr.eads-util :as eu :refer [ds-complete?]]
    [scheduling-tbd.sutil            :as sutil]))
 
 
@@ -221,12 +221,17 @@
 (when-not (s/valid? :job-shop-c/EADS-message job-shop-c)
   (throw (ex-info "Invalid EADS (flow-shop)" {})))
 
+
+(defn completeness-test [_ds] true)
+
 (defmethod ds-complete? :process/job-shop--classifiable
   [tag pid]
-  (agent-log :info (str "This is the summary DS for " tag ":\n"
-                        (with-out-str (pprint (db/get-summary-ds pid tag))))
-             {:console? true :elide-console 130})
-  true)
+  (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
+        complete? (completeness-test ds)]
+    (agent-log (cl-format nil "{:log-comment \"This is the summary DS for ~A  (complete? =  ~A):~%~S\"}"
+                          tag complete? (with-out-str (pprint ds)))
+               {:console? true #_#_:elide-console 130})
+    complete?))
 
 ;;; -------------------- Starting and stopping -------------------------
 (defn init-job-shop-c

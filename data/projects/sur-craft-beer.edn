@@ -1,309 +1,379 @@
 [
-#:project{:active-conversation :optimality,
-          :agents
-          [#:agent{:base-type :process-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_d3inJrF2wiqKDzkdnWILSL5Q",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :pid :sur-craft-beer,
-                   :assistant-id "asst_4h6pZYtJpAB5NEDyQzSTXrhP",
-                   :timestamp #inst "2024-12-08T16:12:48.505-00:00",
-                   :agent-id :process-interview-agent-openai}
-           #:agent{:base-type :data-interview-agent,
-                   :agent-type :shared-assistant,
-                   :thread-id "thread_cGmzuhNrzz9rXDGHpyTQlhzi",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :pid :sur-craft-beer,
-                   :assistant-id "asst_F4ecpUEi8SdZN00XBGyyfS5c",
-                   :agent-id :data-interview-agent-openai}
-           #:agent{:base-type :sur-craft-beer,
-                   :agent-type :project,
-                   :thread-id "thread_optVfyKumBKQf2eDAIG0H6Av",
-                   :llm-provider :openai,
-                   :surrogate? true,
-                   :pid :sur-craft-beer,
-                   :assistant-id "asst_EiS6G0AZGc8kcPWdEW0S15yY",
-                   :expertise "craft beer",
-                   :timestamp #inst "2024-12-08T16:12:48.520-00:00",
-                   :agent-id :sur-craft-beer-openai}],
-          :claims
-          [#:claim{:conversation-id :process,
-                   :question-type :work-type,
-                   :string "(provides-product :sur-craft-beer)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :demand-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :string
-                   "(project-name :sur-craft-beer \"SUR Craft Beer\")"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :bottleneck-processes)"}
-           #:claim{:conversation-id :process,
-                   :string
-                   "(production-mode :sur-craft-beer make-to-stock)"}
-           #:claim{:conversation-id :process,
-                   :string "(surrogate :sur-craft-beer)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :raw-material-uncertainty)"}
-           #:claim{:conversation-id :process,
-                   :question-type :production-system-type,
-                   :string "(flow-shop :sur-craft-beer)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :process-variation)"}
-           #:claim{:conversation-id :process,
-                   :question-type :production-location,
-                   :string
-                   "(production-location :sur-craft-beer factory)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :equipment-utilization)"}
-           #:claim{:conversation-id :process,
-                   :question-type :warm-up,
-                   :string
-                   "(scheduling-challenge :sur-craft-beer :product-variation)"}
-           #:claim{:conversation-id :process,
-                   :string "(project-id :sur-craft-beer)"}],
-          :conversations
-          [#:conversation{:id :process,
+#:project{:conversations
+          [#:conversation{:active-EADS-id :process/flow-shop,
+                          :id :process,
                           :messages
                           [#:message{:content
-                                     "What are the products you make or services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
                                      :from :system,
                                      :id 1,
-                                     :question-type :warm-up,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-16T18:19:13.014-00:00"}
+                           #:message{:content
+                                     "\nWhat are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 2,
+                                     :pursuing-EADS
+                                     :process/warm-up-with-challenges,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:13:14.424-00:00"}
-                           #:message{:content
-                                     "We produce various craft beers, including IPAs, stouts, lagers, and seasonal specialties. Our main scheduling challenge involves coordinating production cycles to ensure consistent inventory match with market demand, accommodating limited fermentation and storage capacity, and managing the supply chain of raw ingredients. Additionally, scheduling can be complex due to varying fermentation times for different beer types and the need to minimize downtime of brewing equipment.",
+                                     #inst "2025-06-16T18:20:05.146-00:00"}
+                           #:message{:answers-question 2,
+                                     :pursuing-EADS
+                                     :process/warm-up-with-challenges,
                                      :from :surrogate,
-                                     :id 2,
-                                     :question-type :warm-up,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-11-18T13:13:14.446-00:00"}
-                           #:message{:content
-                                     "Great, we'll call your project SUR Craft Beer.",
-                                     :from :system,
                                      :id 3,
-                                     :tags
-                                     [:!describe-challenge
-                                      :informative],
                                      :time
-                                     #inst "2024-11-18T13:13:43.313-00:00"}
+                                     #inst "2025-06-16T18:20:05.164-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/warm-up-with-challenges, :commit-notes \"First commit: chose values for product-or-service-name and scheduling-challenges.\", :data-structure {:product-or-service-name {:val \"craft beers\", :comment \"The interviewees mentioned they produce various types of craft beers such as lagers, ales, stouts, IPAs, and seasonal specialties.\"}, :scheduling-challenges {:val [\"process-variation\" \"demand-uncertainty\" \"raw-material-uncertainty\" \"equipment-availability\"], :comment \"Challenges noted include varying fermentation times (process-variation), ingredient availability (raw-material-uncertainty), balancing production versus demand (demand-uncertainty), and equipment restrictions (equipment-availability).\"}, :one-more-thing {:val \"The scheduling likely requires careful coordination across multiple production stages with different durations.\", :comment \"This observation follows from the mention of brewing, fermentation, bottling, and distribution stages with varying fermentation times.\"}}}",
+                                     :content
+                                     "\nWe produce a variety of craft beers, including lagers, ales, stouts, IPAs, and seasonal specialties. The main scheduling challenges involve coordinating brewing, fermentation, bottling, and distribution while accommodating varying fermentation times, equipment restrictions, and ingredient availability. Balancing production to meet customer demand without overstocking or underproducing is a constant concern."}
                            #:message{:content
-                                     "Would you characterize your company's work as primarily providing a product, a service, or consulting? Respond respectively with the single word PRODUCT, SERVICE, or CONSULTING.",
+                                     "\nDo the production stages for your craft beers, such as brewing, fermentation, bottling, and distribution, generally follow the same sequential process for all types of beers you produce?",
                                      :from :system,
                                      :id 4,
-                                     :question-type :work-type,
+                                     :pursuing-EADS
+                                     :process/scheduling-problem-type,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:14:35.500-00:00"}
-                           #:message{:content "PRODUCT",
+                                     #inst "2025-06-16T18:20:59.324-00:00"}
+                           #:message{:answers-question 4,
+                                     :pursuing-EADS
+                                     :process/scheduling-problem-type,
                                      :from :surrogate,
                                      :id 5,
-                                     :question-type :work-type,
-                                     :tags [:response],
                                      :time
-                                     #inst "2024-11-18T13:14:35.528-00:00"}
+                                     #inst "2025-06-16T18:20:59.347-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/scheduling-problem-type, :commit-notes \"Determined principal problem type and established relevant problem components.\", :data-structure {:principal-problem-type {:val \"FLOW-SHOP-SCHEDULING-PROBLEM\", :comment \"The production stages for all beer types generally follow the same sequential process: brewing, fermentation, conditioning, bottling or kegging, and distribution.\"}, :problem-components {:val [\"FLOW-SHOP-SCHEDULING-PROBLEM\" \"JOB-SHOP-SCHEDULING-PROBLEM\"], :comment \"While production stages follow a flow-shop process, variations in duration and specific requirements for each stage (e.g., dry hopping for IPAs, longer conditioning times for stouts) suggest some overlap with job-shop scheduling.\"}, :continuous? {:val false, :comment \"Since the production involves distinct stages like brewing, fermentation, and bottling that do not continuously flow, the system is not continuous.\"}, :cyclical? {:val false, :comment \"The variety in beer products and the adjustments required at different stages (e.g., seasonal specialties) indicate that production schedules are not repeated in a predictable pattern.\"}}}",
+                                     :content
+                                     "\nYes, the production stages generally follow the same sequential process for all types of beers: brewing, fermentation, conditioning, bottling or kegging, and distribution. However, the duration and specific requirements for each stage can vary depending on the type of beer. For instance, IPAs might require dry hopping during fermentation, and stouts may have longer conditioning times."}
                            #:message{:content
-                                     "Some work is performed in your own facility, some, like cutting down trees, has to be performed at the customer's site. Which is most common in your work? Respond with the single word OUR-FACILITY, CUSTOMER-SITE, or if it isn't straightforward, an explanation.",
+                                     "\nCould you provide an overview of the entire production process for your craft beers, detailing the key stages, inputs, outputs, and any resources involved at each stage?",
                                      :from :system,
                                      :id 6,
-                                     :question-type
-                                     :production-location,
+                                     :pursuing-EADS :process/flow-shop,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:15:28.246-00:00"}
-                           #:message{:content "OUR-FACILITY",
+                                     #inst "2025-06-16T18:21:50.730-00:00"}
+                           #:message{:answers-question 6,
+                                     :pursuing-EADS :process/flow-shop,
                                      :from :surrogate,
                                      :id 7,
-                                     :question-type
-                                     :production-location,
-                                     :tags [:response],
                                      :time
-                                     #inst "2024-11-18T13:15:28.277-00:00"}
+                                     #inst "2025-06-16T18:21:50.750-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Created the initial structure for the craft beer production process with stages, inputs, outputs, and resources.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"]} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"]} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"]} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"]} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"]} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"]} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"]} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"]}]}}",
+                                     :content
+                                     "\nCertainly! Here's an overview of the craft beer production process:\n"}
                            #:message{:content
-                                     "There are three common motivations for making product. MAKE-TO-STOCK is product made to replenish inventory. MAKE-TO-ORDER is product made in response to a customer's request to make the product for them, typically through a production order. ENGINEER-TO-ORDER is MAKE-TO-ORDER where details of what is to be made need to be resolved. In this arrangement, product configured, planned, and produced according to customer specifications. Respond with the single term MAKE-TO-STOCK, MAKE-TO-ORDER or ENGINEER-TO-ORDER, according to which of these best describes your motivation for production.",
+                                     "\nCan you provide the approximate duration for each stage in your craft beer production process? For example, how long does milling, mashing, boiling, fermentation, etc., take? Please include time units like hours or days.",
                                      :from :system,
                                      :id 8,
-                                     :question-type
-                                     :production-motivation,
+                                     :pursuing-EADS :process/flow-shop,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:16:33.163-00:00"}
-                           #:message{:content "MAKE-TO-STOCK",
+                                     #inst "2025-06-16T18:22:31.482-00:00"}
+                           #:message{:answers-question 8,
+                                     :pursuing-EADS :process/flow-shop,
                                      :from :surrogate,
                                      :id 9,
-                                     :question-type
-                                     :production-motivation,
-                                     :tags [:response],
                                      :time
-                                     #inst "2024-11-18T13:16:33.187-00:00"}
+                                     #inst "2025-06-16T18:22:31.502-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added duration estimates for each stage in the craft beer production process.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}}]}}",
+                                     :content
+                                     "\nHere's an approximation of the durations for each production stage:\n"}
                            #:message{:content
-                                     "There are a few common patterns or system designs by which product is made. In a FLOW-SHOP, all jobs follow the same sequence of steps through production resources. In a JOB-SHOP, each job might follow its own route, depending on its unique requirements. In a SINGLE-MACHINE arrangement, a single resource is applied to each job one at a time. For example, a paint shop with a single spray booth is a SINGLE-MACHINE system. Respond with the single term FLOW-SHOP, JOB-SHOP, or SINGLE-MACHINE according to which of these best characterizes your system of production.",
+                                     "\nDo any of your production stages involve overlapping or concurrent steps, or do they strictly follow a sequential flow? If there are overlaps, please describe where and how they occur.",
                                      :from :system,
                                      :id 10,
-                                     :question-type
-                                     :production-system-type,
+                                     :pursuing-EADS :process/flow-shop,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:17:22.725-00:00"}
-                           #:message{:content "FLOW-SHOP",
+                                     #inst "2025-06-16T18:23:11.843-00:00"}
+                           #:message{:answers-question 10,
+                                     :pursuing-EADS :process/flow-shop,
                                      :from :surrogate,
                                      :id 11,
-                                     :question-type
-                                     :production-system-type,
-                                     :tags [:response],
                                      :time
-                                     #inst "2024-11-18T13:17:22.753-00:00"}
+                                     #inst "2025-06-16T18:23:11.871-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added information about overlapping and concurrent production stages, indicating the need for shared equipment management.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch due to shared equipment and scheduling flexibility.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of beer from earlier batches.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}}], :invented [{:note \"Shared equipment such as fermenters and conditioning tanks require precise scheduling to accommodate overlapping stages.\"}]}}",
+                                     :content
+                                     "\nYes, some production stages overlap or occur concurrently. For example, while one batch is fermenting, another batch can start the brewing process (milling, mashing, boiling). Similarly, while beer is conditioning in one tank, we may be bottling or kegging a previously conditioned batch. Effective scheduling is critical to manage these overlaps, especially with shared equipment like fermenters and conditioning tanks."}
                            #:message{:content
-                                     "Please list the major steps of your process, one per line. If there are significant components to be made, list each one as a separate step. Don't worry about ordering steps that might be done simultaneously; we'll deal with that later. If you were in the business of making sandwich cookies, the list you create would look like this:\n\n 1. Make Cookie Dough\n 2. Make Filling\n 3. Bake Wafers\n 4. Assemble Cookies\n 5. Package",
+                                     "\nCould you describe any specific constraints or limitations associated with shared equipment like fermenters and conditioning tanks? For example, do you encounter issues with capacity or cleaning requirements between batches?",
                                      :from :system,
                                      :id 12,
-                                     :question-type :process-steps,
+                                     :pursuing-EADS :process/flow-shop,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:18:17.914-00:00"}
-                           #:message{:content
-                                     "1. Milling Grains\n2. Mashing\n3. Lautering\n4. Boiling\n5. Fermentation\n6. Conditioning\n7. Filtering\n8. Carbonation\n9. Bottling/Canning\n10. Packaging",
+                                     #inst "2025-06-16T18:23:47.715-00:00"}
+                           #:message{:answers-question 12,
+                                     :pursuing-EADS :process/flow-shop,
                                      :from :surrogate,
                                      :id 13,
-                                     :question-type :process-steps,
-                                     :tags [:response],
                                      :time
-                                     #inst "2024-11-18T13:18:17.937-00:00"}
+                                     #inst "2025-06-16T18:23:47.731-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added constraints related to shared equipment such as fermenters and conditioning tanks, including capacity limitations and cleaning requirements.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}}], :invented [{:note \"Shared equipment like fermenters and conditioning tanks require precise coordination to manage downtime for cleaning and avoid bottlenecks due to capacity limitations.\"}]}}",
+                                     :content
+                                     "\nShared equipment like fermenters and conditioning tanks pose significant constraints. Capacity is a primary limitation; we must carefully schedule batch sizes to ensure tanks are available when needed. Additionally, tanks require thorough cleaning and sanitization between batches, which adds downtime. Delays in earlier stages can create bottlenecks, as fermenters or tanks might not be ready for the next batch. This requires precise coordination to avoid idle equipment or production delays."}
                            #:message{:content
-                                     "I suppose processing times for each of the steps you just mentioned might vary from product to product. But generally speaking, how long does each step take? Please produce a list just like the one you did for process steps, one process per line, but append to each line the typical processing time in parentheses.",
+                                     "\nWhat is the average amount of time it takes to clean and sanitize fermenters and conditioning tanks between batches? Are there any specific procedures or constraints involved in this process?",
                                      :from :system,
                                      :id 14,
-                                     :question-type :process-durations,
+                                     :pursuing-EADS :process/flow-shop,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:19:17.936-00:00"}
-                           #:message{:content
-                                     "1. Milling Grains (1 hour)\n2. Mashing (1.5 hours)\n3. Lautering (1 hour)\n4. Boiling (1 hour)\n5. Fermentation (7 to 14 days)\n6. Conditioning (2 to 3 days)\n7. Filtering (2 to 4 hours)\n8. Carbonation (1 day)\n9. Bottling/Canning (2 to 4 hours)\n10. Packaging (2 to 4 hours)",
+                                     #inst "2025-06-16T18:24:27.879-00:00"}
+                           #:message{:answers-question 14,
+                                     :pursuing-EADS :process/flow-shop,
                                      :from :surrogate,
                                      :id 15,
-                                     :question-type :process-durations,
-                                     :tags [:response],
                                      :time
-                                     #inst "2024-11-18T13:19:17.969-00:00"}
-                           #:message{:code
-                                     "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {millGrains, mashing, lautering, boiling, fermentation, conditioning, filtering, carbonation, bottlingCanning, packaging};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|1.000, 1.500, 1.000, 1.000, 252.000, 60.000, 3.000, 24.000, 3.000, 3.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, millGrains] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, millGrains] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, millGrains] == taskStarts[p, mashing]);\nconstraint forall (p in Product) (taskEnds[p, mashing] == taskStarts[p, lautering]);\nconstraint forall (p in Product) (taskEnds[p, lautering] == taskStarts[p, boiling]);\nconstraint forall (p in Product) (taskEnds[p, boiling] == taskStarts[p, fermentation]);\nconstraint forall (p in Product) (taskEnds[p, fermentation] == taskStarts[p, conditioning]);\nconstraint forall (p in Product) (taskEnds[p, conditioning] == taskStarts[p, filtering]);\nconstraint forall (p in Product) (taskEnds[p, filtering] == taskStarts[p, carbonation]);\nconstraint forall (p in Product) (taskEnds[p, carbonation] == taskStarts[p, bottlingCanning]);\nconstraint forall (p in Product) (taskEnds[p, bottlingCanning] == taskStarts[p, packaging]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packaging]);",
+                                     #inst "2025-06-16T18:24:27.900-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added cleaning and sanitation details for fermenters and conditioning tanks, including average duration and specific constraints.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\"], :duration {:units \"hours\", :value-string \"2 to 4\"}, :invented {:note \"This process must eliminate cross-contamination risks and ensure thorough removal of cleaning agents for safety.\"}}], :invented [{:note \"Shared equipment like fermenters and conditioning tanks require precise coordination to schedule downtime for cleaning, which typically takes 2 to 4 hours and involves multiple specialized steps.\"}]}}",
                                      :content
-                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
+                                     "\nOn average, it takes about 2 to 4 hours to clean and sanitize fermenters and conditioning tanks between batches. The process involves rinsing out residual beer, running a caustic cleaning solution to remove residues, a thorough rinse with water, and sanitizing to eliminate any microorganisms. Constraints include ensuring no cross-contamination between batches and verifying that cleaning agents are fully removed before reuse. Highly specialized cleaning solutions and quality checks are critical at this stage."}
+                           #:message{:content
+                                     "\nAre there any specific quality checks or testing processes performed during or after cleaning and sanitization? If so, could you describe these procedures and their typical duration?",
                                      :from :system,
                                      :id 16,
-                                     :tags [:info-to-user :minizinc],
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:21:46.585-00:00"}
-                           #:message{:content
-                                     "We are interested in the batch size (the quantity of items or units produced by execution of a single process) for each of the tasks for which you just provided durations. Continuing with our sandwich cookie example, suppose that each step created enough product for 1000 packages. In that case, you could reply with just '1000 packages'. If however, some steps create different amounts, you could list those separately. Or you could just copy and paste the steps list and for each step tell us how much is typically made in that step, like this:\n\n 1. Make Cookie Dough (1000 packages)\n 2. Make Filling (2000 packages)\n 3. Bake Wafers (1000 packages)\n 4. Assemble Cookies (1000 packages)\n 5. Package (1000 packages)",
-                                     :from :system,
+                                     #inst "2025-06-16T18:24:58.474-00:00"}
+                           #:message{:answers-question 16,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
                                      :id 17,
-                                     :question-type :batch-size,
-                                     :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:22:19.696-00:00"}
-                           #:message{:content
-                                     "1. Milling Grains (500 gallons)\n2. Mashing (500 gallons)\n3. Lautering (500 gallons)\n4. Boiling (500 gallons)\n5. Fermentation (500 gallons)\n6. Conditioning (500 gallons)\n7. Filtering (500 gallons)\n8. Carbonation (500 gallons)\n9. Bottling/Canning (500 gallons, typically yielding around 4000 to 4500 standard-sized bottles/cans)\n10. Packaging (4000 to 4500 units)",
-                                     :from :surrogate,
-                                     :id 18,
-                                     :question-type :batch-size,
+                                     #inst "2025-06-16T18:24:58.498-00:00",
                                      :tags [:response],
-                                     :time
-                                     #inst "2024-11-18T13:22:19.729-00:00"}
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added quality check processes performed during and after cleaning and sanitization, including visual, pH, and microbiological tests, along with their durations.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\"], :duration {:units \"hours\", :value-string \"2 to 4\"}, :subprocesses [{:process-id \"quality-checks\", :duration {:units \"minutes\", :value-string \"10 to 20 for visual and pH checks\"}, :optional? false, :inputs [\"Sanitized tanks\"], :outputs [\"Verified cleanliness and sanitation\"], :resources [\"Visual inspection tools\" \"pH testing equipment\"], :invented {:note \"Additional microbiological swab tests may be conducted, taking 1 to 2 days for lab results, for cases requiring extra assurance.\"}}], :invented {:note \"This process must eliminate cross-contamination risks and ensure thorough removal of cleaning agents for safety.\"}}], :invented [{:note \"Shared equipment like fermenters and conditioning tanks requires additional quality checks, including both rapid (visual, pH) and longer-duration (microbiological) tests, further impacting scheduling.\"}]}}",
+                                     :content
+                                     "\nYes, quality checks are crucial during and after cleaning and sanitization. These include visual inspections for residue, verifying pH levels to confirm thorough rinsing, and occasionally swab tests for microbiological contamination. Visual checks and pH testing typically take 10-20 minutes, while microbiological swab tests, if conducted, may take 1-2 days for lab results. These tests ensure the equipment meets sanitation standards before reuse."}
                            #:message{:content
-                                     "Earlier, you listed the process steps typically used in making product (e.g. 1. Milling Grains, 2. Mashing, etc.) and for each you specified typical durations. Now we'd like you to tell us what raw materials and intermediate product go into those process steps. For example, if you were making sandwich cookies, you might simultaneously make the dough for the wafers and make the filling. You might then place the dough in molds and bake to produce wafers. With that done, you would add some filling to one wafer and place another wafer on top. Were the cookie bakers to create a list we seek from you, using their process step list (which had 5 steps) it would look like this:\n\n1. Make Cookie Dough (flour, water, eggs, sugar, chocolate chips)\n2. Make Filling (sugar, water vanilla flavoring)\n3. Bake Wafers (use dough from Make Cookie Dough)\n4. Assemble Cookies (use wafers from Bake Wafers, use filling from Make Filling)\n5. Package (use cookies from Assemble Cookies)",
+                                     "\nAre microbiological swab tests always conducted after cleaning, or are they only performed under certain conditions? If conditional, could you specify these conditions?",
                                      :from :system,
-                                     :id 19,
-                                     :question-type :process-ordering,
+                                     :id 18,
+                                     :pursuing-EADS :process/flow-shop,
                                      :tags [:query],
                                      :time
-                                     #inst "2024-11-18T13:22:57.681-00:00"}
-                           #:message{:content
-                                     "1. Milling Grains (barley, wheat, malt)\n2. Mashing (milled grains from Milling Grains, water)\n3. Lautering (mash from Mashing)\n4. Boiling (wort from Lautering, hops, any additional flavorings or adjuncts as needed)\n5. Fermentation (boiled wort from Boiling, yeast)\n6. Conditioning (beer from Fermentation)\n7. Filtering (conditioned beer from Conditioning)\n8. Carbonation (filtered beer from Filtering, CO2 if force carbonated)\n9. Bottling/Canning (carbonated beer from Carbonation, bottles/cans, caps)\n10. Packaging (bottled/canned beer from Bottling/Canning, packaging materials like boxes or cases)",
+                                     #inst "2025-06-16T18:25:30.093-00:00"}
+                           #:message{:answers-question 18,
+                                     :pursuing-EADS :process/flow-shop,
                                      :from :surrogate,
-                                     :id 20,
-                                     :question-type :process-ordering,
-                                     :tags [:response],
+                                     :id 19,
                                      :time
-                                     #inst "2024-11-18T13:22:57.776-00:00"}]}
+                                     #inst "2025-06-16T18:25:30.116-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Clarified that microbiological swab tests are conditional and described the scenarios in which they are conducted.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\"], :duration {:units \"hours\", :value-string \"2 to 4\"}, :subprocesses [{:process-id \"quality-checks\", :duration {:units \"minutes\", :value-string \"10 to 20 for visual and pH checks\"}, :optional? false, :inputs [\"Sanitized tanks\"], :outputs [\"Verified cleanliness and sanitation\"], :resources [\"Visual inspection tools\" \"pH testing equipment\"], :invented {:note \"Additional microbiological swab tests may be conducted, taking 1 to 2 days for lab results, and these are conditional on factors like suspected contamination, extended downtime, or deep maintenance.\"}}], :invented {:note \"This process must eliminate cross-contamination risks and ensure thorough removal of cleaning agents for safety.\"}}], :invented [{:note \"Shared equipment like fermenters and conditioning tanks requires conditional microbiological swab tests under specific scenarios, such as after suspected contamination or extensive maintenance.\"}]}}",
+                                     :content
+                                     "\nMicrobiological swab tests are not always conducted; they are typically performed under specific conditions. These include when there is suspicion of contamination in the previous batch, following extended equipment downtime, or after deep maintenance of fermenters or tanks. Routine cleaning usually relies on quicker quality checks like visual inspections and pH testing, reserving swab tests for scenarios requiring stringent validation."}
+                           #:message{:content
+                                     "\nRegarding your clean-in-place (CIP) procedures for fermenters and conditioning tanks, do the cleaning durations vary depending on the equipment's prior use, such as handling highly residual batches or allergen-containing batches? If so, can you detail these variations?",
+                                     :from :system,
+                                     :id 20,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-16T18:26:01.161-00:00"}
+                           #:message{:answers-question 20,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
+                                     :id 21,
+                                     :time
+                                     #inst "2025-06-16T18:26:01.181-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added variability in cleaning durations based on the equipment's prior use, factoring in highly residual and allergen-containing batches.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\"], :duration {:units \"hours\", :value-string \"2 to 4 (standard), 3 to 6 (for highly residual batches), 4 to 6 (for allergen-containing batches)\"}, :subprocesses [{:process-id \"quality-checks\", :duration {:units \"minutes\", :value-string \"10 to 20 for visual and pH checks\"}, :optional? false, :inputs [\"Sanitized tanks\"], :outputs [\"Verified cleanliness and sanitation\"], :resources [\"Visual inspection tools\" \"pH testing equipment\"], :invented {:note \"Additional microbiological swab tests may be conducted, taking 1 to 2 days for lab results, and these are conditional on factors like suspected contamination, extended downtime, or deep maintenance.\"}}], :invented {:note \"Cleaning durations vary based on prior use: highly residual batches (e.g., stouts or beers with fruit pulp) add 1-2 hours, and allergen-containing batches add 1-2 hours for extended cleaning and validation.\"}}], :invented [{:note \"Shared equipment cleaning times depend on prior use, with highly residual and allergen-containing batches requiring significantly longer clean-in-place cycles.\"}]}}",
+                                     :content
+                                     "\nYes, CIP cleaning durations can vary based on the equipment's prior use. For standard beer batches, cleaning takes 2-4 hours as usual. However, highly residual batches, such as stouts or beers with heavy adjuncts (like fruit pulp), require longer cleaning cycles, typically adding 1-2 hours for more intensive scrubbing and additional rinsing. For allergen-containing batches (e.g., beers with nuts or lactose), extended cleaning and validation procedures are followed, potentially adding another 1-2 hours to ensure complete allergen removal."}
+                           #:message{:content
+                                     "\nDo the cleaning and sanitization procedures require any specific sequencing or dependencies on other processes, such as availability of personnel or overlap with other production activities? If so, could you describe these dependencies?",
+                                     :from :system,
+                                     :id 22,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-16T18:26:36.589-00:00"}
+                           #:message{:answers-question 22,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
+                                     :id 23,
+                                     :time
+                                     #inst "2025-06-16T18:26:36.610-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added dependencies and sequencing constraints for cleaning and sanitization procedures related to resource and personnel availability, as well as coordination with other production activities.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\" \"Trained personnel\"], :duration {:units \"hours\", :value-string \"2 to 4 (standard), 3 to 6 (for highly residual batches), 4 to 6 (for allergen-containing batches)\"}, :dependencies {:requires-empty-equipment true, :resource-dependencies [\"Trained personnel\" \"Available utilities like hot water and chemicals\"], :overlap-with-production {:val true, :comment \"Cleaning often overlaps with other production activities like brewing or bottling due to shared resources and personnel.\"}}, :subprocesses [{:process-id \"quality-checks\", :duration {:units \"minutes\", :value-string \"10 to 20 for visual and pH checks\"}, :optional? false, :inputs [\"Sanitized tanks\"], :outputs [\"Verified cleanliness and sanitation\"], :resources [\"Visual inspection tools\" \"pH testing equipment\"], :invented {:note \"Additional microbiological swab tests may be conducted, taking 1 to 2 days for lab results, and these are conditional on factors like suspected contamination, extended downtime, or deep maintenance.\"}}], :invented {:note \"Sequencing cleaning depends on emptied equipment, availability of trained personnel, and avoidance of conflicts with concurrent production activities.\"}}], :invented [{:note \"Proper sequencing and resource coordination are critical for cleaning processes to minimize delays and conflicts with ongoing production.\"}]}}",
+                                     :content
+                                     "\nYes, cleaning and sanitization procedures depend on specific sequencing and other processes. Cleaning can only begin once the equipment is emptied of the previous batch, and it requires availability of trained personnel to operate CIP systems and oversee quality checks. Overlaps with other production activities (e.g., brewing or bottling) may occur, especially if resources like personnel or utilities (e.g., hot water, cleaning chemicals) are shared. Proper scheduling is essential to avoid delays or conflicts with production processes."}],
+                          :status :in-progress}
            #:conversation{:id :data,
                           :messages
                           [#:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
                                      :from :system,
-                                     :id 21,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T12:53:11.459-00:00"}
-                           #:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). We like to do this after the preliminary discussion of process. Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
-                                     :from :system,
-                                     :id 24,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-11-20T13:32:53.320-00:00"}
-                           #:message{:content
-                                     "Let's talk about the data you use to do your work. Typically, and especially in small businesses, information about customer orders, resources used to do the work, etc. are maintained in spreadsheets. It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion. Whatever the case, to get started, please write a few sentences about the information you use and how you maintain and store it.",
-                                     :from :system,
-                                     :id 27,
-                                     :question-type :warm-up,
-                                     :tags [:query],
-                                     :time
-                                     #inst "2024-11-20T21:24:10.760-00:00"}
-                           #:message{:content
-                                     "We primarily utilize spreadsheets to track customer orders, inventory levels, production schedules, and raw materials. Each sheet contains information like order volumes, dispatch dates, and allocated resources for inventory management. Additionally, we maintain spreadsheets for tracking suppliers, delivery schedules, and ingredient costs, which help in managing our supply chain efficiently. For more integrated management, some data are also managed through inventory management and production planning software that syncs regularly with our spreadsheet records to ensure cohesive data management.",
-                                     :from :surrogate,
-                                     :id 28,
-                                     :question-type :warm-up,
-                                     :tags [:response],
-                                     :time
-                                     #inst "2024-11-20T21:24:10.786-00:00"}]}
+                                     #inst "2025-06-16T18:19:13.031-00:00"}],
+                          :status :not-started}
            #:conversation{:id :resources,
                           :messages
                           [#:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
                                      :from :system,
-                                     :id 22,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T12:53:11.478-00:00"}
-                           #:message{:content
-                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, you can't generate realistic schedules.",
-                                     :from :system,
-                                     :id 25,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-11-20T13:32:53.345-00:00"}]}
+                                     #inst "2025-06-16T18:19:13.051-00:00"}],
+                          :status :not-started}
            #:conversation{:id :optimality,
                           :messages
                           [#:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
                                      :from :system,
-                                     :id 23,
+                                     :id 1,
                                      :tags [:conversation-intro],
                                      :time
-                                     #inst "2024-11-20T12:53:11.494-00:00"}
-                           #:message{:content
-                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules in your viewpoint. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
-                                     :from :system,
-                                     :id 26,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2024-11-20T13:32:53.373-00:00"}]}],
-          :id :sur-craft-beer,
-          :name "SUR Craft Beer"}
+                                     #inst "2025-06-16T18:19:13.074-00:00"}],
+                          :status :not-started}],
+          :active-conversation :process,
+          :active-EADS-id :process/flow-shop,
+          :agents
+          [#:agent{:base-type :data-interview-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
+                   :instruction-path
+                   "/tmp/stbd-agents/data-interviewer.txt",
+                   :timestamp #inst "2025-06-03T20:46:51.756-00:00",
+                   :agent-id :data-interview-agent-openai}
+           #:agent{:base-type :data-interview-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
+                   :instruction-path
+                   "/tmp/stbd-agents/data-interviewer.txt",
+                   :assistant-id "asst_XggLB4gCbXfbtlxEPwSxwLCr",
+                   :timestamp #inst "2025-06-04T12:45:30.649-00:00",
+                   :agent-id :data-interview-agent}
+           #:agent{:base-type :orchestrator-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :thread-id "thread_8zQrVOk2gyZHcbVkqXzor0Ss",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/EADS/data/orm.json"
+                    "resources/agents/iviewrs/EADS/flow-shop.json"
+                    "resources/agents/iviewrs/EADS/job-shop--classifiable.json"
+                    "resources/agents/iviewrs/EADS/job-shop--unique.json"
+                    "resources/agents/iviewrs/EADS/job-shop.json"
+                    "resources/agents/iviewrs/EADS/orm.json"
+                    "resources/agents/iviewrs/EADS/process/flow-shop.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop--classifiable.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop--unique.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop.json"
+                    "resources/agents/iviewrs/EADS/process/scheduling-problem-type.json"
+                    "resources/agents/iviewrs/EADS/process/timetabling.json"
+                    "resources/agents/iviewrs/EADS/process/warm-up-with-challenges.json"
+                    "resources/agents/iviewrs/EADS/scheduling-problem-type.json"
+                    "resources/agents/iviewrs/EADS/timetabling.json"
+                    "resources/agents/iviewrs/EADS/warm-up-with-challenges.json"],
+                   :instruction-path
+                   "resources/agents/orchestrator.txt",
+                   :assistant-id "asst_rDXaN34fVWUxyBrsNWPaDKMx",
+                   :timestamp #inst "2025-06-16T18:26:36.716-00:00",
+                   :agent-id :orchestrator-agent}
+           #:agent{:base-type :optimality-interview-agent,
+                   :agent-type :shared-assistant,
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer,
+                   :instruction-path
+                   "/tmp/stbd-agents/optimality-interviewer.txt",
+                   :assistant-id "asst_akK3OGJBOiXtsFcH4CAWdsIe",
+                   :timestamp #inst "2025-06-04T12:45:21.614-00:00",
+                   :agent-id :optimality-interview-agent}
+           #:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_cZhIV7w6jlQ1Pyjx37vFexGT",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer,
+                   :instruction-path
+                   "/tmp/stbd-agents/process-interviewer.txt",
+                   :assistant-id "asst_SDlOhtZKFeJUBeurq2b89sAx",
+                   :timestamp #inst "2025-06-16T18:19:17.025-00:00",
+                   :agent-id :process-interview-agent}
+           #:agent{:base-type :resources-interview-agent,
+                   :agent-type :shared-assistant,
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer,
+                   :instruction-path
+                   "/tmp/stbd-agents/resources-interviewer.txt",
+                   :assistant-id "asst_Z8OIRCCEGCPNfQOnuSGsb85V",
+                   :timestamp #inst "2025-06-04T12:45:22.720-00:00",
+                   :agent-id :resources-interview-agent}
+           #:agent{:base-type :sur-craft-beer,
+                   :agent-type :project,
+                   :thread-id "thread_mdOcBKJmTCywewBhCHD5BhWr",
+                   :model-class :gpt,
+                   :instruction-string
+                   "You manage a company that makes craft beer.\nYou are an expert in production and manage your company's supply chains.\nYou help me by answering an interviewer's questions that will allow us to collaborate in building a scheduling system for your company.\nCurrently, you do not use any software in scheduling your work, except maybe spreadsheets and office software calendars.\nYour answers typically are short, just a few sentences each.\n\nTypically you answer in sentences. However, the interviewers may ask you provide a table or add information to a table that the interviewer provides.\nIn these cases, respond with an HTML table wrapped in #+begin_src HTML ... #+end_src\nAll the tables you generate / complete should have the header as the first table row.\nFor example if you were asked to generate / complete a table about process durations for process steps you might respond with:\n\"Here are my estimates of the step durations. Note that I added --Yet another step-- which I think should be included in this context:\"\n\n#+begin_src HTML\n<table>\n  <tr><th>Process Step</th>                <th>Duration</th></tr>\n  <tr><td>--Some step--</td>               <td>2 hours</td></tr>\n  <tr><td>--Some other step--</td>         <td>3 days</td></tr>\n  <tr><td>--Yet anoter step--</td>         <td>1 days</td></tr>\n</table>\n#+end_src",
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :pid :sur-craft-beer,
+                   :assistant-id "asst_1NTi6YxGkcCty33xbPnkHlQX",
+                   :expertise "craft beer",
+                   :timestamp #inst "2025-06-16T18:19:18.426-00:00",
+                   :agent-id :sur-craft-beer-openai}],
+          :claims
+          [#:claim{:string "(project-id :sur-craft-beer)"}
+           #:claim{:string
+                   "(project-name :sur-craft-beer \"SUR Craft Beer\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-craft-beer)"}],
+          :name "SUR Craft Beer",
+          :summary-dstructs
+          [#:dstruct{:budget-left 0.95,
+                     :id :process/warm-up-with-challenges,
+                     :str
+                     "{:product-or-service-name \"craft beers\", :scheduling-challenges [\"process-variation\" \"demand-uncertainty\" \"raw-material-uncertainty\" \"equipment-availability\"], :one-more-thing \"The scheduling likely requires careful coordination across multiple production stages with different durations.\", :EADS-ref :process/warm-up-with-challenges}"}
+           #:dstruct{:budget-left 0.95,
+                     :id :process/scheduling-problem-type,
+                     :str
+                     "{:principal-problem-type :FLOW-SHOP-SCHEDULING-PROBLEM, :problem-components [:FLOW-SHOP-SCHEDULING-PROBLEM :JOB-SHOP-SCHEDULING-PROBLEM], :continuous? false, :cyclical? false, :EADS-ref :process/scheduling-problem-type}"}
+           #:dstruct{:budget-left 0.5499999999999996,
+                     :id :process/flow-shop,
+                     :str
+                     "{:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\" \"Trained personnel\"], :duration {:units \"hours\", :value-string \"2 to 4 (standard), 3 to 6 (for highly residual batches), 4 to 6 (for allergen-containing batches)\"}, :dependencies {:requires-empty-equipment true, :resource-dependencies [\"Trained personnel\" \"Available utilities like hot water and chemicals\"], :overlap-with-production {:val true, :comment \"Cleaning often overlaps with other production activities like brewing or bottling due to shared resources and personnel.\"}}, :subprocesses [{:process-id \"quality-checks\", :duration {:units \"minutes\", :value-string \"10 to 20 for visual and pH checks\"}, :optional? false, :inputs [\"Sanitized tanks\"], :outputs [\"Verified cleanliness and sanitation\"], :resources [\"Visual inspection tools\" \"pH testing equipment\"], :invented {:note \"Additional microbiological swab tests may be conducted, taking 1 to 2 days for lab results, and these are conditional on factors like suspected contamination, extended downtime, or deep maintenance.\"}}], :invented {:note \"Sequencing cleaning depends on emptied equipment, availability of trained personnel, and avoidance of conflicts with concurrent production activities.\"}}], :invented [{:note \"Proper sequencing and resource coordination are critical for cleaning processes to minimize delays and conflicts with ongoing production.\"}], :EADS-ref :process/flow-shop, :EADS-id :process/flow-shop}"}],
+          :id :sur-craft-beer}
 ]

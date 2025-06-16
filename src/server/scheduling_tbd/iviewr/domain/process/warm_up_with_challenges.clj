@@ -1,12 +1,12 @@
 (ns scheduling-tbd.iviewr.domain.process.warm-up-with-challenges
   "Define a EADS to elicit general information about the scheduling problem the interviewees are interested in solving."
   (:require
-   [clojure.pprint                  :refer [pprint]]
+   [clojure.pprint                  :refer [cl-format pprint]]
    [clojure.spec.alpha              :as s]
    [mount.core                      :as mount :refer [defstate]]
    [scheduling-tbd.agent-db         :refer [agent-log]]
    [scheduling-tbd.db               :as db]
-   [scheduling-tbd.iviewr.eads-util :as eads-util :refer [ds-complete? combine-ds!]]
+   [scheduling-tbd.iviewr.eads-util :as eu :refer [ds-complete? combine-ds!]]
    [scheduling-tbd.sutil            :as sutil]))
 
 (s/def :warm-up-with-challenges/EADS-message (s/keys :req-un [::message-type ::interview-objective ::EADS]))
@@ -106,22 +106,22 @@
 
 ;;; ------------------------------- checking for completeness ---------------
 ;;; Collect and combine :process/warm-up-with-challenges ds refinements, favoring recent over earlier versions.
+(defn completeness-test [_ds] true)
+
 (defmethod combine-ds! :process/warm-up-with-challenges
   [tag pid]
   (let [merged (->> (db/get-msg-dstructs pid tag)
                     (sort-by :msg-id)
                     (reduce (fn [r m] (merge r m)) {})
-                    eads-util/strip-annotations)
-        merged (-> merged
-                   (update :principal-problem-type keyword)
-                   (update :problem-components (fn [pcomps] (mapv #(keyword %) pcomps))))]
+                    eu/strip-annotations)]
     (db/put-summary-ds! pid tag merged)))
 
 (defmethod ds-complete? :process/warm-up-with-challenges
   [tag pid]
-  (let [ds (-> (db/get-summary-ds pid tag) eads-util/strip-annotations)
-    complete? (s/valid? ::EADS ds)]
-    (agent-log (str "This is the stripped DS for problem type (complete? = " complete? "):\n" (with-out-str (pprint ds)))
+  (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
+        complete? (completeness-test ds)]
+    (agent-log (cl-format nil "{:log-comment \"This is the summary DS for ~A  (complete? =  ~A):~%~S\"}"
+                          tag complete? (with-out-str (pprint ds)))
                {:console? true #_#_:elide-console 130})
     complete?))
 

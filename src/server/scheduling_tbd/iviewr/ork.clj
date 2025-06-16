@@ -3,7 +3,7 @@
   (:require
    [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
-   [clojure.pprint                :refer [pprint]]
+   [clojure.pprint                :refer [pprint cl-format]]
    [clojure.spec.alpha            :as s]
    [datahike.api                  :as d]
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
@@ -64,15 +64,13 @@
                {} msg-grps)))
 
 (defn add-ds-to-activities
-  "Iterate through the activities and just before changing to new pursuing-EADS add the
-   datastructure for the last one."
-  [pid cid activities]
-  (let [eads-max-ds-map (max-ds pid cid)
-        result (atom [])
+  "Iterate through the activities and just before changing to new pursuing-EADS add the summary DS for the last one."
+  [pid activities]
+  (let [result (atom [])
         current-eads (atom nil)]
     (letfn [(make-ds-entry [eads-id]
-              (let [{:keys [EADS-ref data-structure commit-notes exhausted?]} (get eads-max-ds-map eads-id)]
-                {:resulting-EADS
+              (let [{:keys [EADS-ref data-structure commit-notes exhausted?]} (db/get-summary-ds pid eads-id)]
+                {:summary-EADS
                  ;; This is the arrangement in orchestrator.txt (agent instructions). Jury is out on whether to strip.
                  (cond-> {:EADS-ref EADS-ref :data-structure data-structure}
                    commit-notes (assoc :commit-notes commit-notes)
@@ -115,7 +113,7 @@
         (when q-a-pair (swap! result conj q-a-pair))
         (when code           (swap! result conj {:code code}))
         (when code-execution (swap! result conj {:code-execution code}))))
-    (add-ds-to-activities pid cid @result)))
+    (add-ds-to-activities pid @result)))
 
 ;;; ToDo: Check the :conversation/ork-tid versus the actual (once this doesn't provide the whole thing; so that you don't have to provide the whole thing to same ork.)
 ;;; ToDo: Currently this is very similar to inv/conversation-history.
@@ -164,14 +162,16 @@
   (when-not (s/valid? ::ork-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid ork msg:\n" (with-out-str (pprint msg)))))
   (log! :info (-> (str "Ork told: " msg) (elide 150)))
-  (agent-log (str ";;; [ork manager] (tells ork)\n" (with-out-str (pprint msg))))
+  (agent-log (cl-format nil "{:log-comment \"[ork manager] (tells ork):~%~A\"}"
+                  (with-out-str (pprint msg))))
   (let [msg-string (clj2json-pretty msg)
         res (-> (adb/query-agent ork-agent msg-string {:tries 2}) output-struct2clj)
         res (cond-> res
               (contains? res :message-type)              (update :message-type keyword)
               (= (:message-type res) :PURSUE-EADS)       (update :EADS-id keyword))]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
-    (agent-log (str ";;; [ork manager] (receives response from ork)\n" (with-out-str (pprint res))))
+    (agent-log (cl-format nil "{:log-comment \"[ork manager] (receives response from ork):~%~A\"}"
+                    (with-out-str (pprint res))))
     res))
 
 (defn get-new-EADS-id
@@ -186,12 +186,13 @@
                        [?e :agent/thread-id ?tid]]
                      @(connect-atm pid))]
     (when-not (= old-tid (:tid ork))
-      (agent-log ";;; Project's ork thread has been updated; provide comprehensive history."
-                 {:console? true :level :warn}))
+      (agent-log (cl-format nil "{:log-comment \"Project's ork thread has been updated; provide comprehensive history.\"}"
+                            {:console? true :level :warn})))
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
     (let [pursue-msg (tell-ork (conversation-history pid) ork) ; conversation-history defaults to :all (all cids).
           eads-instructions-id (-> pursue-msg :EADS-id keyword)]
       (if ((db/system-EADS?) eads-instructions-id)
         eads-instructions-id
         ;; Otherwise probably :exhausted. Return nil
-       (agent-log (str ";;; Exhausted or invalid PURSUE-EADS message: " pursue-msg) {:console? true :level :info})))))
+        (agent-log (cl-format nil "{:log-comment \"Exhausted or invalid PURSUE-EADS message: ~A\"}" pursue-msg)
+                   {:console? true :level :info})))))

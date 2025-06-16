@@ -2,6 +2,7 @@
   "Server utilities."
   (:require
    [cheshire.core            :as ches]
+   [clojure.pprint           :refer [cl-format]]
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
@@ -263,21 +264,11 @@
   [obj]
   (ches/generate-string obj {:pretty true}))
 
-#_(defn same-EADS-instructions?
-  "Return true if the argument eads-instructions (an EDN object) is exactly what the system already maintains."
-  [eads-instructions]
-  (let [id (-> eads-instructions :EADS :EADS-id)
-        [ns nam] ((juxt namespace name) id)]
-    (assert (and ns nam))
-    (let [eads-json-fname (str "resources/agents/iviewrs/EADS/" ns "/" nam ".edn")
-          old-text (if (.exists (io/file eads-json-fname)) (slurp eads-json-fname) "")
-          new-text (clj2json-pretty eads-instructions)]
-      (= old-text new-text))))
-
 (defn update-resources-EADS-json!
   "Update the resources/agents/iviewrs/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions.
    These are needed by the orchestrator; they are put in its vector store."
   [eads-instructions]
   (let [id (-> eads-instructions :EADS :EADS-id)
-        eads-json-fname (str "resources/agents/iviewrs/EADS/" (name id) ".json")]
+        [nam ns] ((juxt name namespace) id)
+        eads-json-fname (cl-format nil "resources/agents/iviewrs/EADS/~A/~A.json" ns nam)]
     (spit eads-json-fname (clj2json-pretty eads-instructions))))

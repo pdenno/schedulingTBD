@@ -129,15 +129,14 @@
 (defn ^:diag parse-eads [eads-str]
   (json/read-str eads-str :key-fn keyword))
 
-(defn ds2mermaid [pid ds-id]
-  (assert (#{:process/flow-shop :process/job-shop--classifiable} ds-id))
-  (when-let [ds (db/get-summary-ds pid ds-id)]
-    (when (eads-util/graph-semantics-ok? ds)
-      (str "flowchart TD\n"
-           (decompose-eads ds)
-           (apply str (-> ds
-                          gather-connections
-                          find-connections
-                          combine-connections
-                          format-combined-connections
-                          format-connections))))))
+(defn ds2mermaid [{:keys [EADS-ref] :as ds}]
+  (assert (#{:process/flow-shop :process/job-shop--classifiable} EADS-ref))
+  (when (eads-util/graph-semantics-ok? ds)
+    (str "flowchart TD\n"
+         (decompose-eads ds)
+         (apply str (-> ds
+                        gather-connections
+                        find-connections
+                        combine-connections
+                        format-combined-connections
+                        format-connections)))))

@@ -1,14 +1,14 @@
 (ns scheduling-tbd.iviewr.domain.process.timetabling
   (:require
-   [clojure.pprint           :refer [pprint]]
-   [clojure.set              :as set]
-   [clojure.spec.alpha       :as s]
-   [mount.core               :as mount :refer [defstate]]
-   [scheduling-tbd.agent-db  :refer [agent-log]]
-   [scheduling-tbd.db        :as db]
-   [scheduling-tbd.sutil     :as sutil]
+   [clojure.pprint                  :refer [cl-format pprint]]
+   [clojure.set                     :as set]
+   [clojure.spec.alpha              :as s]
+   [mount.core                      :as mount :refer [defstate]]
+   [scheduling-tbd.agent-db         :refer [agent-log]]
+   [scheduling-tbd.db               :as db]
+   [scheduling-tbd.sutil            :as sutil]
    [scheduling-tbd.iviewr.eads-util :as eu :refer [ds-complete? combine-ds!]]
-   [taoensso.telemere        :refer [log!]]))
+   [taoensso.telemere               :refer [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -262,18 +262,18 @@
   "A timetabling DS is ds-complete? when (conjunctively):
       - there is at least one event-type and all the event types have event-type-id, event-constituents, periodicity, and occurrence-assignment,
       - there is at least one value in timeslots and it has ts-type-id and and spans."
-  [eads]
-  (and (contains? eads :event-types)
-       (s/valid? ::event-types (:event-types eads))
-       (contains? eads :timeslots)
-       (s/valid? ::timeslots (:timeslots eads))))
+  [ds]
+  (and (contains? ds :event-types)
+       (s/valid? ::event-types (:event-types ds))
+       (contains? ds :timeslots)
+       (s/valid? ::timeslots (:timeslots ds))))
 
 (defmethod ds-complete? :process/timetabling
   [tag pid]
   (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
-    complete? (completeness-test ds)]
-    (agent-log (str ";;; This is the stripped DS for timetabling (complete? = " complete? "):\n"
-                    (with-out-str (pprint (db/get-summary-ds pid tag))))
+        complete? (completeness-test ds)]
+    (agent-log (cl-format nil "{:log-comment \"This is the summary DS for ~A  (complete? =  ~A):~%~S\"}"
+                          tag complete? (with-out-str (pprint ds)))
                {:console? true :elide-console 130})
     complete?))
 

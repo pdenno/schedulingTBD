@@ -41,6 +41,8 @@
    (format "You manage a company that makes %s.\n" role)
    "You are an expert in production and manage your company's supply chains.\n"
    "You help me by answering an interviewer's questions that will allow us to collaborate in building a scheduling system for your company.\n"
+
+   "Currently, you do not use any software in scheduling your work, except maybe spreadsheets and office software calendars.\n"
    "Your answers typically are short, just a few sentences each.\n\n"
    how-to-handle-tables))
 
@@ -87,7 +89,7 @@
         (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
                             :new-proj-map {:project/name pname :project/id pid}}))
     (catch Exception e
-      (throw (ex-info "Error starting surrogate:" {:e e})))
+      (throw (ex-info "Error in surrogate interview:" {:e e})))
     (finally ; ToDo: Not sure this is needed.
         (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))))
 

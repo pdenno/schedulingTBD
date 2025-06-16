@@ -238,6 +238,7 @@
    :project/conversations
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
         :doc "The conversations of this project."}
+
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
@@ -1038,13 +1039,14 @@
    If no such data structure yet, returns {}."
   [pid eads-id]
   (if-let [str (d/q '[:find ?str .
-                      :in $ ?ds-id
+                      :in $ ?eads-id
                       :where
-                      [?e :dstruct/id ?ds-id]
+                      [?e :dstruct/id ?eads-id]
                       [?e :dstruct/str ?str]]
-                    @(sutil/connect-atm pid) eads-id)]
+                    @(connect-atm pid) eads-id)]
     (edn/read-string str)
-    {}))
+    (do (log! :warn (str "No summary DS for " eads-id))
+        {})))
 
 (defn ^:diag list-summary-ds
   "Return a vector of eads-id for summary-ds of the given project."
@@ -1057,7 +1059,8 @@
 (defn put-summary-ds!
   "Dehydrate the given summary data structure and write it to the project DB."
   [pid eads-id dstruct]
-  (let [eid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid))]
+  (let [dstruct (dissoc dstruct :msg-id)
+        eid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid))]
     (if eid
       (d/transact (connect-atm pid)
                   {:tx-data [{:db/id eid

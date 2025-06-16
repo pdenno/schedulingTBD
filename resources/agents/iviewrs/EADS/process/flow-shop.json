@@ -1,9 +1,13 @@
 {
   "message-type" : "EADS-INSTRUCTIONS",
   "interviewer-agent" : "process",
-  "interview-objective" : "This EADS assumes the interviewees' production processes are organized as a flow shop.\nLearn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\nWe might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\nFor example, they might have in mind scheduling machine maintenance, not production.\nThis fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\nKnowledge of the processes might prove useful later.",
+  "interview-objective" : "This EADS assumes the interviewees' production processes are organized as a flow shop.\nUse this EADS to learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\nWe use the information you gather to create functional flow block (FFB) diagrams of their processes that interviewees can review.\nWe might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\nFor example, they might have in mind scheduling machine maintenance, not production.\nThis fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\nKnowledge of the processes might prove useful later.\nUnlike many EADS where we accumulate results from your DATA-STRUCTURE-REFINEMENT messages, we'd like you to do that; grow the DSR with each question.",
   "EADS" : {
     "EADS-id" : "process/flow-shop",
+    "exhausted?" : {
+      "val" : true,
+      "comment" : "When you think you have all the key processes documented, including their 'inputs' 'outputs' 'resources' and 'durations', set this to true.\nThe EADS example here is complete in that sense, so we set it to true.\nYou don't need to include this until you are ready to set it to true."
+    },
     "process-id" : {
       "val" : "pencil-manufacturing",
       "comment" : "This is the top-level process. You can name it as you see fit; don't ask the interviewees."
