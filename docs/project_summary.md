@@ -4,6 +4,12 @@
 
 SchedulingTBD is an experimental software platform designed to study **human/machine teaming (HMT)** in long-running cognitive tasks, specifically focusing on collaborative formulation and refinement of manufacturing production scheduling systems. The project explores how humans and AI can work together to create solutions using domain-specific languages (DSLs), particularly [MiniZinc](https://www.minizinc.org/) for constraint programming.
 
+## Note to MCP clients
+
+If you are asked to run functions of the system that involve calls to LLM-based agents, allow at least 30 seconds for each call to complete.
+Things will timeout by themselves, you should not give up.
+In order to observe system activity, you can watch for logging at the console, and also entries made in logs/agent-logs.txt."
+
 ## Project Goals
 
 This research aims to establish consensus and eventual standardization on best practices for:
@@ -125,44 +131,6 @@ Structured interview conversations with four main topics:
 - Automated validation of interview effectiveness
 
 ## Development Workflow
-
-### Running the Application
-
-1. **Environment Setup**:
-   ```bash
-   export OPENAI_API_KEY=sk-...
-   export SCHEDULING_TBD_DB=/opt/scheduling
-   ```
-
-2. **Server (Backend)**:
-   ```bash
-   clj -M:dev
-   # In REPL: (start)
-   ```
-
-3. **Client (Frontend)**:
-   ```bash
-   npm install
-   npm run stbd-client
-   # Visit http://localhost:3300/app
-   ```
-
-### Database Initialization
-```clojure
-(in-ns 'scheduling-tbd.db)
-(recreate-system-db!)
-(recreate-project-dbs!)
-```
-
-### Testing
-```bash
-clj -M:test  # Server-side tests
-npm run kaochaSTBD  # Client-side tests
-```
-
-## Research Context
-
-This software is being developed as part of the NIST project [Human/AI Teaming for Manufacturing Digital Twins](https://www.nist.gov/programs-projects/humanmachine-teaming-manufacturing-digital-twins). The research addresses fundamental questions about how humans and AI systems can effectively collaborate on complex, knowledge-intensive tasks.
 
 ### Current Status
 - ✅ Multi-agent interview system operational

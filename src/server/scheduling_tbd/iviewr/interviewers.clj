@@ -2,7 +2,6 @@
     "Runs an interview using an interview agent."
     (:require
      [cheshire.core                   :as ches]
-     [clojure.core.unify              :as uni]
      [clojure.data.xml                :as xml]
      [clojure.pprint                  :refer [pprint]]
      [clojure.spec.alpha              :as s]
@@ -24,13 +23,7 @@
      [taoensso.telemere                    :as tel :refer [log!]]))
 
 ;;; The usual way of interviews involves q-and-a called from resume-conversation.
-;;; The alternative way, used only when the human or surrogate expert is starting, is to use get-an-answer.
-;;; get-an-answer is called by q-and-a but is also is directly called by surrogate and human conversations on startup.
-;;; The difference being that these two already know what the question is; it is the warm-up question of whatever
-;;; conversation is running. The call to q-and-a, in contrast, uses SUPPLY-QUESTION to the interviewer.
-;;;
 ;;; [resume-conversation] -> q-and-a -> get-an-answer -> chat-pair -> send-to-client or query-agent (sur).
-;;; [start-up]                       -> get-an-answer -> ...
 
 (def ^:diag diag (atom nil))
 (s/def ::cid #(#{:process :data :resources :optimality} %))
@@ -79,7 +72,7 @@
                                        (assoc :dispatch-key :iviewr-says)))
                 (px/submit! (fn [] ; surrogate responder...
                               (try
-                                (agent-log (str "["(name cid) " interviewer] (asking interviewees): " question "\n\n" table-text))
+                                (agent-log (str ";;; ["(name cid) " interviewer] (asking interviewees):\n \"" question "\"\n\n" table-text))
                                 (adb/query-agent surrogate-agent  ; This can timeout.
                                                  (str question "\n\n" table-text)
                                                  {:tries tries
@@ -100,7 +93,7 @@
    If response is immoderate returns {:msg-type :immoderate}"
   [{:keys [responder-type client-id cid] :as ctx}]
   (let [response (chat-pair-aux ctx)]
-    (agent-log (str "["(name cid) " interviewer] (response from interviewees): " response))
+    (agent-log (str ";;; ["(name cid) "interviewer] (response from interviewees):\n\"" response "\""))
     (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})
     (case responder-type
       :human (if (-> response :text llm/immoderate?)
@@ -153,15 +146,15 @@
   ([msg iviewr-agent cid] (tell-interviewer msg iviewr-agent cid {}))
   ([msg iviewr-agent cid opts]
    (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
-     (log! :warn (str "Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
-   (agent-log (str "[interview manager] (tells " (name cid) " interviewer)\n" (with-out-str (pprint msg))))
+     (log! :warn (str ";;; Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
+   (agent-log (str ";;; [interview manager] (tells " (name cid) " interviewer)\n" (with-out-str (pprint msg))))
    (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
    (let [msg-string (ches/generate-string msg {:pretty true})
          res (-> (adb/query-agent iviewr-agent msg-string opts) output-struct2clj)
          res (cond-> res
                (contains? res :message-type)     (update :message-type keyword))]
      (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
-     (agent-log (str "[interview manager] (receives from " (name cid) " interviewer)\n" (with-out-str (pprint res))))
+     (agent-log (str ";;; [interview manager] (receives from " (name cid) " interviewer)\n" (with-out-str (pprint res))))
      res)))
 
 (defn response-analysis
@@ -242,17 +235,20 @@
    (i.e. by OpenAI, because it is more than 30 days old) then the agent knows what has already been
    asked EXCEPT for the warm-up question (if any) which happens before the interview."
   [pid cid]
-  (let [answers (->> cid
-                     (db/get-conversation pid)
-                     :conversation/messages
-                     (filter #(contains? % :message/answers-question)))]
-    (cond-> {:message-type :CONVERSATION-HISTORY
-             :interviewee-type (if (surrogate? pid) :machine :human)
-             :budget (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid))}
-      (not-empty answers)   (assoc :activity (mapv (fn [answer]
-                                                     {:question (-> (db/get-msg pid cid (:message/answers-question answer)) :message/content)
-                                                      :answer  (-> answer :message/content)}) ; ToDo: Is this inclusive of tables?
-                                                   answers)))))
+  (if (db/project-exists? pid)
+    (let [answers (->> cid
+                       (db/get-conversation pid)
+                       :conversation/messages
+                       (filter #(contains? % :message/answers-question)))]
+      (cond-> {:message-type :CONVERSATION-HISTORY
+               :interviewee-type (if (surrogate? pid) :machine :human)
+               :budget (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid))}
+        (not-empty answers)   (assoc :activity (mapv (fn [answer]
+                                                       {:question (-> (db/get-msg pid cid (:message/answers-question answer)) :message/content)
+                                                        :answer  (-> answer :message/content)}) ; ToDo: Is this inclusive of tables?
+                                                     answers))))
+    {:message-type :CONVERSATION-HISTORY
+     :activity []}))
 
 (defn make-supply-question-msg
   "Create a supply question message for the conversation."
@@ -429,7 +425,7 @@
    {:responder-type :human
     :iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})})
 
-(defn start-human-project!
+#_(defn start-human-project!
   "This does a few things to 'catch up' with the surrogate-mode of operation, which alreadys knows what the project is about.
       1) Analyze the response from the :process/warm-up question.
           a) make a project (now you know the real pid).
@@ -535,10 +531,10 @@
                   (let [nspace (when eads-id (-> eads-id namespace keyword))]
                     (when (not= cid nspace) nspace)))]
     (when-not budget-ok?
-      (agent-log (str "[ork manager] (in ork-review) switching to new EADS instructions " new-eads-id "  owing to budget.")
+      (agent-log (str ";;; [ork manager] (in ork-review) switching to new EADS instructions " new-eads-id "  owing to budget.")
                  {:console? true :level :warn}))
     (when new-cid
-      (agent-log (str "[ork manager] (in ork-review) changing conversation to " new-cid ".")))
+      (agent-log (str ";;; [ork manager] (in ork-review) changing conversation to " new-cid ".")))
     (let [res (cond-> {}
                 (not @active?)                    (assoc :force-stop? true)
                 exhausted?                        (assoc :exhausted? true)
@@ -546,7 +542,7 @@
                 new-eads-id                       (assoc :new-eads-id new-eads-id)
                 new-cid                           (assoc :new-cid? true :old-cid cid :cid new-cid)
                 (not new-cid)                     (assoc :cid cid))]
-      (agent-log (str "[ork manager] (in ork-review) returning decision (has extra info):\n"
+      (agent-log (str ";;; [ork manager] (in ork-review) returning decision (has extra info):\n"
                       (with-out-str (pprint res)))
                  {:console? true})
       res)))
@@ -561,7 +557,7 @@
   [{:keys [client-id pid cid] :as ctx}]
   (assert (s/valid? ::client-id client-id))
   (assert (s/valid? ::cid cid))
-  (agent-log (str "============= resume-conversation: " pid  " " cid " " (now) " ========================")
+  (agent-log (str ";;; ============= resume-conversation: " pid  " " cid " " (now) " ========================")
              {:console? true :level :debug})
   (if (ready-for-discussion? pid cid)
     (try
@@ -570,14 +566,15 @@
         (loop [ctx ctx] ; ToDo: currently not used!
           (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?]} (ork-review pid cid)]
             (if (or exhausted? force-stop?)
-              (agent-log (str "resume-conversation exiting. ctx:\n" (with-out-str (pprint ctx))) {:console? true})
+              (agent-log (str ";;; resume-conversation exiting. ctx:\n" (with-out-str (pprint ctx))) {:console? true})
               (let [eads-id (or new-eads-id (db/get-active-EADS-id pid cid))]
                 (when new-cid?
                   (db/put-active-cid! pid cid)
                   (db/put-conversation-status! pid old-cid :eads-exhausted)
                   (db/put-conversation-status! pid cid :in-progress))
                 (when change-eads?
-                  (log! :warn (str "Changing EADS, new-eads-id = " new-eads-id))
+                  (agent-log (str ";;; Changing EADS, new-eads-id = " new-eads-id)
+                             {:console? true :level :warn})
                   (db/put-new-summary-ds! pid new-eads-id)
                   (db/put-project-active-EADS-id! pid new-eads-id) ; This will be used by :message/pursuing-EADS.
                   (db/put-active-EADS-id pid cid new-eads-id) ; This will be used by :message/pursuing-EADS.
@@ -599,7 +596,7 @@
     (find-appropriate-conv-and-redirect ctx)))
 
 ;;; The equivalent for surrogates is start-surrogate. It also asks the first question.
-(defn start-conversation
+#_(defn start-conversation
   "Ask a human the first question (a warm-up question), create a project and call resume-conversation.
    :start-conversation is a dispatch-key from the client, providing, perhaps only the client-id."
   [{:keys [client-id cid] :as ctx}]
@@ -634,7 +631,7 @@
 ;;;------------------------------------ Starting and stopping --------------------------------
 (defn init-iviewers!
   []
-  (ws/register-ws-dispatch :start-conversation start-conversation)
+  #_(ws/register-ws-dispatch :start-conversation start-conversation)
   (ws/register-ws-dispatch :resume-conversation resume-conversation))
 
 (defstate iviewrs

@@ -5,8 +5,10 @@
 
    Note: We don't load this code at system startup. When you compile it, it writes the EADS to resources/EADS/job-shop.txt"
   (:require
+   [clojure.pprint        :refer [pprint]]
    [clojure.spec.alpha    :as s]
    [mount.core :as mount  :refer [defstate]]
+   [scheduling-tbd.agent-db  :refer [agent-log]]
    [scheduling-tbd.db     :as db]
    [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
    [scheduling-tbd.sutil  :as sutil]
@@ -49,8 +51,10 @@
   (throw (ex-info "Invalid EADS (job-shop)" {})))
 
 (defmethod ds-complete? :process/job-shop
-  [eads-id ds]
-  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  [tag pid]
+  (agent-log :info (str ";;; This is the the summary DS for " tag ":\n"
+                        (with-out-str (pprint (db/get-summary-ds pid tag))))
+             {:console? true :elide-console 130})
   true)
 
 (defn init-job-shop

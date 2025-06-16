@@ -5,12 +5,14 @@
 
    Note: We don't load this code at system startup. When you compile it, it writes the EADS to resources/EADS/job-shop-c.txt"
   (:require
-   [clojure.spec.alpha    :as s]
-   [mount.core :as mount  :refer [defstate]]
-   [scheduling-tbd.db     :as db]
+   [clojure.pprint                  :refer [pprint]]
+   [clojure.spec.alpha              :as s]
+   [mount.core                      :as mount  :refer [defstate]]
+   [scheduling-tbd.agent-db         :refer [agent-log]]
+   [scheduling-tbd.db               :as db]
    [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
-   [scheduling-tbd.sutil  :as sutil]
-   [taoensso.telemere :refer [log!]]))
+   [scheduling-tbd.sutil            :as sutil]))
+
 
 (s/def :job-shop-c/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
@@ -220,8 +222,10 @@
   (throw (ex-info "Invalid EADS (flow-shop)" {})))
 
 (defmethod ds-complete? :process/job-shop--classifiable
-  [eads-id ds]
-  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  [tag pid]
+  (agent-log :info (str "This is the summary DS for " tag ":\n"
+                        (with-out-str (pprint (db/get-summary-ds pid tag))))
+             {:console? true :elide-console 130})
   true)
 
 ;;; -------------------- Starting and stopping -------------------------

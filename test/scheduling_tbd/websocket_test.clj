@@ -2,14 +2,11 @@
   "Integration tests for WebSocket functionality including connection lifecycle,
    promise management, and error recovery scenarios."
   (:require
+   [clojure.core.async :as async :refer [>! go]]
    [clojure.test :refer [deftest testing is use-fixtures]]
-   [clojure.core.async :as async :refer [<! >! go chan timeout]]
-   [clojure.edn :as edn]
    [promesa.core :as p]
-   [ring.websocket.async :as wsa]
    [scheduling-tbd.web.websockets :as ws]
-   [scheduling-tbd.util :refer [now]]
-   [taoensso.telemere :refer [log!]]))
+   [scheduling-tbd.util :refer [now]]))
 
 ;; Test fixtures and utilities
 (def test-client-id "test-client-123")
@@ -28,8 +25,9 @@
   (ws/forget-client client-id)
   (swap! ws/ping-dates #(dissoc % client-id)))
 
-(defn test-fixture [f]
+(defn test-fixture
   "Test fixture to ensure clean state before and after tests"
+  [f]
   (ws/clear-promises!)
   (reset! ws/socket-channels {})
   (reset! ws/ping-dates {})
@@ -46,39 +44,39 @@
 ;; Connection Lifecycle Tests
 (deftest test-websocket-connection-lifecycle
   (testing "Basic connection establishment and cleanup"
-    (let [channels (setup-test-client test-client-id)]
-      (is (contains? @ws/socket-channels test-client-id)
-          "Client should be registered in socket-channels")
-      (is (contains? @ws/ping-dates test-client-id)
+    (setup-test-client test-client-id)
+    (is (contains? @ws/socket-channels test-client-id)
+        "Client should be registered in socket-channels")
+    (is (contains? @ws/ping-dates test-client-id)
           "Client should be registered in ping-dates")
 
-      (cleanup-test-client test-client-id)
-      (Thread/sleep 6000) ; Allow time for async cleanup (1000ms delay + processing) ; Increased wait time for async cleanup ; Allow async cleanup to complete
+    (cleanup-test-client test-client-id)
+    (Thread/sleep 6000) ; Allow time for async cleanup (1000ms delay + processing) ; Increased wait time for async cleanup ; Allow async cleanup to complete
 
-      (is (not (contains? @ws/socket-channels test-client-id))
-          "Client should be removed from socket-channels after cleanup")
-      (is (not (contains? @ws/ping-dates test-client-id))
-          "Client should be removed from ping-dates after cleanup"))))
+    (is (not (contains? @ws/socket-channels test-client-id))
+        "Client should be removed from socket-channels after cleanup")
+    (is (not (contains? @ws/ping-dates test-client-id))
+        "Client should be removed from ping-dates after cleanup")))
 
 (deftest test-multiple-clients
   (testing "Multiple client connections and independent cleanup"
-    (let [channels-1 (setup-test-client test-client-id)
-          channels-2 (setup-test-client test-client-id-2)]
+     (setup-test-client test-client-id)
+     (setup-test-client test-client-id-2)
 
-      (is (= 2 (count @ws/socket-channels))
-          "Both clients should be registered")
+     (is (= 2 (count @ws/socket-channels))
+         "Both clients should be registered")
 
-      ;; Remove one client
-      (cleanup-test-client test-client-id)
-      (Thread/sleep 6000) ; Allow time for async cleanup ; Increased wait time for async cleanup 
+     ;; Remove one client
+     (cleanup-test-client test-client-id)
+     (Thread/sleep 6000) ; Allow time for async cleanup ; Increased wait time for async cleanup
 
-      (is (= 1 (count @ws/socket-channels))
-          "Only one client should remain")
-      (is (contains? @ws/socket-channels test-client-id-2)
-          "Second client should still be registered")
+     (is (= 1 (count @ws/socket-channels))
+         "Only one client should remain")
+     (is (contains? @ws/socket-channels test-client-id-2)
+         "Second client should still be registered")
 
-      ;; Clean up remaining client
-      (cleanup-test-client test-client-id-2))))
+     ;; Clean up remaining client
+     (cleanup-test-client test-client-id-2)))
 
 (deftest test-channel-exit-race-condition
   (testing "Channel exit mechanism without race conditions"
@@ -191,17 +189,17 @@
 
 (deftest test-alive-confirmation
   (testing "Client alive confirmation mechanism"
-    (let [{:keys [in out]} (setup-test-client test-client-id)]
+    (setup-test-client test-client-id)
 
-      ;; Set client as not alive
-      (swap! ws/socket-channels #(assoc-in % [test-client-id :alive?] false))
+    ;; Set client as not alive
+    (swap! ws/socket-channels #(assoc-in % [test-client-id :alive?] false))
 
-      ;; Send alive confirmation
-      (ws/client-confirms-alive {:client-id test-client-id})
+    ;; Send alive confirmation
+    (ws/client-confirms-alive {:client-id test-client-id})
 
-      ;; Check that client is marked as alive
-      (is (get-in @ws/socket-channels [test-client-id :alive?])
-          "Client should be marked as alive after confirmation"))))
+    ;; Check that client is marked as alive
+    (is (get-in @ws/socket-channels [test-client-id :alive?])
+        "Client should be marked as alive after confirmation")))
 
 ;; Error Recovery Tests
 (deftest test-message-dispatch-errors
@@ -227,25 +225,25 @@
 ;; Stress Tests
 (deftest test-concurrent-connections
   (testing "Handle multiple concurrent connections"
-    (let [client-ids (map #(str "client-" %) (range 10))
-          channels (doall (map setup-test-client client-ids))]
+    (let [client-ids (map #(str "client-" %) (range 10))]
+      (doall (map setup-test-client client-ids))
 
       (is (= 10 (count @ws/socket-channels))
           "All clients should be registered")
 
       ;; Create promises for all clients
-      (let [promises (doall (map ws/new-promise! client-ids))]
-        (is (= 10 (count @ws/promise-stack))
-            "All promises should be created")
+      (doall (map ws/new-promise! client-ids))
+      (is (= 10 (count @ws/promise-stack))
+          "All promises should be created")
 
-        ;; Clean up all clients
-        (doall (map cleanup-test-client client-ids))
-        (Thread/sleep 200)
+      ;; Clean up all clients
+      (doall (map cleanup-test-client client-ids))
+      (Thread/sleep 200)
 
-        (is (= 0 (count @ws/socket-channels))
-            "All clients should be cleaned up")
-        (is (= 0 (count @ws/promise-stack))
-            "All promises should be cleaned up")))))
+      (is (= 0 (count @ws/socket-channels))
+          "All clients should be cleaned up")
+      (is (= 0 (count @ws/promise-stack))
+          "All promises should be cleaned up"))))
 
 (deftest test-rapid-connect-disconnect
   (testing "Rapid connection and disconnection cycles"
@@ -296,6 +294,7 @@
     (cleanup-test-client test-client-id)))
 
 ;; Run all tests
-(defn run-websocket-tests []
+(defn ^:diag run-websocket-tests
   "Convenience function to run all websocket tests"
+  []
   (clojure.test/run-tests 'scheduling-tbd.websocket-test))

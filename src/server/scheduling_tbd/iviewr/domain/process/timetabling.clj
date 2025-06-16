@@ -1,14 +1,12 @@
 (ns scheduling-tbd.iviewr.domain.process.timetabling
   (:require
-   [clojure.edn              :as edn]
    [clojure.pprint           :refer [pprint]]
    [clojure.set              :as set]
    [clojure.spec.alpha       :as s]
-   [datahike.api             :as d]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.agent-db  :refer [agent-log]]
    [scheduling-tbd.db        :as db]
-   [scheduling-tbd.sutil     :as sutil :refer [connect-atm]]
+   [scheduling-tbd.sutil     :as sutil]
    [scheduling-tbd.iviewr.eads-util :as eu :refer [ds-complete? combine-ds!]]
    [taoensso.telemere        :refer [log!]]))
 
@@ -241,7 +239,6 @@
         ts-replaces  (set/intersection best-ts-type-ids more-ts-type-ids)
         ev-inserts   (set/difference more-event-type-ids best-event-type-ids)
         ev-replaces  (set/intersection best-event-type-ids more-event-type-ids)]
-    ;; <=============================================================================================       (2) Remove :event-types and :timeslots if they are empty when done.
     (as-> best ?b
       (reduce (fn [r new-id] (eu/insert-by-id r :timeslots   (eu/get-object more :ts-type-id new-id))) ?b ts-inserts)
       (reduce (fn [r new-id] (eu/insert-by-id r :event-types (eu/get-object more :event-type-id new-id))) ?b ev-inserts)
@@ -275,7 +272,8 @@
   [tag pid]
   (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
     complete? (completeness-test ds)]
-    (agent-log (str "This is the stripped DS for timetabling (complete? = " complete? "):\n" (with-out-str (pprint ds)))
+    (agent-log (str ";;; This is the stripped DS for timetabling (complete? = " complete? "):\n"
+                    (with-out-str (pprint (db/get-summary-ds pid tag))))
                {:console? true :elide-console 130})
     complete?))
 

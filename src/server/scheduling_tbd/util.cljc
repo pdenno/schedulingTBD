@@ -47,7 +47,7 @@
   []
   (tel/add-handler! :default/console (tel/handler:console {:output-fn custom-console-output-fn}))
   #?(:clj (tel/add-handler! :agent/log (tel/handler:file  {:output-fn agents-log-output-fn
-                                                           :path "./logs/agents-log.txt"
+                                                           :path "./logs/agents-log.edn"
                                                            :interval :daily})))
 ;;; Alternative to above; separate handlers; not working:
 ;;;  #?(:clj  (tel/add-handler! :default/console (tel/handler:console {:output-fn custom-console-output-fn})))

@@ -3,6 +3,7 @@
   (:require
    [ajax.core :refer [GET]] ; for testing
    [clojure.edn     :as edn]
+   [clojure.java.basis]
    [clojure.java.io :as io]
    [clojure.string]
    [mount.core :as mount :refer [defstate]]
@@ -53,10 +54,11 @@
       (log! :error (str "server failed to start on port: " port)))))
 
 ;;; There's a lot to learn here about the server abstraction; it is explained here: https://github.com/ring-clojure/ring/wiki
-(defn start-server [& {:keys [profile] :or {profile :dev}}]
-  (let [base-config (-> "system.edn" io/resource slurp edn/read-string profile)
-        port (-> base-config :server/http :port)
-        host (-> base-config :server/http :host)]
+(defn start-server []
+  (let [env-option (->> (clojure.java.basis/initial-basis) :basis-config :aliases (some #(when (#{:dev :prod :test} %) %)))
+        config (-> "system.edn" io/resource slurp edn/read-string)
+        port (-> config :server/http :port env-option)
+        host (-> config :server/http :host)]
     (try (let [server (jetty/run-jetty #'scheduling-tbd.web.handler/app {:port port, :join? false})]
            (reset! system server)
            ;(test-server port)

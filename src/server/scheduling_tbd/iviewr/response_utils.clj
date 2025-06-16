@@ -5,8 +5,6 @@
    [cheshire.core                 :as ches]
    [clojure.datafy                :refer [datafy]]
    [clojure.core.unify            :as uni]
-   [clojure.edn                   :as edn]
-   [clojure.java.io               :as io]
    [clojure.pprint                :refer [pprint]]
    [clojure.spec.alpha            :as s]
    [clojure.string                :as str]
@@ -75,48 +73,3 @@
                                          "\ntrace:\n" (with-out-str (pprint (:trace d-e))))))))]
        (s/assert ::text-to-var res)
        (:CORRESPONDING-VAR res)))))
-
-(defn get-iviewr-info [cid]
-  (-> "agents/iviewrs/iviewr-infos.edn"
-      io/resource
-      slurp
-      edn/read-string
-      (get cid)))
-
-(defn get-warm-up-q [cid]
-  (-> cid get-iviewr-info :warm-up-question))
-
-
-#_(defn key-vals
-  "Return a collection of keys for which the value is a key."
-  [m]
-  (let [res (atom #{})]
-    (letfn [(kv [obj]
-              (cond  (map? obj)     (doseq [[k v] obj] (if (keyword? v) (swap! res conj k) (kv v)))
-                     (vector? obj)  (doseq [v obj] (kv v))))]
-      (kv m)
-      @res)))
-
-;;; ToDo: Use of key-vals is questionable.
-#_(defn ds2clj
-  "Walk through the data structure, comparing it to the EADS and update map value strings to keywords where appropriate.
-   The term 'data structure' refers to the map structure interviewers create from an EADS."
-  [ds]
-  (let [msg (or (-> ds :EADS-ref keyword db/get-eads not-empty)
-                (throw (ex-info "No such EADS:" {:name (:EADS-ref ds)})))
-        key-val? (-> msg :EADS strip-annotations key-vals)]
-    (letfn [(ds2 [obj]
-              (cond (map? obj)      (reduce-kv (fn [m k v] (assoc m k (if (key-val? k) (keyword v) (ds2 v)))) {} obj)
-                    (vector? obj)   (mapv ds2 obj)
-                    :else           obj))]
-      (ds2 ds))))
-
-;;; ====================== Shared by use of tags :process :data :resources :optimality ====================
-(defn dispatch-by-cid [tag & _]
-  (if (#{:process :data :resources :optimality} tag)
-    tag
-    (throw (ex-info "Bad tag" {:tag tag}))))
-
-;;; The methods for this are in the iviewr/domain directory.
-(defmulti analyze-warm-up        #'dispatch-by-cid)
-(defmulti conversation-complete? #'dispatch-by-cid)

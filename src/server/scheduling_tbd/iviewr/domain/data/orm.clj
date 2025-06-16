@@ -95,33 +95,32 @@
    :budget-decrement 0.05
    :interviewer-agent :data
    :interview-objective
-     (str "The data interview is about discovering and documenting the information that interviewees use to do their work (scheduling production or providing a service to customers).\n"
-          "Many small manufacturers use spreadsheets to run their company.\n"
-          "It would seem expeditious, therefore, to have the interviewees upload their spreadsheets for discussion; but we are not going to do that.\n"
-          "Instead, we are going to learn characteristics of their data through your interview and create example data of the sorts that they described to you.\n"
-          "We will use these data to run prototypes of the MiniZinc-based scheduling system that the humans and AI create together.\n"
+     (str "You, the data interviewer, discover and document information that interviewees use to do their work (scheduling production or providing a service to customers).\n"
+          "The interview you lead reveals characteristics of their data and creates example data of the sorts that they described to you.\n"
+          "We will use these data to together (humans and AI) define a simple prototype of the interviewees' MiniZinc-based production scheduling system.\n"
           "\n"
-          "There are three principal tasks to be achieved in this interview:\n"
-          "   Task 1: determining the kinds and scope of data involved in decision making in the interviewees' work,\n"
-          "   Task 2a: determining the relationships and constraints among the data and expressing these as Object Role Modeling (ORM) fact types, and,\n"
-          "   Task 2b: for each ORM fact type, creating a table of example data that the interviewees would deem realistic.\n"
+          "There are three tasks to be achieved in this interview:\n"
+          "    Task 1: enumerating the areas of inquiry that are involved in making scheduling decisions in the interviewees' work,\n"
+          "    Task 2: determining the relationships and constraints among the data of these areas of inquiry and expressing these as Object Role Modeling (ORM) fact types, and,\n"
+          "    Task 3: for each ORM fact type, creating a table of example data that the interviewees would deem realistic.\n"
           "\n"
-          "Notice that we used the terminology 'Task 2a' and 'Task 2b' rather than 'Task 2' and 'Task 3'.\n"
-          "This is to emphasize that you should focus on completing the specification of each ORM fact (Task 2a) and the production of example data (Task 2b) before addressing the next fact type.\n"
+          "Task 1 is performed once, after which Tasks 2 and 3 are repeated for each area of inquiry and its fact types, until all the areas of inquiry are covered."
           "Working this way, you will help keep the interviewees focused.\n"
           "\n"
-          "In Task 1, the goal is to categorize their quantitative and structured data into 'areas of inquiry'.\n"
-          "We provide an enumeration of areas of inquiry in the EADS.\n"
-          "You are encouraged to use this enumeration, but, as always, you can use EADS annotations to add categories or impart nuance using what you learn from the interviewees.\n"
+          "In Task 1, the goal is to categorize their elementary quantitative and structured data into 'areas of inquiry'.\n"
+          "We use the word 'elementary' to emphasize that this interview should only discuss the data essential to creating a simple prototype of the scheduling system.\n"
+          "We will initiate a more comprehensive interview only after demonstrating a simple prototype.\n"
+          "We provide an enumeration of potential areas of inquiry in the EADS below.\n"
+          "You are encouraged to use this enumeration, but you can use EADS annotations to add categories if needed.\n"
           "\n"
-          "In Task 2a, we are particularly interested in capturing domain semantics of the data in the viewpoint of Object Role Modeling (ORM).\n"
-          "Specifically, Task 2a is about defining all the ORM fact types of the subject area of inquiry.\n"
+          "In Task 2, we are particularly interested in capturing domain semantics of the data in the viewpoint of Object Role Modeling (ORM).\n"
+          "Specifically, Task 2 is about defining all the ORM fact types of the subject area of inquiry.\n"
           "The best way to do this might be to first elicit from the interviewees all the concepts (ORM objects) relevant to the area of inquiry and then suggest to them (as verbalization of a \n"
           "hypothesized fact types) how the concepts interrelate.\n"
           "For example, if interviewees have indicated that they maintain records of employee skills and skill certification dates, you might ask:\n"
           "'As you have pointed out, in your business employees have an employee number. Do you similarly use a code of some sort to describe the skill?'\n"
           "Also you might ask: 'For each employee (employee number) and skill (skill code) do you keep every certification date, or just the most recent?\n"
-          "Then before initiating discussion of another fact type, do Task 2b on this one; suggest a table:\n"
+          "Then before initiating discussion of another fact type, do Task 3 (create a table of example data corresponding to the data type):\n"
           "\n"
           "'Does the following table of employee skill certification capture the sorts of information we have discussed? Feel free to edit the table.'\n"
           "#+begin_src HTML\n"
@@ -136,8 +135,8 @@
           "We are able to read the tables you provide into a UI component that allows interviewees to edit the content of cells, and add and remove rows.\n"
           "\n"
           "ORM allows expression of constraints typical of a predicate calculus representation, including quantification, subtyping, cardinality, functional relationship, domain of roles, and disjointedness.\n"
-          "As you will see in the EADS below, our encoding of ORM fact types borrows from ORM's visual depiction.\n"
-          "For example, for an n-ary fact type, we use arrays of n elements to associate property values matching each of the n compartments of the visual depiction of the fact type role box.\n"
+          "Our encoding of ORM fact types borrows from ORM's visual depiction.\n"
+          "For example, for an n-ary fact type (an n-ary predicate), we use arrays of n elements to associate property values matching each of the n compartments of the visual depiction of the fact type role box.\n"
           "Consider, for example, the ternary fact type 'ACADEMIC obtained DEGREE from UNIVERSITY' in Figure 9 of 'Object-Role Modeling: an overview' (a paper provided to you).\n"
           "We would encode this fact type as:\n"
           "\n"
@@ -149,12 +148,22 @@
             :deontic-keys ["mandatory" "" ""]
             :uniqueness [["key1" "key1" ""]]})
           "\n"
-          "Here the three object properties 'objects', 'reference-modes', and 'deontic' must each contain three elements because that is the arity of the fact type.\n"
-          "The three positions correspond to the 'academic', 'degree' and 'university' compartments  respectively. (This is the order of the 'objects' property.)\n"
-          "There can be multiple ORM 'uniqueness' constraints on a fact type; each array valued element must likewise contain the same number of elements as the arity and same ordering as the 'objects' property.\n"
+          "Here the object properties 'objects', 'reference-modes', and 'deontic' must each contain three elements because that is the arity (role count) of "
+          "sentences of the sort '[Academic] obtains [degree] from [university]'.\n"
+          "The three ordered values of the 'objects' property represents three corresponding compartments of a 'role box' in a visual representation.\n"
+          "The ordering facilitiates a verbalization of the fact type, in this case, 'Academic obtains degree from university'.\n"
+          "(Note that in Task 3, the corresponding table data might include a row ' Dr. John Smith |  mathematics PhD | MIT '.\n"
+          "The table data is ordered the same as the compartments in the role box.)\n"
+          "\n"
+          "The 'uniqueness' property represents how a subset of the fact type compartments determines the value of the remaining ones.\n"
           "In the above " (clj2json-pretty ["key1" "key1" ""]) " represents the idea that there is a functional relationship between tuples [academic, degree], as domain and univerity, as co-domain.\n"
-          "Were we to live in a world where people can get at most one degree at any university, we could specify another ORM uniqueness constraint " (clj2json-pretty ["key2" "" "key2"]) " which maps\n"
-          "tuples [academic, university] to a degree."
+          "To continue the example, we mean that if we are talking about Dr. John Smith and his mathematics PhD, it is at MIT\n"
+          "That is, we are stipulating that a person can only get a particular degree once (or that we only care that they got it once).\n"
+          "\n"
+          "There can be multiple ORM 'uniqueness' constraints on a fact type; each array valued element must likewise contain the same number of elements as \n"
+          "the arity and same ordering as the 'objects' property.\n"
+          "Were, for example, we to live in a world where people can get at most one degree at any university, we could specify another ORM uniqueness constraint "
+          (clj2json-pretty ["key2" "" "key2"]) " which maps tuples [academic, university] to a degree.\n"
           "\n"
           "ORM also has provision to express constraints across fact types, and between object types.\n"
           "Figure 9 of the paper depicts that (1) an academic being tenured and being contracted are exclusive of each other, and (2) professor is a kind of academic.\n"
@@ -181,13 +190,14 @@
           "   'To get started, could you list the kinds of data that you use to schedule production?\n"
           "    For example, do you have speadsheets containing customer orders, raw material delivery, process plans, materials on hand, task durations, worker skills, etc.?\n"
           "\n"
-          "Given the response from this, you can set the 'areas-we-intend-to-discuss' property to a list of strings naming what areas the interviewees' response suggest are important to discuss.\n"
-          "Just be sure to only set 'exhausted?' to true (see the EADS below) when you are finished with the last inquiry that you planned to discuss.\n"
-          "\n"
-          "You can then discuss each area of inquiry they mention (repeating Task 2a and Task 2b for each fact type of the area of inquiry) in whatever order you deem appropriate."
-          "When you have completed the detailed discussion of every area of inquiry they have thus far mentioned, you should ask them whether there is yet more areas to discuss.\n"
-          "If they mention more, continue to apply the three tasks until all areas are discussed.\n"
-          "The EADS has a property, 'exhausted?', you should set to true when you believe this interview can be concluded.\n"
+          "Given the response from this, you can set the 'areas-we-intend-to-discuss' property (see below) to a list of strings naming what areas the interviewees' response suggest are important to discuss.\n"
+          "Because this interview should be scoped to the needs of creating a simple prototype of the scheduling system, it should not wander into areas of inquiry that are "
+          "unnecessary to discuss in the context of a simple prototype.\n"
+           "We will extend the prototype system incrementally as we go.\n"
+          "Once you have established what you would like to discuss (setting areas-we-intend-to-discuss in Task 1), you can then discuss (a possible subset of) these area starting with fundamental facts first, \n"
+          "repeating Task 2 and Task 3 for each fact type of the area of inquiry.\n"
+          "Set 'exhausted?' to true (see the EADS below) when you are have discussed everthing you intend to discuss.\n"
+          "Setting 'exhuasted?' to true should cause us to stop sending you SUPPLY-QUESTION messages.\n"
           "\n"
           "You have choices as to how you communicate back to us in DATA-STRUCTURE-REFINEMENT (DSR) messages. You can\n"
           "   (1) accummulate results from several inquiry areas into one ever-growing DSR message, as is shown in the EADS below,\n"
@@ -213,43 +223,42 @@
           "    (3) if you every need to reassess a fact type (for example if you now think it was represented wrong in prior discussion) just send the new one in your DSR message; it will overwrite the current one.\n"
           "\n"
           "ORM is designed to encourage verbalization of fact types.\n"
-          "We encourage you to use such verbalizations in Task 2a as follow-up questions when the interviewees' response leaves you uncertain what fact type is intended.\n"
-          "For example, in Task 2a you might have discussed a fact type corresponding to the table above with rows 'Employee No.', 'Skill', and 'Certification Date' as described above.\n"
+          "We encourage you to use such verbalizations in Task 2 as follow-up questions when the interviewees' response leaves you uncertain what fact type is intended.\n"
+          "For example, in Task 2 you might have discussed a fact type corresponding to the table above with rows 'Employee No.', 'Skill', and 'Certification Date' as described above.\n"
           "But it was unclear whether or not they were keeping a history of certification dates or just a single date. In this case you might ask:\n"
           "'Is it the case that you associate at most one Certification Date with each employee and skill?'\n"
           "\n"
-          "The interview you conduct may prove to be rather complex and possibly long-running, but it is very important to our work, so we are giving you a big budget for question asking.\n"
+          ;"The interview you conduct may prove to be rather complex and possibly long-running, but it is very important to our work, so we are giving you a big budget for question asking.\n"
           "Good luck!")
      :EADS
      {:EADS-id :data/orm
       :exhausted? {:val false
                    :comment "You don't need to specify this property until you are ready to set its value to true, signifying that you believe that all areas of inquiry have been sufficiently investigated.\n"}
-      :areas-we-intend-to-discuss ["customer-orders", "workforce"]
+      :areas-we-intend-to-discuss {:val ["customer-orders", "workforce"]
+                                   :comment "In Task 1, use this property to give names to the areas of inquiry you plan to discuss."}
       :inquiry-areas
       [{:inquiry-area-id {:val "customer-orders"
-                           :comment (str "'customer-orders' is a value in an enumeration of areas of inquiry. The enumeration values are defined as follows:\n"
+                          :comment (str "'customer-orders' is a value in an enumeration of areas of inquiry and one of the values in the property 'areas-we-intend-to-discuss'.\n"
+                                        "The enumeration values are defined as follows:\n"
                                          "\n"
                                          "'customer-orders' - about products customers are ordering, their quantities, due dates, expected ship dates, etc..\n"
-                                         "'customers' - about the customers themselves, shipping address, their standing in the company's preferred customer program, etc. This could be quite diverse!\n"
+                                         ;"'customers' - about the customers themselves, shipping address, their standing in the company's preferred customer program, etc. This could be quite diverse!\n"
                                          "'materials' - about things that go into making products, including things on hand, en route to the facility, or on order, their expected delivery dates, etc..\n"
                                          "'bill-of-materials' - about what materials go into creating a product of a given product type.\n"
-                                         "'finished-goods' - about finished goods inventory.\n"
+                                         ;"'finished-goods' - about finished goods inventory.\n"
                                          "'WIP' - about work in process, its state of completion etc.\n"
                                          "'processes' - about production processes and process plans, tasks, task durations, equipment used, etc..\n"
-                                         "'facilities' - about places where they make product or perform services, and what equipment is present in these places.\n"
+                                         ;"'facilities' - about places where they make product or perform services, and what equipment is present in these places.\n"
                                          "'equipment' - about machines and tools, their capabilities, capacity, and number.\n"
                                          "'workforce' - about people, their skills, and other information about them relevant to scheduling.\n"
-                                         "'holidays' - about holidays and planned periods of plant shut down.\n"
+                                         ;"'holidays' - about holidays and planned periods of plant shut down.\n"
                                          "\n"
-                                         "This enumeration might be incomplete. Whenever nothing here seems to fit, create another term and define it with an annotation comment."
+                                         "This enumeration might be incomplete. Whenever nothing here seems to fit, create another term and define it with an annotation comment.\n"
                                          "\n"
-                                         "When Task 1 is completed but you have not yet started Task 2a on any fact types, the 'inquiry-areas' property will contain a list of simple objects such as "
+                                         "When Task 1 is completed but you have not yet started Task 2 on any fact types, the 'inquiry-areas' property will contain a list of simple objects such as"
                                          (clj2json-pretty {:inquiry-area-id "customer-orders"}) " " (clj2json-pretty {:inquiry-area-id "WIP"}) " and so on.\n\n"
-                                         "It is important to keep in mind that we are developing the scheduling system incrementally.\n"
-                                         "The first few versions of it might be rudimentary and incomplete. This is intentional! We want to show the humans how MiniZinc works using these rudimentary versions.\n"
-                                         "How this affects your work is that, unless you have been specifically told otherwise, you should limit discussion to areas of inquiry that you think are essential to\n"
-                                         "creating the simplest complete scheduling system. Therefore, unless you have been specifically told otherwise, you should not encourage discussion of WIP, finished-goods,\n"
-                                         "facilities, and holidays (and others that might come to mind to you or the interviewees). But this is just a rule-of-thumb; use your best judgment.")}
+                                         "It is important to keep in mind that we are developing the scheduling system incrementally;\n "
+                                         "your interview should only concerns discussions of areas of inquiry necessary to develop a simple prototype of that system.")}
 
         :inquiry-area-objects
         {:comment (str "This property provides a list of objects (in the JSON sense) where each object names an object in the ORM sense (entities) and provides a definition for it.\n"
@@ -277,7 +286,7 @@
                 :uniqueness {:val [["key1" ""]]
                              :comment (str "Since every order participates in this relationship (mandatory), and order, through the order-number, uniquely identifies a promise date (uniqueness),\n"
                                            "we can infer that every order is associated with exactly one promise date.")}
-                :examples {:comment "Completing this is the work of Task 2b. We are showing only three rows of data in this example. Typically you might show ten or so."
+                :examples {:comment "Completing this is the work of Task 3. We are showing only three rows of data in this example. Typically you might show ten or so."
                            :val {:column-headings {:val ["order-number" "promise-date"]
                                                    :comment (str "The interviewer (you) used the reference-mode 'order-number' but the object name 'promise-date'.\n"
                                                                  "This is the most natural and meaningful naming for these data.")}
@@ -382,7 +391,8 @@
   [tag pid]
   (let [ds (-> (db/get-summary-ds pid tag) eu/strip-annotations)
     complete? (completeness-test ds)]
-    (agent-log (str "This is the stripped DS for timetabling (complete? = " complete? "):\n" (with-out-str (pprint ds)))
+    (agent-log (str ";;; This is the summary DS for timetabling (complete? = " complete? "):\n"
+                    (with-out-str (pprint (db/get-summary-ds pid tag))))
                {:console? true :elide-console 130})
     complete?))
 

@@ -8,12 +8,10 @@
    [clojure.java.io         :as io]
    [clojure.pprint          :refer [pprint]]
    [clojure.spec.alpha      :as s]
-   [datahike.api            :as d]
-   [datahike.pull-api       :as dp]
    [scheduling-tbd.db       :as db]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.specs    :as specs]
-   [scheduling-tbd.sutil    :as sutil :refer [connect-atm default-llm-provider]]
+   [scheduling-tbd.sutil    :as sutil :refer [default-llm-provider]]
    [scheduling-tbd.util     :as util :refer [now]]
    [taoensso.telemere       :as tel :refer [log!]]
    [wkok.openai-clojure.api :as openai]))
@@ -160,8 +158,10 @@
                                        tools                 (assoc :tools tools)
                                        response-format-path  (assoc :response-format (-> response-format-path slurp edn/read-string))
                                        v-store               (assoc :tool-resources {"file_search" {"vector_store_ids" [(:id v-store)]}}))))]
-    (agent-log (str "\n\n Added aid " (:id assist) " to agent " a-name))
-    (if passive? "passive: aid" (:id assist))))
+    (agent-log (str "\n\n;;; Added aid " (:id assist) " to agent " a-name))
+    (if passive?
+      ";;; passive: aid"
+      (:id assist))))
 
 (defn assistant-creation-inst
   "Return the instant object marking when the OpenAI assistant was created.
@@ -195,7 +195,7 @@
    it won't be recreated, even if the assistant instructions are outdated relative to what the agent is using.
    This choice is to preserve the context already built up by the current agent."
   [{:keys [missing-here missing-at-provider outdated? substitute-aid] :as status}
-   {:keys [base-type agent-type pid] :as agent}]
+   {:keys [base-type agent-type pid] :as _agent}]
   (let [missing? (or missing-here missing-at-provider)
         res (case agent-type
               (:project :system)    (cond-> status
@@ -207,19 +207,19 @@
                                       (and pid (:thread missing-here))  (assoc :make-thread? true)))] ; Not a system template, project affiliated.
     (when substitute-aid
       (log! :info (str "Agent " base-type " will use an updated assistant: " substitute-aid "."))
-      (agent-log (str "Agent " base-type " will use an updated assistant: " substitute-aid ".")))
+      (agent-log (str ";;; Agent " base-type " will use an updated assistant: " substitute-aid ".")))
     (when (:make-assistant? res)
-      (log! :info (str "Agent " base-type " will be created."))
-      (agent-log (str "\n Agent " base-type " will be recreated.")))
+      (log! :info (str ";;; Agent " base-type " will be created."))
+      (agent-log (str "\n;;;  Agent " base-type " will be recreated.")))
     (when (:make-thread? res) ; ToDo: Could pass in PID here and mention it.
-      (log! :info (str "A thread will be made for agent " base-type " agent-type " agent-type "."))
-      (agent-log (str "\n\n A thread will be made for agent " base-type " agent type " agent-type ".")))
+      (log! :info (str ";;; A thread will be made for agent " base-type " agent-type " agent-type "."))
+      (agent-log (str "\n\n;;; A thread will be made for agent " base-type " agent type " agent-type ".")))
     res))
 
 (defn agent-status-shared-assistant
   "Provide a bit more information (than with agent-status-basic) for agent-type = :shared-assistant,
    namely, :same-assistant? :system-more-modern?, and, of course, look at the project to get the :agent/thread-id."
-  [{:keys [base-type agent-type pid timestamp aid tid] :as agent}]
+  [{:keys [base-type pid timestamp aid tid] :as agent}]
   (let [files-modify-date (newest-file-modification-date agent)
         outdated? (or (not aid) (and files-modify-date (== 1 (compare files-modify-date  (assistant-creation-inst aid)))))
         system-agent (db/get-agent base-type)
@@ -286,9 +286,10 @@
   [id]
   (s/assert ::agent-id id)
   (let [pid (:pid id)
-        agent (cond-> (db/get-agent id)
-                true         agent-db2proj
-                pid          (assoc :pid pid))]
+        agent (cond-> (db/get-agent id nil)
+                true                        agent-db2proj
+              ;;(surrogate-agent-id? id)    (assoc :agent-type :project) ; Not needed owing to adb/put-agent! (blank-surrogate)
+                pid                         (assoc :pid pid))]
     (-> (case (:agent-type agent)
           (:system :project) (agent-status-basic agent)
           :shared-assistant  (agent-status-shared-assistant agent))
@@ -303,12 +304,12 @@
     (case agent-type
 
       :system
-      (do (log! :info (str "Adding thread " tid " to system DB:\n" (with-out-str (pprint agent))))
-          (agent-log (str "\n\n Adding thread " tid " to system DB:\n" (with-out-str (pprint agent)))))
+      (do (log! :info (str ";;; Adding thread " tid " to system DB:\n" (with-out-str (pprint agent))))
+          (agent-log (str "\n\n;;; Adding thread " tid " to system DB:\n" (with-out-str (pprint agent)))))
 
       (:project :shared-assistant)
-      (log! :debug (str "Adding thread " tid " to project " pid " :\n" (with-out-str (pprint agent))))
-      (agent-log (str "\n\n Adding thread " tid " to project " pid " :\n" (with-out-str (pprint agent)))))
+      (log! :debug (str ";;; Adding thread " tid " to project " pid " :\n" (with-out-str (pprint agent))))
+      (agent-log (str "\n\n;;; Adding thread " tid " to project " pid " :\n" (with-out-str (pprint agent)))))
     tid))
 
 ;;; OpenAI may delete them after 30 days. https://platform.openai.com/docs/models/default-usage-policies-by-endpoint

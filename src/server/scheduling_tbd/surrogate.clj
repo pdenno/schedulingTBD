@@ -1,14 +1,12 @@
 (ns scheduling-tbd.surrogate
   "Functions and operators implementing surrogate users"
   (:require
-   [clojure.core.unify       :as uni]
    [clojure.edn              :as edn]
    [clojure.string           :as str]
    [mount.core               :as mount :refer [defstate]]
    [scheduling-tbd.agent-db  :as adb :refer [agent-log]]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.iviewr.interviewers :as inv]
-   [scheduling-tbd.iviewr.response-utils :as ru]
    [scheduling-tbd.sutil     :as sutil]
    [scheduling-tbd.util      :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
@@ -46,50 +44,6 @@
    "Your answers typically are short, just a few sentences each.\n\n"
    how-to-handle-tables))
 
-;;; (sur/start-surrogate! {:product "optical fiber" :client-id (ws/recent-client!)})
-(defn start-surrogate!
-   "Create a surrogate agent and ask client to :load-proj.
-    :load-proj will cause the client to get-conversation (http and chat). The chat part will :resume-conversation (call back to server).
-    product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
-              Any of the :segment/name from the 'How it's Made' DB would work here.
-    force? - This is about naming of the DB. Any old DB having this pid is deleted."
-  [{:keys [product client-id]} & {:keys [force?] :or {force? true}}]
-  ;(log! :info (str "======= Starting a surrogate: product = " product " ======================="))
-  (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
-        pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
-        [_ _ expertise] (re-matches #"(SUR )?(.*)" pname)
-        expertise (str/lower-case expertise)
-        pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
-        instructions (system-instruction expertise)]
-    (agent-log (str "============= Start surrogate " pid " :process  ========================="))
-    (adb/ensure-agent! {:base-type pid :pid pid} {:agent/instruction-string instructions :agent/surrogate? true :agent/expertise expertise})
-    (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
-    (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-    (try ;; Now do the warm-up question.
-      (let [ctx (inv/ctx-surrogate {:pid pid
-                                    :cid :process
-                                    :question (ru/get-warm-up-q :process)
-                                    :client-id client-id})
-            conversation (inv/get-an-answer ctx) ; get-an-answer also used by q-and-a, but here we have the q.
-            response (-> conversation last :text)
-            warm-up-claims (ru/analyze-warm-up :process response)
-            needed-claims (remove #('#{temp-project-id temp-project-name} (first %)) warm-up-claims)
-            bindings {'?pid pid}]
-        (doseq [{:keys [from text tags]} conversation]
-          (db/add-msg {:pid pid :cid :process :from from :tags tags :text text}))
-        (doseq [claim needed-claims]
-          (db/add-claim! pid {:string (-> claim (uni/subst bindings) str)
-                              :q-type :process/warm-up
-                              :cid :process}))
-        (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
-        ;; This will cause a resume-conversation, which will start with a conversation-history, so the interviewer should see the warm-up question.
-        (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
-                            :new-proj-map {:project/name pname :project/id pid}}))
-      (catch Exception e
-        (log! :error (str "Error starting surrogate:\n" e)))
-      (finally ; ToDo: Not sure this is needed.
-        (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))))
-
 (defn blank-surrogate
   "Create an agent object for use as a surrogate.
    It gets :agent/instructions and :agent/expertise elsewhere."
@@ -102,6 +56,40 @@
            :surrogate? true,
            :timestamp (now)
            :agent-id (-> pid name (str "-" (name llm-provider)) keyword)}))
+
+;;; (sur/start-surrogate! {:product "optical fiber" :client-id (ws/recent-client!)})
+(defn start-surrogate!
+   "Create a surrogate agent and ask client to :load-proj.
+    :load-proj will cause the client to get-conversation (http and chat). The chat part will :resume-conversation (call back to server).
+    product - a string describing what product type the surrogate is going to talk about (e.g. 'plate glass').
+              Any of the :segment/name from the 'How it's Made' DB would work here.
+    force? - This is about naming of the DB. Any old DB having this pid is deleted."
+  [{:keys [product client-id]} & {:keys [force?] :or {force? true}}]
+  (let [pid (as-> product ?s (str/trim ?s) (str/lower-case ?s) (str/replace ?s #"\s+" "-") (str "sur-" ?s) (keyword ?s))
+        pname (as->  product ?s (str/trim ?s) (str/split ?s #"\s+") (map str/capitalize ?s) (interpose " " ?s) (conj ?s "SUR ") (apply str ?s))
+        [_ _ expertise] (re-matches #"(SUR )?(.*)" pname)
+        expertise (str/lower-case expertise)
+        pid (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? force?})
+        instructions (system-instruction expertise)
+        surrogate-map (-> (blank-surrogate pid)
+                          (assoc :agent/instruction-string instructions)
+                          (assoc :agent/expertise expertise))]
+    (agent-log (str ";;; ============= Start surrogate " pid " :process  ========================="))
+    (try
+      (db/put-agent! {:base-type pid :pid pid} surrogate-map)
+      (adb/ensure-agent! {:base-type pid :pid pid}) ; This is how it get aid and tid.
+      (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
+      (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+      (adb/ensure-agent! {:base-type :orchestrator-agent :pid pid})
+      ;; This will cause a resume-conversation, which will start with a conversation-history, so the interviewer should see the warm-up question.
+      (if (= client-id :console)
+        (inv/resume-conversation {:client-id :console :pid pid :cid :process})
+        (ws/send-to-client {:dispatch-key :load-proj :client-id client-id  :promise? false
+                            :new-proj-map {:project/name pname :project/id pid}}))
+    (catch Exception e
+      (throw (ex-info "Error starting surrogate:" {:e e})))
+    (finally ; ToDo: Not sure this is needed.
+        (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))))
 
 (defn start-surrogate+
   "This is like start-surrogate! but the call to it is provided with the project name, challenge descriptiion,
@@ -119,7 +107,7 @@
                                     "Okay, I think we can still help. What's the scheduling problem you are trying to solve?")})
           a-id (db/add-msg {:pid pid :cid :process :from :surrogate :tags [:response :warm-up] :text warm-up-response})]
       (db/update-msg pid :process a-id  {:message/answers-question q-id})
-      (agent-log (str "============= Start surrogate+ " pid " :process  ========================="))
+      (agent-log (str ";;; ============= Start surrogate+ " pid " :process  ========================="))
       (db/put-agent! {:base-type pid :pid pid} (blank-surrogate pid))
       (reset! diag [{:base-type pid :pid pid} {:agent/instruction-string sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true}])
       (adb/ensure-agent! {:base-type pid :pid pid} {:agent/instruction-string sur-instructions :agent/surrogate? true :agent/expertise expertise :make-agent? true})

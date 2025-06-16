@@ -3,20 +3,20 @@
    There are other databases, see for example, him.clj."
   (:require
    [clojure.core :as c]
-   [clojure.edn  :as edn]
+   [clojure.edn :as edn]
    [clojure.instant]
-   [clojure.java.io               :as io]
-   [clojure.pprint                :refer [pprint]]
-   [clojure.set                   :as set]
-   [clojure.spec.alpha            :as s]
-   [clojure.string                :as str]
-   [datahike.api                  :as d]
-   [datahike.pull-api             :as dp]
-   [mount.core                    :as mount :refer [defstate]]
-   [scheduling-tbd.specs          :as specs]
-   [scheduling-tbd.sutil          :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
-   [scheduling-tbd.util           :as util :refer [now]]
-   [taoensso.telemere             :refer [log!]]))
+   [clojure.java.io :as io]
+   [clojure.pprint :refer [pprint]]
+   [clojure.set :as set]
+   [clojure.spec.alpha :as s]
+   [clojure.string :as str]
+   [datahike.api :as d]
+   [datahike.pull-api :as dp]
+   [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.specs :as specs]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
+   [scheduling-tbd.util :as util :refer [now]]
+   [taoensso.telemere :refer [log!]]))
 
 (def db-schema-agent+
   "Defines properties that can be used for agents, which can be stored either in the system DB or a project DB.
@@ -116,10 +116,7 @@
         :doc "the projects known by the system."}
    :system/specs
    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "spec objects used for checking completion of EADS, etc."}
-   :system/warm-ups
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "warm-up objects for various conversations."}})
+        :doc "spec objects used for checking completion of EADS, etc."}})
 
 ;;;========================================================== Project DBs ==========================================
 (def db-schema-proj+
@@ -262,7 +259,7 @@
                   "When this does not match the current ork-agent, "
                   "the agent needs a more expansive CONVERSATION-HISTORY message for the conversation.")}
    :project/interviewer-tid ; ToDo: This hasn't been implemented yet, I think. The ork one has. See ork/get-new-EADS-id.
-      #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc (str "The thread-id of the current interviewer agent.\n"
                   "When this does not match the current intervierwer agent tid, "
                   "the agent needs a more expansive CONVERSATION-HISTORY message for the conversation.")}
@@ -277,8 +274,8 @@
         :doc "true if domain expertise is provided by an artificial agent."}})
 
 (def ^:diag diag (atom nil))
-(def db-schema-sys  (-> db-schema-sys+   (merge db-schema-agent+) datahike-schema))
-(def db-schema-proj (-> db-schema-proj+  (merge db-schema-agent+) datahike-schema))
+(def db-schema-sys (-> db-schema-sys+ (merge db-schema-agent+) datahike-schema))
+(def db-schema-proj (-> db-schema-proj+ (merge db-schema-agent+) datahike-schema))
 (def project-schema-key? (-> db-schema-proj+ (merge db-schema-agent+) keys set))
 
 ;;; ------------------------------------------------- projects ----------------------------------------------------
@@ -303,9 +300,9 @@
    Throw an error if :error is true (default) and project does not exist."
   [pid & {:keys [drop-set error?]
           :or {drop-set #{:db/id} error? true}}]
-   (let [conn (connect-atm pid :error? error?)]
-     (when-let [eid (project-exists? pid)]
-       (resolve-db-id {:db/id eid} conn :drop-set drop-set))))
+  (let [conn (connect-atm pid :error? error?)]
+    (when-let [eid (project-exists? pid)]
+      (resolve-db-id {:db/id eid} conn :drop-set drop-set))))
 
 (defn default-project
   "Return a map of the  default :project/id and :project/name.
@@ -333,7 +330,7 @@
      ;; Otherwise we list using system db. These are the 'legitmate' projects in the project datebase
      (-> (d/q '[:find [?proj-id ...]
                 :where
-                [?e :project/id  ?proj-id]]
+                [?e :project/id ?proj-id]]
               @(connect-atm :system))
          sort
          vec))))
@@ -343,13 +340,13 @@
    Remove nil values, these can show up after doing a :db/retract."
   [proj]
   (letfn [(cpfs [x]
-            (cond (map? x)      (reduce-kv (fn [m k v]
-                                             (if (project-schema-key? k)
-                                               (if (nil? v) m (assoc m k (cpfs v)))
-                                               (do (log! :warn (str "Dropping obsolete attr: " k)) m)))
-                                           {} x)
-                  (vector? x)   (->> (mapv cpfs x) (remove nil?) vec)
-                  :else         x))]
+            (cond (map? x) (reduce-kv (fn [m k v]
+                                        (if (project-schema-key? k)
+                                          (if (nil? v) m (assoc m k (cpfs v)))
+                                          (do (log! :warn (str "Dropping obsolete attr: " k)) m)))
+                                      {} x)
+                  (vector? x) (->> (mapv cpfs x) (remove nil?) vec)
+                  :else x))]
     (cpfs proj)))
 
 (defn backup-proj-db
@@ -393,7 +390,7 @@
                          (when success (or num "0"))) similar-names)
             num (->> nums (map read-string) (apply max) inc)
             new-name (str name " " num)
-            new-id   (-> new-name str/lower-case (str/replace #"\s+" "-") keyword)]
+            new-id (-> new-name str/lower-case (str/replace #"\s+" "-") keyword)]
         (-> proj-info
             (assoc :project/name new-name)
             (assoc :project/id new-id))))))
@@ -440,7 +437,7 @@
    (let [{id :project/id pname :project/name} (if force-this-name? proj-info (unique-proj proj-info))
          cfg (db-cfg-map {:type :project :id id :in-mem? in-mem?})
          dir (-> cfg :store :path)
-         files-dir (-> cfg :base-dir (str "/projects/" pname  "/files"))]
+         files-dir (-> cfg :base-dir (str "/projects/" pname "/files"))]
      (when-not in-mem?
        (when-not (-> dir io/as-file .isDirectory)
          (-> cfg :store :path io/make-parents)
@@ -499,7 +496,7 @@
          (d/create-database cfg)
          (register-db id cfg)
          (let [conn (connect-atm id)
-               content (if  content
+               content (if content
                          (vector content)
                          (->> backup-file slurp edn/read-string))]
            (d/transact conn db-schema-proj)
@@ -552,7 +549,7 @@
     (log! :error "Project does not exist.")))
 
 ;;; --------------------------------------- System db -----------------------------------------------------------
-(defn  get-system
+(defn get-system
   "Return the project structure.
    Throw an error if :error is true (default) and project does not exist."
   []
@@ -563,19 +560,19 @@
 (defn ^:admin backup-system-db
   "Backup the system database to an edn file."
   [& {:keys [target-dir] :or {target-dir "data/"}}]
-      (let [conn-atm (connect-atm :system)
-            filename (str target-dir "system-db.edn")
-            s (with-out-str
-                (println "[")
-                (doseq [ent-id  (sutil/root-entities conn-atm)]
-                  (let [obj (resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
+  (let [conn-atm (connect-atm :system)
+        filename (str target-dir "system-db.edn")
+        s (with-out-str
+            (println "[")
+            (doseq [ent-id (sutil/root-entities conn-atm)]
+              (let [obj (resolve-db-id {:db/id ent-id} conn-atm #{:db/id})]
                     ;; Write content except schema elements and transaction markers.
-                    (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
-                      (pprint obj)
-                      (println))))
-                (println "]"))]
-      (log! :info (str "Writing system DB to " filename))
-      (spit filename s)))
+                (when-not (and (map? obj) (or (contains? obj :db/ident) (contains? obj :db/txInstant)))
+                  (pprint obj)
+                  (println))))
+            (println "]"))]
+    (log! :info (str "Writing system DB to " filename))
+    (spit filename s)))
 
 (defn recreate-system-db!
   "Recreate the system database from an EDN file
@@ -592,8 +589,7 @@
         (d/transact conn db-schema-sys)
         (d/transact conn (-> "data/system-db.edn" slurp edn/read-string))
         cfg))
-      (log! :error "Not recreating system DB: No backup file.")))
-
+    (log! :error "Not recreating system DB: No backup file.")))
 
 (def keep-db? #{:him})
 (defn ^:admin recreate-dbs!
@@ -621,7 +617,7 @@
   ([agent-id] (agent-exists? agent-id @sutil/default-llm-provider))
   ([agent-id llm-provider]
    (s/valid? ::agent-id agent-id)
-   (let [db-id  (if (keyword? agent-id) :system (:pid agent-id))
+   (let [db-id (if (keyword? agent-id) :system (:pid agent-id))
          base-type (if (keyword? agent-id) agent-id (:base-type agent-id))]
      (d/q '[:find ?eid .
             :in $ ?base-type ?provider
@@ -656,12 +652,12 @@
   (s/assert ::agent-id agent-id)
   (s/assert ::specs/db-agent agent-map)
   (let [agent-map (cond-> agent-map
-                    (not (contains? agent-map :agent/llm-provider))   (assoc :agent/llm-provider @sutil/default-llm-provider)
-                    true                                              (assoc :agent/timestamp (now))
-                    (contains? agent-map :agent/tools)                (update :agent/tools str))
+                    (not (contains? agent-map :agent/llm-provider)) (assoc :agent/llm-provider @sutil/default-llm-provider)
+                    true (assoc :agent/timestamp (now))
+                    (contains? agent-map :agent/tools) (update :agent/tools str))
         conn-atm (connect-atm (if (keyword? agent-id) :system (:pid agent-id)))
-        top-level-rel (if (keyword? agent-id) :system/name   :project/id)
-        target-rel    (if (keyword? agent-id) :system/agents :project/agents)
+        top-level-rel (if (keyword? agent-id) :system/name :project/id)
+        target-rel (if (keyword? agent-id) :system/agents :project/agents)
         eid (d/q '[:find ?eid .
                    :in $ ?rel
                    :where [?eid ?rel]]
@@ -682,8 +678,8 @@
                 (dp/pull conn '[*] eid)]
             (cond-> {:claim (edn/read-string string)}
               conversation-id (assoc :conversation-id conversation-id)
-              question-type   (assoc :question-type question-type)
-              confidence      (assoc :confidence confidence)))))
+              question-type (assoc :question-type question-type)
+              confidence (assoc :confidence confidence)))))
       ;; Otherwise just return predicate forms
       (if-let [facts (d/q '[:find [?s ...]
                             :where
@@ -709,8 +705,8 @@
     (d/transact conn {:tx-data [{:db/id eid
                                  :project/claims
                                  (cond-> {:claim/string string}
-                                   cid        (assoc :claim/conversation-id cid)
-                                   q-type     (assoc :claim/question-type q-type)
+                                   cid (assoc :claim/conversation-id cid)
+                                   q-type (assoc :claim/question-type q-type)
                                    confidence (assoc :claim/confidence confidence))}]}))
   true)
 
@@ -744,7 +740,7 @@
   "Add an intro describing the topic and rationale of the conversation."
   [pid]
   (doseq [cid [:process :data :resources :optimality]]
-    (add-msg  {:pid pid :cid cid :from :system :text (get conversation-intros cid) :tags [:conversation-intro]})))
+    (add-msg {:pid pid :cid cid :from :system :text (get conversation-intros cid) :tags [:conversation-intro]})))
 
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
@@ -761,7 +757,7 @@
   (assert (#{:process :data :resources :optimality} cid))
   (if-let [eid (conversation-exists? pid cid)]
     (-> (resolve-db-id {:db/id eid} (connect-atm pid))
-         (update :conversation/messages #(->> % (sort-by :message/id) vec)))
+        (update :conversation/messages #(->> % (sort-by :message/id) vec)))
     {}))
 
 (defn get-conversation-status
@@ -777,7 +773,7 @@
       ;; ToDo: This can go away once old projects go away.
       (do (log! :warn "Conversation status not set. Returning :not-started")
           :not-started))
-  (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
+    (log! :error (str "No such conversation: pid = " pid " cid = " cid))))
 
 (defn put-conversation-status!
   "Set the project' s:converation/status attribute to true."
@@ -822,10 +818,10 @@
           pursuing-EADS (or pursuing-EADS (get-active-EADS-id pid cid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
                                    :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
-                                                            table            (assoc :message/table table)
+                                                            table (assoc :message/table table)
                                                             (not-empty tags) (assoc :message/tags tags)
-                                                            question-type    (assoc :message/question-type question-type)
-                                                            pursuing-EADS    (assoc :message/pursuing-EADS pursuing-EADS))}]})
+                                                            question-type (assoc :message/question-type question-type)
+                                                            pursuing-EADS (assoc :message/pursuing-EADS pursuing-EADS))}]})
       msg-id)
     (throw (ex-info "Could not connect to DB." {:pid pid}))))
 
@@ -854,24 +850,24 @@
 
 ;;; ----------------------------------------- Budget ---------------------------------------------
 #_(defn get-budget
-  "Return the :conversation/interviewer-budget."
-  [pid cid]
-   (d/q '[:find ?budget .
-          :in $ ?cid
-          :where
-          [?e :conversation/id ?cid]
-          [?e :conversation/interviewer-budget ?budget]]
-        @(connect-atm pid) cid))
+    "Return the :conversation/interviewer-budget."
+    [pid cid]
+    (d/q '[:find ?budget .
+           :in $ ?cid
+           :where
+           [?e :conversation/id ?cid]
+           [?e :conversation/interviewer-budget ?budget]]
+         @(connect-atm pid) cid))
 
 #_(defn put-budget!
-  [pid cid val]
-  (let [conn-atm (connect-atm pid)
-        eid (d/q '[:find ?eid .
-                   :in $ ?cid
-                   :where [?eid :conversation/id ?cid]] @conn-atm cid)]
-    (if eid
-      (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
-      (log! :error (str "No such conversation: " cid)))))
+    [pid cid val]
+    (let [conn-atm (connect-atm pid)
+          eid (d/q '[:find ?eid .
+                     :in $ ?cid
+                     :where [?eid :conversation/id ?cid]] @conn-atm cid)]
+      (if eid
+        (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
+        (log! :error (str "No such conversation: " cid)))))
 
 ;;; ----------------------------------------- EADS ---------------------------------------------
 (defn system-EADS?
@@ -1006,13 +1002,13 @@
    returns the value of :dstruct/budget-left for the given eads-id.
    This will create the summary data structure if it doesn't exist."
   [pid eads-id]
-  (assert (or (nil? eads-id)((system-EADS?) eads-id)))
+  (assert (or (nil? eads-id) ((system-EADS?) eads-id)))
   (if-let [eid (summary-ds-exists? pid eads-id)]
     (d/q '[:find ?left . :in $ ?eid :where [?eid :dstruct/budget-left ?left]] @(connect-atm pid) eid)
     (do (when eads-id (put-new-summary-ds! pid eads-id))
         1.0)))
 
-(def default-EADS-budget-decrement 0.5)
+(def default-EADS-budget-decrement 0.05)
 
 (defn reduce-questioning-budget!
   "The system stores EADS-instructions that may or may not have an :EADS/budget-decrement.
@@ -1033,7 +1029,7 @@
                    :where
                    [?eid :dstruct/id ?eads-id]]
                  @(connect-atm pid) eads-id)]
-    (when eid
+    (if eid
       (d/transact (connect-atm pid) {:tx-data [{:db/id eid :dstruct/budget-left (- val dec-val)}]})
       (log! :error (str "No summary structure for EADS id " eads-id)))))
 
@@ -1049,6 +1045,14 @@
                     @(sutil/connect-atm pid) eads-id)]
     (edn/read-string str)
     {}))
+
+(defn ^:diag list-summary-ds
+  "Return a vector of eads-id for summary-ds of the given project."
+  [pid]
+  (d/q '[:find [?eads-id ...]
+         :where
+         [_ :dstruct/id ?eads-id]]
+       @(connect-atm pid)))
 
 (defn put-summary-ds!
   "Dehydrate the given summary data structure and write it to the project DB."

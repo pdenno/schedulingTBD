@@ -2,9 +2,7 @@
   (:require
    [clojure.edn             :as edn]
    [clojure.java.io         :as io]
-   [clojure.pprint          :refer [cl-format]]
    [clojure.set             :as set]
-   [datahike.api            :as d]
    [mount.core              :as mount :refer [defstate]]
    [scheduling-tbd.agent-db :as adb]
    [scheduling-tbd.db       :as db]
@@ -29,7 +27,6 @@
     :cid :process
     :iviewr-name "Process Interviewer"
     :focus "the processes used in their enterprise and the challenges they face in executing those processes."
-    :warm-up-question "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences."
     :model-class :gpt,
     :agent-type :shared-assistant}
 
@@ -38,11 +35,6 @@
     :cid :data
     :iviewr-name "Data Interviewer"
     :focus "data they use in their work. You mostly work with the data/orm EADS instructions."
-    :warm-up-question (str "To get started, please provide a short overview (a few sentences) about the data you use to do your work.\n"
-                           "Typically, and especially in small businesses, information about customer orders, inventory, resources used to do the work, etc. are maintained in spreadsheets.\n"
-                           "It is okay if you don't use spreadsheets for these purposes; we can make what we need with a little more discussion.\n"
-                           "Whatever the case, to get started, please write a few sentences about the information you use.\n"
-                           "Once you provide this overview, we'll have more detailed discussions on each data source you mentioned.")
     :model-class :gpt,
     :tools "[{:type \"file_search\"}]"
     :vector-store-paths ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
@@ -53,9 +45,6 @@
     :cid :resources
     :iviewr-name "Resources Interviewer"
     :focus "the actual physical resources that they use to do their work, their numbers, and capabilities. For example, the number of workers with particular skills."
-    :warm-up-question (str "To get started, please provide a short overview (a few sentences) about the resources your company use to get work done.\n"
-                           "This might include, for example, machines and workers. Once you've provided this overview, we'll dig into the details of the quantities, capabilities,\n"
-                           "and skills classifications etc. for each type of resource you mentioned.")
     :model-class :gpt,
     :agent-type :shared-assistant}
 
@@ -64,9 +53,6 @@
     :cid :optimality
     :iviewr-name "Optimality Interviewer"
     :focus "what good schedules in the their enterprise achieve or avoid. For example, a schedule might seek to maximize utilization of expensive equipment or minimize late delivery of product."
-    :warm-up-question (str "To get started, please provide a short overview (a few sentences) about what you expect of good schedules.\n"
-                           "In some domains, for example, it is important to maximize the utilization of an expensive resource, in others it is to minimize a certain kind of waste.\n"
-                           "Often, it is a combination of such things. After you've provided a short summary, we'll probably have some follow-up questions.")
     :model-class :gpt,
     :agent-type :shared-assistant}
 
@@ -76,12 +62,6 @@
     :agent-type :system
     :instruction-path "resources/agents/response-analysis-agent.txt"
     :response-format-path "resources/agents/response-analysis-format.edn"}
-
-   :scheduling-challenges-agent
-   {:base-type :scheduling-challenges-agent
-    :agent-type :system
-    :instruction-path "resources/agents/scheduling-challenges.txt"
-    :response-format-path "resources/agents/scheduling-challenges-response-format.edn"}
 
    :text-to-var
    {:base-type :text-to-var
@@ -103,12 +83,8 @@
   "Write the agent instructions to resources/agents/iviewrs/<cid>-iviewr-instructions.txt."
   [{:keys [iviewr-name cid focus]}]
   (let [_others (set/difference #{:process :data :resources :optimality} #{cid})]
-     (str "You are one of four interviewers engaging humans in conversations to elicit from them requirements for a scheduling system we humans and AI agents will be creating together using MiniZinc.\n"
-          (format "You are the %s Agent; you ask questions about %s\n" iviewr-name focus)
-          ; ToDo: Add this?
-          #_"The other three agents are:"
-          #_(cl-format nil "~{~%     - a ~A Agent: that interviews about ~A~}" others (map (fn [o] (some #(when (= o (:cid %)) (:focus %)) (vals system-agents-and-bases))) others))
-          "\nIn as far as it is practical, you should avoid asking questions in the areas that are the responsibility of these other agents.\n\n"
+     (str "You are an agent engaging humans in conversations to elicit from them requirements for a scheduling system we humans and AI agents will be creating together using MiniZinc.\n"
+          (format "Specifically, you are the %s Agent; you ask questions about %s\n" iviewr-name focus)
           (-> "resources/agents/iviewrs/base-iviewr-instructions.txt" slurp))))
 
 (defn add-iviewrs-instructions
@@ -148,13 +124,15 @@
 (def actual-agents-and-bases
   (-> system-agents-and-bases add-iviewrs-instructions add-agent-id drop-non-agent-keys keys-in-agent-ns))
 
-;;;
-;;; (sa/force-new-system-agent! :data-interview-agent (get sa/actual-agents-and-bases :data-interview-agent))
+;;; (sa/force-new-system-agent! :process-interview-agent) ; <================== Ugh! First redefine actual-agents-and-bases ToDo: !!!
+;;; (sa/force-new-system-agent! :data-interview-agent)
+;;; (sa/force-new-system-agent! :orchestrator-agent)
 (defn force-new-system-agent!
   "Put the agent in the DB and add an assistant to it.
-   agent-map is 'agent' name-space qualified."
-  [agent-id agent-map]
-  (let [agent-map (cond-> agent-map
+   Arrgument is one of the keys of actual-agents-and-bases."
+  [agent-id]
+  (let [agent-map (get actual-agents-and-bases agent-id) ; this is 'agent' name-space qualified."
+        agent-map (cond-> agent-map
                     (-> agent-map :agent/tools string?)
                     (assoc :agent/tools (-> agent-map :agent/tools edn/read-string)))
         aid (adb/get-llm-assistant-id agent-map)]
@@ -165,8 +143,8 @@
 (defn ^:admin force-new-system-agents!
   "This is to update agents (get new aid, possibly using new instructions)."
   []
-  (doseq [[agent-id agent-map] actual-agents-and-bases]
-    (force-new-system-agent! agent-id agent-map)))
+  (doseq [[agent-id _agent-map] actual-agents-and-bases]
+    (force-new-system-agent! agent-id)))
 
 ;;; ------------------------------- starting and stopping ---------------------------------
 (defn ensure-system-agent-basics

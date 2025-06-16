@@ -3,12 +3,13 @@
        As the case is with flow-shop problems, this structure defines the flow of work through resources.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
-   [clojure.spec.alpha    :as s]
-   [mount.core :as mount  :refer [defstate]]
-   [scheduling-tbd.db     :as db]
+   [clojure.pprint                  :refer [pprint]]
+   [clojure.spec.alpha              :as s]
+   [mount.core                      :as mount  :refer [defstate]]
+   [scheduling-tbd.agent-db         :refer [agent-log]]
+   [scheduling-tbd.db               :as db]
    [scheduling-tbd.iviewr.eads-util :refer [graph-semantics-ok? ds-complete?]]
-   [scheduling-tbd.sutil :as sutil]
-   [taoensso.telemere :refer [log!]]))
+   [scheduling-tbd.sutil            :as sutil]))
 
 ;;; ToDo: Consider replacing spec with Malli, https://github.com/metosin/malli .
 ;;; ToDo: Someday it might make sense to have an agent with strict response format following these specs.
@@ -210,8 +211,10 @@
 
 ;;; ------------------------------- checking for completeness ---------------
 (defmethod ds-complete? :process/flow-shop
-  [eads-id ds]
-  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  [tag pid]
+  (agent-log :info (str ";;; This is the the summary DS for " tag ":\n"
+                        (with-out-str (pprint (db/get-summary-ds pid tag))))
+             {:console? true :elide-console 130})
   true)
 
 ;;; -------------------- Starting and stopping -------------------------

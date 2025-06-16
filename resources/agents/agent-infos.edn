@@ -1,8 +1,0 @@
-;;; This is used by agent-db.clj to create agents.
-;;; "The actual agent :base-type is the one provided here with -<llm-provider> added."
-
-;;; ToDo: Right now I keep this on an atom adb/agent-infos. It might be better to put this nfion into the relevant DBs.
-;;;       This, however, isn't a complete solution because
-;;;              1) they aren't all system agents (shared-assistant go away, but orchestartor already gets special handling.)
-;;;              2) it would be best to put a :force-new? on these where needed ???
-{

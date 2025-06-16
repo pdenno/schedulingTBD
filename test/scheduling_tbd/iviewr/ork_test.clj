@@ -3,11 +3,9 @@
    [clojure.data.json                        :as cdjson]
    [clojure.test                             :refer [deftest is testing]]
    [scheduling-tbd.agent-db                  :as adb]
-   [scheduling-tbd.db                        :as db]
-   [scheduling-tbd.iviewr.interviewers :as inv]
-   [scheduling-tbd.iviewr.ork          :as ork]
+   [scheduling-tbd.iviewr.interviewers       :as inv]
+   [scheduling-tbd.iviewr.ork                :as ork]
    [scheduling-tbd.surrogate                 :as sur]
-   [scheduling-tbd.web.websockets            :as ws]
    [taoensso.telemere                        :as tel :refer [log!]]))
 
 (defonce pid nil #_(db/create-proj-db! {:project/id :orch-test :project/name "orch-test"} {} {:force-this-name? true}))
@@ -19,7 +17,7 @@
 
 (def ork nil)
 
-(defn music-school
+(defn ^:diag music-school
   "Run a surrogate with special instructions (using start-surrogate+)."
   []
   (sur/start-surrogate+
@@ -37,6 +35,11 @@
                                           "Lessons are either 30 min, 45, or an hour.")
                    :warm-up-response "Thanks! Yes, we run a music school and we'd like a system that helps us schedule use of our practice rooms with students and instructors."
                    :expertise "running a music school"})}))
+
+(defn ^:diag craft-beer
+  "Run a project where a surrogate expert in craft beer production is interviewed."
+  []
+  (sur/start-surrogate! {:product "craft beer" :client-id :console}))
 
 #_(defn ^:diag check-ork-knowledge-of-eads
   []

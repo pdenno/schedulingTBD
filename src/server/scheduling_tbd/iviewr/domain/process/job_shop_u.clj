@@ -2,13 +2,13 @@
   "(1) Define the an example annotated data structure (EADS) to provide to the interviewer for a job-shop scheduling problem where each job potentially follows a unique process.
    (2) Define well-formedness constraints for this structure. These can also be used to check the structures produced by the interviewer."
   (:require
+   [clojure.pprint        :refer [pprint]]
    [clojure.spec.alpha    :as s]
-   [datahike.api          :as d]
    [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.agent-db :refer [agent-log]]
    [scheduling-tbd.db     :as db]
    [scheduling-tbd.iviewr.eads-util :refer [ds-complete?]]
-   [scheduling-tbd.sutil  :as sutil :refer [connect-atm clj2json-pretty]]
-   [taoensso.telemere               :refer [log!]]))
+   [scheduling-tbd.sutil  :as sutil]))
 
 (s/def :job-shop-u/EADS-message (s/keys :req-un [::message-type ::interview-objective ::interviewer-agent ::EADS]))
 (s/def ::message-type #(= % :EADS-INSTRUCTIONS))
@@ -120,8 +120,10 @@
 
 ;;; ------------------------------- checking for completeness ---------------
 (defmethod ds-complete? :process/job-shop--unique
-  [eads-id ds]
-  (log! :info (str "This is the ds-complete for " eads-id ". ds = " ds))
+  [tag pid]
+  (agent-log :info (str ";;; This is the the summary DS for " tag ":\n"
+                        (with-out-str (pprint (db/get-summary-ds pid tag))))
+             {:console? true :elide-console 130})
   true)
 
 ;;; -------------------- Starting and stopping -------------------------

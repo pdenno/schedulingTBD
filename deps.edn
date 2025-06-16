@@ -22,6 +22,7 @@
            org.clojure/clojure                 {:mvn/version "1.12.0"}
            org.clojure/core.unify              {:mvn/version "0.7.0"}
            org.clojure/data.xml                {:mvn/version "0.0.8"}
+           ;;org.clojure/tools.cli               {:mvn/version "1.1.230"}
            org.clojure/tools.logging           {:mvn/version "1.3.0"}
            org.ring-clojure/ring-websocket-async {:mvn/version "0.2.0"}
            ring/ring-defaults                  {:mvn/version "0.6.0"}
@@ -37,21 +38,31 @@
                                            #_"-Djdk.attach.allowAttachSelf"]  ; https://github.com/clojure-goes-fast/clj-async-profiler
                           ;; :dev includes src/server (for use with exerciser) thus much of this stuff.
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
-                                           ;binaryage/devtools              {:mvn/version "1.0.7"} ; ToDo: would use with telemere handler:console-raw.
-                                           ;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
+                                           ;;binaryage/devtools            {:mvn/version "1.0.7"} ; ToDo: would use with telemere handler:console-raw.
+                                           ;;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
                                            cider/cider-nrepl               {:mvn/version "0.52.1"}
                                            com.lambdaisland/classpath      {:mvn/version "0.6.58"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
                                            lilactown/helix                 {:mvn/version "0.2.1"}
-                                           ;no.cjohansen/replicant          {:mvn/version "2025.03.27"} ; exploring this for debugging
+                                           ;;no.cjohansen/replicant        {:mvn/version "2025.03.27"} ; exploring this for debugging
                                            nrepl/nrepl                     {:mvn/version "1.3.1"}
                                            org.clojure/java.classpath      {:mvn/version "1.1.0"}
                                            org.clojure/tools.namespace     {:mvn/version "1.5.0"}}}
 
-           ;; clojure-mpc: nREPL server for AI to connect to
-           ;; Include all paths you want available for development
-           :nrepl {:extra-paths ["test"]
-                   :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
+           ;; clojure-mpc: nREPL server for AI to connect to; similar to dev, but uses a different port for http (so I can run both).
+           ;; Include all paths you want available for development.
+           :nrepl {:extra-paths ["src/server" "test" "env/dev" "resources"]
+                   :extra-deps {applied-science/js-interop      {:mvn/version "0.4.2"}
+                                ;;binaryage/devtools              {:mvn/version "1.0.7"} ; ToDo: would use with telemere handler:console-raw.
+                                ;;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
+                                cider/cider-nrepl               {:mvn/version "0.52.1"}
+                                com.lambdaisland/classpath      {:mvn/version "0.6.58"}
+                                expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
+                                lilactown/helix                 {:mvn/version "0.2.1"}
+                                ;;no.cjohansen/replicant          {:mvn/version "2025.03.27"} ; exploring this for debugging
+                                nrepl/nrepl                     {:mvn/version "1.3.1"}
+                                org.clojure/java.classpath      {:mvn/version "1.1.0"}
+                                org.clojure/tools.namespace     {:mvn/version "1.5.0"}}
                    :jvm-opts ["-Djdk.attach.allowAttachSelf"]
                    :main-opts ["-m" "nrepl.cmdline" "--port" "7888"]}
 

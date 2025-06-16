@@ -137,19 +137,23 @@
   ([pid] (conversation-history pid :all))
   ([pid cid]
    (assert (#{:all :process :data :resources :optimality} cid))
-   (let [challenges (->> (db/get-claims pid)
-                         (filter #(uni/unify '(scheduling-challenge ?pid ?challenge) %))
-                         (mapv #(nth % 2))
-                         (mapv #(get scheduling-challenge2-description %)))
-         activities (if (= :all cid)
-                      (reduce (fn [res cid] (into res (conversation-activity pid cid)))
-                              []
-                              [:process :data :resources :optimality])
-                      (conversation-activity pid cid))]
-     (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
-     (cond-> {:message-type :CONVERSATION-HISTORY}
-       (not-empty challenges)  (assoc :scheduling-challenges challenges)
-       (not-empty activities)  (assoc :activity activities)))))
+   (if (db/project-exists? pid)
+     (let [challenges (->> (db/get-claims pid)
+                           (filter #(uni/unify '(scheduling-challenge ?pid ?challenge) %))
+                           (mapv #(nth % 2))
+                           (mapv #(get scheduling-challenge2-description %)))
+           activities (if (= :all cid)
+                        (reduce (fn [res cid] (into res (conversation-activity pid cid)))
+                                []
+                                [:process :data :resources :optimality])
+                        (conversation-activity pid cid))]
+       (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
+       (cond-> {:message-type :CONVERSATION-HISTORY}
+         (not-empty challenges)  (assoc :scheduling-challenges challenges)
+         (not-empty activities)  (assoc :activity activities)))
+     {:message-type :CONVERSATION-HISTORY
+      :scheduling-challenges []
+      :activity []})))
 
 (s/def ::ork-msg map?) ; ToDo: Write specs for ork messages.
 
@@ -160,14 +164,14 @@
   (when-not (s/valid? ::ork-msg msg) ; We don't s/assert here because old project might not be up-to-date.
     (log! :warn (str "Invalid ork msg:\n" (with-out-str (pprint msg)))))
   (log! :info (-> (str "Ork told: " msg) (elide 150)))
-  (agent-log (str "[ork manager] (tells ork)\n" (with-out-str (pprint msg))))
+  (agent-log (str ";;; [ork manager] (tells ork)\n" (with-out-str (pprint msg))))
   (let [msg-string (clj2json-pretty msg)
         res (-> (adb/query-agent ork-agent msg-string {:tries 2}) output-struct2clj)
         res (cond-> res
               (contains? res :message-type)              (update :message-type keyword)
               (= (:message-type res) :PURSUE-EADS)       (update :EADS-id keyword))]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
-    (agent-log (str "[ork manager] (receives response from ork)\n" (with-out-str (pprint res))))
+    (agent-log (str ";;; [ork manager] (receives response from ork)\n" (with-out-str (pprint res))))
     res))
 
 (defn get-new-EADS-id
@@ -182,7 +186,7 @@
                        [?e :agent/thread-id ?tid]]
                      @(connect-atm pid))]
     (when-not (= old-tid (:tid ork))
-      (agent-log "Project's ork thread has been updated; provide comprehensive history."
+      (agent-log ";;; Project's ork thread has been updated; provide comprehensive history."
                  {:console? true :level :warn}))
     ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
     (let [pursue-msg (tell-ork (conversation-history pid) ork) ; conversation-history defaults to :all (all cids).
@@ -190,4 +194,4 @@
       (if ((db/system-EADS?) eads-instructions-id)
         eads-instructions-id
         ;; Otherwise probably :exhausted. Return nil
-       (agent-log (str "Exhausted or invalid PURSUE-EADS message: " pursue-msg) {:console? true :level :info})))))
+       (agent-log (str ";;; Exhausted or invalid PURSUE-EADS message: " pursue-msg) {:console? true :level :info})))))

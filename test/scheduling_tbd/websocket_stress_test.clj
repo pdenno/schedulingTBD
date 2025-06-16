@@ -2,9 +2,8 @@
   "Stress testing utilities for WebSocket connections to identify race conditions,
    memory leaks, and performance issues under load."
   (:require
-   [clojure.test :refer [deftest testing is]]
-   [clojure.core.async :as async :refer [<! >! go chan timeout]]
-   [clojure.edn :as edn]
+   [clojure.core.async :as async :refer [<! >! go timeout]]
+   [clojure.string :as str]
    [promesa.core :as p]
    [scheduling-tbd.web.websockets :as ws]
    [scheduling-tbd.util :refer [now]]
@@ -22,15 +21,17 @@
 (defn generate-client-id []
   (str "stress-client-" (System/currentTimeMillis) "-" (rand-int 10000)))
 
-(defn setup-stress-client [client-id]
+(defn setup-stress-client
   "Set up a client for stress testing"
+  [client-id]
   (let [channels (ws/make-ws-channels client-id)]
     (swap! ws/ping-dates #(assoc % client-id (now)))
     (ws/dispatching-loop client-id)
     channels))
 
-(defn simulate-client-activity [client-id duration-ms]
+(defn simulate-client-activity
   "Simulate normal client activity (pings, messages) for a duration"
+  [client-id duration-ms]
   (go
     (let [start-time (System/currentTimeMillis)
           end-time (+ start-time duration-ms)
@@ -51,8 +52,9 @@
           (<! (timeout (:ping-interval-ms stress-config)))
           (recur))))))
 
-(defn stress-test-concurrent-connections []
+(defn stress-test-concurrent-connections
   "Test many concurrent connections"
+  []
   (log! :info "Starting concurrent connections stress test")
   (let [client-count (:max-clients stress-config)
         client-ids (repeatedly client-count generate-client-id)
@@ -66,7 +68,7 @@
     (log! :info (str "Created " client-count " concurrent clients"))
 
     ;; Monitor system state during test
-    (let [monitor-chan (go
+    (let [_monitor-chan (go
                          (loop []
                            (let [active-clients (count @ws/socket-channels)
                                  active-promises (count @ws/promise-stack)
@@ -106,8 +108,9 @@
          :remaining-pings remaining-pings
          :duration-ms (- (System/currentTimeMillis) start-time)}))))
 
-(defn stress-test-rapid-cycling []
+(defn stress-test-rapid-cycling
   "Test rapid connection/disconnection cycles"
+  []
   (log! :info "Starting rapid cycling stress test")
   (let [start-time (System/currentTimeMillis)
         end-time (+ start-time (:test-duration-ms stress-config))
@@ -142,8 +145,9 @@
        :remaining-pings final-pings
        :duration-ms (- (System/currentTimeMillis) start-time)})))
 
-(defn stress-test-promise-handling []
+(defn stress-test-promise-handling
   "Test promise creation and resolution under load"
+  []
   (log! :info "Starting promise handling stress test")
   (let [client-id (generate-client-id)
         promise-count 100
@@ -179,8 +183,9 @@
          :remaining-promises remaining-promises
          :duration-ms (- (System/currentTimeMillis) start-time)}))))
 
-(defn stress-test-message-bursts []
+(defn stress-test-message-bursts
   "Test handling of message bursts"
+  []
   (log! :info "Starting message burst stress test")
   (let [client-id (generate-client-id)
         burst-size (:message-burst-size stress-config)
@@ -215,8 +220,9 @@
        :total-messages (* burst-count burst-size)
        :duration-ms (- (System/currentTimeMillis) start-time)})))
 
-(defn stress-test-cleanup-under-load []
+(defn stress-test-cleanup-under-load
   "Test cleanup mechanisms under high load"
+  []
   (log! :info "Starting cleanup under load stress test")
   (let [client-count 20
         start-time (System/currentTimeMillis)]
@@ -251,8 +257,9 @@
        :remaining-promises (count @ws/promise-stack)
        :duration-ms (- (System/currentTimeMillis) start-time)})))
 
-(defn run-all-stress-tests []
+(defn run-all-stress-tests
   "Run all stress tests and return results"
+  []
   (log! :info "Starting comprehensive WebSocket stress tests")
 
   ;; Clean state before testing
@@ -274,8 +281,9 @@
     (log! :info "All stress tests completed")
     results))
 
-(defn analyze-stress-test-results [results]
+(defn analyze-stress-test-results
   "Analyze stress test results for potential issues"
+  [results]
   (doseq [result results]
     (let [test-name (:test result)
           issues (atom [])]
@@ -293,14 +301,15 @@
       ;; Report results
       (if (empty? @issues)
         (log! :info (str test-name " passed - no resource leaks detected"))
-        (log! :warn (str test-name " potential issues: " (clojure.string/join ", " @issues))))
+        (log! :warn (str test-name " potential issues: " (str/join ", " @issues))))
 
       ;; Log performance metrics
       (log! :info (str test-name " metrics: " (dissoc result :test))))))
 
 ;; Convenience function for running stress tests
-(defn stress-test-websockets []
+(defn ^:diag stress-test-websockets
   "Run comprehensive stress tests on WebSocket system"
+  []
   (let [results (run-all-stress-tests)]
     (analyze-stress-test-results results)
     results))
