@@ -36,9 +36,11 @@ After the example, we will document the "message-types" used in the example.
 
 ========= EXAMPLE INTERACTIONS =====================================
 
-   We: {"message-type": "CONVERSATION-HISTORY"}
+  We: {"message-type": "CONVERSATION-HISTORY"}
 
   You: {"message-type": "STATUS", "status": "OK"}
+
+  We: 
 
   We:  {"message-type" : "EADS-INSTRUCTIONS",
         "interview-objective" : "The objective of this interview segment is to 

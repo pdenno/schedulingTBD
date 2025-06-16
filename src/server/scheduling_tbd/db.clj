@@ -962,7 +962,7 @@
                           [?e :EADS/msg-str ?msg-str]]
                         @(connect-atm :system) eads-id)]
     (edn/read-string msg-str)
-    (throw (ex-info "No eads-id: " eads-id {:eads-id eads-id}))))
+    ""))
 
 (defn same-EADS-instructions?
   "Return true if the argument eads-instructions (an EDN object) is exactly what the system already maintains."

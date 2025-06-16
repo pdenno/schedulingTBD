@@ -50,6 +50,7 @@
 ;  'pan    'scheduling-tbd.iviewr.domain.process.process-analysis
    'sptype 'scheduling-tbd.iviewr.domain.process.scheduling-problem-type
    'ttable 'scheduling-tbd.iviewr.domain.process.timetabling
+   'warm   'scheduling-tbd.iviewr.domain.process.warm-up-with-challenges
    'eu     'scheduling-tbd.iviewr.eads-util
    'inv    'scheduling-tbd.iviewr.interviewers
    'ork    'scheduling-tbd.iviewr.ork
