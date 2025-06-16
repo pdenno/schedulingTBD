@@ -34,7 +34,8 @@
   {:message-type :EADS-INSTRUCTIONS,
    :interview-objective
    (str
-    "This is typically the EADS to use in cases where there has been very little conversation so far, where the activities property of CONVERSATION-ACTIVITY is empty or nearly so.\n"
+    "This is typically the EADS the orchestrator will use first.\n"
+    "Use it in cases where there has been very little conversation so far, where the activities property of CONVERSATION-HISTORY is empty or nearly so.\n"
     "The objective of this interview segment is to \n"
     "   1) get the interviewees started in discussing their scheduling problem, and,\n"
     "   2) make some basic observations about the scheduling challenges they face.\n"

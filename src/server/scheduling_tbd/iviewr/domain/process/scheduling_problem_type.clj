@@ -51,7 +51,7 @@
     "This is typically the EADS to use directly after 'process/warm-up-with-challenges';\n"
     "it continues to discover the basic characteristics of the interviewees' scheduling problem.\n"
     "More specifically, the objective of this interview segment is to \n"
-    "   1) classify the principal method of scheduling that is most appropriate for the work they do, and"
+    "   1) classify the principal method of scheduling that is most appropriate for the work they do, and\n"
     "   2) make some basic observations about ancillary aspects of scheduling.\n")
    :EADS {:EADS-id :process/scheduling-problem-type
 

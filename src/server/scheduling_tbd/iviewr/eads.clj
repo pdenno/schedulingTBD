@@ -8,4 +8,5 @@
    [scheduling-tbd.iviewr.domain.process.job_shop]
    [scheduling-tbd.iviewr.domain.process.job_shop_u]
    [scheduling-tbd.iviewr.domain.process.scheduling-problem-type]
-   [scheduling-tbd.iviewr.domain.process.timetabling]))
+   [scheduling-tbd.iviewr.domain.process.timetabling]
+   [scheduling-tbd.iviewr.domain.process.warm-up-with-challenges]))
