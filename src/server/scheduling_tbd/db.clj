@@ -201,6 +201,9 @@
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
+   :message/graph
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An optional graph that is the response, or part of the response of a user."}
    :message/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
         :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts,\n"
@@ -216,7 +219,7 @@
         :doc "Optional keywords used to classify the message."}
    :message/table
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An optional table that that is the response, or part of the response of a user."}
+        :doc "An optional table that is the response, or part of the response of a user, or is produced by an interviewer.."}
    :message/time
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
         :doc "The time at which the message was sent."}

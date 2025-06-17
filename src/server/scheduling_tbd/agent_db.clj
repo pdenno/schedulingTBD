@@ -194,8 +194,8 @@
    The POLICY-BASED decision is that if the agent is :share-assistant and the llm-provider has the stuff,
    it won't be recreated, even if the assistant instructions are outdated relative to what the agent is using.
    This choice is to preserve the context already built up by the current agent."
-  [{:keys [missing-here missing-at-provider outdated? substitute-aid] :as status}
-   {:keys [base-type agent-type pid] :as _agent}]
+  [{:keys [base-type pid] :as _agent-id}
+   {:keys [missing-here missing-at-provider outdated? substitute-aid agent-type] :as status}]
   (let [missing? (or missing-here missing-at-provider)
         res (case agent-type
               (:project :system)    (cond-> status
@@ -291,7 +291,9 @@
                                           (if pid (assoc ?a :pid pid) ?a))
         status  (cond (#{:system :project}  agent-type)           (agent-status-basic agent)
                       (#{:shared-assistant} agent-type)           (agent-status-shared-assistant agent))]
-    (remake-needs status (assoc id :agent-type agent-type))))
+    (remake-needs id
+                  (cond-> status
+                    agent-type (assoc :agent-type agent-type)))))
 
 (defn get-llm-thread-id
   "Return a tid for the argument agent, which must have an assisatnt-id.

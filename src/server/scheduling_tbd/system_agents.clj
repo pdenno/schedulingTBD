@@ -127,6 +127,9 @@
 (def actual-agents-and-bases
   (-> system-agents-and-bases add-iviewrs-instructions add-agent-id drop-non-agent-keys keys-in-agent-ns))
 
+;;; (sa/force-new-system-agent! :response-analysis-agent)
+;;; (sa/force-new-system-agent! :text-function-agent)
+;;; (sa/force-new-system-agent! :text-to-var)
 ;;; (sa/force-new-system-agent! :process-interview-agent)
 ;;; (sa/force-new-system-agent! :data-interview-agent)
 ;;; (sa/force-new-system-agent! :orchestrator-agent)
@@ -135,13 +138,16 @@
    Arrgument is one of the keys of actual-agents-and-bases."
   [agent-id]
   (let [agent-map (get actual-agents-and-bases agent-id) ; this is 'agent' name-space qualified."
+        {:agent/keys [agent-type] :as agent-map} (cond-> agent-map
+                                                   (-> agent-map :agent/tools string?)
+                                                   (assoc :agent/tools (-> agent-map :agent/tools edn/read-string)))
+        aid (adb/get-llm-assistant-id agent-map)
+        agent-map (if aid (assoc agent-map :agent/assistant-id aid) agent-map)
+        tid (when (and aid (= :system agent-type)) (adb/get-llm-thread-id agent-map))
         agent-map (cond-> agent-map
-                    (-> agent-map :agent/tools string?)
-                    (assoc :agent/tools (-> agent-map :agent/tools edn/read-string)))
-        aid (adb/get-llm-assistant-id agent-map)]
-    (if (string? aid)
-      (db/put-agent! agent-id (assoc agent-map :agent/assistant-id aid))
-      (log! :error (str "Could not create assistant-id for " agent-id)))))
+                    aid (assoc :agent/assistant-id aid)
+                    tid (assoc :agent/thread-id tid))]
+    (db/put-agent! agent-id agent-map)))
 
 (defn ^:admin force-new-system-agents!
   "This is to update agents (get new aid, possibly using new instructions)."

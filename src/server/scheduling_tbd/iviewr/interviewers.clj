@@ -31,7 +31,7 @@
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
 ;;; (like when it is burning OpenAI asking the same question over and over ;^)).
 ;;; If it doesn't stop, it is probably the case that you need to test for it in more places.
-(def ^:diag active? "Debugging tool to stop the interview when false." (atom true))
+(def ^:diag active? "Debugging tool to stop the interview when false." (atom false))
 
 ;;; For use of chat-pair and other things defined below.
 (s/def ::chat-pair-ctx (s/and ::common-ctx

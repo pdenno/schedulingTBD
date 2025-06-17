@@ -58,8 +58,8 @@
                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
                   :instruction-path
                   "/tmp/stbd-agents/data-interviewer.txt",
-                  :assistant-id "asst_XggLB4gCbXfbtlxEPwSxwLCr",
-                  :timestamp #inst "2025-06-04T12:45:30.649-00:00",
+                  :assistant-id "asst_aH2xqHWSW2mTGI8oLKpWKuj1",
+                  :timestamp #inst "2025-06-17T16:30:57.694-00:00",
                   :agent-id :data-interview-agent}
           #:agent{:base-type :response-analysis-agent,
                   :agent-type :system,
@@ -87,8 +87,8 @@
                    "resources/agents/iviewrs/EADS/process/warm-up-with-challenges.json"],
                   :instruction-path
                   "resources/agents/orchestrator.txt",
-                  :assistant-id "asst_rDXaN34fVWUxyBrsNWPaDKMx",
-                  :timestamp #inst "2025-06-16T16:23:39.780-00:00",
+                  :assistant-id "asst_WRzWewXmYtIk7zvlqeaxq53V",
+                  :timestamp #inst "2025-06-17T16:31:12.339-00:00",
                   :agent-id :orchestrator-agent}
           #:agent{:base-type :text-to-var,
                   :agent-type :system,
@@ -123,8 +123,8 @@
                   :llm-provider :openai,
                   :instruction-path
                   "/tmp/stbd-agents/process-interviewer.txt",
-                  :assistant-id "asst_s4vBdrlW28Td93XcjYiERxTd",
-                  :timestamp #inst "2025-06-16T00:02:26.466-00:00",
+                  :assistant-id "asst_BgM9lCZmBo0BhKdBJTNFEGLy",
+                  :timestamp #inst "2025-06-17T16:30:45.993-00:00",
                   :agent-id :process-interview-agent}
           #:agent{:base-type :resources-interview-agent,
                   :agent-type :shared-assistant,
@@ -135,7 +135,7 @@
                   :assistant-id "asst_Z8OIRCCEGCPNfQOnuSGsb85V",
                   :timestamp #inst "2025-06-04T12:45:22.720-00:00",
                   :agent-id :resources-interview-agent}],
-         :default-project-id :blank-project,
+         :default-project-id :sur-craft-beer,
          :name "SYSTEM",
          :projects
          [#:project{:dir "/opt/scheduling/projects/blank-project",

@@ -9,17 +9,22 @@
    ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default"           :as MainContainer]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default"                 :as Message]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default"   :as MessageHeader]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageCustomContent$default"   :as MessageCustomContent]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHtmlContent$default"   :as MessageHtmlContent]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default"            :as MessageInput]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"             :as MessageList]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default"        :as MessageSeparator]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default"                 :as Sidebar]
    ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
    ["@mui/material/Box$default" :as Box]
+   ["@mui/material/IconButton$default" :as IconButton]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core    :as p]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
+   [stbd-app.components.graph-modal   :refer [GrapheModal]]
+   [stbd-app.components.table-modal   :refer [TableModal]]
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
    [stbd-app.ws         :as ws :refer [remember-promise]]
@@ -59,12 +64,21 @@
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
 
+(defn show-table
+  [table]
+  (log! :info (str "Show table: " table)))
+
+(defn show-graph
+  [graph]
+  (log! :info (str "Show graph: " graph)))
+
+
 (defn msgs2cs ; cs = ChatScope, https://chatscope.io/
   "Create ChatScope structures (Message, MessageHeader, MessageSeparator, etc.) for a collection of messages."
   [msgs]
   (let [new-date (atom today)]
     (reduce (fn [r msg]
-              (let [{:message/keys [content from time] :or {time (js/Date. (.now js/Date))}} msg
+              (let [{:message/keys [content from time table graph] :or {time (js/Date. (.now js/Date))}} msg
                     content (msg-with-title content from)
                     msg-date (-> time inst2date (subs 0 15))]
                 (as-> r ?r
@@ -76,9 +90,14 @@
                               {:key (new-key)
                                :model #js {:position "single" ; "single" "normal", "first" and "last"
                                            :direction (if (#{:system :developer-interjected} from) "incoming" "outgoing") ; From perspective of user.
-                                           :type "html"
-                                           :payload content}}
-                              ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))})))))) ;  They only appear for Interviewer, which is probably good!
+                                           :type "custom"}}
+                              ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))}) ;  They only appear for Interviewer, which is probably good!
+                              ($ MessageCustomContent {}
+                                 ($ MessageHtmlContent {:html content})
+                                 (when (or table graph)
+                                   ($ ButtonGroup {}
+                                      (when table ($ TableModal {:table table}))
+                                      (when graph ($ GraphModal {:graph graph}))))))))))
             []
             msgs)))
 

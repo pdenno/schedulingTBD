@@ -101,10 +101,6 @@
 (def error-info-2 (atom nil))
 
 (defn connect! []
-  ;; 2024-05-31: I was getting
-  ;; *ERROR [scheduling-tbd.web.websockets:287] - Could not find out async channel for client [uuid]*
-  ;; in long-running interactions. I don't think I had good rationale for resetting client-id!
-  ;;(reset! client-id (str (random-uuid))) ; ToDo: Use bare random-uuid if/when we start using transit.
   (reset-state)
   (if-let [chan (js/WebSocket. (ws-url client-id))]
     (do (log! :info (str "Websocket Connected! " client-id))

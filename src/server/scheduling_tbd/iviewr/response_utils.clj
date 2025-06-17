@@ -50,7 +50,6 @@
       (str/replace #"\s+" "-")
       str/lower-case))
 
-
 ;;; (ru/text-to-var "Dessert (100g serving)")
 ;;; (adb/ensure-agent :text-to-var)
 (defn text-to-var
