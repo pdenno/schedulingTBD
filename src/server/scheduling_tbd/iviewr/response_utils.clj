@@ -50,26 +50,26 @@
       (str/replace #"\s+" "-")
       str/lower-case))
 
+
+;;; (ru/text-to-var "Dessert (100g serving)")
+;;; (adb/ensure-agent :text-to-var)
 (defn text-to-var
   "Convert some text to variable name, return as a string.
-   This uses a agent only in the case that the text is long or has some characters in it that wouldn't look good in a variable
+   This uses an agent only in the case that the text is long or has some characters in it that wouldn't look good in a variable
    (regarding this, see function good-for-var?)
    Call the text-to-var agent on the argument text, returning a map containing keys:
    :INPUT-TEXT and :CORRESPONDING-VAR."
-  ([text] (text-to-var text {}))
-  ([text {:keys [asking-role]}]
-   (if (good-for-var? text)
-     (make-var-from-string text)
-     (let [res (try (-> (adb/query-agent :text-to-var
-                                         (format "{\"INPUT-TEXT\" : \"%s\"}" text)
-                                         (when asking-role {:asking-role asking-role}))
-                        ches/parse-string
-                        (update-keys keyword))
-                    (catch Exception e
-                      (let [d-e (datafy e)]
-                        (log! :warn (str "text-to-var failed\n "
-                                         "\nmessage: " (-> d-e :via first :message)
-                                         "\ncause: " (-> d-e :data :body)
-                                         "\ntrace:\n" (with-out-str (pprint (:trace d-e))))))))]
-       (s/assert ::text-to-var res)
-       (:CORRESPONDING-VAR res)))))
+  [text]
+  (if (good-for-var? text)
+    (make-var-from-string text)
+    (let [res (try (-> (adb/query-agent :text-to-var (format "{\"INPUT-TEXT\" : \"%s\"}" text))
+                       ches/parse-string
+                       (update-keys keyword))
+                   (catch Exception e
+                     (let [d-e (datafy e)]
+                       (log! :warn (str "text-to-var failed\n "
+                                        "\nmessage: " (-> d-e :via first :message)
+                                        "\ncause: " (-> d-e :data :body)
+                                        "\ntrace:\n" (with-out-str (pprint (:trace d-e))))))))]
+      (s/assert ::text-to-var res)
+      (:CORRESPONDING-VAR res))))

@@ -350,7 +350,7 @@
                   :else x))]
     (cpfs proj)))
 
-(defn backup-proj-db
+(defn backup-project-db
   [id & {:keys [target-dir clean?] :or {target-dir "data/projects/" clean? true}}]
   (let [filename (str target-dir (name id) ".edn")
         proj (cond-> (get-project id)
@@ -362,12 +362,12 @@
     (log! :info (str "Writing project to " filename))
     (spit filename s)))
 
-(defn ^:admin backup-proj-dbs
+(defn ^:admin backup-project-dbs
   "Backup the project databases one each to edn files. This will overwrite same-named files in tar-dir.
    Example usage: (backup-proj-dbs)."
   [& {:keys [target-dir] :or {target-dir "data/projects/"}}]
   (doseq [id (list-projects)]
-    (backup-proj-db id {:target-dir target-dir})))
+    (backup-project-db id {:target-dir target-dir})))
 
 (defn ^:admin unknown-projects
   "Return a vector of directories that the system DB does not know."
@@ -510,7 +510,7 @@
 (defn ^:admin update-project-for-schema!
   "This has the ADDITIONAL side-effect of writing a backup file."
   [pid]
-  (backup-proj-db pid)
+  (backup-project-db pid)
   (recreate-project-db! pid))
 
 (defn ^:admin update-all-projects-for-schema!

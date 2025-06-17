@@ -96,7 +96,7 @@
   (let [merged (->> (db/get-msg-dstructs pid tag)
                     (sort-by :msg-id)
                     (reduce (fn [r m] (merge r m)) {})
-                    eads-util/strip-annotations)
+                    eu/strip-annotations)
         merged (-> merged
                    (update :principal-problem-type keyword)
                    (update :problem-components (fn [pcomps] (mapv #(keyword %) pcomps))))]

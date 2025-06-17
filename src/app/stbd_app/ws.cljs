@@ -158,11 +158,9 @@
     :interviewer-busy?         ; Enable/disable various UI features depending on whether interviewer is busy.
     :ping                      ; Ping server.
     :resume-conversation       ; Restart interviewing. Done after client receives a :load-proj, and when switches conversation.
-    :run-long                  ; diagnostic
     :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation
     :start-surrogate+          ; User wrote "SUR+:" <map of various info> Start a surrogate with information from the map provided.
     :surrogate-follow-up       ; User wrote "SUR?:" <some question about dialog to date>
-    :throw-it                  ; diagnostic
     :user-returns-table})      ; User submitted table data
 
 (defn send-msg

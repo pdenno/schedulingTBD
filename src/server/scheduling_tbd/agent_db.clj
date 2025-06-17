@@ -283,17 +283,15 @@
       :agent-date -- if not missing?, the timepoint (Instant) when the agent was created.}
 
    :agent-date is not provided if the agent is not present in the any database we maintain."
-  [id]
+  [{:keys [pid base-type] :as id}]
   (s/assert ::agent-id id)
-  (let [pid (:pid id)
-        agent (cond-> (db/get-agent id nil)
-                true                        agent-db2proj
-              ;;(surrogate-agent-id? id)    (assoc :agent-type :project) ; Not needed owing to adb/put-agent! (blank-surrogate)
-                pid                         (assoc :pid pid))]
-    (-> (case (:agent-type agent)
-          (:system :project) (agent-status-basic agent)
-          :shared-assistant  (agent-status-shared-assistant agent))
-        (remake-needs agent))))
+  (let [{:keys [agent-type] :as agent}  (as-> (db/get-agent id nil) ?a
+                                          (if (empty? ?a) (db/get-agent base-type) ?a)
+                                          (agent-db2proj ?a)
+                                          (if pid (assoc ?a :pid pid) ?a))
+        status  (cond (#{:system :project}  agent-type)           (agent-status-basic agent)
+                      (#{:shared-assistant} agent-type)           (agent-status-shared-assistant agent))]
+    (remake-needs status (assoc id :agent-type agent-type))))
 
 (defn get-llm-thread-id
   "Return a tid for the argument agent, which must have an assisatnt-id.
@@ -418,7 +416,7 @@
   "Wrap query-on-thread-aux to allow multiple tries at the same query.
     :test-fn a function that should return true on a valid result from the response. It defaults to a function that returns true.
     :preprocesss-fn is a function that is called before test-fn; it defaults to identity."
-  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn asked-role asking-role tries]
+  [& {:keys [aid tid role query-text timeout-secs llm-provider test-fn preprocess-fn]
       :or {test-fn (fn [_] true),
            preprocess-fn identity
            llm-provider @default-llm-provider
@@ -426,7 +424,7 @@
            role "user"} :as opts}]
   (let [opts (cond-> opts ; All recursive calls will contains? :tries.
               (or (not (contains? opts :tries))
-                  (and (contains? opts :tries) (-> opts :tries nil?))) (assoc :tries 1))]
+                  (and (contains? opts :tries) (-> opts :tries nil?))) (assoc :tries 2))] ; Default 2 tries!
     (assert (< (:tries opts) 10))
     (if (> (:tries opts) 0)
       (try
@@ -457,7 +455,7 @@
                             (contains? agent-or-id :tid))    agent-or-id
                        (s/valid? ::agent-id agent-or-id)     (ensure-agent! agent-or-id)
                        :else                                 (log! :error (str "query-agent: Invalid agent spec: " agent-or-id)))
-           {:keys [aid tid base-type]} agent]
+           {:keys [aid tid]} agent]
        (assert (string? aid))
        (assert (string? tid))
        (query-on-thread (merge opts-map {:aid aid

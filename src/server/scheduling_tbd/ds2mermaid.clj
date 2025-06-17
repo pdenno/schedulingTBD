@@ -1,6 +1,5 @@
-(ns scheduling-tbd.datastructure2mermaid
-  (:require [scheduling-tbd.iviewr.eads-util :as eads-util]
-            [scheduling-tbd.db :as db]
+(ns scheduling-tbd.ds2mermaid
+  (:require [scheduling-tbd.iviewr.eads-util :as eu]
             [clojure.data.json :as json]))
 
 (defn decompose-eads
@@ -131,7 +130,7 @@
 
 (defn ds2mermaid [{:keys [EADS-ref] :as ds}]
   (assert (#{:process/flow-shop :process/job-shop--classifiable} EADS-ref))
-  (when (eads-util/graph-semantics-ok? ds)
+  (when (eu/graph-semantics-ok? ds)
     (str "flowchart TD\n"
          (decompose-eads ds)
          (apply str (-> ds

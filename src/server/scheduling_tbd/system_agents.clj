@@ -127,7 +127,7 @@
 (def actual-agents-and-bases
   (-> system-agents-and-bases add-iviewrs-instructions add-agent-id drop-non-agent-keys keys-in-agent-ns))
 
-;;; (sa/force-new-system-agent! :process-interview-agent) ; <================== Ugh! First redefine actual-agents-and-bases ToDo: !!!
+;;; (sa/force-new-system-agent! :process-interview-agent)
 ;;; (sa/force-new-system-agent! :data-interview-agent)
 ;;; (sa/force-new-system-agent! :orchestrator-agent)
 (defn force-new-system-agent!

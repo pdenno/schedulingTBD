@@ -86,10 +86,15 @@
                                      :time
                                      #inst "2025-06-16T18:22:31.502-00:00",
                                      :tags [:response],
+                                     :table
+                                     "<table>\n  <tr><th>Stage</th>                <th>Duration</th></tr>\n  <tr><td>Milling</td>              <td>30 minutes</td></tr>\n  <tr><td>Mashing</td>              <td>1.5 to 2 hours</td></tr>\n  <tr><td>Boiling</td>              <td>1 to 1.5 hours</td></tr>\n  <tr><td>Cooling</td>              <td>30 to 60 minutes</td></tr>\n  <tr><td>Fermentation</td>         <td>7 to 14 days (varies by beer type)</td></tr>\n  <tr><td>Conditioning</td>         <td>7 to 30 days (varies by beer type)</td></tr>\n  <tr><td>Bottling/Kegging</td>     <td>2 to 4 hours per batch</td></tr>\n  <tr><td>Distribution</td>         <td>Varies by destination, typically 1 to 2 days locally</td></tr>\n</table>",
                                      :EADS-data-structure
                                      "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added duration estimates for each stage in the craft beer production process.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}}]}}",
                                      :content
-                                     "\nHere's an approximation of the durations for each production stage:\n"}
+                                     "\nHere's an approximation of the durations for each production stage:
+<svg width=\"30pt\" height=\"30pt\" version=\"1.1\" viewBox=\"0 0 1200 1200\" xmlns=\"http://www.w3.org/2000/svg\">
+ <path d=\"m1040.4 30h-880.8c-72 0-129.6 58.801-129.6 129.6v879.6c0 72 58.801 129.6 129.6 129.6h879.6c72 0 129.6-58.801 129.6-129.6l-0.003907-879.6c1.1992-70.801-57.602-129.6-128.4-129.6zm-880.8 61.199h879.6c38.398 0 69.602 31.199 69.602 69.602l-0.003907 139.2h-1017.6v-140.4c0-37.203 31.199-68.402 68.402-68.402zm679.2 270v208.8h-208.8v-208.8zm-268.8 208.8h-208.8v-208.8h208.8zm-270 0h-208.8v-208.8h208.8zm0 60v208.8h-208.8v-208.8zm61.199 0h208.8v208.8h-208.8zm208.8 270v208.8h-208.8v-208.8zm60 0h208.8v208.8h-208.8zm0-61.199v-208.8h208.8v208.8zm270-208.8h208.8v208.8h-208.8zm0-60v-208.8h208.8v208.8zm-808.8 470.4v-140.4h208.8v208.8h-140.4c-37.203 0-68.402-31.199-68.402-68.402zm949.2 68.402h-140.4v-208.8h208.8v139.2c0 38.402-31.199 69.602-68.402 69.602z\" fill=\"#ff814a\"/>
+</svg>"}
                            #:message{:content
                                      "\nDo any of your production stages involve overlapping or concurrent steps, or do they strictly follow a sequential flow? If there are overlaps, please describe where and how they occur.",
                                      :from :system,
@@ -223,17 +228,10 @@
                                      "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added dependencies and sequencing constraints for cleaning and sanitization procedures related to resource and personnel availability, as well as coordination with other production activities.\", :data-structure {:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\" \"Trained personnel\"], :duration {:units \"hours\", :value-string \"2 to 4 (standard), 3 to 6 (for highly residual batches), 4 to 6 (for allergen-containing batches)\"}, :dependencies {:requires-empty-equipment true, :resource-dependencies [\"Trained personnel\" \"Available utilities like hot water and chemicals\"], :overlap-with-production {:val true, :comment \"Cleaning often overlaps with other production activities like brewing or bottling due to shared resources and personnel.\"}}, :subprocesses [{:process-id \"quality-checks\", :duration {:units \"minutes\", :value-string \"10 to 20 for visual and pH checks\"}, :optional? false, :inputs [\"Sanitized tanks\"], :outputs [\"Verified cleanliness and sanitation\"], :resources [\"Visual inspection tools\" \"pH testing equipment\"], :invented {:note \"Additional microbiological swab tests may be conducted, taking 1 to 2 days for lab results, and these are conditional on factors like suspected contamination, extended downtime, or deep maintenance.\"}}], :invented {:note \"Sequencing cleaning depends on emptied equipment, availability of trained personnel, and avoidance of conflicts with concurrent production activities.\"}}], :invented [{:note \"Proper sequencing and resource coordination are critical for cleaning processes to minimize delays and conflicts with ongoing production.\"}]}}",
                                      :content
                                      "\nYes, cleaning and sanitization procedures depend on specific sequencing and other processes. Cleaning can only begin once the equipment is emptied of the previous batch, and it requires availability of trained personnel to operate CIP systems and oversee quality checks. Overlaps with other production activities (e.g., brewing or bottling) may occur, especially if resources like personnel or utilities (e.g., hot water, cleaning chemicals) are shared. Proper scheduling is essential to avoid delays or conflicts with production processes."}],
+                          :status :eads-exhausted}
+           #:conversation{:active-EADS-id :data/orm,
+                          :id :data,
                           :status :in-progress}
-           #:conversation{:id :data,
-                          :messages
-                          [#:message{:content
-                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
-                                     :from :system,
-                                     :id 1,
-                                     :tags [:conversation-intro],
-                                     :time
-                                     #inst "2025-06-16T18:19:13.031-00:00"}],
-                          :status :not-started}
            #:conversation{:id :resources,
                           :messages
                           [#:message{:content
@@ -254,64 +252,10 @@
                                      :time
                                      #inst "2025-06-16T18:19:13.074-00:00"}],
                           :status :not-started}],
-          :active-conversation :process,
-          :active-EADS-id :process/flow-shop,
+          :active-conversation :data,
+          :active-EADS-id :data/orm,
           :agents
-          [#:agent{:base-type :data-interview-agent,
-                   :agent-type :shared-assistant,
-                   :tools "[{:type \"file_search\"}]",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :pid :sur-craft-beer,
-                   :vector-store-paths
-                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
-                   :instruction-path
-                   "/tmp/stbd-agents/data-interviewer.txt",
-                   :timestamp #inst "2025-06-03T20:46:51.756-00:00",
-                   :agent-id :data-interview-agent-openai}
-           #:agent{:base-type :data-interview-agent,
-                   :agent-type :shared-assistant,
-                   :tools "[{:type \"file_search\"}]",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :pid :sur-craft-beer,
-                   :vector-store-paths
-                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
-                   :instruction-path
-                   "/tmp/stbd-agents/data-interviewer.txt",
-                   :assistant-id "asst_XggLB4gCbXfbtlxEPwSxwLCr",
-                   :timestamp #inst "2025-06-04T12:45:30.649-00:00",
-                   :agent-id :data-interview-agent}
-           #:agent{:base-type :orchestrator-agent,
-                   :agent-type :shared-assistant,
-                   :tools "[{:type \"file_search\"}]",
-                   :thread-id "thread_8zQrVOk2gyZHcbVkqXzor0Ss",
-                   :model-class :gpt,
-                   :llm-provider :openai,
-                   :pid :sur-craft-beer,
-                   :vector-store-paths
-                   ["resources/agents/iviewrs/EADS/data/orm.json"
-                    "resources/agents/iviewrs/EADS/flow-shop.json"
-                    "resources/agents/iviewrs/EADS/job-shop--classifiable.json"
-                    "resources/agents/iviewrs/EADS/job-shop--unique.json"
-                    "resources/agents/iviewrs/EADS/job-shop.json"
-                    "resources/agents/iviewrs/EADS/orm.json"
-                    "resources/agents/iviewrs/EADS/process/flow-shop.json"
-                    "resources/agents/iviewrs/EADS/process/job-shop--classifiable.json"
-                    "resources/agents/iviewrs/EADS/process/job-shop--unique.json"
-                    "resources/agents/iviewrs/EADS/process/job-shop.json"
-                    "resources/agents/iviewrs/EADS/process/scheduling-problem-type.json"
-                    "resources/agents/iviewrs/EADS/process/timetabling.json"
-                    "resources/agents/iviewrs/EADS/process/warm-up-with-challenges.json"
-                    "resources/agents/iviewrs/EADS/scheduling-problem-type.json"
-                    "resources/agents/iviewrs/EADS/timetabling.json"
-                    "resources/agents/iviewrs/EADS/warm-up-with-challenges.json"],
-                   :instruction-path
-                   "resources/agents/orchestrator.txt",
-                   :assistant-id "asst_rDXaN34fVWUxyBrsNWPaDKMx",
-                   :timestamp #inst "2025-06-16T18:26:36.716-00:00",
-                   :agent-id :orchestrator-agent}
-           #:agent{:base-type :optimality-interview-agent,
+          [#:agent{:base-type :optimality-interview-agent,
                    :agent-type :shared-assistant,
                    :model-class :gpt,
                    :llm-provider :openai,
@@ -323,14 +267,14 @@
                    :agent-id :optimality-interview-agent}
            #:agent{:base-type :process-interview-agent,
                    :agent-type :shared-assistant,
-                   :thread-id "thread_cZhIV7w6jlQ1Pyjx37vFexGT",
+                   :thread-id "thread_t1mMtPWXuTZmLc5gg2F2ULFX",
                    :model-class :gpt,
                    :llm-provider :openai,
                    :pid :sur-craft-beer,
                    :instruction-path
                    "/tmp/stbd-agents/process-interviewer.txt",
-                   :assistant-id "asst_SDlOhtZKFeJUBeurq2b89sAx",
-                   :timestamp #inst "2025-06-16T18:19:17.025-00:00",
+                   :assistant-id "asst_ooRInge7C2p3YEKzTiMzDXUi",
+                   :timestamp #inst "2025-06-16T22:01:10.552-00:00",
                    :agent-id :process-interview-agent}
            #:agent{:base-type :resources-interview-agent,
                    :agent-type :shared-assistant,
@@ -353,8 +297,29 @@
                    :pid :sur-craft-beer,
                    :assistant-id "asst_1NTi6YxGkcCty33xbPnkHlQX",
                    :expertise "craft beer",
-                   :timestamp #inst "2025-06-16T18:19:18.426-00:00",
-                   :agent-id :sur-craft-beer-openai}],
+                   :timestamp #inst "2025-06-16T22:23:17.270-00:00",
+                   :agent-id :sur-craft-beer-openai}
+           #:agent{:base-type :orchestrator-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :thread-id "thread_AxVM9B7rdNfgSUNdctlZUDat",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/EADS/data/orm.json"
+                    "resources/agents/iviewrs/EADS/process/flow-shop.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop--classifiable.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop--unique.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop.json"
+                    "resources/agents/iviewrs/EADS/process/scheduling-problem-type.json"
+                    "resources/agents/iviewrs/EADS/process/timetabling.json"
+                    "resources/agents/iviewrs/EADS/process/warm-up-with-challenges.json"],
+                   :instruction-path
+                   "resources/agents/orchestrator.txt",
+                   :assistant-id "asst_DeNz8PHqMh2OtSqy9vYZYbPo",
+                   :timestamp #inst "2025-06-16T22:27:15.674-00:00",
+                   :agent-id :orchestrator-agent-openai}],
           :claims
           [#:claim{:string "(project-id :sur-craft-beer)"}
            #:claim{:string
@@ -374,6 +339,10 @@
            #:dstruct{:budget-left 0.5499999999999996,
                      :id :process/flow-shop,
                      :str
-                     "{:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\" \"Trained personnel\"], :duration {:units \"hours\", :value-string \"2 to 4 (standard), 3 to 6 (for highly residual batches), 4 to 6 (for allergen-containing batches)\"}, :dependencies {:requires-empty-equipment true, :resource-dependencies [\"Trained personnel\" \"Available utilities like hot water and chemicals\"], :overlap-with-production {:val true, :comment \"Cleaning often overlaps with other production activities like brewing or bottling due to shared resources and personnel.\"}}, :subprocesses [{:process-id \"quality-checks\", :duration {:units \"minutes\", :value-string \"10 to 20 for visual and pH checks\"}, :optional? false, :inputs [\"Sanitized tanks\"], :outputs [\"Verified cleanliness and sanitation\"], :resources [\"Visual inspection tools\" \"pH testing equipment\"], :invented {:note \"Additional microbiological swab tests may be conducted, taking 1 to 2 days for lab results, and these are conditional on factors like suspected contamination, extended downtime, or deep maintenance.\"}}], :invented {:note \"Sequencing cleaning depends on emptied equipment, availability of trained personnel, and avoidance of conflicts with concurrent production activities.\"}}], :invented [{:note \"Proper sequencing and resource coordination are critical for cleaning processes to minimize delays and conflicts with ongoing production.\"}], :EADS-ref :process/flow-shop, :EADS-id :process/flow-shop}"}],
+                     "{:process-id \"craft-beer-production\", :subprocesses [{:process-id \"milling\", :inputs [\"Malts\"], :outputs [\"Crushed Malts\"], :resources [\"Malt Mill\"], :duration {:units \"minutes\", :value-string \"30\"}} {:process-id \"mashing\", :inputs [\"Crushed Malts\" \"Hot Water\"], :outputs [\"Wort\"], :resources [\"Mash Tun\"], :duration {:units \"hours\", :value-string \"1.5 to 2\"}} {:process-id \"boiling\", :inputs [\"Wort\" \"Hops\"], :outputs [\"Boiled Wort\"], :resources [\"Brew Kettle\" \"Heat Source\"], :duration {:units \"hours\", :value-string \"1 to 1.5\"}} {:process-id \"cooling\", :inputs [\"Boiled Wort\"], :outputs [\"Cooled Wort\"], :resources [\"Heat Exchanger\"], :duration {:units \"minutes\", :value-string \"30 to 60\"}} {:process-id \"fermentation\", :inputs [\"Cooled Wort\" \"Yeast\"], :outputs [\"Beer (unconditioned)\"], :resources [\"Fermenter\"], :duration {:units \"days\", :value-string \"7 to 14\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Fermentation of one batch can overlap with brewing (milling, mashing, boiling) of another batch.\"}, :invented {:note \"Capacity and cleaning requirements for fermenters are critical constraints; delays in earlier stages often lead to bottlenecks.\"}} {:process-id \"conditioning\", :inputs [\"Beer (unconditioned)\"], :outputs [\"Conditioned Beer\"], :resources [\"Conditioning Tanks\"], :duration {:units \"days\", :value-string \"7 to 30\"}, :subprocess-flow {:val \"overlap-allowed\", :comment \"Beer conditioning can overlap with the bottling or kegging of earlier batches.\"}, :invented {:note \"Capacity and cleaning requirements for conditioning tanks add scheduling complexity.\"}} {:process-id \"bottling-kegging\", :inputs [\"Conditioned Beer\" \"Bottles or Kegs\"], :outputs [\"Packaged Beer\"], :resources [\"Packaging Line\"], :duration {:units \"hours\", :value-string \"2 to 4\"}} {:process-id \"distribution\", :inputs [\"Packaged Beer\"], :outputs [\"Delivered Beer\"], :resources [\"Trucks\" \"Logistics\"], :duration {:units \"days\", :value-string \"1 to 2 (locally, varies by destination)\"}} {:process-id \"cleaning-and-sanitization\", :inputs [\"Residual beer\" \"Caustic cleaning solution\" \"Water\" \"Sanitizing agents\"], :outputs [\"Clean fermenters and tanks\"], :resources [\"Specialized cleaning solutions\" \"Quality testing equipment\" \"Trained personnel\"], :duration {:units \"hours\", :value-string \"2 to 4 (standard), 3 to 6 (for highly residual batches), 4 to 6 (for allergen-containing batches)\"}, :dependencies {:requires-empty-equipment true, :resource-dependencies [\"Trained personnel\" \"Available utilities like hot water and chemicals\"], :overlap-with-production {:val true, :comment \"Cleaning often overlaps with other production activities like brewing or bottling due to shared resources and personnel.\"}}, :subprocesses [{:process-id \"quality-checks\", :duration {:units \"minutes\", :value-string \"10 to 20 for visual and pH checks\"}, :optional? false, :inputs [\"Sanitized tanks\"], :outputs [\"Verified cleanliness and sanitation\"], :resources [\"Visual inspection tools\" \"pH testing equipment\"], :invented {:note \"Additional microbiological swab tests may be conducted, taking 1 to 2 days for lab results, and these are conditional on factors like suspected contamination, extended downtime, or deep maintenance.\"}}], :invented {:note \"Sequencing cleaning depends on emptied equipment, availability of trained personnel, and avoidance of conflicts with concurrent production activities.\"}}], :invented [{:note \"Proper sequencing and resource coordination are critical for cleaning processes to minimize delays and conflicts with ongoing production.\"}], :EADS-ref :process/flow-shop, :EADS-id :process/flow-shop}"}
+           #:dstruct{:budget-left 0.7499999999999998,
+                     :id :data/orm,
+                     :str
+                     "{:data-maintained [{:category \"Orders\", :details [\"quantities\" \"delivery deadlines\"], :update-frequency \"Daily or as orders come in\", :storage-format \"Spreadsheets\", :granularity \"Tracks individual orders, including beer type, quantity, customer, and deadlines\", :shared {:teams [\"sales\" \"production\" \"logistics\"], :purpose \"To align demand with production and delivery schedules\", :method \"Shared spreadsheets or email updates\", :issues [\"Delays or version control problems due to manual access or updates\" \"Manual updates can lead to errors, such as missed entries or incorrect figures\"]}} {:category \"Inventory\", :details [\"raw materials\" \"finished goods\"], :update-frequency \"Daily\", :storage-format \"Spreadsheets\", :granularity \"Tracks individual raw materials (e.g., malt, hops) and finished goods by batch\", :shared {:teams [\"production\" \"procurement\"], :purpose \"To ensure materials are restocked on time\", :method \"Shared spreadsheets or email updates\", :issues [\"Delays or version control problems due to manual access or updates\" \"Manual updates lead to errors, particularly in inventory tracking\" \"Delays in inventory updates can disrupt scheduling or cause material shortages\"]}} {:category \"Production\", :details [\"batch progress\" \"equipment usage\" \"fermentation timelines\"], :update-frequency \"At key process milestones\", :storage-format \"Spreadsheets\", :granularity \"Tracks each batch status by process stage (e.g., brewing, fermentation) and key dates\", :issues [\"Delays in updating production progress disrupt planning and decision-making\"]} {:category \"Staff Schedules\", :details [\"availability\" \"roles\"], :update-frequency \"Weekly or as changes occur\", :storage-format \"Spreadsheets or calendars\", :granularity \"Tracks shifts and assignments for each worker by role and task\"} {:category \"Equipment Maintenance\", :details [\"maintenance schedules\"], :update-frequency \"After each maintenance task\", :storage-format \"Spreadsheets or paper logs\", :granularity \"Records equipment-specific tasks, dates, and issues resolved\"} {:category \"Cleaning\", :details [\"cleaning logs\"], :update-frequency \"After each cleaning cycle\", :storage-format \"Spreadsheets or paper logs\", :granularity \"Tracks cleaning dates, equipment cleaned, duration, and personnel involved\"} {:category \"Utility Usage\", :details [\"water usage\" \"cleaning chemicals\"], :update-frequency \"not mentioned\", :storage-format \"not mentioned\", :granularity \"Aggregates data by category (e.g., water, chemicals) and approximate usage per batch or task\"}], :EADS-ref :data/orm, :issues-summary {:accuracy [\"Manual updates can cause errors: missed entries, incorrect figures (orders, inventory)\" \"Simultaneous edits lead to version control issues\"], :timeliness [\"Delays in updating production progress or inventory levels disrupt planning and scheduling\" \"Material shortages occur due to untimely updates\"], :impact \"Decision-making inefficiencies and scheduling disruptions\"}, :EADS-id :data/orm}"}],
           :id :sur-craft-beer}
 ]

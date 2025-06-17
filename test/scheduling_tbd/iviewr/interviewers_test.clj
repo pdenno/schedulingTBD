@@ -292,7 +292,7 @@
     []
   (doseq [pid (db/list-projects)]
     (log! :info (str "Doing project " pid))
-    (db/backup-proj-db pid)))
+    (db/backup-project-db pid)))
 
 "We run a fitness center. We have two small areas for one-on-one sessions between trainers and their clients.
  It only fits one pair at a time, so we'd like to schedule things so trainers can meet (typically once a week)

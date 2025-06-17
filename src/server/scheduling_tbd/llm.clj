@@ -265,19 +265,6 @@
     (log! :info (str "Deleting assistant " (:name a) (:id a)))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))
 
-;;; (ws/register-ws-dispatch  :run-long llm/run-long)
-(defn ^:diag run-long
-  "Diagnostic for exploring threading/blocking with websocket."
-  [& _]
-  (loop [cnt 0]
-    (log! :info (str "Run-long: cnt = " cnt))
-    (Thread/sleep 5000) ; 5000 * 30, about 4 minutes.
-    (when (< cnt 20) (recur (inc cnt)))))
-
-(defn ^:diag throw-it
-  [& _]
-  (throw (ex-info "Just because I felt like it." {})))
-
 (def moderation-checking?
   "Set to true if you want to filter immoderate user text."
   (atom false))
@@ -355,8 +342,6 @@
 (defn llm-start []
   (select-llm-models!)
   (ws/register-ws-dispatch :ask-llm llm-directly) ; User types 'LLM:'
-  (ws/register-ws-dispatch :run-long run-long)    ; Diag
-  (ws/register-ws-dispatch :throw-it throw-it)    ; Diag
   (reset! assistant-memo {})
   (reset! thread-memo {})
   [:llm-fns-registered-for-ws-dispatch])

@@ -251,7 +251,21 @@
 (when-not (s/valid? :flow-shop/EADS-message flow-shop)
   (throw (ex-info "Invalid EADS (flow-shop)" {})))
 
-(defn completeness-test [{:keys [exhausted?]}] exhausted?)
+(defn completeness-test [{:keys [exhausted?] :as ds}]
+  (let [has-dur? (atom true)]
+    (letfn [(ck-dur [obj]
+              (when @has-dur?
+                (cond (map? obj) (if (contains? obj :process-id)
+                                   (if (contains? obj :duration)
+                                     (doseq [[_ v] obj] (ck-dur v))
+                                     (reset! has-dur? false))
+                                   (doseq [[_ v] obj] (ck-dur v)))
+                      (vector? obj) (doseq [v obj] (ck-dur v)))))]
+      (or exhausted?
+          (if (and  (contains? ds :subprocesses)
+                    (> (-> ds :subprocesses count) 0))
+            (do (ck-dur (:subprocesses ds)) @has-dur?) ; We don't require the toplevel process to have a duration.
+            false)))))
 
 ;;; ------------------------------- checking for completeness ---------------
 (defmethod ds-complete? :process/flow-shop

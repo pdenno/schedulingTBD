@@ -162,8 +162,6 @@
 ;;; go block threads, causing all go block processing to stop.
 
 ;;; https://medium.com/@reetesh043/difference-between-completablefuture-and-future-in-java-4f7e00bcdb56
-;;; Interesting. However, what that post says about blocking doesn't seem to be true. I can block (see llm/run-long)
-;;; and throw exceptions (see llm/throw-it) and nothing bad happens.
 (defn dispatching-loop
   "Run the listening and dispatching loop for the client's channel."
   [client-id]

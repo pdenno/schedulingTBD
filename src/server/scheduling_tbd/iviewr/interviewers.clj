@@ -1,4 +1,4 @@
-:inter(ns scheduling-tbd.iviewr.interviewers
+(ns scheduling-tbd.iviewr.interviewers
     "Runs an interview using an interview agent."
     (:require
      [cheshire.core                   :as ches]
@@ -19,7 +19,7 @@
      [scheduling-tbd.sutil                 :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.util                  :as util :refer [now]]
      [scheduling-tbd.web.websockets        :as ws]
-     [scheduling-tbd.datastructure2mermaid :as ds2m]
+     [scheduling-tbd.ds2mermaid            :as ds2m]
      [taoensso.telemere                    :as tel :refer [log!]]))
 
 ;;; The usual way of interviews involves q-and-a called from resume-conversation.
@@ -31,7 +31,7 @@
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
 ;;; (like when it is burning OpenAI asking the same question over and over ;^)).
 ;;; If it doesn't stop, it is probably the case that you need to test for it in more places.
-(def ^:diag active? "Debugging tool to stop the interview when false." (atom true))
+(def ^:diag active? "Debugging tool to stop the interview when false." (atom false)) ; < ============================================================ NOT ACTIVE!
 
 ;;; For use of chat-pair and other things defined below.
 (s/def ::chat-pair-ctx (s/and ::common-ctx
@@ -339,6 +339,11 @@
          (reset! diag {:text text})
          {:full-text text :text text})))
 
+(defn tryme []
+  (let [table-html
+        "<table>\n  <tr><th>Stage</th>                <th>Duration</th></tr>\n  <tr><td>Milling</td>              <td>30 minutes</td></tr>\n  <tr><td>Mashing</td>              <td>1.5 to 2 hours</td></tr>\n  <tr><td>Boiling</td>              <td>1 to 1.5 hours</td></tr>\n  <tr><td>Cooling</td>              <td>30 to 60 minutes</td></tr>\n  <tr><td>Fermentation</td>         <td>7 to 14 days (varies by beer type)</td></tr>\n  <tr><td>Conditioning</td>         <td>7 to 30 days (varies by beer type)</td></tr>\n  <tr><td>Bottling/Kegging</td>     <td>2 to 4 hours per batch</td></tr>\n  <tr><td>Distribution</td>         <td>Varies by destination, typically 1 to 2 days locally</td></tr>\n</table>"]
+    (-> table-html java.io.StringReader. xml/parse table-xml2clj #_table2obj)))
+
 (defn separate-table
   "Arg may be (1) a string that might contain an embedded table, or (2) a context map that contains :question.
    Return a map containing :full-text (a string) :text (a string) :table-html (a string)  and :table (a map).
@@ -388,12 +393,14 @@
             :data                    (not (done? dstat))
             :process                 (not (done? pstat))))))
 
+(declare resume-conversation tell-interviewer ctx-surrogate)
+
 ;;; ToDo: This needs work. You should be able to reopen a conversation at any time. Maybe need an agent for this!
 (defn find-appropriate-conv-and-redirect
   "If we think the conversation is over, ask them if they want to reopen it.
    Put a message in the current chat to go to the recommended chat or
    Typically this is called with ready-for-discussion? returned false."
-  [{:keys [pid cid client-id]}]
+  [{:keys [pid cid client-id] :as ctx}]
   (letfn [(ready? [status] (#{:not-started :in-progress} status))]
     (let [[pstat dstat rstat ostat]  (doall (for [c [:process :data :resources :optimality]]
                                               (db/get-conversation-status pid c)))
@@ -414,8 +421,13 @@
                  "We are satisfied with this conversation as it is. Did you want to reopen it for discussion?"
                  (str "At this point in our work, it would be better to discuss " (name better-choice) ". "
                       "Could you select " (-> better-choice name str/capitalize) " from the menu on the left?"))]
-      ;; Note that you don't send cid; it lands in whatever conversation the users is looking at.
-      (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :text text}))))
+      (if (= client-id :console)
+        (let [{:keys [iviewr-agent]} (merge ctx (ctx-surrogate ctx))]
+          (db/put-active-cid! pid better-choice) ; ToDo: This hasn't been tested. Is that enough?
+            (when-let [eads-id (db/get-active-EADS-id pid better-choice)]
+              (tell-interviewer (db/get-EADS-instructions eads-id) iviewr-agent better-choice))
+            (resume-conversation (assoc ctx :cid better-choice)))
+        (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :text text})))))
 
 (defn ctx-surrogate
   "Return context updated with surrogate info."
