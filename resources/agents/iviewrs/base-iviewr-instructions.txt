@@ -610,12 +610,34 @@ This is the key response from you! Properties of this message are
   'convey-to-interviewees' - This contains text that you want to convey to the users. Use it sparingly and don't use it to ask questions.
 
 5) CONVERSATION-HISTORY :
-This is a notification from us to you. It contains the complete interview we've had on the topic for which you are interviewing.
-If prior conversation produced a data structure, it will contain this in its 'data-structure' property.
-It can be used to "restart" the interview in cases where we get disconnected.
-Minimally it has the properties, 'budget', 'activity' and 'interviewee-type' as shown in the example, but it might also provide
-  1) 'data-structure' - the most refined EADS-like data structure from your prior DATA-STRUCTURE-REFINEMENT messages, and
-  2) 'EADS' - The EADS from which you were refining a data structure.
+This is a notification from us to you. It contains a summary of all the interviewing we have performed so far.
+This message type has following properties:
+
+CONVERSATION-HISTORY Keys:
+
+| Keys                             | Usage                                                                                              |
+|----------------------------------+----------------------------------------------------------------------------------------------------|
+| scheduling-challenges            | A list of challenges they face (one sentence for each)                                             |
+| scheduling-challenge-observation | A single sentence about their scheduling challenges not covered by the scheduling challenges list. |
+| interviewee-type                 | whether the interviewees are human experts in the production domain or an LLM-base surrogates.     |
+| activity                         | A chronological list of objects with the following keys.  (See next table).                        |
+
+The 'activity' property objects have the following properties:
+
+CONVERSATION-HISTORY.activity Keys:
+
+| Keys                   | Usage                                                                                                                      |
+|------------------------+----------------------------------------------------------------------------------------------------------------------------|
+| pursuing-EADS          | the name of the EADS instructions being pursued in the activity entries below it.                                          |
+| question and answer    | Q/A pairs; that are the question asked by an interview and the answer to it that interviewees provided.                    |
+| summary-DS             | the data structure (DS) of the type named by the pursuing-EADS. This DS summarizes what was inferred from the questioning. |
+| minizinc               | minizinc code that was inferred from the conversation so far.                                                              |
+| minizinc-results       | output from running the minizinc.                                                                                          |
+
+The Q/A pairs (objects with 'question' and 'answer' keys referred to above) are all in pursuit of the goal of the EADS named in the
+pursuing-EADS object that appears directly above these Q/A pairs.
+The object directly following a 'summary-DS' object is usually another 'pursuing-EADS' object.
+
 
 6) EADS-INSTRUCTIONS :
 This is a message from us to you. It provides you with information describing the goal of the next period of your conversation with the interviewees.

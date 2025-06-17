@@ -340,19 +340,32 @@ The only property of this message type is:
 
 This is a notification from us to you about conversation that has occurred.
 It provides information crucial to your task of selecting an EADS-id in PURSUE-EADS.
-This message type has five properties:
-  a) 'scheduling-challenges': a list of sentences describing scheduling challenges interviewees they are facing.
-  b) 'activity':  which is a temporally-ordered list of events summarizing a period of interviewing that has occurred with one of the interview agents.
-                  The chronologically ordered elements of this list are objects of three types:
-                    i) EADS objective objects - in which the value of the 'pursuing-EADS' property is an EADS-id that you requested the interviewer to pursue in a PURSUE-EADS message.
-                    ii) question/answer objects: that contain questions the interviewer asked in pursuit of the data-structure corresponding to the EADS.
-                                                (These always include a 'question' property, and contain an 'answer' property whenever brevity is not a concern.)
-                    iii) 'summary-EADS' objects: - Each of these is an object with properties 'data-structure' 'EADS-ref'.
-                          The 'data-structure' property provide the complete EADS data-structure resulting from the other activities (question/answers and the most resent 'pursuing-EADS')
-                          that occur earlier in this 'activities list.
-                          (The data-structure object can serve to summarize answers to questions where the answers were not provided in question/answer objects.)
-  c) 'minizinc':  which is an object with the property 'minizinc' the value of which is the current scheduling system MiniZinc code, and
-  d) 'minizinc-execution: which is an object with property 'execution' that describes that results of executing the minizinc code.
+This message type has following properties:
+
+CONVERSATION-HISTORY Keys:
+
+| Keys                             | Usage                                                                                              |
+|----------------------------------+----------------------------------------------------------------------------------------------------|
+| scheduling-challenges            | A list of challenges they face (one sentence for each)                                             |
+| scheduling-challenge-observation | A single sentence about their scheduling challenges not covered by the scheduling challenges list. |
+| interviewee-type                 | whether the interviewees are human experts in the production domain or an LLM-base surrogates.     |
+| activity                         | A chronological list of objects with the following keys.  (See next table).                        |
+
+The 'activity' property objects have the following properties:
+
+CONVERSATION-HISTORY.activity Keys:
+
+| Keys                   | Usage                                                                                                                      |
+|------------------------+----------------------------------------------------------------------------------------------------------------------------|
+| pursuing-EADS          | the name of the EADS instructions being pursued in the activity entries below it.                                          |
+| question and answer    | Q/A pairs; that are the question asked by an interview and the answer to it that interviewees provided.                    |
+| summary-DS             | the data structure (DS) of the type named by the pursuing-EADS. This DS summarizes what was inferred from the questioning. |
+| minizinc               | minizinc code that was inferred from the conversation so far.                                                              |
+| minizinc-results       | output from running the minizinc.                                                                                          |
+
+The Q/A pairs (objects with 'question' and 'answer' keys referred to above) are all in pursuit of the goal of the EADS named in the
+pursuing-EADS object that appears directly above these Q/A pairs.
+The object directly following a 'summary-DS' object is usually another 'pursuing-EADS' object.
 
 
 3) BACKCHANNEL-COMMUNICATION

@@ -31,7 +31,7 @@
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
 ;;; (like when it is burning OpenAI asking the same question over and over ;^)).
 ;;; If it doesn't stop, it is probably the case that you need to test for it in more places.
-(def ^:diag active? "Debugging tool to stop the interview when false." (atom false)) ; < ============================================================ NOT ACTIVE!
+(def ^:diag active? "Debugging tool to stop the interview when false." (atom true))
 
 ;;; For use of chat-pair and other things defined below.
 (s/def ::chat-pair-ctx (s/and ::common-ctx
@@ -232,29 +232,6 @@
 
 (defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
 
-;;; ToDo: It isn't obvious that the interview agent needs to see all this. Only useful when the thread was destroyed?
-;;; ToDo: V4 instructions do not mention claims, but this still holds
-(defn conversation-history
-  "Construct a conversation-history message structure for the argument project.
-   This tells the interview agent what has already been asked. If the thread hasn't been deleted
-   (i.e. by OpenAI, because it is more than 30 days old) then the agent knows what has already been
-   asked EXCEPT for the warm-up question (if any) which happens before the interview."
-  [pid cid]
-  (if (db/project-exists? pid)
-    (let [answers (->> cid
-                       (db/get-conversation pid)
-                       :conversation/messages
-                       (filter #(contains? % :message/answers-question)))]
-      (cond-> {:message-type :CONVERSATION-HISTORY
-               :interviewee-type (if (surrogate? pid) :machine :human)
-               :budget (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid))}
-        (not-empty answers)   (assoc :activity (mapv (fn [answer]
-                                                       {:question (-> (db/get-msg pid cid (:message/answers-question answer)) :message/content)
-                                                        :answer  (-> answer :message/content)}) ; ToDo: Is this inclusive of tables?
-                                                     answers))))
-    {:message-type :CONVERSATION-HISTORY
-     :activity []}))
-
 (defn make-supply-question-msg
   "Create a supply question message for the conversation."
   [pid]
@@ -432,8 +409,8 @@
 (defn ctx-surrogate
   "Return context updated with surrogate info."
   [{:keys [pid cid force-new?] :as ctx}]
-  (let [iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
-        surrogate-agent   (adb/ensure-agent! {:base-type pid :pid pid} {:make-agent? force-new?})
+  (let [iviewr-agent    (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
+        surrogate-agent (adb/ensure-agent! {:base-type pid :pid pid} {:force-new? force-new?})
         ctx (-> ctx
                 (assoc :responder-type :surrogate)
                 (assoc :iviewr-agent iviewr-agent)
@@ -569,9 +546,12 @@
   (if (ready-for-discussion? pid cid)
     (try
       (let [{:keys [iviewr-agent] :as ctx} (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))
-            history (conversation-history pid cid)]
-        (when (-> history :activity not-empty) ; Things to do when r-c is called for actual resuming, instead of starting fresh.
-          (tell-interviewer history iviewr-agent cid))
+            history (ork/conversation-history pid)]
+        ;; Things to do when r-c is called for actual resuming, instead of starting fresh.
+        ;; ToDo: It would be better to know what has been seen, but when OpenAI assistants go away this is going to be necessar always anyway!
+        (tell-interviewer history iviewr-agent cid)
+        (when-let [eads-id (db/get-active-EADS-id pid cid)]
+          (tell-interviewer (db/get-EADS-instructions eads-id) iviewr-agent cid))
 
         (loop [ctx ctx] ; ToDo: currently not used!
           (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?]} (ork-review pid cid)]

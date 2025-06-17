@@ -1,7 +1,6 @@
 (ns scheduling-tbd.iviewr.ork
   "Code for working with the orchestrator agent."
   (:require
-   [clojure.core.unify            :as uni]
    [clojure.edn                   :as edn]
    [clojure.pprint                :refer [pprint cl-format]]
    [clojure.spec.alpha            :as s]
@@ -30,23 +29,27 @@
   (adb/ensure-agent! :orchestrator-agent #_{:force-new? true}))
 
 ;;; ToDo: Find a better home for this.
-(def scheduling-challenge2-description
-  "ork/conversation-history provides sentences describing scheduling challenges."
-  {:raw-material-uncertainty "They sometimes don't have the raw material they need to make what they want to make."
-   :demand-uncertainty "They are uncertain what to make because they are uncertain what customers need."
-   :delivery-schedules "They are having problems meeting delivery promise dates."
-   :variation-in-demand "They have slow periods and very busy periods. This is often the case, for example, when demand has seasonality."
-   :planned-maintenance "They need to accommodate equipment maintenance schedules in their production schedules."
-   :resource-assignment "They need to reserve several resources for simultaneous use."
-   :equipment-changeover "The time it takes to change equipment setting and tooling is considerable."
-   :equipment-availability "They struggle with equipment breakdowns."
-   :equipment-utilization "They have expensive equipment that they would like to be able to use more."
-   :worker-availability "They struggle with shortages of workers."
-   :skilled-worker-availability "This is a specific subtype of 'worker-availability' where they suggest that matching worker skills and/or certification to the process is the challenge."
-   :bottleneck-processes "The pace of their production is throttled by just a few processes."
-   :process-variation "They have many different processes for making roughly the same class of products."
-   :product-variation "They have many different products to make."
-   :meeting-KPIs "They mention key performance indicators (KPIs) or difficulty performing to them."})
+(defn challenge-key2sentence
+  "Using a key from :process/warm-up-with-challenges, provides sentences describing the given scheduling challenges."
+  [ckey]
+  (assert (keyword? ckey))
+  (let [defs
+        {:raw-material-uncertainty "They sometimes don't have the raw material they need to make what they want to make."
+         :demand-uncertainty "They are uncertain what to make because they are uncertain what customers need."
+         :delivery-schedules "They are having problems meeting delivery promise dates."
+         :variation-in-demand "They have slow periods and very busy periods. This is often the case, for example, when demand has seasonality."
+         :planned-maintenance "They need to accommodate equipment maintenance schedules in their production schedules."
+         :resource-assignment "They need to reserve several resources for simultaneous use."
+         :equipment-changeover "The time it takes to change equipment setting and tooling is considerable."
+         :equipment-availability "They struggle with equipment breakdowns."
+         :equipment-utilization "They have expensive equipment that they would like to be able to use more."
+         :worker-availability "They struggle with shortages of workers."
+         :skilled-worker-availability "This is a specific subtype of 'worker-availability' where they suggest that matching worker skills and/or certification to the process is the challenge."
+         :bottleneck-processes "The pace of their production is throttled by just a few processes."
+         :process-variation "They have many different processes for making roughly the same class of products."
+         :product-variation "They have many different products to make."
+         :meeting-KPIs "They mention key performance indicators (KPIs) or difficulty performing to them."}]
+    (str (name ckey) " : " (ckey defs))))
 
 (defn max-ds
   "Return a map where keys are EADS ids and values are the EADS data structure from the
@@ -66,15 +69,9 @@
 (defn add-ds-to-activities
   "Iterate through the activities and just before changing to new pursuing-EADS add the summary DS for the last one."
   [pid activities]
-  (let [result (atom [])
-        current-eads (atom nil)]
-    (letfn [(make-ds-entry [eads-id]
-              (let [{:keys [EADS-ref data-structure commit-notes exhausted?]} (db/get-summary-ds pid eads-id)]
-                {:summary-EADS
-                 ;; This is the arrangement in orchestrator.txt (agent instructions). Jury is out on whether to strip.
-                 (cond-> {:EADS-ref EADS-ref :data-structure data-structure}
-                   commit-notes (assoc :commit-notes commit-notes)
-                   exhausted?   (assoc :exhausted? true))}))]
+  (letfn [(make-ds-entry [eads-id] {:summary-DS (db/get-summary-ds pid eads-id)})]
+    (let [result (atom [])
+          current-eads (atom nil)]
       (doseq [act activities]
         (if-let [eads-id (:pursuing-EADS act)]
           (when (not= @current-eads eads-id)
@@ -90,18 +87,23 @@
 (defn conversation-activity
   "Create a chronologically-ordered vector of activities for the argument conversation, including q/a pairs,
    changes in the EADS being pursued, and the EADS data structure resulting."
-  [pid cid]
-  (let [msgs (->> cid
-                  (db/get-conversation pid)
-                  :conversation/messages
-                  (filter #(contains? % :message/answers-question))
-                  (sort-by :message/id)
-                  (mapv #(if-let [q-id (:message/answers-question %)]
-                             (assoc % :message/q-a-pair
-                                    (let [q-msg (db/get-msg pid cid q-id)]
-                                      {:question (:message/content q-msg)
-                                       :answer   (:message/content %)})) ; ToDo: Ok to elide long answers?
-                             %)))
+  [pid]
+  (let [msgs
+        (reduce (fn [r cid]
+                  (into r (->> (db/get-conversation pid cid)
+                               :conversation/messages
+                               (filter #(contains? % :message/answers-question))
+                               (sort-by :message/id)
+                               (mapv #(if-let [q-id (:message/answers-question %)]
+                                        (assoc % :message/q-a-pair
+                                               (let [q-msg (db/get-msg pid cid q-id)]
+                                                 {:question (cond-> (:message/content q-msg)
+                                                              (contains? q-msg :message/table) (str (:message/table q-msg)))
+                                                  :answer   (cond-> (:message/content %)
+                                                              (contains? % :message/table) (str (:message/table %)))}))
+                                        %)))))
+                []
+                [:process :data :resources :optimality])
         current-eads (atom nil)
         result (atom [])]
     ;; Create the ordered activities vector in result
@@ -115,15 +117,37 @@
         (when code-execution (swap! result conj {:code-execution code}))))
     (add-ds-to-activities pid @result)))
 
-;;; ToDo: Check the :conversation/ork-tid versus the actual (once this doesn't provide the whole thing; so that you don't have to provide the whole thing to same ork.)
-;;; ToDo: Currently this is very similar to inv/conversation-history.
+
+;;;   CONVERSATION-HISTORY Keys
+;;;
+;;;   | Keys                             | Usage                                                                                              |
+;;;   |----------------------------------+----------------------------------------------------------------------------------------------------|
+;;;   | scheduling-challenges            | A list of challenges they face (one sentence for each)                                             |
+;;;   | scheduling-challenge-observation | A single sentence about their scheduling challenges not covered by the scheduling challenges list. |
+;;;   | interviewee-type                 | whether the interviewees are human experts in the production domain or an LLM-base surrogates.     |
+;;;   | activity                         | A chronological list of objects with the following keys.  (See next table).                        |
+;;;
+;;;   CONVERSATION-HISTORY.activity Keys
+;;;
+;;;   | Keys                   | Usage                                                                                                                      |
+;;;   |------------------------+----------------------------------------------------------------------------------------------------------------------------|
+;;;   | pursuing-EADS          | the name of the EADS instructions being pursued in the activity entries below it.                                          |
+;;;   | question and answer    | Q/A pairs; that are the question asked by an interview and the answer to it that interviewees provided.                    |
+;;;   | summary-DS             | the data structure (DS) of the type named by the pursuing-EADS. This DS summarizes what was inferred from the questioning. |
+;;;   | minizinc               | minizinc code that was inferred from the conversation so far.                                                              |
+;;;   | minizinc-results       | output from running the minizinc.                                                                                          |
+;;;
+;;;   These Q/A pairs (objects with 'question' and 'answer' keys referred to above) are all in pursuit of the goal of the EADS named in the
+;;;   pursuing-EADS object that appears directly above these Q/A pairs.
+;;;   The object directly following a 'summary-DS' object is usually another 'pursuing-EADS' object.
+
 ;;; ToDo: Needs minizinc execution
 (defn conversation-history
   "Return a CONVERSATION-HISTORY message for use with the orchestrator with values translated to JSON.
 
-   There are potentially five kinds of information in the 'activity' property of this message:
+   There are potentially six kinds of information in the 'activity' property of this message:
         1) a list of all EADS (their EADS-id) that have been completely discussed,
-        2) question/answer pairs: which are objects that have 'question' and 'answer' properties, and
+        2) question/answer pairs: which are objects that have 'question' and 'answer' properties, and sometimes an additional 'table' property, and
         3) data-structure: which are objects that have a 'data-structure' property, the value of which is the the most complete response any of your PROVIDE-EADS messages on which the interviewer has worked.
         4) minizinc: which is an object with the property 'minizinc' the value of which is the current scheduling system MiniZinc code.
         5) minizinc-execution: which describes that results of executing the minizinc code.
@@ -132,26 +156,25 @@
    We don't include all question/answer pairs, only those since our last C-H message to the orchestrator.
    (And we check that there isn't a new thread since that message.)
    Likewise, we only include the current data-structure if the orchestrator has been around for earlier C-H messages."
-  ([pid] (conversation-history pid :all))
-  ([pid cid]
-   (assert (#{:all :process :data :resources :optimality} cid))
-   (if (db/project-exists? pid)
-     (let [challenges (->> (db/get-claims pid)
-                           (filter #(uni/unify '(scheduling-challenge ?pid ?challenge) %))
-                           (mapv #(nth % 2))
-                           (mapv #(get scheduling-challenge2-description %)))
-           activities (if (= :all cid)
-                        (reduce (fn [res cid] (into res (conversation-activity pid cid)))
-                                []
-                                [:process :data :resources :optimality])
-                        (conversation-activity pid cid))]
-       (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
-       (cond-> {:message-type :CONVERSATION-HISTORY}
-         (not-empty challenges)  (assoc :scheduling-challenges challenges)
-         (not-empty activities)  (assoc :activity activities)))
-     {:message-type :CONVERSATION-HISTORY
-      :scheduling-challenges []
-      :activity []})))
+  [pid]
+  (if (db/project-exists? pid)
+    (let [warm-up (db/get-summary-ds :sur-craft-beer :process/warm-up-with-challenges)
+          observation (:one-more-thing warm-up)
+          challenges (->> warm-up
+                          :scheduling-challenges
+                          (map keyword)
+                          (mapv challenge-key2sentence))
+          itype (if (some #(= (first %) 'surrogate) (db/get-claims pid)) :surrogate :human)
+          activities (conversation-activity pid)]
+      (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
+      (cond-> {:message-type :CONVERSATION-HISTORY}
+        (not-empty challenges)     (assoc :scheduling-challenges challenges)
+        (not-empty observation)    (assoc :scheduling-challenge-observation observation)
+        true                       (assoc :interviewee-type itype)
+        (not-empty activities)     (assoc :activity activities)))
+    {:message-type :CONVERSATION-HISTORY
+     :scheduling-challenges []
+     :activity []}))
 
 (s/def ::ork-msg map?) ; ToDo: Write specs for ork messages.
 

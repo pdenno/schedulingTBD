@@ -141,7 +141,7 @@
     (go
       (loop []
         (when-let [msg (<! err)]
-          (log! :warn (str "Client reports " (type msg) ": client-id = " client-id))
+          ;(log! :warn (str "Client reports " (type msg) ": client-id = " client-id))
           (forget-client client-id)
           (when-not exit? (recur)))))
     (log! :error (str "error-listener: Cannot find client-id " client-id))))

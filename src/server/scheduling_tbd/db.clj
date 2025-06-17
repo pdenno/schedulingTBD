@@ -267,7 +267,7 @@
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
-   :project/surrogate?
+   :project/surrogate? ; ToDo: Not used?
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
         :doc "true if domain expertise is provided by an artificial agent."}
    :project/tables
