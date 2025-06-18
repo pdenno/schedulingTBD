@@ -17,13 +17,12 @@
    ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default"                 :as Sidebar]
    ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
    ["@mui/material/Box$default" :as Box]
-   ["@mui/material/IconButton$default" :as IconButton]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core    :as p]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
-   [stbd-app.components.graph-modal   :refer [GrapheModal]]
+   [stbd-app.components.graph-modal   :refer [GraphModal]]
    [stbd-app.components.table-modal   :refer [TableModal]]
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
@@ -64,14 +63,7 @@
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
 
-(defn show-table
-  [table]
-  (log! :info (str "Show table: " table)))
-
-(defn show-graph
-  [graph]
-  (log! :info (str "Show graph: " graph)))
-
+;(def example-graph "graph TD\nA[Client] --> B[Load Balancer]\nB --> C[Server01]\nB --> D[Server02]")
 
 (defn msgs2cs ; cs = ChatScope, https://chatscope.io/
   "Create ChatScope structures (Message, MessageHeader, MessageSeparator, etc.) for a collection of messages."
@@ -95,7 +87,7 @@
                               ($ MessageCustomContent {}
                                  ($ MessageHtmlContent {:html content})
                                  (when (or table graph)
-                                   ($ ButtonGroup {}
+                                   ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
                                       (when table ($ TableModal {:table table}))
                                       (when graph ($ GraphModal {:graph graph}))))))))))
             []
@@ -203,7 +195,7 @@
         (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
         (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
         (register-fn :set-active-conv set-active-conv)
-        (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (do (set-busy? val)))) ; Yes. Need to do both.
+        (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (set-busy? val))) ; Yes. Need to do both.
         (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
         (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
         (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs))))  ; These two used to update message time.

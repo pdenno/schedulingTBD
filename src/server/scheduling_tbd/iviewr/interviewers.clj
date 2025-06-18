@@ -277,8 +277,10 @@
         titles (if (every? #(= (:tag %) :th) heading)
                  (->> heading
                       (mapv #(-> % :content first))
-                      (mapv #(-> {} (assoc :title %) (assoc :key (-> % ru/text-to-var keyword {:asking-role :table2obj})))))
-                 (log! :warn "No titles in ugly table."))
+                      (mapv #(-> {}
+                                 (assoc :title %)
+                                 (assoc :key (-> % (ru/text-to-var) keyword)))))
+                 (log! :warn "No titles in table2obj."))
         title-keys (map :key titles)
         data-rows  (->> ugly-table
                         :content                                 ; table content
@@ -286,7 +288,7 @@
                         (mapv (fn [row]
                                 (mapv #(or (-> % :content first) "") (:content row)))))]
     {:table-headings  titles
-     :table-data (mapv (fn [row] (zipmap title-keys row)) data-rows)}))
+     :table-body (mapv (fn [row] (zipmap title-keys row)) data-rows)}))
 
 (defn separate-table-aux
   "Look through the text (typically an interviewer question) for '#+begin_src HTML ... #+end_src'; what is between those markers should be a table.

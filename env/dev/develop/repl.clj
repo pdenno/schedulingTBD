@@ -39,6 +39,7 @@
    'adb    'scheduling-tbd.agent-db
    'core   'scheduling-tbd.core
    'db     'scheduling-tbd.db
+   'ds2m   'scheduling-tbd.ds2mermaid
    ;'how    'scheduling-tbd.how-made
    'llm    'scheduling-tbd.llm
    'llmt   'scheduling-tbd.llm-test

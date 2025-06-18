@@ -6,11 +6,8 @@
    [helix.dom                  :as dom]
    [helix.hooks                :as hooks]
    [stbd-app.components.graph  :refer [GraphPane]]
-   ["@mui/icons-material/Schema$default" :as SchemaIcon]
-   ["@mui/material/Dialog$default"       :as Dialog]
-   ["@mui/material/IconButton$default"   :as IconButton]))
-
-(def example-graph nil)
+   ["@mui/material/Button$default"   :as Button]
+   ["@mui/material/Dialog$default"   :as Dialog]))
 
 ;;; https://mui.com/material-ui/react-modal/
 (defnc GraphModal [{:keys [graph]}]
@@ -18,8 +15,7 @@
         [open set-open] (hooks/use-state false)]
     (letfn [(handle-open [] (when (j/get modal :current) (set-open true)))
             (handle-close [] (set-open false))]
-      (dom/div {:ref modal}
-               ($ IconButton {:color "warning" :onClick handle-open}
-                  ($ SchemaIcon))
-               ($ Dialog  {:open open :onClose handle-close}
-                  ($ GraphPane {:init-graph example-graph}))))))
+      (dom/div {:ref modal :minWidth 1000}
+               ($ Button {:color "warning" :onClick handle-open} "Graph")
+               ($ Dialog  {:open open :onClose handle-close :minWidth 1000}
+                  ($ GraphPane {:init-graph graph :minWidth 1000})))))) ; minWidth does nothing.

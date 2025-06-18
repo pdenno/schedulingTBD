@@ -2,34 +2,34 @@
   "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
    [applied-science.js-interop :as j]
+   [clojure.edn                :as edn]
    [helix.core :refer [defnc $]]
    [helix.dom :as dom]
    [helix.hooks :as hooks]
    [stbd-app.components.table :refer [TablePane]]
-   ["@mui/icons-material/AppRegistration$default" :as AppRegIcon]
-   ["@mui/material/Dialog$default"          :as Dialog]
-   ["@mui/material/IconButton$default" :as IconButton]))
+   ["@mui/material/Button$default"                :as Button]
+   ["@mui/material/Dialog$default"                :as Dialog]))
 
-(def example-table
-  {:table-headings [{:title "Dessert (100g serving)" :key :name},
-                    {:title "Calories" :key :calories},
-                    {:title "Fat (g)" :key :fat}
-                    {:title "Carbs (g)" :key :carbs},
-                    {:title "Protein (g)" :key :protein}]
-   :table-body [{:name "Frozen yogurt", :calories 159, :fat 6.0, :carbs 24, :protein 4.0}
-                {:name "Ice cream sandwich" :calories 237, :fat  9.0, :carbs 37, :protein 4.3}
-                {:name "Eclair", :calories 262, :fat 16.0, :carbs 24, :protein 6.0}
-                {:name "Cupcake", :calories 305, :fat 3.7, :carbs 67, :protein 4.3}
-                {:name "Gingerbread", :calories 356, :fat 16.0, :carbs 49, :protein 3.9}]})
+#_(def example-table
+  {:table-headings [{:title "Stage", :key :stage} {:title "Duration", :key :duration}],
+   :table-body
+   [{:stage "Milling", :duration "30 minutes"}
+    {:stage "Mashing", :duration "1.5 to 2 hours"}
+    {:stage "Boiling", :duration "1 to 1.5 hours"}
+    {:stage "Cooling", :duration "30 to 60 minutes"}
+    {:stage "Fermentation", :duration "7 to 14 days (varies by beer type)"}
+    {:stage "Conditioning", :duration "7 to 30 days (varies by beer type)"}
+    {:stage "Bottling/Kegging", :duration "2 to 4 hours per batch"}
+    {:stage "Distribution", :duration "Varies by destination, typically 1 to 2 days locally"}]})
 
 ;;; https://mui.com/material-ui/react-modal/
-(defnc TableModal [{:keys [table post-table-fn]}]
+(defnc TableModal [{:keys [table]}]
   (let [modal           (hooks/use-ref nil)
+        table     (when (not-empty table) (edn/read-string table))
         [open set-open] (hooks/use-state false)]
     (letfn [(handle-open [] (when (j/get modal :current) (set-open true)))
             (handle-close [] (set-open false))]
       (dom/div {:ref modal}
-               ($ IconButton {:color "warning" :onClick handle-open}
-                  ($ AppRegIcon))
+               ($ Button {:onClick handle-open :color "warning"} "Table")
                ($ Dialog  {:open open :onClose handle-close}
-                  ($ TablePane {:init-table example-table}))))))
+                  ($ TablePane {:init-table table}))))))

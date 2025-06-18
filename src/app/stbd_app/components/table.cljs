@@ -51,7 +51,7 @@
 (defnc EditCell [{:keys [cell-id row-id text table set-table-fn]}]
   ($ TableCell {:key cell-id :sx #js {:padding "0"}}
      ($ TextField {:key text ; :key must be text, nothing else seems to work!
-                   :size "small"
+                   #_#_:size "small"
                    :sx #js {:bgcolor "#fff6d9"} ; "#f0e699" is the yellow color used in MessageList; this is lighter.
                    :defaultValue text
                    :autoFocus true
@@ -67,12 +67,14 @@
       (let [ix (swap! index-id inc)
             row-id (:internal/id table-row)
             column-keys  (->> table :table-headings (mapv :key))]
-        ($ TableRow {:key row-id #_#_:editMode "row" :editable true :sx #js {:padding "0 0 0 0"}}
+        ($ TableRow {:key row-id #_#_:editMode "row" :editable true :sx #js {:width "100%" :padding "0 0 0 0"}}
            (-> (for [k column-keys]
-                 ($ EditCell {:key (name k) :text (get table-row k) :row-id row-id :cell-id k :table table :set-table-fn set-table-fn}))
+                 ($ EditCell {:sx #js {:width "100%"}
+                              :key (name k) :text (get table-row k) :row-id row-id :cell-id k :table table :set-table-fn set-table-fn}))
                vec
                (conj
                 ($ RowButtons {:key (str "rb-" ix)
+                               :sx #js {:width "100%"}
                                :index-id ix
                                :add-fn    (fn [] (set-table-fn
                                                   (-> (update table :table-body
@@ -122,17 +124,17 @@
         (hooks/use-effect [table]
           (when (and (not @original-table) (-> table :table-body not-empty))
              (reset! original-table (set-row-ids table))))
-      (if table-headings
-        ($ Stack {:sx #js {:display "flex", :flexDirection "column" :height "100%" :width "100%" :alignItems "stretch" :overflowY "auto" :overflowX "auto"}
+      (when table-headings
+        ($ Stack {:sx #js {:display "flex", :height "100%" :width "100%" :alignItems "stretch" :overflowY "auto" :overflowX "auto"}
                   :id "data-area" :direction "column" :spacing "0px"}
-           ($ TableContainer {:component Paper}
-              ($ Table {:size "small"}
-                 ($ TableHead {}
-                    ($ TableRow {}
+           ($ TableContainer {:component Paper
+                              :sx #js {:display "flex", :height "100%" :width "100%" :alignItems "stretch" :overflowY "auto" :overflowX "auto"}} ; does nothing.
+              ($ Table {:sx #js {:width "100%"}} #_{:sx #js {:minWidth 900}} ; DOES MATTER, but I can't make other things match!
+                 ($ TableHead {:sx #js {:width "100%"}} ; does nothing
+                    ($ TableRow {:sx #js {:width "100%"}} ; does nothing
                        (for [{:keys [key title]} table-headings] ($ TableCell {:key key} title))))
-                 ($ TableBody {}
+                 ($ TableBody {:sx #js {:width "100%"}} ; Does nothing
                     ($ BodyRows {:table table :set-table-fn set-table}))))
            ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
               ($ Button {:onClick submit-table  :width "50px"} "Submit")
-              ($ Button {:onClick reset-table  :width "50px"} "Reset")))
-        ($ Box {:id "data-area-null"})))))
+              ($ Button {:onClick reset-table  :width "50px"} "Reset")))))))
