@@ -344,12 +344,12 @@ This message type has following properties:
 
 CONVERSATION-HISTORY Keys:
 
-| Keys                             | Usage                                                                                              |
-|----------------------------------+----------------------------------------------------------------------------------------------------|
-| scheduling-challenges            | A list of challenges they face (one sentence for each)                                             |
-| scheduling-challenge-observation | A single sentence about their scheduling challenges not covered by the scheduling challenges list. |
-| interviewee-type                 | whether the interviewees are human experts in the production domain or an LLM-base surrogates.     |
-| activity                         | A chronological list of objects with the following keys.  (See next table).                        |
+| Keys                             | Usage                                                                                                      |
+|----------------------------------+------------------------------------------------------------------------------------------------------------|
+| scheduling-challenges            | A list of challenges they face (one sentence for each)                                                     |
+| scheduling-challenge-observation | A single sentence about their scheduling challenges not covered by the scheduling challenges list.         |
+| interviewee-type                 | whether the interviewees are human experts in the production domain or an LLM-base surrogates ("machine"). |
+| activity                         | A chronological list of objects with the following keys.  (See next table).                                |
 
 The 'activity' property objects have the following properties:
 

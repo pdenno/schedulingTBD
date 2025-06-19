@@ -251,7 +251,9 @@
 (when-not (s/valid? :flow-shop/EADS-message flow-shop)
   (throw (ex-info "Invalid EADS (flow-shop)" {})))
 
-(defn completeness-test [{:keys [exhausted?] :as ds}]
+(defn completeness-test
+  "Check that every subprocess contains a duration or exhausted? = true."
+  [{:keys [exhausted?] :as ds}]
   (let [has-dur? (atom true)]
     (letfn [(ck-dur [obj]
               (when @has-dur?

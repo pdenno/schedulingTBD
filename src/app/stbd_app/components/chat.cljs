@@ -1,15 +1,15 @@
 (ns stbd-app.components.chat
    "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
-   [helix.core                 :refer [defnc $]]
-   [helix.hooks                :as hooks]
+   [helix.core   :refer [defnc $]]
+   [helix.hooks  :as hooks]
    ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default"           :as ChatContainer]
    ["@chatscope/chat-ui-kit-react/dist/cjs/ConversationList$default"        :as ConversationList]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Conversation$default"            :as Conversation]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default"           :as MainContainer]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default"                 :as Message]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default"   :as MessageHeader]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageCustomContent$default"   :as MessageCustomContent]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageCustomContent$default" :as MessageCustomContent]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHtmlContent$default"   :as MessageHtmlContent]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default"            :as MessageInput]
    ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"             :as MessageList]
@@ -17,17 +17,18 @@
    ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default"                 :as Sidebar]
    ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
    ["@mui/material/Box$default" :as Box]
+   ["@mui/material/Button$default" :as Button]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
-   [promesa.core    :as p]
+   [promesa.core :as p]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
-   [stbd-app.components.share :as share :refer [ShareUpDown]]
-   [stbd-app.components.graph-modal   :refer [GraphModal]]
-   [stbd-app.components.table-modal   :refer [TableModal]]
+   [stbd-app.components.share :as share  :refer [ShareUpDown]]
+   [stbd-app.components.graph            :refer [GraphModal]]
+   [stbd-app.components.table            :refer [TableModal]]
    [stbd-app.db-access  :as dba]
    [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
-   [stbd-app.ws         :as ws :refer [remember-promise]]
-   [taoensso.telemere          :as tel :refer-macros [log!]]))
+   [stbd-app.ws         :as ws   :refer [remember-promise]]
+   [taoensso.telemere   :as tel  :refer-macros [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -70,7 +71,7 @@
   [msgs]
   (let [new-date (atom today)]
     (reduce (fn [r msg]
-              (let [{:message/keys [content from time table graph] :or {time (js/Date. (.now js/Date))}} msg
+              (let [{:message/keys [content from time table graph code] :or {time (js/Date. (.now js/Date))}} msg
                     content (msg-with-title content from)
                     msg-date (-> time inst2date (subs 0 15))]
                 (as-> r ?r
@@ -89,7 +90,8 @@
                                  (when (or table graph)
                                    ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
                                       (when table ($ TableModal {:table table}))
-                                      (when graph ($ GraphModal {:graph graph}))))))))))
+                                      (when graph ($ GraphModal {:graph graph}))
+                                      (when code  ($ Button {:color "warning"} "Code"))))))))))
             []
             msgs)))
 
@@ -124,7 +126,8 @@
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
-                 (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid})
+                 (when (:active? @common-info)
+                   (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))
                  (update-common-info! {:pid pid :cid cid}))))))
 
 (register-fn :get-conversation get-conversation)

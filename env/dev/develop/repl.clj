@@ -77,9 +77,18 @@
   (doseq [[a nspace] alias-map]
     (safe-alias a nspace)))
 
+(defn ^:diag undo-ns-setup!
+  "Simply undo what ns-setup! does."
+  []
+  (let [user-ns (find-ns 'user)]
+    (doseq [a (keys alias-map)]
+      (when-not (= a 'repl)
+        (ns-unalias user-ns a)))))
+
 ;;; See also https://github.com/clojure/tools.namespace?tab=readme-ov-file#warnings-for-aliases
-(defn ^:diag ns-fix-setup!
-  "Remove all the namespace aliases from the argument namespace.
+;;; I'm not sure this one does any good.
+#_(defn ^:diag ns-fix-setup!
+  "THIS MIGHT BE MORE THAN YOU WANT! Remove all the namespace aliases from the argument namespace.
    For example, when you get *Alias sutil already exists in namespace <messed-up-ns>, aliasing scheduling-tbd.sutil*
    Don't: Use this on the user namespace. <======================????
    Do:

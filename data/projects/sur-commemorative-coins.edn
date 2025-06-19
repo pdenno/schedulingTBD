@@ -1,0 +1,68 @@
+[
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_3YDKO2DuDITcfcmkuWzeADnl",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-commemorative-coins,
+                   :assistant-id "asst_2QErW3cf91GcIX95z0IfQtqJ",
+                   :timestamp #inst "2025-03-13T15:26:51.344-00:00",
+                   :agent-id :process-interview-agent-openai}
+           #:agent{:base-type :sur-commemorative-coins,
+                   :agent-type :project,
+                   :thread-id "thread_AgSVKfZLFxC26ZQt1EuxHN4H",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :pid :sur-commemorative-coins,
+                   :assistant-id "asst_qy4MqfrnevAVpjiw1XrSc9kb",
+                   :expertise "commemorative coins",
+                   :timestamp #inst "2025-04-17T16:18:29.494-00:00",
+                   :agent-id :sur-commemorative-coins-openai}],
+          :claims
+          [#:claim{:string "(project-id :sur-commemorative-coins)"}
+           #:claim{:string
+                   "(project-name :sur-commemorative-coins \"SUR Commemorative Coins\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-commemorative-coins)"}],
+          :conversations
+          [#:conversation{:id :process,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-04-17T16:18:28.140-00:00"}]}
+           #:conversation{:id :data,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-04-17T16:18:28.153-00:00"}]}
+           #:conversation{:id :resources,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-04-17T16:18:28.167-00:00"}]}
+           #:conversation{:id :optimality,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-04-17T16:18:28.181-00:00"}]}],
+          :id :sur-commemorative-coins,
+          :name "SUR Commemorative Coins"}
+]

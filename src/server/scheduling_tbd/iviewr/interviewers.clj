@@ -16,6 +16,7 @@
      [scheduling-tbd.iviewr.eads-util      :as eu :refer [combine-ds!]]
      [scheduling-tbd.iviewr.ork            :as ork]
      [scheduling-tbd.iviewr.response-utils :as ru]
+     [scheduling-tbd.minizinc              :as mzn]
      [scheduling-tbd.sutil                 :as sutil :refer [elide output-struct2clj]]
      [scheduling-tbd.util                  :as util :refer [now]]
      [scheduling-tbd.web.websockets        :as ws]
@@ -37,7 +38,7 @@
 (s/def ::chat-pair-ctx (s/and ::common-ctx
                               (s/or :surrogate ::surrogate-ctx :human ::human-ctx)))
 
-(s/def ::common-ctx    (s/keys :req-un [::client-id ::question]))
+(s/def ::common-ctx    (s/keys :req-un [::client-id ::question ::cid]))
 (s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-type ::surrogate-agent ::iviewr-agent]))
 (s/def ::human-ctx     (s/keys :req-un [:hum/responder-type ::iviewr-agent]))
 (s/def ::basic-agent (s/keys :req-un [::aid ::tid ::base-type]))
@@ -93,11 +94,10 @@
         :text is text in response to the query with surrogate tables removed.
         :table is a table map completed by the expert.
    If response is immoderate returns {:msg-type :immoderate}"
-  [{:keys [responder-type client-id cid] :as ctx}]
+  [{:keys [responder-type cid] :as ctx}]
   (let [response (chat-pair-aux ctx)]
     (agent-log (cl-format nil "{:log-comment \"[~A interviewer] (response from interviewees):~%~A\"}" (name cid) response)
                {:console? true :elide-console 130})
-    (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})
     (case responder-type
       :human (if (-> response :text llm/immoderate?)
                {:msg-type :immoderate}
@@ -129,7 +129,7 @@
 (s/def :iviewr/data-structure-refinement (s/keys :req-un [:iviewr/commit-notes :iviewr/data-structure]))
 (s/def :iviewr/commit-notes string?)
 (s/def :iviewr/data-structure map?)
-(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/budget :iviewr/interviewee-type] :opt-un [:iviewr/activity :iviewr/data-structure :iviewr/EADS]))
+(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/interviewee-type] :opt-un [:iviewr/activity :iviewr/budget :iviewr/data-structure :iviewr/EADS]))
 (s/def :iviewr/budget number?)
 (s/def :iviewr/interviewee-type #(#{:human :machine} %))
 (s/def :iviewr/activity (s/coll-of :iviewr/activity-map :kind vector?))
@@ -363,14 +363,15 @@
   "Return true if the state of conversation is such that we can now have
    discussion on the given topic."
   [pid cid]
-  (letfn [(done? [status] (= status :eads-exhausted))]
-    (let [[pstat dstat rstat _ostat]  (doall (for [c [:process :data :resources :optimality]]
-                                              (db/get-conversation-status pid c)))]
+  (let [cid (or cid (db/get-active-cid pid))] ; See chat.cljs for why cid might be nil.
+    (letfn [(done? [status] (= status :eads-exhausted))]
+      (let [[pstat dstat rstat _ostat]  (doall (for [c [:process :data :resources :optimality]]
+                                                 (db/get-conversation-status pid c)))]
       (case cid
-            :resources               (and (done? pstat) (done? dstat))
-            :optimality              (and (done? pstat) (done? dstat) (done? rstat))
-            :data                    (not (done? dstat))
-            :process                 (not (done? pstat))))))
+        :resources               (and (done? pstat) (done? dstat))
+        :optimality              (and (done? pstat) (done? dstat) (done? rstat))
+        :data                    (not (done? dstat))
+        :process                 (not (done? pstat)))))))
 
 (declare resume-conversation tell-interviewer ctx-surrogate)
 
@@ -411,9 +412,11 @@
 (defn ctx-surrogate
   "Return context updated with surrogate info."
   [{:keys [pid cid force-new?] :as ctx}]
-  (let [iviewr-agent    (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
+  (let [cid (or cid (db/get-active-cid pid)) ; See chat.cljs, which suggests there might be reasons it will send cid=nil.
+        iviewr-agent    (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
         surrogate-agent (adb/ensure-agent! {:base-type pid :pid pid} {:force-new? force-new?})
         ctx (-> ctx
+                (assoc :cid cid)
                 (assoc :responder-type :surrogate)
                 (assoc :iviewr-agent iviewr-agent)
                 (assoc :surrogate-agent surrogate-agent))]
@@ -427,6 +430,32 @@
   [{:keys [pid cid]}]
    {:responder-type :human
     :iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})})
+
+(defn resume-exit
+  "Clean things up, or at least produce a log message."
+  [state-change ctx]
+  (let [status (->> {:active?-atm @active?}
+                    (merge ctx)
+                    (merge state-change))]
+    (agent-log (cl-format nil "{:log-comment \"resume-conversation exiting. status :~%~A\"}"
+                          (with-out-str (pprint status))
+                          {:console? true}))))
+
+(defn resume-update-db-cid
+  "Update DB for a new conversation."
+  [pid cid old-cid]
+  (db/put-active-cid! pid cid)
+  (db/put-conversation-status! pid old-cid :eads-exhausted)
+  (db/put-conversation-status! pid cid :in-progress))
+
+(defn resume-update-db-eads
+  "Update DB for new EADS instructions."
+  [pid cid new-eads-id]
+  (agent-log (cl-format nil "{:log-comment \" Changing EADS instructions to ~A.\"}" new-eads-id)
+             {:console? true :level :warn})
+  (db/put-new-summary-ds! pid new-eads-id)
+  (db/put-project-active-EADS-id! pid new-eads-id) ; This will be used by :message/pursuing-EADS.
+  (db/put-active-EADS-id pid cid new-eads-id)) ; This will be used by :message/pursuing-EADS.
 
 (defn put-EADS-ds-on-msg!
   "Clean-up the EADS data structure and save it on a property :message/EADS-data-structure
@@ -456,7 +485,7 @@
                                         EADS-id  (assoc :pursuing-EADS EADS-id)))))
     (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})))
 
-(defn post-ui-actions
+(defn resume-post-ui-actions
   "Send client actions to perform such as loading graphs or (for humans) changing conversations."
   [iviewr-response pid cid {:keys [new-cid? client-id responder-type] :as _ctx}]
   (when-not (= client-id :console)
@@ -475,14 +504,20 @@
                                    "but we'd like to continue on the " (-> cid name str/capitalize) "conversation. "
                                    "Would you mind switching over there? (Use menu on the right.)")})))
 
-(defn post-db-actions!
+(defn resume-post-db-actions!
   "If the interviewer responded with a DATA-STRUCTURE-REFINEMENT (which is typical), associate the
    whole message as a string to the message which is an answer to the question."
-  [iviewr-response pid cid]
+  [iviewr-response pid cid eads-id]
+  (db/reduce-questioning-budget! pid eads-id)
   (try (when (= :DATA-STRUCTURE-REFINEMENT (:message-type iviewr-response))
          (put-EADS-ds-on-msg! pid cid iviewr-response)
          (when-let [eads-id (db/get-active-EADS-id pid cid)]
-           (combine-ds! eads-id pid)))
+           (combine-ds! eads-id pid))
+         (when (and (#{:process/flow-shop} eads-id)
+                    (eu/ds-complete? eads-id pid))
+           (when-let [minizinc (mzn/get-best-minizinc (db/get-summary-ds pid eads-id))]
+             (let [mid (db/max-msg-id pid cid)]
+               (db/update-msg pid cid mid {:message/code minizinc})))))
        (catch Exception _e
          (log! :error "Error in post-db-action!. Continuing.")
          (reset! diag {:iviewr-response iviewr-response :pid pid :cid cid}))))
@@ -492,7 +527,6 @@
    Those must be cleared before the next iteration. This function returns the argument ctx with those props removed."
   [ctx]
   (dissoc ctx :new-eads-id :new-cid? :old-cid))
-
 
 ;;; (inv/ork-review {:pid :plate-glass-ork :cid :process})
 (defn ork-review
@@ -506,48 +540,48 @@
          4) interviewing to stop (because ork conludes that no more eads-instructions apply, or forced by active? atom)."
   [pid cid]
   (ork/ensure-ork! pid)
-  (let [budget-ok? (> (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid)) 0)
-        active-eads-id (db/get-project-active-EADS-id pid)
-        active-eads-complete? (or (not budget-ok?)
+  (if (or (not @active?) (= :paused (db/get-execution-status pid)))
+    {:forced-stop true :cid cid}
+    ;; Otherwise do an analysis...
+    (let [budget-ok? (> (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid)) 0)
+          active-eads-id (db/get-project-active-EADS-id pid)
+          active-eads-complete? (or (not budget-ok?)
                                   (and active-eads-id (eu/ds-complete? active-eads-id pid)))
-        new-eads-id (when (or active-eads-complete? (not active-eads-id))
-                      (ork/get-new-EADS-id pid))
-        change-eads? new-eads-id
-        eads-id (or new-eads-id active-eads-id)
-        exhausted? (not eads-id)
-        new-cid (when new-eads-id
-                  (let [nspace (when eads-id (-> eads-id namespace keyword))]
-                    (when (not= cid nspace) nspace)))]
-    (when-not budget-ok?
-      (agent-log (cl-format nil "{:log-comment \"[ork manager] (in ork-review) switching to new EADS instructions ~A owing to budget.\"}" new-eads-id)
-                 {:console? true :level :warn}))
-    (when new-cid
-      (agent-log (cl-format nil "{:log-comment \"[ork manager] (in ork-review) changing conversation to ~A.\"}" new-cid)))
-    (let [res (cond-> {}
-                (not @active?)                    (assoc :force-stop? true)
-                exhausted?                        (assoc :exhausted? true)
-                change-eads?                      (assoc :change-eads? true)
-                new-eads-id                       (assoc :new-eads-id new-eads-id)
-                new-cid                           (assoc :new-cid? true :old-cid cid :cid new-cid)
-                (not new-cid)                     (assoc :cid cid))]
-      (agent-log (cl-format nil "{:log-comment \"[ork manager] (in ork-review) returning decision:~%~A\"}"
-                            (with-out-str (pprint res)))
-                 {:console? true})
-      res)))
+          new-eads-id (when (or active-eads-complete? (not active-eads-id))
+                        (ork/get-new-EADS-id pid))
+          change-eads? new-eads-id
+          eads-id (or new-eads-id active-eads-id)
+          exhausted? (not eads-id)
+          new-cid (when new-eads-id
+                    (let [nspace (when eads-id (-> eads-id namespace keyword))]
+                      (when (not= cid nspace) nspace)))]
+      (when-not budget-ok?
+        (agent-log (cl-format nil "{:log-comment \"[ork manager] (in ork-review) switching to new EADS instructions ~A owing to budget.\"}" new-eads-id)
+                   {:console? true :level :warn}))
+      (when new-cid
+        (agent-log (cl-format nil "{:log-comment \"[ork manager] (in ork-review) changing conversation to ~A.\"}" new-cid)))
+      (let [res (cond-> {}
+                  exhausted?                        (assoc :exhausted? true)
+                  change-eads?                      (assoc :change-eads? true)
+                  new-eads-id                       (assoc :new-eads-id new-eads-id)
+                  new-cid                           (assoc :new-cid? true :old-cid cid :cid new-cid)
+                  (not new-cid)                     (assoc :cid cid))]
+        (agent-log (cl-format nil "{:log-comment \"[ork manager] (in ork-review) returning decision:~%~A\"}"
+                              (with-out-str (pprint res)))
+                   {:console? true})
+        res))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; (inv/resume-conversation {:client-id :console :pid :sur-craft-beer :cid :process})
 (defn resume-conversation
   "Resume the interview loop for an established project and given cid."
-  [{:keys [client-id pid cid] :as ctx}]
+  [{:keys [client-id pid cid] :as ctx}] ; cid might be nil here.
   (assert (s/valid? ::client-id client-id))
-  (assert (s/valid? ::cid cid))
   (agent-log (cl-format nil "{:log-comment \"============= resume-conversation: ~A ~A ~A ========================\"}"
-                        pid cid (str (now)))
-             {:console? true :level :debug})
+                        pid cid (str (now))) {:console? true :level :debug})
   (if (ready-for-discussion? pid cid)
     (try
-      (let [{:keys [iviewr-agent] :as ctx} (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))
+      (let [{:keys [iviewr-agent cid] :as ctx} (if (surrogate? pid) (merge ctx (ctx-surrogate ctx)) (merge ctx (ctx-human ctx)))
             history (ork/conversation-history pid)]
         ;; Things to do when r-c is called for actual resuming, instead of starting fresh.
         ;; ToDo: It would be better to know what has been seen, but when OpenAI assistants go away this is going to be necessar always anyway!
@@ -556,35 +590,23 @@
           (tell-interviewer (db/get-EADS-instructions eads-id) iviewr-agent cid))
 
         (loop [ctx ctx] ; ToDo: currently not used!
-          (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?]} (ork-review pid cid)]
+          (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?] :as state-change} (ork-review pid cid)]
             (if (or exhausted? force-stop?)
-              (agent-log (cl-format nil "{:log-comment \"resume-conversation exiting. ctx:~%~A\"}"
-                                    (with-out-str (pprint ctx)))
-                         {:console? true})
+              (resume-exit state-change ctx)
               (let [eads-id (or new-eads-id (db/get-active-EADS-id pid cid))]
-                (when new-cid?
-                  (db/put-active-cid! pid cid)
-                  (db/put-conversation-status! pid old-cid :eads-exhausted)
-                  (db/put-conversation-status! pid cid :in-progress))
+                (when new-cid? (resume-update-db-cid pid cid old-cid))
                 (when change-eads?
-                  (agent-log (cl-format nil "{:log-comment \" Selecting EADS, new-eads-id = ~A.\"}" new-eads-id)
-                             {:console? true :level :warn})
-                  (db/put-new-summary-ds! pid new-eads-id)
-                  (db/put-project-active-EADS-id! pid new-eads-id) ; This will be used by :message/pursuing-EADS.
-                  (db/put-active-EADS-id pid cid new-eads-id) ; This will be used by :message/pursuing-EADS.
+                  (resume-update-db-eads pid cid new-eads-id)
                   (tell-interviewer (db/get-EADS-instructions new-eads-id) iviewr-agent cid))
-                (let [conversation (q-and-a iviewr-agent pid cid ctx) ; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
+                ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
+                (let [conversation (q-and-a iviewr-agent pid cid ctx)
                       expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
                       ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
                       iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
-                                                        iviewr-agent
-                                                        cid
-                                                        {:tries 2
-                                                         :test-fn output-struct2clj})]
-                    (db/reduce-questioning-budget! pid eads-id)
+                                                        iviewr-agent cid {:tries 2 :test-fn output-struct2clj})]
                     (update-db-conversation! pid cid conversation)
-                    (post-ui-actions  iviewr-response pid cid ctx)  ; show graphs and tables, tell humans to switch conv.
-                    (post-db-actions! iviewr-response pid cid)) ; associate DS refinement with msg.
+                    (resume-post-ui-actions  iviewr-response pid cid ctx)  ; show graphs and tables, tell humans to switch conv.
+                    (resume-post-db-actions! iviewr-response pid cid eads-id)) ; associate DS refinement with msg.
                   (recur (clear-ctx-ephemeral ctx)))))))
       (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))
     (find-appropriate-conv-and-redirect ctx)))

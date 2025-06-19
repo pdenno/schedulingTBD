@@ -76,7 +76,13 @@
    :text-function-agent
    {:base-type :text-function-agent
     :agent-type :system
-    :instruction-path "resources/agents/text-function-agent.txt"}})
+    :instruction-path "resources/agents/text-function-agent.txt"}
+
+   :uniform-durations
+   {:base-type :uniform-durations
+    :agent-type :system
+    :model-class :mini
+    :instruction-path "resources/agents/uniform-durations.txt"}})
 
 (def sys-agent? (-> system-agents-and-bases keys set))
 
@@ -127,6 +133,7 @@
 (def actual-agents-and-bases
   (-> system-agents-and-bases add-iviewrs-instructions add-agent-id drop-non-agent-keys keys-in-agent-ns))
 
+;;; (sa/force-new-system-agent! :uniform-durations)
 ;;; (sa/force-new-system-agent! :response-analysis-agent)
 ;;; (sa/force-new-system-agent! :text-function-agent)
 ;;; (sa/force-new-system-agent! :text-to-var)

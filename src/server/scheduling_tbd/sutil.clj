@@ -251,11 +251,16 @@
 
 ;;; This became complicated once I couldn't use strict schema results.
 (defn output-struct2clj
-  "Translate the OpenAI API output structure (a string) to a map with keyword keys."
+  "Translate the OpenAI API output structure (a string) to clj object, where JSON objects are given keyword keys."
   [s-in]
   (try
-    (let [s (remove-preamble s-in)]
-      (update-keys (ches/parse-string s) keyword))
+    (let [s (remove-preamble s-in)
+          m (ches/parse-string s)]
+      (letfn [(upk [obj]
+                (cond (map? obj)    (reduce-kv (fn [m k v] (assoc m (keyword k) (upk v))) {} obj)
+                      (vector? obj) (mapv upk obj)
+                      :else         obj))]
+        (upk m)))
     (catch Exception _e
       (throw (ex-info  "Could not read object returned from OpenAI (should be a string):" {:s-in s-in })))))
 

@@ -59,7 +59,8 @@
            :timestamp (now)
            :agent-id (-> pid name (str "-" (name llm-provider)) keyword)}))
 
-;;; (sur/start-surrogate! {:product "optical fiber" :client-id (ws/recent-client!)})
+;;; (sur/start-surrogate! {:product "craft beer" :client-id :console})
+;;; (sur/start-surrogate! {:product "craft beer" :client-id (ws/recent-client!)})
 (defn start-surrogate!
    "Create a surrogate agent and ask client to :load-proj.
     :load-proj will cause the client to get-conversation (http and chat). The chat part will :resume-conversation (call back to server).

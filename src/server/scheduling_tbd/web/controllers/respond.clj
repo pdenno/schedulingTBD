@@ -24,6 +24,7 @@
         pid (keyword project-id)
         cid (if cid (keyword cid) (db/get-active-cid pid))
         eid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid))]
+    (assert (#{:process :data :resources :optimality} cid))
     (d/transact (connect-atm pid) {:tx-data [{:db/id eid :project/active-conversation cid}]})
     (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
     (let [eid (db/project-exists? pid)

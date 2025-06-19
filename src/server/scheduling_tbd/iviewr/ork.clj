@@ -164,7 +164,7 @@
                           :scheduling-challenges
                           (map keyword)
                           (mapv challenge-key2sentence))
-          itype (if (some #(= (first %) 'surrogate) (db/get-claims pid)) :surrogate :human)
+          itype (if (some #(= (first %) 'surrogate) (db/get-claims pid)) :machine :human)
           activities (conversation-activity pid)]
       (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
       (cond-> {:message-type :CONVERSATION-HISTORY}

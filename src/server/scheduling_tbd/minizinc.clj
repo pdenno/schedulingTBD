@@ -1,18 +1,45 @@
 (ns scheduling-tbd.minizinc
   "Functions for creating MiniZinc from templates and executing with solvers."
   (:require
+   [camel-snake-kebab.core   :as csk]
    [clojure.edn              :as edn]
    [clojure.pprint           :refer [cl-format]]
    [clojure.spec.alpha        :as s]
    [clojure.string           :as str]
-   [scheduling-tbd.db        :as db]
-   [taoensso.telemere.timbre        :as log]))
+   [scheduling-tbd.agent-db  :as adb]
+   [scheduling-tbd.sutil     :as sutil]
+   [taoensso.telemere        :as tel :refer [log!]]))
 
-;;; System thoughts: Given minimal-mzn-for-process, you could then ask to
+;;; ToDo: integrate extreme-durs-range?
+;;; ToDo: Given minimal-mzn-for-process, you could then ask to
 ;;;   - allow parallelism where feasible
-;;;   - multiple jobs with
+;;;   - add data from :data/orm.
 
 (def ^:diag diag (atom nil))
+
+(defn uniform-durations
+  "Use the uniform-durations agent to turn durations such as produced by :process/flow-shop EADS instructions,
+   for example:
+
+   {:units 'hours', :value-string '2 to 4 (standard), 3 to 6 (for highly residual batches), 4 to 6 (for allergen-containing batches)'}
+
+   into structures such:
+   {:quantity/low {:quantity/units 'hours',  :quantity/value-string '2'}
+    :quantity/high {:quantity/units 'hours', :quantity/value-string '6'}}"
+  [input-clj]
+  (letfn [(unit2k [obj]
+            (cond (map? obj)        (reduce-kv (fn [m k v]
+                                                 (if (= k :quantity/units)
+                                                   (assoc m k (keyword v))
+                                                   (assoc m k (unit2k v))))
+                                               {}
+                                               obj)
+                  (vector? obj)     (mapv unit2k obj)
+                  :else             obj))]
+  (-> (adb/query-agent (adb/ensure-agent! :uniform-durations)
+                       (sutil/clj2json-pretty input-clj))
+      (sutil/output-struct2clj)
+      unit2k)))
 
 (defn serial-precedence-constraints
   "Return constraints ensuring that the next task can't start until the previous one ends."
@@ -75,6 +102,7 @@
 (defn number-heuristic
   "Produce some kind of number out of something that might not be a number."
   [s]
+  (reset! diag s)
   (let [val (edn/read-string s)]
     (if (number? val)
       val
@@ -84,35 +112,37 @@
           (#{"several"} st)     5,
           :else                 -1)))))
 
-(defn process-dur-avg
+(defn average-duration
   "Return the argument the process definition with where :process/duration in the case where
    it has :quantity-range/low and :quantity-range/high values with the average using units of :quantity-range/low.
    Where these keys are not present, return the argument untouched."
-  [{:process/keys [duration] :as process}]
-  (if (contains? duration :quantity-range/low)
-    (let [low-uom (-> duration :quantity-range/low :quantity/units)
-          low-val (-> duration :quantity-range/low :quantity/value-string number-heuristic)
-          high-val (convert-duration low-uom (:quantity-range/high duration))]
-      (assoc process :process/duration {:quantity/value-string (cl-format nil "~,3f" (/ (+ high-val low-val) 2.0))
-                                        :quantity/units low-uom}))
-    process))
+  [dur]
+  (if (contains? dur :quantity/units)
+    dur
+    (let [low-uom (-> dur :quantity-range/low :quantity/units)
+          low-val (-> dur :quantity-range/low :quantity/value-string number-heuristic)
+          high-val (convert-duration low-uom (:quantity-range/high dur))]
+      {:quantity/value-string (cl-format nil "~,3f" (/ (+ high-val low-val) 2.0))
+       :quantity/units low-uom})))
 
 (defn extreme-dur-range?
-  "Return the units found in the case that the UoM vary over a unmanageably wide range."
-  [proc-maps]
-  (let [units? (->> proc-maps (mapv #(-> % :process/duration :quantity/units)) set)]
+  "Argument is a vector of duration maps and duration-range maps
+   Return the units found in the case that the UoM vary over a unmanageably wide range."
+  [durs]
+  (let [units? (->> durs (mapv :quantity/units) set)]
     (cond (and (units? :minutes) (or (units? :days)  (units? :weeks) (units? :months))) (vec units?)
           (and (units? :hours)   (or (units? :weeks) (units? :months)))                 (vec units?))))
 
 ;;; ToDo: A candidate for an agent???
 (defn best-uom
-  "Apply a heuristic to return what seems to be the best common unit of measure for scheduling.
+  "Argument is a vector of duration maps and duration-range maps
+   Apply a heuristic to return what seems to be the best common unit of measure for scheduling.
    This heuristic assumes that the process-maps don't contain quantity-ranges.
    For example, process-dur-avg has been applied to transform the range to the average."
-  [proc-maps]
-  (when-let [units (extreme-dur-range? proc-maps)]
-    (log/warn "Extreme range of units. May want to ignore or aggregate some processes:" units))
-  (let [units-found? (->> proc-maps (mapv #(-> % :process/duration :quantity/units)) set)]
+  [durs]
+  (when-let [units (extreme-dur-range? durs)]
+    (log! :warn (str "Extreme range of units. May want to ignore or aggregate some processes:" units)))
+  (let [units-found? (->> durs (mapv :quantity/units) set)]
     ;; ToDo: Not much of a heuristic yet!
     (cond (every? #(= % :minutes) units-found?) :minutes
           (units-found? :hours) :hours
@@ -121,24 +151,23 @@
           (units-found? :weeks) :days
           (units-found? :months) :days)))
 
-(defn round-dur
+#_(defn round-dur
   "Replace the dur-string with a rounded integer value."
-  [proc]
-  (update-in proc [:process/duration :quantity/value-string] #(-> % edn/read-string Math/round str)))
+  [dur]
+  (update dur :quantity/value-string #(-> % edn/read-string Math/round str)))
 
 ;;; The full line looks like this:
 ;;; array [Product, Task] of int: taskDuration = [|1, 2, 1, 1, 1, 0.50|];
 ;;; We want the part starting at 'int:' and with the ']' before the semicolon.
 (defn task-durations
-  "Return a map of :durs and :uom where :durs and :type where
+  "Argument is a vector of duration maps and duration-range maps.
+   Return a map of :durs and :uom where :durs and :type where
     - :durs a vector of string representing numbers (float or int) indicating quantities of time,
     - :uom is a map describing a unit of measure, and
-    - :type is either :float or :int indicating how :durs is represented.
-   Argument is some vector of process object in DB format."
-  [procs]
-  (let [procs (map process-dur-avg procs)
-        uom (best-uom procs)
-        durs (mapv #(convert-duration uom %) (map :process/duration procs))
+    - :type is either :float or :int indicating how :durs is represented."
+  [durs]
+  (let [uom (best-uom durs)
+        durs (mapv #(convert-duration uom %) durs)
         type (if (not-every? integer? durs) :float :int)
         dur-string (if (= type :int)
                      (cl-format nil "[|~{~A~^, ~}|]" durs)
@@ -181,8 +210,19 @@
             []
             template-maps)))
 
-;;; Need multiple of these. What is used depends on what EADS were pursued.
-#_(defn minimal-mzn-for-process
+(def cached-durs
+  "Temporary, while developing minimal-mzn-for-process"
+  [#:quantity{:units :minutes, :value-string "30"}
+   #:quantity-range{:low #:quantity{:units :hours, :value-string "1.5"}, :high #:quantity{:units :hours, :value-string "2"}}
+   #:quantity-range{:low #:quantity{:units :hours, :value-string "1"}, :high #:quantity{:units :hours, :value-string "1.5"}}
+   #:quantity-range{:low #:quantity{:units :minutes, :value-string "30"}, :high #:quantity{:units :minutes, :value-string "60"}}
+   #:quantity-range{:low #:quantity{:units :days, :value-string "7"}, :high #:quantity{:units :days, :value-string "14"}}
+   #:quantity-range{:low #:quantity{:units :days, :value-string "7"}, :high #:quantity{:units :days, :value-string "30"}}
+   #:quantity-range{:low #:quantity{:units :hours, :value-string "2"}, :high #:quantity{:units :hours, :value-string "4"}}
+   #:quantity-range{:low #:quantity{:units :days, :value-string "1"}, :high #:quantity{:units :days, :value-string "2"}}
+   #:quantity-range{:low #:quantity{:units :hours, :value-string "2"}, :high #:quantity{:units :hours, :value-string "6"}}])
+
+(defn minimal-mzn-for-process
   "Return a complete but minimal MiniZinc specification for the project's process.
    It is minimal in the following sense:
     - It is for running one product or batch (i.e. one job).
@@ -190,15 +230,20 @@
     - The resources are available.
     - Parallel use of anything. It is all serial.
    The data that it must provide should be similar to that of the :test-data key found in
-   the minimal-process.edn key :test-data, the keys of which are :sub-keys."
-  [pid]
+   the minimal-process.edn key :test-data, the keys of which are :sub-keys.
+   Argument is a summary DS, such as from :process/flow-shop."
+  [ds]
   (let [template (-> "data/templates/minimal-process.edn" slurp edn/read-string)
-        procs (->> (db/get-process pid :initial-unordered) ; <================== Get it from :process/flow-shop EADS, etc.
-                   :process/sub-processes
-                   (remove #(:process/supply-chain? %))
-                   vec)
-        var-names (map :process/var-name procs)
-        {:keys [dur-string dur-type uom]} (task-durations procs)]
+        procs (->> (:subprocesses ds)
+                   #_(remove #(:process/supply-chain? %)) ; ToDo: this will have to be pruned by conversation?
+                   #_vec)
+        var-names (->> procs
+                       (map :process-id)
+                       (map #(str/replace % #"\s+" "-"))
+                       (mapv csk/->camelCase))
+        durs cached-durs #_(->> procs (mapv :duration) (mapv uniform-durations))
+        avg-durs (mapv average-duration durs)
+        {:keys [dur-string dur-type uom]} (task-durations avg-durs)]
     (->>
      (sub-in-template
       template
@@ -211,3 +256,8 @@
        :task-serial-constraints  (serial-precedence-constraints var-names)})
      (interpose "\n")
      (apply str))))
+
+(defn get-best-minizinc
+  "Given various information, return the best minizinc, or nil if none."
+  [{:keys [ds]}]
+  (minimal-mzn-for-process ds))

@@ -65,11 +65,12 @@
                   :agent-type :system,
                   :response-format-path
                   "resources/agents/response-analysis-format.edn",
+                  :thread-id "thread_p4i8WPiS7ag78H5hWhSuTXIZ",
                   :llm-provider :openai,
                   :instruction-path
                   "resources/agents/response-analysis-agent.txt",
-                  :assistant-id "asst_aZfupuGclbRTmos9elKR2VZy",
-                  :timestamp #inst "2025-06-04T12:45:11.336-00:00",
+                  :assistant-id "asst_6KIYxR8bwSnOB69zyDZVQdPg",
+                  :timestamp #inst "2025-06-17T21:47:56.535-00:00",
                   :agent-id :response-analysis-agent}
           #:agent{:base-type :orchestrator-agent,
                   :agent-type :shared-assistant,
@@ -94,11 +95,12 @@
                   :agent-type :system,
                   :response-format-path
                   "resources/agents/text-to-var-response-format.edn",
+                  :thread-id "thread_wzNqn7ooP5CXOmtojDZvStu8",
                   :model-class :mini,
                   :llm-provider :openai,
                   :instruction-path "resources/agents/text-to-var.txt",
-                  :assistant-id "asst_0k6Tszv6bkrEoGmK3irgnYUH",
-                  :timestamp #inst "2025-06-04T12:45:20.786-00:00",
+                  :assistant-id "asst_SqMEyS0LGBjxShxXc01RqyhA",
+                  :timestamp #inst "2025-06-17T21:44:16.139-00:00",
                   :agent-id :text-to-var}
           #:agent{:base-type :optimality-interview-agent,
                   :agent-type :shared-assistant,
@@ -109,14 +111,15 @@
                   :assistant-id "asst_akK3OGJBOiXtsFcH4CAWdsIe",
                   :timestamp #inst "2025-06-04T12:45:21.614-00:00",
                   :agent-id :optimality-interview-agent}
-          #:agent{:agent-id :text-function-agent,
+          #:agent{:base-type :text-function-agent,
                   :agent-type :system,
-                  :assistant-id "asst_TJulpU1N3sPdNw7gss91zyu6",
-                  :base-type :text-function-agent,
+                  :thread-id "thread_ilD0hoBKfjL0TxlC2vNsPjOq",
+                  :llm-provider :openai,
                   :instruction-path
                   "resources/agents/text-function-agent.txt",
-                  :llm-provider :openai,
-                  :timestamp #inst "2025-06-04T12:45:21.932-00:00"}
+                  :assistant-id "asst_8SNTc7KEvm1sIxehCNAT248Z",
+                  :timestamp #inst "2025-06-17T21:48:06.792-00:00",
+                  :agent-id :text-function-agent}
           #:agent{:base-type :process-interview-agent,
                   :agent-type :shared-assistant,
                   :model-class :gpt,

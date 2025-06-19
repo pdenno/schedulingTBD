@@ -16,6 +16,7 @@
    [scheduling-tbd.specs :as specs]
    [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
    [scheduling-tbd.util :as util :refer [now]]
+   [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere :refer [log!]]))
 
 (def db-schema-agent+
@@ -245,9 +246,10 @@
    :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "the original paragraph written by the user describing what she/he wants done."}
-   :project/summary-dstructs
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "'summary' data structures indexed by their EADS-id, :dstruct/id."}
+   :project/execution-status ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
+        :doc ":running means resume-conversation can work (not that it necessarily is)
+              :paused means resume-conversation will not work."}
    :project/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
         :doc "a lowercase kebab-case keyword naming a project; unique to the project."}
@@ -262,11 +264,9 @@
         :doc (str "The thread-id of orchestrator agent.\n"
                   "When this does not match the current ork-agent, "
                   "the agent needs a more expansive CONVERSATION-HISTORY message for the conversation.")}
-   :project/interviewer-tid ; ToDo: This hasn't been implemented yet, I think. The ork one has. See ork/get-new-EADS-id.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc (str "The thread-id of the current interviewer agent.\n"
-                  "When this does not match the current intervierwer agent tid, "
-                  "the agent needs a more expansive CONVERSATION-HISTORY message for the conversation.")}
+   :project/summary-dstructs
+   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
+        :doc "'summary' data structures indexed by their EADS-id, :dstruct/id."}
    :project/surrogate
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
         :doc "the project's surrogate object, if any."}
@@ -286,14 +286,41 @@
 (defn project-exists?
   "If a project with argument :project/id (a keyword) exists, return the root entity ID of the project
    (the entity id of the map containing :project/id in the database named by the argumen project-id)."
+  ([pid] (project-exists? pid nil))
+  ([pid warn?]
+   (assert (keyword? pid))
+   (let [res (and (some #(= % pid) (sutil/db-ids))
+                  (d/q '[:find ?e .
+                         :in $ ?pid
+                         :where
+                         [?e :project/id ?pid]]
+                       @(connect-atm pid) pid))]
+     (when (and warn? (not res))
+       (log! :warn (str "No project found for pid = " pid)))
+     res)))
+
+(defn get-execution-status
+  "Returns the execution status keyword (currently just :running or :paused)."
   [pid]
-  (assert (keyword? pid))
-  (when (some #(= % pid) (sutil/db-ids)) ; (sutil/db-ids) includes non-project IDs.
-    (d/q '[:find ?e .
-           :in $ ?pid
-           :where
-           [?e :project/id ?pid]]
-         @(connect-atm pid) pid)))
+  (d/q '[:find ?stat .
+         :where [_ :project/execution-status ?stat]]
+       @(connect-atm pid)))
+
+(defn put-execution-status!
+  "Returns the execution status keyword (currently just :running or :paused)."
+  [pid status]
+  (assert (#{:running :paused} status))
+  (when-let [eid (project-exists? pid true)]
+    (d/transact (connect-atm pid) {:tx-data [{:db/id eid
+                                              :project/execution-status status}]})))
+
+(defn set-execution-status!
+  "This is just a call to  put-execution-status! for use by clients.
+   It is ws/registered."
+  [{:keys[pid status]}]
+  (assert (#{:running :paused} status))
+  (log! :info (str "Setting execution-status to " status))
+  (put-execution-status! pid status))
 
 (defn get-project-name [pid]
   (when-let [eid (project-exists? pid)]
@@ -457,6 +484,7 @@
      (d/transact (connect-atm id) db-schema-proj)
      (d/transact (connect-atm id) {:tx-data [{:project/id id
                                               :project/name pname
+                                              :project/execution-status :running
                                               :project/agents (->> (get-system)
                                                                    :system/agents
                                                                    (filterv #(= (:agent/agent-type %) :shared-assistant))
@@ -852,27 +880,6 @@
         (d/transact (connect-atm pid) {:tx-data [(merge {:db/id eid} info)]})
         (log! :warn (str "Could not find msg for update-msg: pid = " pid " cid = " cid " mid = " mid))))))
 
-;;; ----------------------------------------- Budget ---------------------------------------------
-#_(defn get-budget
-    "Return the :conversation/interviewer-budget."
-    [pid cid]
-    (d/q '[:find ?budget .
-           :in $ ?cid
-           :where
-           [?e :conversation/id ?cid]
-           [?e :conversation/interviewer-budget ?budget]]
-         @(connect-atm pid) cid))
-
-#_(defn put-budget!
-    [pid cid val]
-    (let [conn-atm (connect-atm pid)
-          eid (d/q '[:find ?eid .
-                     :in $ ?cid
-                     :where [?eid :conversation/id ?cid]] @conn-atm cid)]
-      (if eid
-        (d/transact conn-atm {:tx-data [{:db/id eid :conversation/interviewer-budget val}]})
-        (log! :error (str "No such conversation: " cid)))))
-
 ;;; ----------------------------------------- EADS ---------------------------------------------
 (defn system-EADS?
   "Return a set of EADS-ids (keywords) known to the system db. (Often used as a predicate.)"
@@ -1083,6 +1090,7 @@
   []
   (register-project-dbs)
   (register-db :system (db-cfg-map {:type :system}))
+  (ws/register-ws-dispatch :set-execution-status! set-execution-status!)
   {:sys-cfg (db-cfg-map {:type :system})})
 
 (defstate sys&proj-database-cfgs

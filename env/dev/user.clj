@@ -7,7 +7,7 @@
    [clojure.string]
    [clojure.spec.alpha :as s]
    [clojure.tools.namespace.repl :as tools-ns :refer [set-refresh-dirs]]
-   [develop.repl :refer [ns-setup! ns-fix-setup!]] ; for use at REPL.
+   [develop.repl :refer [ns-setup! undo-ns-setup!]] ; for use at REPL.
    [develop.dutil]
    [expound.alpha :as expound]
    [mount.core :as mount]
@@ -17,7 +17,7 @@
    [scheduling-tbd.web.handler]                            ; for mount, defines rm.server.config/config, and router stuff.
    [taoensso.telemere :as tel :refer [log!]]))
 
-[server llm-tools ns-setup! ns-fix-setup!] ; for mount
+[server llm-tools ns-setup! undo-ns-setup!] ; for mount
 
 ;;; If you get stuck do: (clojure.tools.namespace.repl/refresh)
 
@@ -33,9 +33,13 @@
 (defn ^:admin start
   "Start the web server"
   []
-  (let [res (mount/start)
-        info (str "   " (clojure.string/join ",\n    " (:started res)))]
-    (log! :info (str "started:\n" info))))
+  (try
+    (let [res (mount/start)
+          info (str "   " (clojure.string/join ",\n    " (:started res)))]
+      (log! :info (str "started:\n" info)))
+    (catch Exception e
+      (log! :error (str "start might fail with a UnresolvedAddressException if the internet connection is bad.\n" e)))))
+
 
 (defn stop
   "Stop the web server"

@@ -287,14 +287,14 @@
    Note that we call it 'domain-expert' rather than 'user' because the role is just that, and it can be
    filled by a human or surrogate expert."
   [{:keys [msg-text table client-id promise-keys] :as msg}]
-  (log! :debug (str "domain-expert-says: " msg))
+  (log! :info (str "domain-expert-says: " msg))
   (if-let [prom-obj (select-promise promise-keys)]
     (do (log! :debug (str "Before resolve!: prom-obj = " prom-obj))
         (p/resolve! (:prom prom-obj) (cond-> {:msg-type :expert-response}
                                        msg-text (assoc :text msg-text)
                                        table (assoc :table table)))
         (clear-keys client-id [(:p-key prom-obj)]))
-    (log! :error "domain-expert-says: no p-key (e.g. no question in play)")))
+    (log! :warn "domain-expert-says: no p-key (e.g. no question in play). May be starting.)")))
 
 ;;;-------------------- Sending questions, tables, and graphs etc. to a client --------------------------
 (defn send-to-client
@@ -306,7 +306,7 @@
   [{:keys [client-id promise? dispatch-key] :as content}]
   (s/assert ::specs/chat-msg-obj content)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
-  (if (= :client-id :console)
+  (if (= client-id :console)
     (log! :info (str "send-to-client (console):\n" (with-out-str (pprint content))))
     (if-let [out (->> client-id (get @socket-channels) :out)]
       (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))

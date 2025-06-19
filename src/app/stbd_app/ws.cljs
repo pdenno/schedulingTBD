@@ -152,6 +152,7 @@
     :close-channel             ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
     :domain-expert-says        ; Human user wrote at the chat prompt (typically answering a question).
     :interviewer-busy?         ; Enable/disable various UI features depending on whether interviewer is busy.
+    :set-execution-status!     ; Set :project/execution-status in the project DB. (:paused :running)
     :ping                      ; Ping server.
     :resume-conversation       ; Restart interviewing. Done after client receives a :load-proj, and when switches conversation.
     :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation

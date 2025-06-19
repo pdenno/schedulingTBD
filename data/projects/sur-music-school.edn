@@ -1,0 +1,210 @@
+[
+#:project{:conversations
+          [#:conversation{:active-EADS-id :process/timetabling,
+                          :id :process,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-10T23:17:38.705-00:00"}
+                           #:message{:content
+                                     "We understand that you have a special request to us:\nYou'd like to create a scheduling system, but you aren't a manufacturer.\nOkay, I think we can still help. What's the scheduling problem you are trying to solve?",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:query :warm-up],
+                                     :time
+                                     #inst "2025-06-10T23:17:38.849-00:00"}
+                           #:message{:answers-question 2,
+                                     :content
+                                     "Thanks! Yes, we run a music school and we'd like a system that helps us schedule use of our practice rooms with students and instructors.",
+                                     :from :surrogate,
+                                     :id 3,
+                                     :tags [:response :warm-up],
+                                     :time
+                                     #inst "2025-06-10T23:17:38.873-00:00"}
+                           #:message{:content
+                                     "\nDo your practice rooms and instructors need to be scheduled for specific time slots to avoid conflicts? Also, do you have any repeating patterns in the schedules, such as weekly lessons?",
+                                     :from :system,
+                                     :id 4,
+                                     :pursuing-EADS
+                                     :process/scheduling-problem-type,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-10T23:18:34.051-00:00"}
+                           #:message{:answers-question 4,
+                                     :pursuing-EADS
+                                     :process/scheduling-problem-type,
+                                     :from :surrogate,
+                                     :id 5,
+                                     :time
+                                     #inst "2025-06-10T23:18:34.072-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/scheduling-problem-type, :commit-notes \"The problem was identified as a timetabling problem with a cyclical component due to the weekly recurring lessons. The system also needs to handle occasional adjustments.\", :data-structure {:principal-problem-type \"TIMETABLING-PROBLEM\", :problem-components [\"TIMETABLING-PROBLEM\"], :continuous? false, :cyclical? true}}",
+                                     :content
+                                     "\nYes, both practice rooms and instructors need to be scheduled for specific time slots to avoid conflicts. Each instructor and practice room can only be in use by one student at a time, so careful scheduling is crucial. Most students have weekly recurring lessons, making much of the schedule predictable once initial arrangements are made. However, some students or instructors may need occasional adjustments, making it important to have a flexible system. Lessons typically run in consistent time slots, like 30, 45, or 60 minutes, allowing for structured planning."}
+                           #:message{:content
+                                     "\nWhat are the different types of lessons or events you need to schedule in your music school (e.g., individual lessons, group lessons, practice sessions)? Could you also indicate how many students and instructors are typically involved in each event type?",
+                                     :from :system,
+                                     :id 6,
+                                     :pursuing-EADS
+                                     :process/timetabling,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-10T23:19:25.911-00:00"}
+                           #:message{:answers-question 6,
+                                     :pursuing-EADS
+                                     :process/timetabling,
+                                     :from :surrogate,
+                                     :id 7,
+                                     :time
+                                     #inst "2025-06-10T23:19:25.933-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/timetabling, :commit-notes \"Added two event types: 'individual-lessons' and 'room-reservations'. Defined their constituents and durations based on the interviewee's input.\", :data-structure {:event-types [{:event-type-id \"individual-lessons\", :event-constituents [{:constituent-type \"room-type-music\", :base-type \"place\", :comment \"Practice rooms designated for music lessons.\"} {:constituent-type \"student-type\", :base-type \"human\"} {:constituent-type \"instructor-type\", :base-type \"human\"}], :periodicity {:interval {:units \"week\", :value-string \"1\"}, :occurrences {:value-string \"variable\", :comment \"Frequency depends on each student's arrangement with their instructor.\"}}, :occurrence-assignment {:val [\"30min-slots\" \"45min-slots\" \"60min-slots\"], :comment \"The lessons are scheduled in fixed durations of 30, 45, or 60 minutes.\"}} {:event-type-id \"room-reservations\", :event-constituents [{:constituent-type \"room-type-music\", :base-type \"place\"} {:constituent-type \"instructor-type\", :base-type \"human\"}], :occurrence-assignment {:val \"opportunistic\", :comment \"Room reservations are made as needed and are not bound to a regular schedule.\"}, :opportunistic? true}]}}",
+                                     :content
+                                     "\nWe only schedule two types of events: **individual lessons** and <b>room reservations by instructors</b>. \n\n1. <b>Individual Lessons</b>: \n   - One-on-one between a student and an instructor.\n   - Typically, we schedule 30, 45, or 60-minute lessons.\n   - Only one instructor and one student are involved in each session.\n   \n2. <b>Room Reservations</b>:\n   - Instructors may reserve practice rooms for their own purposes (e.g., personal practice, preparing materials, etc.).\n   - These do not involve students.\n\nWe do not schedule group lessons or general practice sessions for students—only the two specific types mentioned above."}],
+                          :status :in-progress}
+           #:conversation{:id :data,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-10T23:17:38.735-00:00"}],
+                          :status :not-started}
+           #:conversation{:id :resources,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-10T23:17:38.769-00:00"}],
+                          :status :not-started}
+           #:conversation{:id :optimality,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-10T23:17:38.796-00:00"}],
+                          :status :not-started}],
+          :active-conversation :process,
+          :active-EADS-id :process/timetabling,
+          :agents
+          [#:agent{:base-type :data-interview-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-music-school,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
+                   :instruction-path
+                   "/tmp/stbd-agents/data-interviewer.txt",
+                   :timestamp #inst "2025-06-03T20:46:51.756-00:00",
+                   :agent-id :data-interview-agent-openai}
+           #:agent{:base-type :data-interview-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-music-school,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
+                   :instruction-path
+                   "/tmp/stbd-agents/data-interviewer.txt",
+                   :assistant-id "asst_XggLB4gCbXfbtlxEPwSxwLCr",
+                   :timestamp #inst "2025-06-04T12:45:30.649-00:00",
+                   :agent-id :data-interview-agent}
+           #:agent{:base-type :orchestrator-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :thread-id "thread_rMuoL6MFNIDrp1G1Icw7NoH6",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-music-school,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/EADS/flow-shop.json"
+                    "resources/agents/iviewrs/EADS/job-shop--classifiable.json"
+                    "resources/agents/iviewrs/EADS/job-shop--unique.json"
+                    "resources/agents/iviewrs/EADS/job-shop.json"
+                    "resources/agents/iviewrs/EADS/orm.json"
+                    "resources/agents/iviewrs/EADS/scheduling-problem-type.json"
+                    "resources/agents/iviewrs/EADS/timetabling.json"],
+                   :instruction-path
+                   "resources/agents/orchestrator.txt",
+                   :assistant-id "asst_ta0kfPBwzaHOsgGyg7SulRA6",
+                   :timestamp #inst "2025-06-10T23:19:26.033-00:00",
+                   :agent-id :orchestrator-agent}
+           #:agent{:base-type :optimality-interview-agent,
+                   :agent-type :shared-assistant,
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-music-school,
+                   :instruction-path
+                   "/tmp/stbd-agents/optimality-interviewer.txt",
+                   :assistant-id "asst_akK3OGJBOiXtsFcH4CAWdsIe",
+                   :timestamp #inst "2025-06-04T12:45:21.614-00:00",
+                   :agent-id :optimality-interview-agent}
+           #:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_N2kBdSoaHxUyqwXNvz2xCw7Z",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-music-school,
+                   :instruction-path
+                   "/tmp/stbd-agents/process-interviewer.txt",
+                   :assistant-id "asst_7IvFTCVP0rLKOOcdCa6OQn63",
+                   :timestamp #inst "2025-06-10T23:17:49.159-00:00",
+                   :agent-id :process-interview-agent}
+           #:agent{:base-type :resources-interview-agent,
+                   :agent-type :shared-assistant,
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-music-school,
+                   :instruction-path
+                   "/tmp/stbd-agents/resources-interviewer.txt",
+                   :assistant-id "asst_Z8OIRCCEGCPNfQOnuSGsb85V",
+                   :timestamp #inst "2025-06-04T12:45:22.720-00:00",
+                   :agent-id :resources-interview-agent}
+           #:agent{:base-type :sur-music-school,
+                   :agent-type :project,
+                   :thread-id "thread_DzY17O307qBptsLUCS2rVxiN",
+                   :model-class :gpt,
+                   :instruction-string
+                   "You run a private music school. Mostly students of your school are from local middle schools and high schools.\nYour task is to answer questions about scheduling lessons at this school, committing to realistic details you make up rather than speaking about music schools in general.\nKeep your answers short, typically less than 10 sentences; the interviewer will get the whole story by asking additional question that follow from your reply.\nYou only schedule two kinds of things: lessons for individual students, and explicit reservations for rooms by instructors for various reasons we don't care about.\nUntil today you've been scheduling student lessons by fiddling with a spreadsheet.\nBut that is error-prone and time consuming. The problem is that you need to bring each student together with their instructor\nin a room having the right equipment. (Only some practice rooms have pianos or drums.) Of course, instructors don't want\nto come in to teach just one student. Most instructors would like to do a block of a few hours of lessons on days they come in.\nLessons are either 30 min, 45, or an hour.",
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :pid :sur-music-school,
+                   :assistant-id "asst_2z2IfFmOXQrcf5IF6yvMDhje",
+                   :expertise "running a music school",
+                   :timestamp #inst "2025-06-10T23:17:50.022-00:00",
+                   :agent-id :sur-music-school-openai}],
+          :claims
+          [#:claim{:string "(project-id :sur-music-school)"}
+           #:claim{:string
+                   "(project-name :sur-music-school \"Music School\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-music-school)"}],
+          :name "Music School",
+          :summary-dstructs
+          [#:dstruct{:budget-left 0.5,
+                     :id :process/scheduling-problem-type,
+                     :str
+                     "{:principal-problem-type :TIMETABLING-PROBLEM, :problem-components [:TIMETABLING-PROBLEM], :continuous? false, :cyclical? true, :msg-id 5, :EADS-ref :process/scheduling-problem-type}"}
+           #:dstruct{:budget-left 0.85,
+                     :id :process/timetabling,
+                     :str
+                     "{:event-types [{:event-type-id \"room-reservations\", :event-constituents [{:constituent-type \"room-type-music\", :base-type \"place\"} {:constituent-type \"instructor-type\", :base-type \"human\"}], :occurrence-assignment \"opportunistic\", :opportunistic? true} {:event-type-id \"individual-lessons\", :event-constituents [{:constituent-type \"room-type-music\", :base-type \"place\"} {:constituent-type \"student-type\", :base-type \"human\"} {:constituent-type \"instructor-type\", :base-type \"human\"}], :periodicity {:interval {:units \"week\", :value-string \"1\"}, :occurrences {:value-string \"variable\"}}, :occurrence-assignment [\"30min-slots\" \"45min-slots\" \"60min-slots\"]}], :msg-id 7, :EADS-ref :process/timetabling, :EADS-id :process/timetabling}"}],
+          :id :sur-music-school}
+]
