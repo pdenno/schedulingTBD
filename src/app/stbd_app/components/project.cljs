@@ -89,7 +89,7 @@
       (hooks/use-effect [play-active?]
         (update-common-info! {:active? (not play-active?)})
         (let [{:keys [active? pid cid]} @common-info] ; If the play button is active, it is because execution is paused.
-          (ws/send-msg {:dispatch-key :set-execution-status! :pid pid :status (if active? :running? :paused)})
+          (ws/send-msg {:dispatch-key :set-execution-status! :pid pid :status (if active? :running :paused)})
           (when (and active? pid cid)
             (log! :info (str "Resuming conversation pid = " pid " cid = " cid))
             (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))))

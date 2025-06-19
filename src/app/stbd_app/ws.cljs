@@ -94,7 +94,7 @@
   "Ping the server to keep the socket alive. Add detailed logging for diagnostics."
   []
   (when-not @reconnecting?
-    (log! :info "Sending ping to keep connection alive.")
+    ;(log! :info "Sending ping to keep connection alive.")
     (send-msg {:dispatch-key :ping, :ping-id (swap! ping-id inc)})))
 
 (def error-info (atom nil))

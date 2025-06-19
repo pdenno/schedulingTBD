@@ -91,7 +91,9 @@
                                    ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
                                       (when table ($ TableModal {:table table}))
                                       (when graph ($ GraphModal {:graph graph}))
-                                      (when code  ($ Button {:color "warning"} "Code"))))))))))
+                                      (when code
+                                        ((lookup-fn :set-code) code)
+                                        ($ Button {:color "warning"} "Code"))))))))))
             []
             msgs)))
 
@@ -101,7 +103,8 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function. <========================
+;;; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function.
+(def msgs-atm "A vector of messages in the DB format." (atom nil))
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
 (defn update-msg-times
@@ -111,7 +114,8 @@
     (log! :debug (str "update-msg-times: msg-count = " (count @msgs-atm)))
     ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
-;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid. <======================== So why not put it in db_access.cljs? Answer: msgs-atm but see above!
+;;; ToDo So why not put it in db_access.cljs? Answer: msgs-atm but see above!
+;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid.
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
   "Using an HTTP GET, get the conversation, and also the code, if any."
@@ -243,10 +247,10 @@
                  ($ Stack {:direction "row" :spacing "0px"}
                     ($ ButtonGroup
                        ($ AttachmentModal {:post-attach-fn #(log! :info (str "attach-fn: args = " %))})) ; This has the attachment modal
-                    ($ MessageInput {:placeholder "Type message here...."
+                    ($ MessageInput {:placeholder "Type message here..."
                                      :onSend #(do (log! :info (str "onSend: " %))
                                                   (process-user-input %))
                                      :attachButton false
                                      :fancyScroll false
                                      ;; It sets height to whatever you'd like with px, but doesn't expand scroll bars. It doesn't respond to :height <percent> either.
-                                     :style #js {#_#_:height "200px" :width "90%"}})))}))))
+                                     :style #js {:width "90%"}})))}))))

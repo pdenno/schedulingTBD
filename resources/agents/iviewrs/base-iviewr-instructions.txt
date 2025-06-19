@@ -131,7 +131,7 @@ After the example, we will document the "message-types" used in the example.
   We:  {"message-type" : "EADS-INSTRUCTIONS",
         "interview-objective" : "This is typically the EADS to use directly after 'process/warm-up-with-challenges';
                                  it continues to discover the basic characteristics of the interviewees' scheduling problem.
-                                 More specifically, the objective of this interview segment is to 
+                                 More specifically, the objective of this interview segment is to
                                        1) classify the principal method of scheduling that is most appropriate for the work they do, and
                                        2) make some basic observations about ancillary aspects of scheduling."
         "EADS" :
