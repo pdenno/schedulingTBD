@@ -7,7 +7,11 @@
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
-   [taoensso.telemere        :refer [log!]]))
+   [taoensso.telemere        :refer [log!]])
+  (:import ; ToDo: Why does clj-kondo complain?
+   java.net.URI
+   java.nio.file.StandardCopyOption
+   java.nio.file.Paths))
 
 (def ^:diag diag (atom nil))
 
@@ -187,15 +191,6 @@
                               (into-array java.nio.file.CopyOption
                                           [(java.nio.file.StandardCopyOption/ATOMIC_MOVE)
                                            (java.nio.file.StandardCopyOption/REPLACE_EXISTING)]))))
-
-;;; Keep this around for a while; it might get used eventually!
-#_(defmacro report-long-running
-  "Return the string from writing to *out* after this runs in a future."
-  [[timeout] & body]
-  `(-> (p/future (with-out-str ~@body))
-       (p/await ~timeout)
-       (p/then #(log! :info (str "Long-running: " %)))
-       (p/catch #(log! :warn (str "Long-running (exception): " %)))))
 
 (defn chat-status
   "Create a string to explain in the chat the error we experienced."

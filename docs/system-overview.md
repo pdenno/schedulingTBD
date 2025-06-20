@@ -9,46 +9,12 @@ SchedulingTBD is an experimental software platform designed to study **human/mac
 This research aims to establish consensus and eventual standardization on best practices for:
 
 - **AI-mediated systems integration**
-- **Human/AI teaming on long-running and complex endeavors.
+- **Human/AI teaming on long-running and complex endeavors.**
 - **Designing DSLs fit for human/AI teaming**
 - **Running AI agent-based interviews** to elicit requirements
 - **Plan recognition** in collaborative tasks
 - **Constructionist learning** for adults
 - **Scientific explanation** in HMT
-
-## System Architecture
-
-### Core Components
-
-1. **Multi-Agent Interview System**
-   - **Interview Manager**: Orchestrates the overall interview process
-   - **Process Interviewer**: Conducts interviews about business processes
-   - **Data Interviewer**: Focuses on data modeling and Object Role Modeling (ORM)
-   - **ORK (Orchestration) Manager**: Decides which interview path to pursue next
-
-2. **Surrogate Domain Expert Agents**
-   - AI agents that roleplay as domain experts (e.g., music school operators)
-   - Provide realistic, consistent responses during interviews
-   - Created with specific domain knowledge and behavioral instructions
-
-3. **EADS (Example Annotated Data Structure) Framework**
-   - Collection of templates used to help the interviewers ask relevant questions.
-   - Guides the interview process through predefined inquiry areas
-   - Ensures comprehensive coverage of scheduling requirements
-   - Produces 'actionable' results in the form of data structures that can be used to generate code and graphics.
-
-4. **Problem Classification Engine**
-   - Automatically determines the type of scheduling problem:
-     - Flow Shop Scheduling
-     - Job Shop Scheduling
-     - Timetabling Problems
-     - Project Scheduling
-     - Single Machine Scheduling
-
-5. **Web Infrastructure**
-   - **Jetty Server**: Runs on port 3300
-   - **WebSocket Support**: Real-time communication for interactive sessions
-   - **HTTP Handler Routes**: Dynamic route management for web interface
 
 ## How the System Works
 
