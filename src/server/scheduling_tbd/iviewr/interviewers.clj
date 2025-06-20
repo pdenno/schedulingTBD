@@ -1,46 +1,46 @@
 (ns scheduling-tbd.iviewr.interviewers
-    "Runs an interview using an interview agent."
-    (:require
-     [cheshire.core                   :as ches]
-     [clojure.data.xml                :as xml]
-     [clojure.pprint                  :refer [pprint cl-format]]
-     [clojure.spec.alpha              :as s]
-     [clojure.string                  :as str]
-     [mount.core                      :as mount :refer [defstate]]
-     [promesa.core                    :as p]
-     [promesa.exec                    :as px]
-     [scheduling-tbd.agent-db         :as adb :refer [agent-log]]
-     [scheduling-tbd.db               :as db]
-     [scheduling-tbd.llm              :as llm]
-     [scheduling-tbd.iviewr.eads] ; for mount
-     [scheduling-tbd.iviewr.eads-util      :as eu :refer [combine-ds!]]
-     [scheduling-tbd.iviewr.ork            :as ork]
-     [scheduling-tbd.iviewr.response-utils :as ru]
-     [scheduling-tbd.minizinc              :as mzn]
-     [scheduling-tbd.sutil                 :as sutil :refer [elide output-struct2clj]]
-     [scheduling-tbd.util                  :as util :refer [now]]
-     [scheduling-tbd.web.websockets        :as ws]
-     [scheduling-tbd.ds2mermaid            :as ds2m]
-     [taoensso.telemere                    :as tel :refer [log!]]))
+  "Runs an interview using an interview agent."
+  (:require
+   [cheshire.core :as ches]
+   [clojure.data.xml :as xml]
+   [clojure.pprint :refer [pprint cl-format]]
+   [clojure.spec.alpha :as s]
+   [clojure.string :as str]
+   [mount.core :as mount :refer [defstate]]
+   [promesa.core :as p]
+   [promesa.exec :as px]
+   [scheduling-tbd.agent-db :as adb :refer [agent-log]]
+   [scheduling-tbd.db :as db]
+   [scheduling-tbd.llm :as llm]
+   [scheduling-tbd.iviewr.eads] ; for mount
+   [scheduling-tbd.iviewr.eads-util :as eu :refer [combine-ds!]]
+   [scheduling-tbd.iviewr.ork :as ork]
+   [scheduling-tbd.iviewr.response-utils :as ru]
+   [scheduling-tbd.minizinc :as mzn]
+   [scheduling-tbd.sutil :as sutil :refer [elide output-struct2clj]]
+   [scheduling-tbd.util :as util :refer [now]]
+   [scheduling-tbd.web.websockets :as ws]
+   [scheduling-tbd.ds2mermaid :as ds2m]
+   [taoensso.telemere :as tel :refer [log!]]))
 
 ;;; The usual way of interviews involves q-and-a called from resume-conversation.
 ;;; [resume-conversation] -> q-and-a -> get-an-answer -> chat-pair -> send-to-client or query-agent (sur).
 
+(def ^:diag active? "Debugging tool to stop the interview when false." (atom true))
 (def ^:diag diag (atom nil))
 (s/def ::cid #(#{:process :data :resources :optimality} %))
 
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
 ;;; (like when it is burning OpenAI asking the same question over and over ;^)).
 ;;; If it doesn't stop, it is probably the case that you need to test for it in more places.
-(def ^:diag active? "Debugging tool to stop the interview when false." (atom false))
 
 ;;; For use of chat-pair and other things defined below.
 (s/def ::chat-pair-ctx (s/and ::common-ctx
                               (s/or :surrogate ::surrogate-ctx :human ::human-ctx)))
 
-(s/def ::common-ctx    (s/keys :req-un [::client-id ::question ::cid]))
+(s/def ::common-ctx (s/keys :req-un [::client-id ::question ::cid]))
 (s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-type ::surrogate-agent ::iviewr-agent]))
-(s/def ::human-ctx     (s/keys :req-un [:hum/responder-type ::iviewr-agent]))
+(s/def ::human-ctx (s/keys :req-un [:hum/responder-type ::iviewr-agent]))
 (s/def ::basic-agent (s/keys :req-un [::aid ::tid ::base-type]))
 (s/def ::iviewr-agent ::basic-agent)
 (s/def ::surrogate-agent ::basic-agent)
@@ -63,26 +63,26 @@
   "Run one query/response pair of chat elements with a human or a surrogate. This executes blocking.
    For human interactions, the response is based on :dispatch-key :domain-experts-says (See websockets/domain-expert-says)."
   [{:keys [question table table-text surrogate-agent responder-type preprocess-fn tries pid cid] :as ctx
-    :or {tries 1  preprocess-fn identity}}]
+    :or {tries 1 preprocess-fn identity}}]
   (log! :debug (str "ctx in chat-pair-aux:\n" (with-out-str (pprint ctx))))
-   (let [prom (if (= :human responder-type)
-                (ws/send-to-client (-> ctx                        ; This cannot timeout.
-                                       (assoc :text question)
-                                       (assoc :table table)
-                                       (assoc :promise? true)
-                                       (assoc :dispatch-key :iviewr-says)))
-                (px/submit! (fn [] ; surrogate responder...
-                              (try
-                                (adb/agent-log (cl-format nil "{:log-comment \"[~A interviewer] (asking interviewees):~%~A~%Table:~%~A \"}"
-                                                          (name cid) question table-text)
-                                               {:console? true})
-                                (adb/query-agent surrogate-agent  ; This can timeout.
-                                                 (str question "\n\n" table-text)
-                                                 {:tries tries
-                                                  :base-type pid
-                                                  :preprocess-fn preprocess-fn})
-                                (catch Exception e {:error e})))))]
-     (-> prom p/await)))
+  (let [prom (if (= :human responder-type)
+               (ws/send-to-client (-> ctx ; This cannot timeout.
+                                      (assoc :text question)
+                                      (assoc :table table)
+                                      (assoc :promise? true)
+                                      (assoc :dispatch-key :iviewr-says)))
+               (px/submit! (fn [] ; surrogate responder...
+                             (try
+                               (adb/agent-log (cl-format nil "{:log-comment \"[~A interviewer] (asking interviewees):~%~A~%Table:~%~A \"}"
+                                                         (name cid) question table-text)
+                                              {:console? true})
+                               (adb/query-agent surrogate-agent ; This can timeout.
+                                                (str question "\n\n" table-text)
+                                                {:tries tries
+                                                 :base-type pid
+                                                 :preprocess-fn preprocess-fn})
+                               (catch Exception e {:error e})))))]
+    (-> prom p/await)))
 
 (declare separate-table)
 
@@ -105,7 +105,7 @@
       ;; ToDo: Move the let up so can capture tables correctly with human too.
       :surrogate (let [{:keys [full-text text table-html table]} (separate-table response)]
                    (cond-> {:msg-type :expert-response :full-text full-text}
-                     text  (assoc :text text)
+                     text (assoc :text text)
                      table (assoc :table table)
                      table (assoc :table-html table-html))))))
 
@@ -113,14 +113,14 @@
 (s/def ::interviewer-msg (s/and (s/keys :req-un [:iviewr/message-type])
                                 (fn [msg]
                                   (case (:message-type msg)
-                                   :SUPPLY-QUESTION                   (s/valid? :iviewr/supply-question msg)
-                                   :QUESTION-TO-ASK                   (s/valid? :iviewr/question-to-ask msg)
-                                   :INTERVIEWEES-RESPOND              (s/valid? :iviewr/interviewees-respond msg)
-                                   :DATA-STRUCTURE-REFINEMENT         (s/valid? :iviewr/data-structure-refinement msg)
-                                   :CONVERSATION-HISTORY              (s/valid? :iviewr/conversation-history msg)
-                                   :EADS-INSTRUCTIONS                 (s/valid? :iviewr/eads-instructions msg)
-                                   :COURSE-CORRECTION                 (s/valid? :iviewr/course-correction msg)
-                                   :STATUS                            #(string? (get % :status))))))
+                                    :SUPPLY-QUESTION (s/valid? :iviewr/supply-question msg)
+                                    :QUESTION-TO-ASK (s/valid? :iviewr/question-to-ask msg)
+                                    :INTERVIEWEES-RESPOND (s/valid? :iviewr/interviewees-respond msg)
+                                    :DATA-STRUCTURE-REFINEMENT (s/valid? :iviewr/data-structure-refinement msg)
+                                    :CONVERSATION-HISTORY (s/valid? :iviewr/conversation-history msg)
+                                    :EADS-INSTRUCTIONS (s/valid? :iviewr/eads-instructions msg)
+                                    :COURSE-CORRECTION (s/valid? :iviewr/course-correction msg)
+                                    :STATUS #(string? (get % :status))))))
 
 (s/def :iviewr/supply-question (s/keys :req-un [:iviewr/budget]))
 (s/def :iviewr/question-to-ask (s/keys :req-un [:iviewr/question]))
@@ -148,19 +148,20 @@
    :aid and :tid in the opts should be for the interviewer agent."
   ([msg iviewr-agent cid] (tell-interviewer msg iviewr-agent cid {}))
   ([msg iviewr-agent cid opts]
-   (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
-     (log! :warn (str ";;; Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
-   (agent-log (cl-format nil "{:log-comment \"[interview manager] (tells ~A interviewer):~%~A\"}"
-                         (name cid) (with-out-str (pprint msg))))
-   (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
-   (let [msg-string (ches/generate-string msg {:pretty true})
-         res (-> (adb/query-agent iviewr-agent msg-string opts) output-struct2clj)
-         res (cond-> res
-               (contains? res :message-type)     (update :message-type keyword))]
-     (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
-     (agent-log (cl-format nil "{:log-comment \"[interview manager] (receives from ~A interviewer)~%~A\"}"
-                           (name cid) (with-out-str (pprint res))))
-     res)))
+   (when @active?
+     (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
+       (log! :warn (str ";;; Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
+     (agent-log (cl-format nil "{:log-comment \"[interview manager] (tells ~A interviewer):~%~A\"}"
+                           (name cid) (with-out-str (pprint msg))))
+     (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
+     (let [msg-string (ches/generate-string msg {:pretty true})
+           res (-> (adb/query-agent iviewr-agent msg-string opts) output-struct2clj)
+           res (cond-> res
+                 (contains? res :message-type) (update :message-type keyword))]
+       (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
+       (agent-log (cl-format nil "{:log-comment \"[interview manager] (receives from ~A interviewer)~%~A\"}"
+                             (name cid) (with-out-str (pprint res))))
+       res))))
 
 (defn response-analysis
   "Return a map of booleans including
@@ -207,28 +208,29 @@
    Note that the first element of the conversation should be the question, and the last the answer.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
   [{:keys [question responder-type human-starting?] :as ctx}]
+  (assert (string? question))
   (when-not human-starting?
     (when-not (s/valid? ::chat-pair-ctx ctx)
       (throw (ex-info "Invalid context in get-an-answer." {:ctx ctx}))))
   (let [conversation [{:text question :from :system :tags [:query]}]
-        {:keys [full-text] :as response}  (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
+        {:keys [full-text] :as response} (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
         answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
-        {:keys [answers-the-question? raises-a-question? wants-a-break?]}  (when (and (not answered?) (string? full-text))
-                                                                             (response-analysis question full-text ctx))
+        {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when (and (not answered?) (string? full-text))
+                                                                            (response-analysis question full-text ctx))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
       (let [same-question (ask-again question)]
         (into conversation (get-an-answer (-> ctx (assoc :question same-question)))))
       (cond-> conversation
-        answered?                  (conj (-> response
-                                             (assoc :from responder-type)
-                                             (assoc :tags [:response])))
-        wants-a-break?             (into (handle-wants-a-break question response ctx))
-        raises-a-question?         (into (handle-raises-a-question question response ctx))
+        answered? (conj (-> response
+                            (assoc :from responder-type)
+                            (assoc :tags [:response])))
+        wants-a-break? (into (handle-wants-a-break question response ctx))
+        raises-a-question? (into (handle-raises-a-question question response ctx))
         (not
          (or answered?
              wants-a-break?
-             raises-a-question?))  (into (handle-other-non-responsive question response ctx))))))
+             raises-a-question?)) (into (handle-other-non-responsive question response ctx))))))
 
 (defn surrogate? [pid] (ru/find-claim '(surrogate ?x) (db/get-claims pid)))
 
@@ -244,9 +246,9 @@
   (letfn [(x2c [x]
             (cond (seq? x) (mapv x2c x)
                   (map? x) (reduce-kv (fn [m k v]
-                                        (cond (= k :content)        (assoc m k (->> v (remove #(and (string? %) (re-matches #"^\s+" %))) vec x2c))
-                                              (= k :attrs)          m ; There aren't any values here in our application.
-                                              :else                 (assoc m k (x2c v))))
+                                        (cond (= k :content) (assoc m k (->> v (remove #(and (string? %) (re-matches #"^\s+" %))) vec x2c))
+                                              (= k :attrs) m ; There aren't any values here in our application.
+                                              :else (assoc m k (x2c v))))
                                       {}
                                       x)
                   (vector? x) (mapv x2c x)
@@ -282,46 +284,69 @@
                                  (assoc :key (-> % (ru/text-to-var) keyword)))))
                  (log! :warn "No titles in table2obj."))
         title-keys (map :key titles)
-        data-rows  (->> ugly-table
-                        :content                                 ; table content
-                        rest                                     ; everything but header
-                        (mapv (fn [row]
-                                (mapv #(or (-> % :content first) "") (:content row)))))]
-    {:table-headings  titles
+        data-rows (->> ugly-table
+                       :content ; table content
+                       rest ; everything but header
+                       (mapv (fn [row]
+                               (mapv #(or (-> % :content first) "") (:content row)))))]
+    {:table-headings titles
      :table-body (mapv (fn [row] (zipmap title-keys row)) data-rows)}))
 
+(def table-error-text (atom nil))
+
 (defn separate-table-aux
-  "Look through the text (typically an interviewer question) for '#+begin_src HTML ... #+end_src'; what is between those markers should be a table.
+  "The argument is a text string which may contain a single block of HTML (a table, it turns out) between the markers '#+begin_src HTML ... #+end_src'.
+   (In this function we don't care what is between the markers, but in usage it is typically a single HTML table.)
    Return a map where
       :full-text is the argument text,
-      :text is the argument string minus the table, and
-      :table-html is the substring between the markers."
+      :text is the argument string minus the content between the marker, and
+      :table-html is the substring between the markers. If no markers were found an empty string will be returned."
   [text]
-  (try (let [in-table? (atom false)]
-         (if (string? text)
-           (loop [lines (str/split-lines text)
-                  res {:full-text text :text "" :table-html ""}]
-             (let [l (first lines)]
-               (when (and l @in-table? (re-matches #"(?i)^\s*\#\+end_src\s*" l))  (reset! in-table? false))
-               (when (and l (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l))    (reset! in-table? true))
-               (if (empty? lines)
-                 res
-                 (recur (rest lines)
-                        (cond (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l) res
-                              (re-matches #"(?i)^\s*\#\+end_src\s*"          l) res
-                              (not @in-table?) (update res :text       #(str % "\n" l))
-                              @in-table?       (update res :table-html #(str % "\n" l)))))))
-           (do (log! :warn "Argument to separate-table-aux is not a string.")
-               {:full-text text :text text})))
-       (catch Exception _e
-         (log! :error  "Error separate-table-aux. Continuing.")
-         (reset! diag {:text text})
-         {:full-text text :text text})))
+  (assert (string? text))
+  (let [in-table? (atom false)
+        diag-found-table? (atom false)
+        first-table-line? (atom true)
+        result (loop [lines (str/split-lines text)
+                      res {:full-text text :text "" :table-html ""}]
+                 (let [l (first lines)]
+                   (if (empty? lines)
+                     res
+                     (recur (rest lines)
+                            (cond
+                              ;; Table begin marker - skip this line and enter table mode
+                              (and l (not @in-table?) (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l))
+                              (do (reset! diag-found-table? true)
+                                  (reset! in-table? true)
+                                  (reset! first-table-line? true)
+                                  res)
 
-(defn tryme []
-  (let [table-html
-        "<table>\n  <tr><th>Stage</th>                <th>Duration</th></tr>\n  <tr><td>Milling</td>              <td>30 minutes</td></tr>\n  <tr><td>Mashing</td>              <td>1.5 to 2 hours</td></tr>\n  <tr><td>Boiling</td>              <td>1 to 1.5 hours</td></tr>\n  <tr><td>Cooling</td>              <td>30 to 60 minutes</td></tr>\n  <tr><td>Fermentation</td>         <td>7 to 14 days (varies by beer type)</td></tr>\n  <tr><td>Conditioning</td>         <td>7 to 30 days (varies by beer type)</td></tr>\n  <tr><td>Bottling/Kegging</td>     <td>2 to 4 hours per batch</td></tr>\n  <tr><td>Distribution</td>         <td>Varies by destination, typically 1 to 2 days locally</td></tr>\n</table>"]
-    (-> table-html java.io.StringReader. xml/parse table-xml2clj #_table2obj)))
+                              ;; End marker for table - skip this line, exit table mode
+                              (and l @in-table? (re-matches #"(?i)^\s*\#\+end_src\s*" l))
+                              (do (reset! in-table? false)
+                                  ;; Add trailing newline to table-html
+                                  (-> res
+                                      (update :table-html #(str % "\n"))
+                                      (update :text #(if (empty? %) "" (str % "\n")))))
+
+                              ;; Regular text outside table
+                              (and l (not @in-table?))
+                              (update res :text #(if (empty? %) l (str % "\n" l)))
+
+                              ;; Content inside table - add leading newline for first line
+                              (and l @in-table?)
+                              (do
+                                (if @first-table-line?
+                                  (do (reset! first-table-line? false)
+                                      (update res :table-html #(str % "\n" l)))
+                                  (update res :table-html #(str % "\n" l))))
+
+                              ;; Empty line case
+                              :else res)))))]
+    ;; Check if we found table markers but no actual content (just whitespace/newlines)
+    (when (and @diag-found-table? (-> result :table-html str/trim empty?))
+      (reset! table-error-text text)
+      (throw (ex-info "Table markers; no table." {:text text})))
+    result))
 
 (defn separate-table
   "Arg may be (1) a string that might contain an embedded table, or (2) a context map that contains :question.
@@ -329,13 +354,20 @@
    Where :text is a substring of :full-text (argument text)."
   [arg]
   (let [text (if (string? arg) arg (:question arg))
-        {:keys [table-text] :as res} (separate-table-aux text)]
-    (if (not-empty table-text)
-      (try (as-> res ?r
-             (assoc ?r :table (-> ?r :table-html java.io.StringReader. xml/parse table-xml2clj table2obj))
-             (assoc ?r :status :ok))
-           ;; ToDo:  This catch is not catching!?!
-           (catch Throwable _e (assoc res :status :invalid-table)))
+        {:keys [table-html] :as res} (separate-table-aux text)]
+    (if (not-empty table-html)
+      (try
+        ;; Clean up HTML entities for XML parsing
+        (let [clean-html (-> table-html
+                             (str/replace "&" "&amp;") ; Fix unescaped ampersands
+                             (str/replace "&amp;amp;" "&amp;") ; Avoid double-escaping
+                             (str/replace "&amp;lt;" "&lt;")
+                             (str/replace "&amp;gt;" "&gt;"))
+              parsed-table (-> clean-html java.io.StringReader. xml/parse table-xml2clj table2obj)]
+          (-> res
+              (assoc :table parsed-table)
+              (assoc :status :ok)))
+        (catch Throwable _e (assoc res :status :invalid-table)))
       res)))
 
 (s/def ::question string?)
@@ -347,16 +379,17 @@
    Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :text :table...).
    The first element in the vector should be the question object, and the last the answer object."
   [iviewr-agent pid cid {:keys [client-id responder-type] :as ctx}]
-  (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-  (try (let [iviewr-q (-> (make-supply-question-msg pid) ; This just makes a SUPPLY-QUESTION message-type.
-                          (tell-interviewer iviewr-agent cid)         ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
-                          (separate-table))]               ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
-         (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
-         ;; This returns a VECTOR of statements from the interviewees and interviewer.
-         (get-an-answer (cond-> ctx
-                          true                                (assoc :question (:text iviewr-q))
-                          (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q)))))
-       (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))
+  (when @active?
+    (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
+    (try (let [iviewr-q (-> (make-supply-question-msg pid) ; This just makes a SUPPLY-QUESTION message-type.
+                            (tell-interviewer iviewr-agent cid) ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
+                            (separate-table))] ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
+           (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
+           ;; This returns a VECTOR of statements from the interviewees and interviewer.
+           (get-an-answer (cond-> ctx
+                            true (assoc :question (:text iviewr-q))
+                            (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q)))))
+         (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))))
 
 ;;; ToDo: This needs work. You should be able to reopen a conversation at any time.
 (defn ready-for-discussion?
@@ -365,13 +398,13 @@
   [pid cid]
   (let [cid (or cid (db/get-active-cid pid))] ; See chat.cljs for why cid might be nil.
     (letfn [(done? [status] (= status :eads-exhausted))]
-      (let [[pstat dstat rstat _ostat]  (doall (for [c [:process :data :resources :optimality]]
-                                                 (db/get-conversation-status pid c)))]
-      (case cid
-        :resources               (and (done? pstat) (done? dstat))
-        :optimality              (and (done? pstat) (done? dstat) (done? rstat))
-        :data                    (not (done? dstat))
-        :process                 (not (done? pstat)))))))
+      (let [[pstat dstat rstat _ostat] (doall (for [c [:process :data :resources :optimality]]
+                                                (db/get-conversation-status pid c)))]
+        (case cid
+          :resources (and (done? pstat) (done? dstat))
+          :optimality (and (done? pstat) (done? dstat) (done? rstat))
+          :data (not (done? dstat))
+          :process (not (done? pstat)))))))
 
 (declare resume-conversation tell-interviewer ctx-surrogate)
 
@@ -382,21 +415,21 @@
    Typically this is called with ready-for-discussion? returned false."
   [{:keys [pid cid client-id] :as ctx}]
   (letfn [(ready? [status] (#{:not-started :in-progress} status))]
-    (let [[pstat dstat rstat ostat]  (doall (for [c [:process :data :resources :optimality]]
-                                              (db/get-conversation-status pid c)))
+    (let [[pstat dstat rstat ostat] (doall (for [c [:process :data :resources :optimality]]
+                                             (db/get-conversation-status pid c)))
           better-choice (case cid
-                          :process      (cond (ready? dstat) :data
-                                              (ready? rstat) :resources
-                                              (ready? ostat) :optimality
-                                              :else          :all-done!)
-                          :data         (cond (ready? pstat) :process
-                                              (ready? rstat) :resources
-                                              (ready? ostat) :optimality
-                                              :else          :all-done!)
-                          :resources    (cond (ready? pstat) :process
-                                              (ready? dstat) :data
-                                              (ready? ostat) :optimality
-                                              :else          :all-done!))
+                          :process (cond (ready? dstat) :data
+                                         (ready? rstat) :resources
+                                         (ready? ostat) :optimality
+                                         :else :all-done!)
+                          :data (cond (ready? pstat) :process
+                                      (ready? rstat) :resources
+                                      (ready? ostat) :optimality
+                                      :else :all-done!)
+                          :resources (cond (ready? pstat) :process
+                                           (ready? dstat) :data
+                                           (ready? ostat) :optimality
+                                           :else :all-done!))
           text (if (= :all-done! better-choice)
                  "We are satisfied with this conversation as it is. Did you want to reopen it for discussion?"
                  (str "At this point in our work, it would be better to discuss " (name better-choice) ". "
@@ -404,16 +437,16 @@
       (if (= client-id :console)
         (let [{:keys [iviewr-agent]} (merge ctx (ctx-surrogate ctx))]
           (db/put-active-cid! pid better-choice) ; ToDo: This hasn't been tested. Is that enough?
-            (when-let [eads-id (db/get-active-EADS-id pid better-choice)]
-              (tell-interviewer (db/get-EADS-instructions eads-id) iviewr-agent better-choice))
-            (resume-conversation (assoc ctx :cid better-choice)))
+          (when-let [eads-id (db/get-active-EADS-id pid better-choice)]
+            (tell-interviewer (db/get-EADS-instructions eads-id) iviewr-agent better-choice))
+          (resume-conversation (assoc ctx :cid better-choice)))
         (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :text text})))))
 
 (defn ctx-surrogate
   "Return context updated with surrogate info."
   [{:keys [pid cid force-new?] :as ctx}]
   (let [cid (or cid (db/get-active-cid pid)) ; See chat.cljs, which suggests there might be reasons it will send cid=nil.
-        iviewr-agent    (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
+        iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
         surrogate-agent (adb/ensure-agent! {:base-type pid :pid pid} {:force-new? force-new?})
         ctx (-> ctx
                 (assoc :cid cid)
@@ -428,8 +461,8 @@
 (defn ctx-human
   "Return  part of context specific to humans."
   [{:keys [pid cid]}]
-   {:responder-type :human
-    :iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})})
+  {:responder-type :human
+   :iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})})
 
 (defn resume-exit
   "Clean things up, or at least produce a log message."
@@ -463,9 +496,9 @@
    in the argument conversation)."
   [pid cid iviewr-response]
   (letfn [(up-keys [obj]
-            (cond (map? obj)     (reduce-kv (fn [m k v] (assoc m (keyword k) (up-keys v))) {} obj)
-                  (vector? obj)  (mapv up-keys obj)
-                  :else          obj))]
+            (cond (map? obj) (reduce-kv (fn [m k v] (assoc m (keyword k) (up-keys v))) {} obj)
+                  (vector? obj) (mapv up-keys obj)
+                  :else obj))]
     (let [obj (-> iviewr-response
                   up-keys
                   (update :message-type keyword)
@@ -482,7 +515,7 @@
         EADS-id (db/get-active-EADS-id pid cid)]
     (doseq [msg msgs-vec]
       (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
-                                        EADS-id  (assoc :pursuing-EADS EADS-id)))))
+                                        EADS-id (assoc :pursuing-EADS EADS-id)))))
     (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})))
 
 (defn resume-post-ui-actions
@@ -546,7 +579,7 @@
     (let [budget-ok? (> (db/get-questioning-budget-left! pid (db/get-project-active-EADS-id pid)) 0)
           active-eads-id (db/get-project-active-EADS-id pid)
           active-eads-complete? (or (not budget-ok?)
-                                  (and active-eads-id (eu/ds-complete? active-eads-id pid)))
+                                    (and active-eads-id (eu/ds-complete? active-eads-id pid)))
           new-eads-id (when (or active-eads-complete? (not active-eads-id))
                         (ork/get-new-EADS-id pid))
           change-eads? new-eads-id
@@ -561,15 +594,41 @@
       (when new-cid
         (agent-log (cl-format nil "{:log-comment \"[ork manager] (in ork-review) changing conversation to ~A.\"}" new-cid)))
       (let [res (cond-> {}
-                  exhausted?                        (assoc :exhausted? true)
-                  change-eads?                      (assoc :change-eads? true)
-                  new-eads-id                       (assoc :new-eads-id new-eads-id)
-                  new-cid                           (assoc :new-cid? true :old-cid cid :cid new-cid)
-                  (not new-cid)                     (assoc :cid cid))]
+                  exhausted? (assoc :exhausted? true)
+                  change-eads? (assoc :change-eads? true)
+                  new-eads-id (assoc :new-eads-id new-eads-id)
+                  new-cid (assoc :new-cid? true :old-cid cid :cid new-cid)
+                  (not new-cid) (assoc :cid cid))]
         (agent-log (cl-format nil "{:log-comment \"[ork manager] (in ork-review) returning decision:~%~A\"}"
                               (with-out-str (pprint res)))
                    {:console? true})
         res))))
+
+;;; (inv/ork-force-new-thread :sur-craft-beer)
+(defn ^:diag ork-force-new-thread
+  [pid]
+  (let [ork (db/get-agent {:base-type :orchestrator-agent :pid pid})
+        tid (adb/get-llm-thread-id ork)
+        ork-with-thread (assoc ork :agent/thread-id tid)]
+    (db/put-agent! {:base-type :orchestrator-agent :pid pid} ork-with-thread)))
+
+;;; Define this in user
+#_(defn ^:diag run-demo!
+    ([] (run-demo! :sur-craft-beer "craft beer"))
+    ([pid product]
+     (try
+       (let [client-id (ws/recent-client!)]
+         (reset! inv/active? true)
+         (db/recreate-project-db! pid)
+         (inv/ork-force-new-thread pid)
+         (db/set-execution-status! {:pid pid :status :running})
+         (sur/start-surrogate! {:product product :client-id client-id})
+         (inv/resume-conversation {:client-id client-id :pid :sur-craft-beer :cid :process}))
+       (catch Exception e
+         (reset! inv/active? false)
+         (throw (ex-info "run-demo" {:e e})))
+       (finally
+         (reset! inv/active? false)))))
 
 ;;; resume-conversation is typically called by client dispatch :resume-conversation.
 ;;; (inv/resume-conversation {:client-id :console :pid :sur-craft-beer :cid :process})
@@ -593,7 +652,9 @@
           (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?] :as state-change} (ork-review pid cid)]
             (if (or exhausted? force-stop?)
               (resume-exit state-change ctx)
-              (let [eads-id (or new-eads-id (db/get-active-EADS-id pid cid))]
+              (let [eads-id (or new-eads-id (db/get-active-EADS-id pid cid))
+                    ;; Capture the EADS ID that will be used for the question to ensure budget is decremented against the correct EADS
+                    question-eads-id (db/get-project-active-EADS-id pid)]
                 (when new-cid? (resume-update-db-cid pid cid old-cid))
                 (when change-eads?
                   (resume-update-db-eads pid cid new-eads-id)
@@ -604,10 +665,11 @@
                       ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
                       iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
                                                         iviewr-agent cid {:tries 2 :test-fn output-struct2clj})]
-                    (update-db-conversation! pid cid conversation)
-                    (resume-post-ui-actions  iviewr-response pid cid ctx)  ; show graphs and tables, tell humans to switch conv.
-                    (resume-post-db-actions! iviewr-response pid cid eads-id)) ; associate DS refinement with msg.
-                  (recur (clear-ctx-ephemeral ctx)))))))
+                  (update-db-conversation! pid cid conversation)
+                  (resume-post-ui-actions iviewr-response pid cid ctx) ; show graphs and tables, tell humans to switch conv.
+                  ;; Use question-eads-id to ensure budget is decremented against the EADS that provided the question
+                  (resume-post-db-actions! iviewr-response pid cid question-eads-id)) ; associate DS refinement with msg.
+                (recur (clear-ctx-ephemeral ctx)))))))
       (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))
     (find-appropriate-conv-and-redirect ctx)))
 

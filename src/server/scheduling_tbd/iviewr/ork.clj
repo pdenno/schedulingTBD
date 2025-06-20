@@ -158,7 +158,7 @@
    Likewise, we only include the current data-structure if the orchestrator has been around for earlier C-H messages."
   [pid]
   (if (db/project-exists? pid)
-    (let [warm-up (db/get-summary-ds :sur-craft-beer :process/warm-up-with-challenges)
+    (let [warm-up (db/get-summary-ds pid :process/warm-up-with-challenges)
           observation (:one-more-thing warm-up)
           challenges (->> warm-up
                           :scheduling-challenges
@@ -211,8 +211,7 @@
     (when-not (= old-tid (:tid ork))
       (agent-log (cl-format nil "{:log-comment \"Project's ork thread has been updated; provide comprehensive history.\"}"
                             {:console? true :level :warn})))
-    ;; ToDo: For the time being, I always provide the complete history for :process (the cid).
-    (let [pursue-msg (tell-ork (conversation-history pid) ork) ; conversation-history defaults to :all (all cids).
+    (let [pursue-msg (tell-ork (conversation-history pid) ork)
           eads-instructions-id (-> pursue-msg :EADS-id keyword)]
       (if ((db/system-EADS?) eads-instructions-id)
         eads-instructions-id

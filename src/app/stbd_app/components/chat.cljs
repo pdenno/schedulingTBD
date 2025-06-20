@@ -130,7 +130,7 @@
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
-                 (when (:active? @common-info)
+                 #_(when (:active? @common-info) ; <========================================================================================================== DEMO
                    (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))
                  (update-common-info! {:pid pid :cid cid}))))))
 

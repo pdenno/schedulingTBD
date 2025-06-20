@@ -2,6 +2,7 @@
   "Server utilities."
   (:require
    [cheshire.core            :as ches]
+   [clojure.java.io          :as io]
    [clojure.pprint           :refer [cl-format]]
    [clojure.string           :as str]
    [datahike.api             :as d]
@@ -277,3 +278,13 @@
         [nam ns] ((juxt name namespace) id)
         eads-json-fname (cl-format nil "resources/agents/iviewrs/EADS/~A/~A.json" ns nam)]
     (spit eads-json-fname (clj2json-pretty eads-instructions))))
+
+;;;https://gist.github.com/olieidel/c551a911a4798312e4ef42a584677397
+(defn delete-directory-recursive
+  "Recursively delete a directory."
+  [path]
+  (letfn [(ddr [file]
+            (when (.isDirectory file)
+              (run! ddr (.listFiles file)))
+            (io/delete-file file))]
+    (-> path java.io.File. ddr)))

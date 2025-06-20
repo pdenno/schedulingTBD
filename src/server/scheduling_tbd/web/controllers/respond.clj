@@ -20,17 +20,20 @@
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
    Note that this can CHANGE :project/active-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
   [request]
-  (let [{:keys [project-id cid client-id]}  (-> request :query-params (update-keys keyword))
-        pid (keyword project-id)
-        cid (if cid (keyword cid) (db/get-active-cid pid))
-        eid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid))]
-    (assert (#{:process :data :resources :optimality} cid))
-    (d/transact (connect-atm pid) {:tx-data [{:db/id eid :project/active-conversation cid}]})
-    (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
-    (let [eid (db/project-exists? pid)
-          pname (db/get-project-name pid)
-          msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) [])] ; ToDo: Trim some of conversation?
-      (http/ok {:project-id pid :project-name pname :conv msgs :cid cid}))))
+  (try
+    (let [{:keys [project-id cid client-id]}  (-> request :query-params (update-keys keyword))
+          pid (keyword project-id)
+          cid (if cid (keyword cid) (db/get-active-cid pid))
+          eid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid))]
+      (assert (#{:process :data :resources :optimality} cid))
+      (d/transact (connect-atm pid) {:tx-data [{:db/id eid :project/active-conversation cid}]})
+      (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
+      (let [eid (db/project-exists? pid)
+            pname (db/get-project-name pid)
+            msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) [])] ; ToDo: Trim some of conversation?
+        (http/ok {:project-id pid :project-name pname :conv msgs :cid cid})))
+    (catch Exception e
+      (log! (str "Get conversation:" e)))))
 
 (defn list-projects
     "Return a map containing :current-project, :cid, and :others, which is a sorted list of every other project in the system DB.

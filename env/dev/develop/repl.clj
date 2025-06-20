@@ -54,6 +54,7 @@
    'warm   'scheduling-tbd.iviewr.domain.process.warm-up-with-challenges
    'eu     'scheduling-tbd.iviewr.eads-util
    'inv    'scheduling-tbd.iviewr.interviewers
+   'invt   'scheduling-tbd.iviewr.interviewers-test
    'ork    'scheduling-tbd.iviewr.ork
    'orkt   'scheduling-tbd.iviewr.ork-test
    'ru     'scheduling-tbd.iviewr.response-utils

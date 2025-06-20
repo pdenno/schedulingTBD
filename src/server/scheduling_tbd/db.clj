@@ -505,36 +505,53 @@
   [pid]
   (if (some #(= % pid) (list-projects))
     (let [conn-atm (connect-atm :system)]
+      ;; Remove from system DB.
       (when-let [s-eid (d/q '[:find ?e . :in $ ?pid :where [?e :project/id ?pid]] @conn-atm pid)]
         (let [obj (resolve-db-id {:db/id s-eid} conn-atm)]
-          (d/transact (connect-atm :system) {:tx-data (for [[k v] obj] [:db/retract s-eid k v])})
-          (sutil/deregister-db pid)
-          nil)))
+          (d/transact (connect-atm :system) {:tx-data (for [[k v] obj] [:db/retract s-eid k v])})))
+      ;; Remove DB files
+      (let [cfg (db-cfg-map {:type :project :id pid})]
+        (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
+          (d/delete-database cfg))
+        (sutil/deregister-db pid)
+        (when-let [base-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
+          (let [dir (str base-dir "/projects/" (name pid) "/")]
+            (sutil/delete-directory-recursive dir)))
+        nil))
     (log! :warn (str "Delete-project: Project not found: " pid))))
 
 (defn recreate-project-db!
   "Recreate a DB for each project using EDN files."
-  ([id] (recreate-project-db! id nil))
-  ([id content]
-   (let [backup-file (format "data/projects/%s.edn" (name id))]
+  ([pid] (recreate-project-db! pid nil))
+  ([pid content]
+   (let [backup-file (format "data/projects/%s.edn" (name pid))]
      (if (or content (.exists (io/file backup-file)))
-       (let [cfg (db-cfg-map {:type :project :id id})
-             files-dir (-> cfg :base-dir (str "/projects/" (name id) "/files"))]
+       (let [cfg (db-cfg-map {:type :project :id pid})
+             files-dir (-> cfg :base-dir (str "/projects/" (name pid) "/files"))
+             db-dir (-> cfg :base-dir (str "/projects/" (name pid) "/db/"))
+             pname (as-> (name :sur-back-ba) ?s
+                     (str/replace ?s #"\-" " ")
+                     (str/split ?s #"\s+")
+                     (map str/capitalize ?s)
+                     (interpose " " ?s)
+                     (apply str ?s))]
+         (when-not (-> files-dir io/as-file .isDirectory)
+           (-> files-dir io/as-file .mkdir))
          (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
            (d/delete-database cfg))
          (when-not (-> cfg :store :path io/as-file .isDirectory)
            (-> cfg :store :path io/make-parents)
            (-> cfg :store :path io/as-file .mkdir))
          (d/create-database cfg)
-         (register-db id cfg)
-         (let [conn (connect-atm id)
-               content (if content
-                         (vector content)
+         ;; Register it and add to system because when you create with two args,
+         ;; the pid need not be registered yet.
+         (add-project-to-system pid pname db-dir)
+         (register-db pid cfg)
+         (let [content (if content
+                         (-> content (assoc :project/id pid) (assoc :project/name pname) vector)
                          (->> backup-file slurp edn/read-string))]
-           (d/transact conn db-schema-proj)
-           (d/transact conn content))
-         (when-not (-> files-dir io/as-file .isDirectory)
-           (-> files-dir io/as-file .mkdir))
+           (d/transact (connect-atm pid) db-schema-proj)
+           (d/transact (connect-atm pid) {:tx-data content}))
          cfg)
        (log! :error (str "Not recreating DB because backup file does not exist: " backup-file))))))
 

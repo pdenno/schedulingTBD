@@ -2,7 +2,19 @@
 
 ## Introduction
 
-The SchedulingTBD system is a sophisticated multi-agent AI framework designed to automatically understand scheduling problems and generate MiniZinc-based solutions. The system uses a structured interview process with AI agents to elicit requirements, classify problems, and model data relationships. It serves as a web-based application running on Jetty at port 3300 with real-time WebSocket communication and comprehensive logging.
+SchedulingTBD is an experimental software platform designed to study **human/machine teaming (HMT)** in long-running cognitive tasks, specifically focusing on collaborative formulation and refinement of manufacturing production scheduling systems. The project explores how humans and AI can work together to create solutions using domain-specific languages (DSLs), particularly [MiniZinc](https://www.minizinc.org/) for constraint programming. The system is a  multi-agent AI framework designed to automatically understand scheduling problems and generate MiniZinc-based solutions. The system uses a structured interview process with AI agents to elicit requirements, classify problems, and model data relationships. It serves as a web-based application running on Jetty at port 3300 with real-time WebSocket communication and comprehensive logging.
+
+## Project Goals
+
+This research aims to establish consensus and eventual standardization on best practices for:
+
+- **AI-mediated systems integration**
+- **Human/AI teaming on long-running and complex endeavors.
+- **Designing DSLs fit for human/AI teaming**
+- **Running AI agent-based interviews** to elicit requirements
+- **Plan recognition** in collaborative tasks
+- **Constructionist learning** for adults
+- **Scientific explanation** in HMT
 
 ## System Architecture
 
@@ -14,15 +26,16 @@ The SchedulingTBD system is a sophisticated multi-agent AI framework designed to
    - **Data Interviewer**: Focuses on data modeling and Object Role Modeling (ORM)
    - **ORK (Orchestration) Manager**: Decides which interview path to pursue next
 
-2. **Surrogate Agents**
+2. **Surrogate Domain Expert Agents**
    - AI agents that roleplay as domain experts (e.g., music school operators)
    - Provide realistic, consistent responses during interviews
    - Created with specific domain knowledge and behavioral instructions
 
-3. **EADS (Expert Analysis and Decision Support) Framework**
-   - Structured data collection templates for different problem types
+3. **EADS (Example Annotated Data Structure) Framework**
+   - Collection of templates used to help the interviewers ask relevant questions.
    - Guides the interview process through predefined inquiry areas
    - Ensures comprehensive coverage of scheduling requirements
+   - Produces 'actionable' results in the form of data structures that can be used to generate code and graphics.
 
 4. **Problem Classification Engine**
    - Automatically determines the type of scheduling problem:
@@ -39,42 +52,28 @@ The SchedulingTBD system is a sophisticated multi-agent AI framework designed to
 
 ## How the System Works
 
-### Phase 1: Problem Initialization
-1. A surrogate agent is created representing a specific domain (e.g., music school)
-2. The surrogate is given detailed instructions about their role and expertise
-3. Initial conversation context is established
-4. OpenAI models are utilized for AI agent intelligence
+An orchestrator agent assesses the current level of discussion that has occurred through messages that pull data from the project database.
+It then chooses an EADS instruction accordingly for use by a corresponding interview agent.
+(Four kinds of interview agents exist: proccess, data, resources, and optimality).
+The selected interview agent uses the EADS instructions to formulate questions for human experts or surrogate (LLM-based) expert.
+The selected interview agent uses the answers to its questions to build a data structure conforming to the EADS instructions.
+Code associated with each EADS instruction determines how to build a 'summary data structure' from the commits the interviewer makes.
+Determining when to end the interview segment associated with the EADS is made by three means
+  - (1) code associated with each EADS instruction determines the completeness,
+  - (2) the interviewer agent itself decides that it has covered the topic adequately, or
+  - (3) the budget for the asking questions associated with the EADS instructions is depleted.
 
-### Phase 2: Problem Classification
-1. The ORK manager analyzes the initial problem description
-2. Determines which EADS template to pursue (e.g., `process/scheduling-problem-type`)
-3. The process interviewer conducts targeted questions to classify the problem
-4. Key properties are determined:
-   - **Principal problem type** (e.g., TIMETABLING-PROBLEM)
-   - **Problem components** (supporting problem types)
-   - **Continuous?** (whether processes flow continuously)
-   - **Cyclical?** (whether schedules repeat in patterns)
+### Generated Artifacts
+- **MiniZinc models** - Constraint programming specifications
+- **Process diagrams** - Mermaid-based visualizations
+- **Summary data structures** - Formalized representations of requirements derived from the EADS templates chosen by the orchestrator.
 
-### Phase 3: Detailed Process Analysis
-1. Once classified, the system pursues specific EADS templates (e.g., `process/timetabling`)
-2. Structured interviews collect information about:
-   - **Event types** and their characteristics
-   - **Time slots** and availability
-   - **Resource constraints** and priorities
-   - **Special events** and exceptions
-
-### Phase 4: Data Modeling
-1. The system switches to data interviewing mode
-2. Object Role Modeling (ORM) techniques are used to:
-   - Identify key entities (students, instructors, rooms)
-   - Define relationships and constraints
-   - Create example data structures
-   - Establish fact types and reference modes
-
-### Phase 5: Solution Generation
-1. Based on collected requirements and data models
-2. Generate MiniZinc constraint satisfaction problems
-3. Create executable scheduling solutions
+### Conversations
+Structured interview conversations with four main topics:
+1. **Process** - Understanding the manufacturing workflow
+2. **Data** - Identifying data sources and requirements
+3. **Resources** - Cataloging available resources (people, machines)
+4. **Optimality** - Defining what constitutes a "good" schedule
 
 ## Key Functionalities
 
@@ -176,11 +175,55 @@ When running `(orkt/music-school)`, the system:
 
 ## Current Operational Status
 
-- Server runs on Jetty at port 3300
+- Server runs on Jetty at port 3300 or 3301, depending on configuration.
 - OpenAI models actively used for agent processing
 - Dynamic HTTP handler route updates
 - Real-time conversation management
 - Comprehensive agent activity logging
+
+## Development Workflow
+
+### Current Status
+- ✅ Multi-agent interview system operational
+- ✅ MiniZinc integration for simple process modeling
+- ✅ Web-based chat interface with real-time updates
+- ✅ Surrogate agent testing framework
+- 🔄 Working toward complete MiniZinc solution generation
+- 🔄 Testing with hundreds of surrogate domain experts
+- ⏳ Planning human expert validation studies
+
+## Dependencies and Integration
+
+### External Systems
+- **OpenAI API** - For LLM capabilities
+- **MiniZinc** - Constraint programming solver
+- **WebSocket infrastructure** - For real-time communication
+
+### Data Persistence
+- **Datahike** database for conversation history
+- **EDN files** for project configurations
+- **File system** for generated artifacts
+
+
+## Project Structure
+
+```
+schedulingTBD/
+├── src/
+│   ├── server/          # Clojure backend
+│   └── app/             # ClojureScript frontend
+├── data/
+│   ├── projects/        # Manufacturing scenario data
+│   ├── examples/        # MiniZinc examples
+│   └── templates/       # Minizinc solution templates
+├── resources/
+│   ├── agents/          # Agent configuration
+│   └── public/          # Static web assets
+├── test/                # Test suites
+├── env/                 # Environment-specific config
+├── doc/                 # Documentation and screenshots
+└── bin/                 # Utility scripts
+```
 
 ## Future Extensions
 
@@ -192,6 +235,18 @@ The system architecture supports:
 - Advanced optimization objectives and constraints
 - Enhanced web interface features
 - Additional AI model integrations
+
+## Some Guidelines for AI MCP-based Coding Copilots
+
+1. Preserve exact formatting and whitespace when making any edits
+2. Use the MCP Clojure editing tools for precise, surgical changes
+3. Only modify what needs to be changed without reformatting entire sections
+4. Allow sufficient time (30+ seconds) for LLM agent calls as noted in the documentation
+
+If you are asked to run functions of the system that involve calls to LLM-based agents, allow at least 30 seconds for each call to complete.
+Things will timeout by themselves, you should not give up.
+In order to observe system activity, you can watch for logging at the console, and also entries made in logs/agent-logs.txt."
+
 
 ---
 

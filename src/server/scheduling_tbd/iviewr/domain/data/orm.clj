@@ -92,7 +92,7 @@
 
 (def orm
   {:message-type :EADS-INSTRUCTIONS
-   :budget-decrement 0.05
+   :budget-decrement 0.08
    :interviewer-agent :data
    :interview-objective
      (str "You, the data interviewer, discover and document information that interviewees use to do their work (scheduling production or providing a service to customers).\n"
@@ -113,9 +113,11 @@
           "We provide an enumeration of potential areas of inquiry in the EADS below.\n"
           "You are encouraged to use this enumeration, but you can use EADS annotations to add categories if needed.\n"
           "\n"
-          "In Task 2, we are particularly interested in capturing domain semantics of the data in the viewpoint of Object Role Modeling (ORM).\n"
+          "In Task 2, we are particularly interested in capturing domain semantics of each area of inquiry in the viewpoint of Object Role Modeling (ORM).\n"
           "Specifically, Task 2 is about defining all the ORM fact types of the subject area of inquiry.\n"
-          "The best way to do this might be to first elicit from the interviewees all the concepts (ORM objects) relevant to the area of inquiry and then suggest to them (as verbalization of a \n"
+          "The best way to do this might be, for each area of inquiry, to first elicit from the interviewees all the concepts (ORM objects) relevant to the area of inquiry and then suggest to them (as verbalization of a \n"
+          "Because you are working under a budget for questioning, choose the order in which you discuss areas of inquiry carefully; work on the most fundamental areas of inquiry to support scheduling first.\n"
+          "The most fundamental areas are typically customer orders, equipment, workforce, and products\n"
           "hypothesized fact types) how the concepts interrelate.\n"
           "For example, if interviewees have indicated that they maintain records of employee skills and skill certification dates, you might ask:\n"
           "'As you have pointed out, in your business employees have an employee number. Do you similarly use a code of some sort to describe the skill?'\n"
@@ -386,6 +388,7 @@
     complete?))
 
 ;;; -------------------- Starting and stopping -------------------------
+;;; (orm/init-orm)
 (defn init-orm
   []
   (if (s/valid? :orm/EADS-message orm)
