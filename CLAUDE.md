@@ -70,13 +70,10 @@ Use the clojure-MCP tool `clojure_eval` to interact with the system.
 
 ## Agent Session Management
 
-⚠️ **CRITICAL**: AI agents disappear after 10-20 minutes of work.
-
-**Always write progress to `docs/` directory before timeout:**
-- Document current work status
-- Note next steps and dependencies
-- Save intermediate findings or analysis
-- Use `docs/issues/current-task.md` (symlink to current work)
+**Best Practice**: Document significant progress and findings as you work:
+- Update `docs/issues/current-task.md` (symlink to current work) for major milestones
+- Note next steps and dependencies for complex multi-step tasks
+- Save intermediate findings or analysis for future reference
 
 ## Additional Resources
 
