@@ -189,7 +189,7 @@ Tag definitions used for REPL diagnostics but not part of the main system with `
    (transform data options)))
 
 ;; Complex parameter destructuring
-(defn add-msg 
+(defn add-msg
   [{:keys [pid cid from full-text table tags question-type pursuing-EADS]}]
   (let [mid (inc (max-msg-id pid cid))
         msg {:message/id mid
@@ -307,7 +307,7 @@ git commit -m "db: Add new project validation functions
 
 # Good - related namespace changes
 git add src/server/scheduling_tbd/agent_db.clj
-git add src/server/scheduling_tbd/llm.clj  
+git add src/server/scheduling_tbd/llm.clj
 git commit -m "agent_db,llm: Integrate mock system for testing
 
 - Update agent queries to use mock responses

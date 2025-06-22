@@ -13,9 +13,13 @@
    [mount.core :as mount]
    [lambdaisland.classpath.watch-deps :as watch-deps]      ; hot loading for deps.
    [scheduling-tbd.core :refer [server]]                   ; for mount.
-   [scheduling-tbd.llm  :as llm :refer [llm-tools]]        ; Because of deep synchronization problems when this is from mount.
+   [scheduling-tbd.db                    :as db]           ; for run-demo!
+   [scheduling-tbd.iviewr.interviewers   :as inv]
+   [scheduling-tbd.llm                   :as llm :refer [llm-tools]]        ; Because of deep synchronization problems when this is from mount.
+   [scheduling-tbd.surrogate             :as sur]
    [scheduling-tbd.web.handler]                            ; for mount, defines rm.server.config/config, and router stuff.
-   [taoensso.telemere :as tel :refer [log!]]))
+   [scheduling-tbd.web.websockets        :as ws]                  ; for run-demo!.
+   [taoensso.telemere                    :as tel :refer [log!]]))
 
 [server llm-tools ns-setup! undo-ns-setup!] ; for mount
 
@@ -57,3 +61,22 @@
   []
   (stop)
   (tools-ns/refresh :after 'user/start))
+
+
+;;; Define this in user
+(defn ^:diag run-demo!
+  ([] (run-demo! :sur-craft-beer "craft beer"))
+  ([pid product]
+   (try
+     (let [client-id (ws/recent-client!)]
+       (reset! inv/active? true)
+       (db/recreate-project-db! pid)
+       (inv/ork-force-new-thread pid)
+       (db/set-execution-status! {:pid pid :status :running})
+       (sur/start-surrogate! {:product product :client-id client-id})
+       (inv/resume-conversation {:client-id client-id :pid :sur-craft-beer :cid :process}))
+     (catch Exception e
+       (reset! inv/active? false)
+       (throw (ex-info "run-demo" {:e e})))
+     (finally
+       (reset! inv/active? false)))))

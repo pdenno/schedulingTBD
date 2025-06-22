@@ -31,7 +31,7 @@ Use the clojure-MCP tool `clojure_eval` to interact with the system.
   ```clojure
   ;; Good
   (def mock? (atom false))
-  
+
   ;; Avoid
   (def ^:dynamic *mock-enabled* false)
   ```
@@ -52,7 +52,7 @@ Use the clojure-MCP tool `clojure_eval` to interact with the system.
   (cond
       (test-1)                      1
       (much-longer-test)           2)
-  
+
   ;; Don't collapse to single spaces
   ```
 

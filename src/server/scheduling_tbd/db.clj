@@ -13,274 +13,14 @@
    [datahike.api :as d]
    [datahike.pull-api :as dp]
    [mount.core :as mount :refer [defstate]]
+   [scheduling-tbd.schema :as schema :refer [db-schema-sys db-schema-proj project-schema-key?]]
    [scheduling-tbd.specs :as specs]
-   [scheduling-tbd.sutil :as sutil :refer [connect-atm datahike-schema db-cfg-map register-db resolve-db-id]]
+   [scheduling-tbd.sutil :as sutil :refer [connect-atm db-cfg-map mocking? register-db resolve-db-id shadow-pid]]
    [scheduling-tbd.util :as util :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
    [taoensso.telemere :refer [log!]]))
 
-(def db-schema-agent+
-  "Defines properties that can be used for agents, which can be stored either in the system DB or a project DB.
-   This common information is merged into other system and project schema."
-  {:agent/agent-id ; Yeah a redundant name, but I think it makes things easier in agent_db.clj, where I strip off the ns.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A unique ID for each agent to ensure only one of each type is available."}
-   :agent/agent-type
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "Currently one of #{:system :project :shared-assistant}."}
-   :agent/assistant-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant id (a string) associated with this surrogate."}
-   :agent/base-type
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "Indicates the purpose and instructions given."}
-   :agent/expertise
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a description of what the agent is good at (used in surrogates, at least)."}
-   :agent/instruction-path
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "as it is used by OpenAI circa 2025."}
-   :agent/instruction-string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "This is only used with surrogates, it is the system instruction verbatim. Idea is I can't run SUR: for things like a music school."}
-   :agent/llm-provider
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "Currently either :openai or :azure."}
-   :agent/model-class
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "One of the classes of LLM model defined in the system. See llm.clj."}
-   :agent/pid
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "This is used to distinguish runnable agents affiliated with projects from their templates in the system DB."}
-   :agent/response-format-path
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "as it is used by OpenAI circa 2025."}
-   :agent/surrogate?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "True if the agent is a human surrogate."}
-   :agent/thread-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An OpenAI assistant thread (a string) uniquely identifying the thread on which this surrogate operates."}
-   :agent/timestamp
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "The time at which the agent was created."}
-   :agent/tools
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "as it is used by OpenAI circa 2025."}
-   :agent/vector-store-paths
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/string
-        :doc "as it is used by OpenAI circa 2025."}})
-
-(def db-schema-sys+
-  "Defines content that manages project DBs and their analysis including:
-     - The project's name and db directory
-     - system-level agents
-     - See also db-schema-agent+ which gets merged into this."
-  {;; ------------------------------- EADS
-   :EADS/budget-decrement
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
-        :doc "The cost of each question, decrementing againt a budget for the entire conversation."}
-   :EADS/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "A unique ID for each EADS. The namespace of the keyword is the cid, e.g. :process/flow-shop."}
-   :EADS/msg-str
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The stringified message object, it can be edn/read-string. It is the EDN version of the JSON in resources used by ork."}
-   :EADS/can-produce-visuals
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "Indicates the purpose and instructions given."}
-   ;; ---------------------- project
-   :project/dir ; ToDo: Fix this so that the string doesn't have the root (env var part) of the pathname.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
-        :doc "a string naming a subdirectory containing a project."}
-   :project/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
-        :doc "a keyword matching the one in the same named property of a project database"}
-   :project/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string, same as the :project/name in the project's DB."}
-;;; ---------------------- system
-   :system/agents
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "an agent (OpenAI Assistant) that outputs a vector of clojure maps in response to queries."}
-   :system/default-project-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword,
-        :doc "a keyword providing a project-id clients get when starting up."}
-   :system/EADS
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "EADS objects"}
-   :system/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string, :unique :db.unique/identity
-        :doc "the value 'SYSTEM' to represent a single object holding data such as the current project name."}
-   :system/projects
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "the projects known by the system."}
-   :system/specs
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "spec objects used for checking completion of EADS, etc."}})
-
-;;;========================================================== Project DBs ==========================================
-(def db-schema-proj+
-  "Defines schema for a project plus metadata :mm/info.
-   To eliminate confusion and need for back pointers, each project has its own db.
-   See also db-schema-agent+ which gets merged into this."
-  {;; ---------------------- box
-   :box/string-val
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "boxed value"}
-   :box/number-val
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/number
-        :doc "boxed value"}
-   :box/keyword-val
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "boxed value"}
-   :box/boolean-val
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "boxed value"}
-
-   ;; ---------------------- claim (something believed owing to what users said in interviews)
-   :claim/string
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string :unique :db.unique/identity
-        :doc (str "a stringified fact (in predicate calculus) about the project, similar in concept to planning state fact in the earlier design.\n"
-                  "For example, (:process/production-motivation make-to-stock).")}
-   :claim/conversation-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The conversation from which this claim is founded. Currently a cid."}
-   :claim/question-type
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The question-type (if any) on which this claim is founded."}
-   :claim/confidence
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc "a number [0,1] expressing how strongly we believe the proposition ."}
-
-   ;; ---------------------- conversation
-   :conversation/active-EADS-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc (str "The id of the EADS instructions which is currently being pursued in this conversation.\n"
-                  "If the conversation doesn't have one, functions such as ork/get-EADS-id can determine it using the project's orchestrator agent."
-                  "Though only one EADS can truely be active at a time, we index the active-EADS-id by [pid, cid] because other conversations "
-                  "could still need work. See also :project/active-EADS-id")}
-   :conversation/status
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc (str "A keyword that specifies the status of the conversation. Thus far, the only values are :eads-exhausted :in-progress, and "
-                  ":not-started. :in-progress only means that this conversation can be pursued further. For this conversation to be the one "
-                  "currently being pursued, it must also be the case that :project/active-conversation is this conversation.")}
-   :conversation/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a keyword uniquely identifying the kind of conversation; so far just #{:process :data :resources :optimality}."}
-   :conversation/messages
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the messages between the interviewer and interviewees of the conversation."}
-
-   ;; ---------------------- summary data structures
-   :dstruct/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "the EADS-id uniquely identifying the summary data structure."}
-   :dstruct/str
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string that can be edn/read-string to the data structure."}
-   :dstruct/budget-left
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/double
-        :doc "the amount of budget left for questioning."}
-
-   ;; ---------------------- message
-   :message/answers-question
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc "an optional property that refers to a :message/id of a question for which this response is deemed to be a answer."}
-   :message/code
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "Code produced at this point in the conversation."}
-   :message/code-execution
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "Result of running code produced at this point in the conversation."}
-   :message/content
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string with optional html links."}
-   :message/EADS-data-structure
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "a string that can be edn/read-string into an EADS data structure inferred from conversation so far."}
-   :message/from
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The agent issuing the message, #{:human :surrogate :system}."}
-   :message/graph
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An optional graph that is the response, or part of the response of a user."}
-   :message/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/long
-        :doc (str "The unique ID of a message. These are natural numbers starting at 0, but owing to 'LLM:' prompts,\n"
-                  "which aren't stored, some values can be skipped. Because these are not unique to the DB, they are not :db.unique/identity.")}
-   :message/pursuing-EADS
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The EADS being pursued by this question or answer, if any."}
-   :message/question-type
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "A label (from interview instructions) associated with this question or answer."}
-   :message/tags
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/keyword
-        :doc "Optional keywords used to classify the message."}
-   :message/table
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "An optional table that is the response, or part of the response of a user, or is produced by an interviewer.."}
-   :message/time
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/instant
-        :doc "The time at which the message was sent."}
-
-   ;; ---------------------- project -- the top-level object in the db/file.
-   :project/active-conversation
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc (str "The conversation most recently busy, #{:process...}. Note that several conversations can still need work, and there can "
-                  "be an :conversation/active-EADS-id on several, however, this is the conversation to start if coming back to the project.")}
-   :project/active-EADS-id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc "The most recently purused EADS in the project. See also :conversation/active-EADS-id."}
-   :project/agents
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,
-        :doc "an agent (OpenAI Assistant, etc.) that outputs a vector of clojure maps in response to queries."}
-   :project/claims
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "the collection of things we believe about the project as logical statements."}
-   :project/conversations
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "The conversations of this project."}
-
-   :project/desc ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "the original paragraph written by the user describing what she/he wants done."}
-   :project/execution-status ; ToDo: If we keep this at all, it would be an annotation on an ordinary :message/content.
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
-        :doc ":running means resume-conversation can work (not that it necessarily is)
-              :paused means resume-conversation will not work."}
-   :project/id
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword :unique :db.unique/identity
-        :doc "a lowercase kebab-case keyword naming a project; unique to the project."}
-   :project/name
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "4 words or so describing the project; e.g. 'craft brewing production scheduling'"}
-   :project/ork-aid
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc "The orchestrator agent id (OpenAI notion)."}
-   :project/ork-tid
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
-        :doc (str "The thread-id of orchestrator agent.\n"
-                  "When this does not match the current ork-agent, "
-                  "the agent needs a more expansive CONVERSATION-HISTORY message for the conversation.")}
-   :project/summary-dstructs
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "'summary' data structures indexed by their EADS-id, :dstruct/id."}
-   :project/surrogate
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/ref
-        :doc "the project's surrogate object, if any."}
-   :project/surrogate? ; ToDo: Not used?
-   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
-        :doc "true if domain expertise is provided by an artificial agent."}
-   :project/tables
-   #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref
-        :doc "true if domain expertise is provided by an artificial agent."}})
-
 (def ^:diag diag (atom nil))
-(def db-schema-sys (-> db-schema-sys+ (merge db-schema-agent+) datahike-schema))
-(def db-schema-proj (-> db-schema-proj+ (merge db-schema-agent+) datahike-schema))
-(def project-schema-key? (-> db-schema-proj+ (merge db-schema-agent+) keys set))
 
 ;;; ------------------------------------------------- projects ----------------------------------------------------
 (defn project-exists?
@@ -288,39 +28,43 @@
    (the entity id of the map containing :project/id in the database named by the argumen project-id)."
   ([pid] (project-exists? pid nil))
   ([pid warn?]
-   (assert (keyword? pid))
-   (let [res (and (some #(= % pid) (sutil/db-ids))
-                  (d/q '[:find ?e .
-                         :in $ ?pid
-                         :where
-                         [?e :project/id ?pid]]
-                       @(connect-atm pid) pid))]
-     (when (and warn? (not res))
-       (log! :warn (str "No project found for pid = " pid)))
-     res)))
+   (let [pid (if @mocking? (shadow-pid pid) pid)]
+     (assert (keyword? pid))
+     (let [res (and (some #(= % pid) (sutil/db-ids))
+                    (d/q '[:find ?e .
+                           :in $ ?pid
+                           :where
+                           [?e :project/id ?pid]]
+                         @(connect-atm pid) pid))]
+       (when (and warn? (not res))
+         (log! :warn (str "No project found for pid = " pid)))
+       res))))
 
 (defn get-execution-status
   "Returns the execution status keyword (currently just :running or :paused)."
   [pid]
-  (d/q '[:find ?stat .
-         :where [_ :project/execution-status ?stat]]
-       @(connect-atm pid)))
+  (let [pid (if @mocking? (shadow-pid pid) pid)]
+    (d/q '[:find ?stat .
+           :where [_ :project/execution-status ?stat]]
+         @(connect-atm pid))))
 
 (defn put-execution-status!
   "Returns the execution status keyword (currently just :running or :paused)."
   [pid status]
-  (assert (#{:running :paused} status))
-  (when-let [eid (project-exists? pid true)]
-    (d/transact (connect-atm pid) {:tx-data [{:db/id eid
-                                              :project/execution-status status}]})))
+   (let [pid (if @mocking? (shadow-pid pid) pid)]
+     (assert (#{:running :paused} status))
+     (when-let [eid (project-exists? pid true)]
+       (d/transact (connect-atm pid) {:tx-data [{:db/id eid
+                                                 :project/execution-status status}]}))))
 
 (defn set-execution-status!
   "This is just a call to  put-execution-status! for use by clients.
    It is ws/registered."
-  [{:keys[pid status]}]
-  (assert (#{:running :paused} status))
-  (log! :info (str "Setting execution-status to " status))
-  (put-execution-status! pid status))
+  [{:keys [pid status]}]
+  (let [pid (if @mocking? (shadow-pid pid) pid)]
+    (assert (#{:running :paused} status))
+    (log! :info (str "Setting execution-status to " status))
+    (put-execution-status! pid status)))
 
 (defn get-project-name [pid]
   (when-let [eid (project-exists? pid)]
@@ -548,10 +292,19 @@
          (add-project-to-system pid pname db-dir)
          (register-db pid cfg)
          (let [content (if content
-                         (-> content (assoc :project/id pid) (assoc :project/name pname) vector)
-                         (->> backup-file slurp edn/read-string))]
+                         (-> content (assoc :project/id pid) (assoc :project/name pname))
+                         (->> backup-file slurp edn/read-string first))
+               ;; Update the surrogate agent, if any, to have the argument pid as its base-type.
+               content (if (:project/agents content)
+                         (update content :project/agents
+                                 (fn [agents]
+                                   (mapv (fn [agent] (if (:agent/surrogate? agent)
+                                                       (assoc agent :agent/base-type pid)
+                                                       agent))
+                                         agents)))
+                         content)]
            (d/transact (connect-atm pid) db-schema-proj)
-           (d/transact (connect-atm pid) {:tx-data content}))
+           (d/transact (connect-atm pid) {:tx-data [content]}))
          cfg)
        (log! :error (str "Not recreating DB because backup file does not exist: " backup-file))))))
 
@@ -569,33 +322,37 @@
 (defn get-active-cid
   "Get what the DB asserts is the project's current conversation CID, or :process if it doesn't have a value."
   [pid]
-  (or (d/q '[:find ?cid . :where [_ :project/active-conversation ?cid]] @(connect-atm pid))
-      :process))
+  (let [pid (if @mocking? (shadow-pid pid) pid)]
+    (or (d/q '[:find ?cid . :where [_ :project/active-conversation ?cid]] @(connect-atm pid))
+        :process)))
 
 (defn put-active-cid!
   [pid cid]
-  (assert (#{:process :data :resources :optimality} cid))
-  (if-let [eid (project-exists? pid)]
-    (d/transact (connect-atm pid) {:tx-data [{:db/id eid
-                                              :project/active-conversation cid}]})
-    (log! :error "Could not put-active-cid!")))
+   (let [pid (if @mocking? (shadow-pid pid) pid)]
+     (assert (#{:process :data :resources :optimality} cid))
+     (if-let [eid (project-exists? pid)]
+       (d/transact (connect-atm pid) {:tx-data [{:db/id eid
+                                                 :project/active-conversation cid}]})
+       (log! :error "Could not put-active-cid!"))))
 
 (defn get-project-active-EADS-id
   [pid]
-  (d/q '[:find ?eads-id .
-         :where
-         [_ :project/active-EADS-id ?eads-id]]
-       @(connect-atm pid)))
+  (let [pid (if @mocking? (shadow-pid pid) pid)]
+    (d/q '[:find ?eads-id .
+           :where
+           [_ :project/active-EADS-id ?eads-id]]
+         @(connect-atm pid))))
 
 (declare system-EADS?)
 
 (defn put-project-active-EADS-id!
   [pid eads-id]
-  (assert ((system-EADS?) eads-id))
-  (if-let [eid (project-exists? pid)]
-    (d/transact (connect-atm pid) {:tx-data [{:db/id eid
-                                              :project/active-EADS-id eads-id}]})
-    (log! :error "Project does not exist.")))
+  (let [pid (if @mocking? (shadow-pid pid) pid)]
+    (assert ((system-EADS?) eads-id))
+    (if-let [eid (project-exists? pid)]
+      (d/transact (connect-atm pid) {:tx-data [{:db/id eid
+                                                :project/active-EADS-id eads-id}]})
+      (log! :error "Project does not exist."))))
 
 ;;; --------------------------------------- System db -----------------------------------------------------------
 (defn get-system
@@ -719,24 +476,25 @@
 (defn get-claims
   "Return the planning state set (a collection of ground propositions) for the argument project, or #{} if none."
   [pid & {:keys [objects?]}]
-  (let [conn @(connect-atm pid)]
-    (if objects?
-      (let [eids (d/q '[:find [?eid ...] :where [?eid :claim/string]] conn)]
-        (for [eid eids]
-          (let [{:claim/keys [string conversation-id question-type confidence]}
-                (dp/pull conn '[*] eid)]
-            (cond-> {:claim (edn/read-string string)}
-              conversation-id (assoc :conversation-id conversation-id)
-              question-type (assoc :question-type question-type)
-              confidence (assoc :confidence confidence)))))
-      ;; Otherwise just return predicate forms
-      (if-let [facts (d/q '[:find [?s ...]
-                            :where
-                            [_ :project/claims ?pp]
-                            [?pp :claim/string ?s]]
-                          conn)]
-        (-> (mapv edn/read-string facts) set)
-        #{}))))
+   (let [pid (if @mocking? (shadow-pid pid) pid)
+         conn @(connect-atm pid)]
+       (if objects?
+         (let [eids (d/q '[:find [?eid ...] :where [?eid :claim/string]] conn)]
+           (for [eid eids]
+             (let [{:claim/keys [string conversation-id question-type confidence]}
+                   (dp/pull conn '[*] eid)]
+               (cond-> {:claim (edn/read-string string)}
+                 conversation-id (assoc :conversation-id conversation-id)
+                 question-type (assoc :question-type question-type)
+                 confidence (assoc :confidence confidence)))))
+         ;; Otherwise just return predicate forms
+         (if-let [facts (d/q '[:find [?s ...]
+                               :where
+                               [_ :project/claims ?pp]
+                               [?pp :claim/string ?s]]
+                             conn)]
+           (-> (mapv edn/read-string facts) set)
+           #{}))))
 
 (s/def ::claim (s/keys :req-un [:claim/string :claim/cid] :opt-un [:claim/q-type :claim/confidence]))
 (s/def :claim/string string?)
@@ -747,17 +505,18 @@
 (defn add-claim!
   "Add the argument vector of ground proposition to state, a set. Returns true."
   [pid {:keys [string cid q-type confidence] :as claim}]
-  (s/assert ::claim claim)
-  (assert (s/valid? ::claim claim))
-  (let [conn (connect-atm pid)
-        eid (d/q '[:find ?eid . :where [?eid :project/claims]] @conn)]
-    (d/transact conn {:tx-data [{:db/id eid
-                                 :project/claims
-                                 (cond-> {:claim/string string}
-                                   cid (assoc :claim/conversation-id cid)
-                                   q-type (assoc :claim/question-type q-type)
-                                   confidence (assoc :claim/confidence confidence))}]}))
-  true)
+  (let [pid (if @mocking? (shadow-pid pid) pid)]
+    (s/assert ::claim claim)
+    (assert (s/valid? ::claim claim))
+    (let [conn (connect-atm pid)
+          eid (d/q '[:find ?eid . :where [?eid :project/claims]] @conn)]
+      (d/transact conn {:tx-data [{:db/id eid
+                                   :project/claims
+                                   (cond-> {:claim/string string}
+                                     cid (assoc :claim/conversation-id cid)
+                                     q-type (assoc :claim/question-type q-type)
+                                     confidence (assoc :claim/confidence confidence))}]}))
+    true))
 
 ;;; --------------------------------------- Conversations ---------------------------------------------------------------------
 (def conversation-intros
@@ -789,7 +548,7 @@
   "Add an intro describing the topic and rationale of the conversation."
   [pid]
   (doseq [cid [:process :data :resources :optimality]]
-    (add-msg {:pid pid :cid cid :from :system :text (get conversation-intros cid) :tags [:conversation-intro]})))
+    (add-msg {:pid pid :cid cid :from :system :full-text (get conversation-intros cid) :tags [:conversation-intro]})))
 
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
@@ -858,16 +617,16 @@
   "Create a message object and add it to current conversation of the database with :project/id = id.
    Return the :message/id.
    Note that this doesn't handle :message/answers-question. That is typically done with update-msg."
-  [{:keys [pid cid from text table tags question-type pursuing-EADS]}]
+  [{:keys [pid cid from full-text table tags question-type pursuing-EADS]}]
   (assert (keyword? cid))
   (assert (#{:system :human :surrogate :developer-injected} from))
-  (assert (string? text))
+  (assert (string? full-text))
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid cid))
           pursuing-EADS (or pursuing-EADS (get-active-EADS-id pid cid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
-                                   :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content text}
-                                                            table (assoc :message/table table)
+                                   :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content full-text}
+                                                            table (assoc :message/table (str table))
                                                             (not-empty tags) (assoc :message/tags tags)
                                                             question-type (assoc :message/question-type question-type)
                                                             pursuing-EADS (assoc :message/pursuing-EADS pursuing-EADS))}]})

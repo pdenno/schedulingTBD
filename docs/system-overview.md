@@ -41,48 +41,6 @@ Structured interview conversations with four main topics:
 3. **Resources** - Cataloging available resources (people, machines)
 4. **Optimality** - Defining what constitutes a "good" schedule
 
-## Key Functionalities
-
-### WebSocket Operations
-- **`:start-conversation`**: Initiates a new conversation context
-- **`:resume-conversation`**: Manages ongoing conversation states
-- **`:load-proj`**: Loads and initializes project-related conversations
-- **`:domain-expert-says`**: Handles domain expert responses
-- **`:ask-llm`**: Facilitates interactions with language models for advanced insights
-
-### Intelligent Orchestration
-- The ORK manager makes dynamic decisions about which questions to ask next
-- Budget management ensures efficient use of LLM resources
-- Automatic transitions between different interview phases
-
-### Structured Knowledge Capture
-- EADS templates ensure consistent data collection
-- ORM modeling creates precise data relationships
-- Example data generation for testing and validation
-
-### Domain Flexibility
-- Surrogate agents can represent any scheduling domain
-- Generic framework adapts to different problem types
-- Extensible EADS templates for new domains
-
-## Example: Music School Scheduling
-
-When running `(orkt/music-school)`, the system:
-
-1. **Creates a surrogate** representing a music school operator
-2. **Classifies the problem** as a timetabling problem (not cyclical, not continuous)
-3. **Gathers timetabling details**:
-   - Individual student lessons (30/45/60 minutes)
-   - Instructor room reservations
-   - Room equipment requirements (pianos, drums, soundproofing)
-   - Time preferences (3PM-9PM, Monday-Saturday)
-   - Priority rules (student lessons > instructor reservations)
-4. **Models the data**:
-   - Student information (name, instrument, skill level, availability)
-   - Instructor information (name, instruments taught, preferred blocks)
-   - Room details (equipment, capacity, maintenance schedules)
-   - Lesson schedules and constraints
-
 ## Technical Implementation
 
 ### Technologies Used
@@ -120,34 +78,26 @@ When running `(orkt/music-school)`, the system:
 - EADS template progression
 - Data structure refinements
 
-## Benefits
-
-1. **Automated Requirements Elicitation**: No manual analysis needed
-2. **Domain Agnostic**: Works across different scheduling domains
-3. **Structured Approach**: Ensures comprehensive problem understanding
-4. **Executable Solutions**: Generates working MiniZinc models
-5. **Transparent Process**: Detailed logging shows decision-making
-6. **Iterative Refinement**: Agents can ask follow-up questions as needed
-7. **Real-time Interaction**: WebSocket support for interactive sessions
-8. **Scalable Architecture**: Multi-agent system handles complex workflows
-
-## Integration Points
-
-- **Machine Learning Models**: OpenAI integration for intelligent agent behavior
-- **Constraint Solving**: MiniZinc backend for optimization
-- **Web Interface**: Real-time browser-based interaction
-- **Logging Infrastructure**: Telemere for monitoring and analysis
 - **Data Persistence**: Structured storage of interview results and models
 
 ## Current Operational Status
 
-- Server runs on Jetty at port 3300 or 3301, depending on configuration.
+- **Server Configuration**: Runs on Jetty with port determined by profile:
+  - **Port 3301**: nREPL sessions (MCP agent development)
+  - **Port 3300**: Regular sessions (`:dev`, `:prod`, `:test` profiles)
+  - Configuration located in `resources/system.edn`
 - OpenAI models actively used for agent processing
 - Dynamic HTTP handler route updates
 - Real-time conversation management
 - Comprehensive agent activity logging
 
 ## Development Workflow
+
+ - You start the system using the clojure form (start) in a repl in the user namespace.
+ - We use consistent naming for namespace aliases in conversation with MCP-based code pilots. To establish these aliases, use (ns-setup!) after starting.
+ - See env/dev/develop/repl.clj to see the implementation of ns-setup! and the correspondence between aliases and namespaces.
+ - If the system get hosed, you can often fix things with (restart). If aliases get messed up (a current problem) you can do (undo-ns-setup!) and then (ns-setup!) again.
+ - There are concepts for which we always use the same variable names: pid for project-id (a keyword); cid for conversation ID, one of #{:process, :data, :resources, :optimality}.
 
 ### Current Status
 - ✅ Multi-agent interview system operational
@@ -204,15 +154,12 @@ The system architecture supports:
 
 ## Some Guidelines for AI MCP-based Coding Copilots
 
-1. Preserve exact formatting and whitespace when making any edits
-2. Use the MCP Clojure editing tools for precise, surgical changes
-3. Only modify what needs to be changed without reformatting entire sections
-4. Allow sufficient time (30+ seconds) for LLM agent calls as noted in the documentation
+1. Preserve exact formatting and whitespace when making any edits.
+2. Use the MCP Clojure editing tools for precise, surgical changes.
+3. Only modify what needs to be changed without reformatting entire sections.
+4. Allow sufficient time (30+ seconds) for LLM agent calls as noted in the documentation.
 
-If you are asked to run functions of the system that involve calls to LLM-based agents, allow at least 30 seconds for each call to complete.
-Things will timeout by themselves, you should not give up.
-In order to observe system activity, you can watch for logging at the console, and also entries made in logs/agent-logs.txt."
-
+In order to observe system activity, you can watch for logging at the console (REPL), and also entries made in logs/agent-logs.txt."
 
 ---
 

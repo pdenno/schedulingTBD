@@ -8,7 +8,7 @@
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.iviewr.eads] ; for mount
-   [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide output-struct2clj]]
+   [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide mocking? output-struct2clj shadow-pid]]
    [taoensso.telemere             :as tel :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -55,7 +55,8 @@
   "Return a map where keys are EADS ids and values are the EADS data structure from the
    highest :message/id of messages pursuing that EADS."
   [pid cid]
-  (let [msgs (->> cid
+  (let [pid (if @mocking? (shadow-pid pid) pid)
+        msgs (->> cid
                   (db/get-conversation pid)
                   :conversation/messages
                   (filter #(contains? % :message/EADS-data-structure)))
@@ -69,26 +70,28 @@
 (defn add-ds-to-activities
   "Iterate through the activities and just before changing to new pursuing-EADS add the summary DS for the last one."
   [pid activities]
-  (letfn [(make-ds-entry [eads-id] {:summary-DS (db/get-summary-ds pid eads-id)})]
-    (let [result (atom [])
-          current-eads (atom nil)]
-      (doseq [act activities]
-        (if-let [eads-id (:pursuing-EADS act)]
-          (when (not= @current-eads eads-id)
-            (if @current-eads
-              (swap! result into [(make-ds-entry @current-eads) act])
-              (swap! result conj act))
-            (reset! current-eads eads-id))
-          (swap! result conj act)))
-      (if @current-eads
-        (conj @result (make-ds-entry @current-eads))
-        @result))))
+  (let [pid (if @mocking? (shadow-pid pid) pid)]
+    (letfn [(make-ds-entry [eads-id] {:summary-DS (db/get-summary-ds pid eads-id)})]
+      (let [result (atom [])
+            current-eads (atom nil)]
+        (doseq [act activities]
+          (if-let [eads-id (:pursuing-EADS act)]
+            (when (not= @current-eads eads-id)
+              (if @current-eads
+                (swap! result into [(make-ds-entry @current-eads) act])
+                (swap! result conj act))
+              (reset! current-eads eads-id))
+            (swap! result conj act)))
+        (if @current-eads
+          (conj @result (make-ds-entry @current-eads))
+          @result)))))
 
 (defn conversation-activity
   "Create a chronologically-ordered vector of activities for the argument conversation, including q/a pairs,
    changes in the EADS being pursued, and the EADS data structure resulting."
   [pid]
-  (let [msgs
+  (let [pid (if @mocking? (shadow-pid pid) pid)
+        msgs
         (reduce (fn [r cid]
                   (into r (->> (db/get-conversation pid cid)
                                :conversation/messages
@@ -157,24 +160,25 @@
    (And we check that there isn't a new thread since that message.)
    Likewise, we only include the current data-structure if the orchestrator has been around for earlier C-H messages."
   [pid]
-  (if (db/project-exists? pid)
-    (let [warm-up (db/get-summary-ds pid :process/warm-up-with-challenges)
-          observation (:one-more-thing warm-up)
-          challenges (->> warm-up
-                          :scheduling-challenges
-                          (map keyword)
-                          (mapv challenge-key2sentence))
-          itype (if (some #(= (first %) 'surrogate) (db/get-claims pid)) :machine :human)
-          activities (conversation-activity pid)]
-      (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
-      (cond-> {:message-type :CONVERSATION-HISTORY}
-        (not-empty challenges)     (assoc :scheduling-challenges challenges)
+  (let [pid (if @mocking? (shadow-pid pid) pid)]
+    (if (db/project-exists? pid)
+      (let [warm-up (db/get-summary-ds pid :process/warm-up-with-challenges)
+                observation (:one-more-thing warm-up)
+            challenges (->> warm-up
+                            :scheduling-challenges
+                            (map keyword)
+                            (mapv challenge-key2sentence))
+            itype (if (some #(= (first %) 'surrogate) (db/get-claims pid)) :machine :human)
+            activities (conversation-activity pid)]
+        (when (some nil? challenges) (log! :warn "nil scheduling challenge."))
+        (cond-> {:message-type :CONVERSATION-HISTORY}
+          (not-empty challenges)     (assoc :scheduling-challenges challenges)
         (not-empty observation)    (assoc :scheduling-challenge-observation observation)
         true                       (assoc :interviewee-type itype)
         (not-empty activities)     (assoc :activity activities)))
-    {:message-type :CONVERSATION-HISTORY
-     :scheduling-challenges []
-     :activity []}))
+      {:message-type :CONVERSATION-HISTORY
+       :scheduling-challenges []
+       :activity []})))
 
 (s/def ::ork-msg map?) ; ToDo: Write specs for ork messages.
 

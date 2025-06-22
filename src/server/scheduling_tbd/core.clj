@@ -55,7 +55,7 @@
 
 ;;; There's a lot to learn here about the server abstraction; it is explained here: https://github.com/ring-clojure/ring/wiki
 (defn start-server []
-  (let [env-option (->> (clojure.java.basis/initial-basis) :basis-config :aliases (some #(when (#{:dev :prod :test} %) %)))
+  (let [env-option (->> (clojure.java.basis/initial-basis) :basis-config :aliases (some #(when (#{:dev :prod :test :nrepl} %) %)))
         config (-> "system.edn" io/resource slurp edn/read-string)
         port (-> config :server/http :port env-option)
         host (-> config :server/http :host)]

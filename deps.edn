@@ -40,7 +40,7 @@
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
                                            ;;binaryage/devtools            {:mvn/version "1.0.7"} ; ToDo: would use with telemere handler:console-raw.
                                            ;;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
-                                           cider/cider-nrepl               {:mvn/version "0.52.1"}
+                                           cider/cider-nrepl               {:mvn/version "0.55.7"}
                                            com.lambdaisland/classpath      {:mvn/version "0.6.58"}
                                            expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
                                            lilactown/helix                 {:mvn/version "0.2.1"}
@@ -49,13 +49,14 @@
                                            org.clojure/java.classpath      {:mvn/version "1.1.0"}
                                            org.clojure/tools.namespace     {:mvn/version "1.5.0"}}}
 
-           ;; clojure-mpc: nREPL server for AI to connect to; similar to dev, but uses a different port for http (so I can run both).
-           ;; Include all paths you want available for development.
+           ;; clojure-mcp: nREPL server for AI to connect to; similar to dev, but uses a different port for http (so I can run both).
+           ;; Include all paths you want available for development. While running with clojure-mcp/nrepl the server listens on
+           ;; port 3301. See resources/system.edn.
            :nrepl {:extra-paths ["src/server" "test" "env/dev" "resources"]
                    :extra-deps {applied-science/js-interop      {:mvn/version "0.4.2"}
                                 ;;binaryage/devtools              {:mvn/version "1.0.7"} ; ToDo: would use with telemere handler:console-raw.
                                 ;;com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.2.0"}
-                                cider/cider-nrepl               {:mvn/version "0.52.1"}
+                                cider/cider-nrepl               {:mvn/version "0.55.7"}
                                 com.lambdaisland/classpath      {:mvn/version "0.6.58"}
                                 expound/expound                 {:mvn/version "0.9.0"} ; more readable spec messages
                                 lilactown/helix                 {:mvn/version "0.2.1"}
@@ -86,7 +87,7 @@
                                          com.lambdaisland/glogi       {:mvn/version "1.3.169"}
                                          ;com.lambdaisland/chui        {:mvn/version "1.2.205"} ; Still can't find lambdaisland.chui.remote. (start funnel?)
                                          nrepl/nrepl                  {:mvn/version "1.3.1"}
-                                         cider/cider-nrepl            {:mvn/version "0.52.1"}}}
+                                         cider/cider-nrepl            {:mvn/version "0.55.7"}}}
 
            :build    {:deps {io.github.clojure/tools.build {:mvn/version "0.10.9"}}
                       :ns-default build}
@@ -100,7 +101,7 @@
 ;;;
 ;;;   |    :file |                         :name | :current |  :latest |
 ;;;   |----------+-------------------------------+----------+----------|
-;;;   | deps.edn |             cider/cider-nrepl |   0.52.1 |   0.55.7 | ; Skip it. cider wants 0.52.1
+;;;   | deps.edn |             cider/cider-nrepl |   0.55.7 |   0.55.7 | ; Skip it. cider wants 0.52.1... Well, now with clojure-mcp it seems to want 0.55.7, which is what is in ~/.clojure/deps.edn.
 ;;;   |          |           com.taoensso/timbre |    6.7.0 |    6.7.1 |
 ;;;   |          | io.github.clojure/tools.build |   0.10.8 |   0.10.9 |
 ;;;   |          |        io.replikativ/datahike | 0.6.1594 | 0.6.1596 | ; Skip it.

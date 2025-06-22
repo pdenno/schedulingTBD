@@ -128,8 +128,8 @@
            (log! :info (str "SUR's answer:" answer))
            (when (string? answer)
              (ws/send-to-client (assoc chat-args :text answer))
-             (db/add-msg {:pid pid :cid cid :from :system :text question})
-             (db/add-msg {:pid pid :cid cid :from :surrogate :text answer})))
+             (db/add-msg {:pid pid :cid cid :from :system :full-text question})
+             (db/add-msg {:pid pid :cid cid :from :surrogate :full-text answer})))
          (catch Exception e
            (log! :error (str "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message)))
            (ws/send-to-client (assoc chat-args :text "We had a problem answering this questions."))))))

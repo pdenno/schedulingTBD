@@ -7,13 +7,18 @@
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
-   [taoensso.telemere        :refer [log!]])
+   [taoensso.telemere        :as tel])
   (:import ; ToDo: Why does clj-kondo complain?
    java.net.URI
    java.nio.file.StandardCopyOption
    java.nio.file.Paths))
 
 (def ^:diag diag (atom nil))
+
+(defn log!
+  "This is to keep cider stepping from stumbling over the telemere log! macro."
+  [log-key s]
+  (tel/log! log-key s))
 
 ;(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
 (def default-llm-provider "Default provider to use. Choices are #{:openai :azure}." (atom :openai)) ; Values are azure and :openai
@@ -283,3 +288,32 @@
               (run! ddr (.listFiles file)))
             (io/delete-file file))]
     (-> path java.io.File. ddr)))
+
+;;;--------------------------------------- Shared stuff for mocking ----------------
+
+(def mocking?
+  "This is set to true when we start mocking a project execution."
+  (atom false))
+
+(defn shadow-pid
+  "Return a shadow pid, if the argument is a shadow-pid, return the argument."
+  [pid]
+  (let [[success? _normal-pid] (re-matches #"^(.+)\-\-temp$" (name pid))]
+    (if success?
+      pid
+      (-> pid name (str "--temp") keyword))))
+
+(defn normal-pid
+  "When given a shadow-pid, return the normal pid."
+  [pid]
+  (let [[success? normal-pid] (re-matches #"^(.+)\-\-temp$" (name pid))]
+    (if success?
+      (keyword normal-pid)
+      pid)))
+
+
+(defn get-mocked-dispatch
+  [tag _agent-id]
+  tag)
+
+(defmulti get-mocked-by-role! #'get-mocked-dispatch)
