@@ -38,7 +38,7 @@
                   :else             obj))]
   (-> (adb/query-agent (adb/ensure-agent! :uniform-durations)
                        (sutil/clj2json-pretty input-clj))
-      (sutil/output-struct2clj)
+      (sutil/ai-response2clj)
       unit2k)))
 
 (defn serial-precedence-constraints

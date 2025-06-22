@@ -94,21 +94,30 @@
                      :keep-set #{:project/name :project/id}))))
 
 (defn list-projects
-  "Return a vector of keywords maps describing each project known by the system DB."
-  ([] (list-projects {:from-storage? false}))
-  ([{:keys [from-storage?]}]
-   (if from-storage?
-     (if-let [base-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
-       (let [files (-> base-dir (str "/projects/") clojure.java.io/file .listFiles)]
-         (mapv #(-> % .getName keyword) files))
-       (throw (ex-info "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases." {})))
-     ;; Otherwise we list using system db. These are the 'legitmate' projects in the project datebase
+  "Return a vector of keywords maps describing each project known by the system DB.
+   Three viewpoints set by option-map property :view :
+     1) :system (default) -- what the system DB has registered,
+     2) :registry         -- what the db registry has a datahike cfg for (include in-mem)
+     3) :files            -- what there are DB files for in the environment var."
+  ([] (list-projects {:view :system}))
+  ([{:keys [view]}]
+   (case view
+     :system
      (-> (d/q '[:find [?proj-id ...]
                 :where
                 [?e :project/id ?proj-id]]
               @(connect-atm :system))
          sort
-         vec))))
+         vec)
+
+     :registry
+     (-> @sutil/databases-atm keys sort)
+
+     :files
+     (if-let [base-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
+       (let [files (-> base-dir (str "/projects/") clojure.java.io/file .listFiles)]
+         (mapv #(-> % .getName keyword) files))
+       (throw (ex-info "Set the environment variable SCHEDULING_TBD_DB to the directory containing SchedulingTBD databases." {}))))))
 
 (defn clean-project-for-schema
   "Remove attributes that are no longer in the schema.
@@ -147,7 +156,7 @@
   "Return a vector of directories that the system DB does not know."
   []
   (set/difference
-   (set (list-projects {:from-storage? true}))
+   (set (list-projects {:view :files}))
    (set (list-projects))))
 
 (defn unique-proj
@@ -858,7 +867,7 @@
 (defn register-project-dbs
   "Make a config for each project and register it."
   []
-  (doseq [id (list-projects {:from-storage? true})]
+  (doseq [id (list-projects {:view :files})]
     (register-db id (db-cfg-map {:type :project :id id}))))
 
 (defn init-dbs

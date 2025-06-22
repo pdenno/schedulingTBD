@@ -1,0 +1,343 @@
+[
+#:project{:execution-status :running,
+          :conversations
+          [#:conversation{:active-EADS-id :process/flow-shop,
+                          :id :process,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered. It is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL) through which together we design a solution to your scheduling problem. You can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-20T15:37:00.706-00:00"}
+                           #:message{:content
+                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 2,
+                                     :pursuing-EADS
+                                     :process/warm-up-with-challenges,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:37:52.748-00:00"}
+                           #:message{:answers-question 2,
+                                     :pursuing-EADS
+                                     :process/warm-up-with-challenges,
+                                     :from :surrogate,
+                                     :id 3,
+                                     :time
+                                     #inst "2025-06-20T15:37:52.769-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/warm-up-with-challenges, :commit-notes \"First commit: identified product/service name, scheduling challenges, and additional observations.\", :data-structure {:product-or-service-name {:val \"craft beers\", :comment \"Based on their response, 'craft beers' is a concise way to capture the variety of products they mentioned.\"}, :scheduling-challenges {:val [\"process-variation\" \"demand-uncertainty\" \"variation-in-demand\" \"raw-material-uncertainty\" \"bottleneck-processes\"], :comment \"These challenges were inferred from their mention of coordinating multiple production processes, variability in demand, ingredient availability, and limited tank capacity.\"}, :one-more-thing {:val \"Their challenges might also involve meeting strict quality timelines linked to fermentation and conditioning stages.\", :comment \"This observation was inferred based on their mention of 'strict timelines for quality.'\"}}}",
+                                     :content
+                                     "We produce various craft beers, including ales, lagers, stouts, and IPAs. Our scheduling challenge involves coordinating production steps like brewing, fermenting, conditioning, packaging, and distribution, all while managing limited tank capacity, ingredient availability, and strict timelines for quality. We also face variability in demand and seasonal product changes, which adds complexity to planning and resource allocation."}
+                           #:message{:content
+                                     "Do the production steps for your various craft beers follow the same sequence, or do they vary depending on the type of beer being produced?",
+                                     :from :system,
+                                     :id 4,
+                                     :pursuing-EADS
+                                     :process/scheduling-problem-type,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:38:22.522-00:00"}
+                           #:message{:answers-question 4,
+                                     :pursuing-EADS
+                                     :process/scheduling-problem-type,
+                                     :from :surrogate,
+                                     :id 5,
+                                     :time
+                                     #inst "2025-06-20T15:38:22.545-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/scheduling-problem-type, :commit-notes \"Determined the principal problem type and noted variations in beer production timing and requirements.\", :data-structure {:principal-problem-type {:val \"FLOW-SHOP-SCHEDULING-PROBLEM\", :comment \"The production steps follow a fixed sequence (mashing, boiling, fermenting, conditioning, packaging), which is characteristic of a flow-shop structure.\"}, :problem-components {:val [\"FLOW-SHOP-SCHEDULING-PROBLEM\" \"JOB-SHOP-SCHEDULING-PROBLEM\"], :comment \"While the sequence is fixed overall, variations in timing, temperature, and other requirements for different beer types suggest elements of a job-shop scheduling problem.\"}, :continuous? {:val false, :comment \"The process is not continuous since it involves distinct steps like fermenting and conditioning, each requiring specific durations.\"}, :cyclical? {:val false, :comment \"Production is not cyclical because of variability in demand and production adjustments for different beer types.\"}}}",
+                                     :content
+                                     "The production steps generally follow the same sequence—mashing, boiling, fermenting, conditioning, and packaging—but the timing and specific requirements (like temperature, yeast strains, and conditioning duration) vary depending on the type of beer. For example, lagers require longer fermentation at cooler temperatures compared to ales."}
+                           #:message{:content
+                                     "Could you provide an overview of your complete beer production process? For instance, what are the key production steps, their sequence, and any inputs or equipment used at each step?",
+                                     :from :system,
+                                     :id 6,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:38:58.671-00:00"}
+                           #:message{:answers-question 6,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
+                                     :id 7,
+                                     :time
+                                     #inst "2025-06-20T15:38:58.689-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"First commit: identified primary processes, their inputs, outputs, and key equipment. Added detailed subprocesses for beer production.\", :data-structure {:process-id \"beer-production\", :subprocesses [{:process-id \"milling-and-mashing\", :inputs [\"malted barley\" \"water\"], :outputs [\"wort\"], :resources [\"mill\" \"mash tun\"], :subprocesses [], :comment \"Crush grains and mix with hot water to extract sugars.\"} {:process-id \"boiling\", :inputs [{:item-id \"wort\", :from \"milling-and-mashing\"} \"hops\"], :outputs [\"hopped wort\"], :resources [\"kettle/boil tun\"], :subprocesses [], :comment \"Boil wort and add hops for bitterness, flavor, and aroma.\"} {:process-id \"cooling-and-fermenting\", :inputs [{:item-id \"hopped wort\", :from \"boiling\"} \"yeast\"], :outputs [\"fermented beer\"], :resources [\"heat exchangers\" \"fermentation tanks\"], :subprocesses [], :comment \"Cool wort to specific temperatures and add yeast for fermentation.\"} {:process-id \"conditioning-and-maturation\", :inputs [{:item-id \"fermented beer\", :from \"cooling-and-fermenting\"} \"time\"], :outputs [\"conditioned beer\"], :resources [\"conditioning tanks\"], :subprocesses [], :comment \"Mature beer to develop desired flavors.\"} {:process-id \"filtration\", :optional? {:val true, :comment \"'Optional?' means this process occurs depending on the beer being produced.\"}, :inputs [{:item-id \"conditioned beer\", :from \"conditioning-and-maturation\"} {:item-id \"filtration media\"}], :outputs [\"filtered beer\"], :resources [\"filter systems\"], :subprocesses [], :comment \"Clarify the beer, if required.\"} {:process-id \"packaging\", :inputs [{:item-id \"conditioned beer\", :from \"conditioning-and-maturation\"} \"bottles\" \"cans\" \"kegs\" \"CO2\"], :outputs [\"packaged beer\"], :resources [\"packaging lines\" \"sanitizers\"], :subprocesses [], :comment \"Pack beer into final containers for distribution.\"}]}}",
+                                     :content
+                                     "Here’s an overview of our beer production process:\n\n1. <b>Milling & Mashing</b>  \n   - <b>Inputs</b>: Malted barley, water  \n   - <b>Equipment</b>: Mill, mash tun  \n   - Crush grains and mix with hot water to extract sugars.\n\n2. <b>Boiling</b>  \n   - <b>Inputs</b>: Wort (from mashing), hops  \n   - <b>Equipment</b>: Kettle/boil tun  \n   - Boil wort and add hops for bitterness, flavor, and aroma.\n\n3. <b>Cooling & Fermenting</b>  \n   - <b>Inputs</b>: Yeast  \n   - <b>Equipment</b>: Heat exchangers, fermentation tanks  \n   - Cool wort to specific temperatures and add yeast for fermentation.\n\n4. <b>Conditioning & Maturation</b>  \n   - <b>Inputs</b>: Time (varies per beer type)  \n   - <b>Equipment</b>: Conditioning tanks  \n   - Mature beer to develop desired flavors.\n\n5. <b>Filtration (Optional)</b>  \n   - <b>Inputs</b>: Filtration media (if applicable)  \n   - <b>Equipment</b>: Filter systems  \n   - Clarify the beer, if required.\n\n6. <b>Packaging</b>  \n   - <b>Inputs</b>: Bottles, cans, kegs, CO2  \n   - <b>Equipment</b>: Packaging lines, sanitizers  \n   - Pack beer into final containers for distribution.  \n\nThis sequence applies broadly but varies slightly in timing and specifics for each beer type."}
+                           #:message{:content
+                                     "Could you provide the approximate duration for each production step in your beer production process? For example, milling & mashing, boiling, cooling & fermenting, conditioning, filtration (if done), and packaging?",
+                                     :from :system,
+                                     :id 8,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:39:20.808-00:00"}
+                           #:message{:answers-question 8,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
+                                     :id 9,
+                                     :time
+                                     #inst "2025-06-20T15:39:20.828-00:00",
+                                     :tags [:response],
+                                     :table
+                                     "{:table-headings [{:title \"Production Step\", :key :production-step} {:title \"Duration\", :key :duration}], :table-body [{:production-step \"Milling & Mashing\", :duration \"4-6 hours\"} {:production-step \"Boiling\", :duration \"1-2 hours\"} {:production-step \"Cooling & Fermenting\", :duration \"7-14 days (or longer for lagers)\"} {:production-step \"Conditioning & Maturation\", :duration \"5-14 days (depending on beer type)\"} {:production-step \"Filtration (If done)\", :duration \"2-4 hours\"} {:production-step \"Packaging\", :duration \"1-2 days\"}]}",
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :process/flow-shop, :commit-notes \"Added durations to each production step in the beer production process.\", :data-structure {:process-id \"beer-production\", :subprocesses [{:process-id \"milling-and-mashing\", :inputs [\"malted barley\" \"water\"], :outputs [\"wort\"], :resources [\"mill\" \"mash tun\"], :duration {:units \"hours\", :value-string \"4-6\"}, :subprocesses [], :comment \"Crush grains and mix with hot water to extract sugars.\"} {:process-id \"boiling\", :inputs [{:item-id \"wort\", :from \"milling-and-mashing\"} \"hops\"], :outputs [\"hopped wort\"], :resources [\"kettle/boil tun\"], :duration {:units \"hours\", :value-string \"1-2\"}, :subprocesses [], :comment \"Boil wort and add hops for bitterness, flavor, and aroma.\"} {:process-id \"cooling-and-fermenting\", :inputs [{:item-id \"hopped wort\", :from \"boiling\"} \"yeast\"], :outputs [\"fermented beer\"], :resources [\"heat exchangers\" \"fermentation tanks\"], :duration {:units \"days\", :value-string \"7-14 (or longer for lagers)\"}, :subprocesses [], :comment \"Cool wort to specific temperatures and add yeast for fermentation.\"} {:process-id \"conditioning-and-maturation\", :inputs [{:item-id \"fermented beer\", :from \"cooling-and-fermenting\"} \"time\"], :outputs [\"conditioned beer\"], :resources [\"conditioning tanks\"], :duration {:units \"days\", :value-string \"5-14 (depending on beer type)\"}, :subprocesses [], :comment \"Mature beer to develop desired flavors.\"} {:process-id \"filtration\", :optional? {:val true, :comment \"'Optional?' means this process occurs depending on the beer being produced.\"}, :inputs [{:item-id \"conditioned beer\", :from \"conditioning-and-maturation\"} {:item-id \"filtration media\"}], :outputs [\"filtered beer\"], :resources [\"filter systems\"], :duration {:units \"hours\", :value-string \"2-4\"}, :subprocesses [], :comment \"Clarify the beer, if required.\"} {:process-id \"packaging\", :inputs [{:item-id \"conditioned beer\", :from \"conditioning-and-maturation\"} \"bottles\" \"cans\" \"kegs\" \"CO2\"], :outputs [\"packaged beer\"], :resources [\"packaging lines\" \"sanitizers\"], :duration {:units \"days\", :value-string \"1-2\"}, :subprocesses [], :comment \"Pack beer into final containers for distribution.\"}]}}",
+                                     :content
+                                     "Here are the approximate durations for each production step:\n\n\n\nThese times can vary depending on the recipe, beer type, and production scale.",
+                                     :code
+                                     "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|0.500, 1.750, 1.250, 0.750, 252.000, 444.000, 3.000, 36.000, 4.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, nil] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, nil] > 0);\n\n% Every other task can start after the previous task ends.\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, nil]);"}
+                           #:message{:content
+                                     "Let's start with customer orders. For each order, do you track details like order number, product types, quantities, due dates, and customers? Are there any additional details you maintain?",
+                                     :from :system,
+                                     :id 10,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:40:25.719-00:00"}
+                           #:message{:answers-question 10,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
+                                     :id 11,
+                                     :time
+                                     #inst "2025-06-20T15:40:25.745-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :data/orm, :commit-notes \"Defined objects and fact types for 'customer-orders' inquiry area based on the provided details.\", :data-structure {:inquiry-areas [{:inquiry-area-id {:val \"customer-orders\", :comment \"Captures details related to customer orders, including products, quantities, due dates, and customer information.\"}, :inquiry-area-objects {:val [{:object-id \"order\", :definition \"A unique identifier for a customer order.\"} {:object-id \"product-type\", :definition \"The specific beer types associated with an order.\"} {:object-id \"quantity\", :definition \"Amount of each product type ordered.\"} {:object-id \"due-date\", :definition \"The date by which the order is scheduled for delivery to the customer.\"} {:object-id \"customer\", :definition \"The name and contact information of the individual or organization placing the order.\"} {:object-id \"special-requirements\", :definition \"Additional instructions or conditions for the order, such as special packaging or labeling.\"} {:object-id \"priority-level\", :definition \"The priority assigned to the order (if multiple orders overlap).\"}]}, :fact-types {:val [{:fact-type-id \"ORDER-has-PRODUCT-TYPE\", :arity 2, :objects [\"order\" \"product-type\"], :reference-modes [\"order-number\" \"product-code\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"key1\"]], :examples {:column-headings [\"order-number\" \"product-code\"], :rows [[\"ORD-001\" \"IPA-123\"] [\"ORD-002\" \"STOUT-456\"] [\"ORD-003\" \"ALE-789\"]]}} {:fact-type-id \"ORDER-includes-QUANTITY\", :arity 3, :objects [\"order\" \"product-type\" \"quantity\"], :reference-modes [\"order-number\" \"product-code\" \"amount\"], :deontic-keys [\"mandatory\" \"mandatory\" \"\"], :uniqueness [[\"key1\" \"key1\" \"\"]], :examples {:column-headings [\"order-number\" \"product-code\" \"amount\"], :rows [[\"ORD-001\" \"IPA-123\" \"20 cases\"] [\"ORD-002\" \"STOUT-456\" \"15 cases\"] [\"ORD-003\" \"ALE-789\" \"10 cases\"]]}} {:fact-type-id \"ORDER-is-for-CUSTOMER\", :arity 2, :objects [\"order\" \"customer\"], :reference-modes [\"order-number\" \"customer-name\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"order-number\" \"customer-name\"], :rows [[\"ORD-001\" \"Brewery Supplies Co.\"] [\"ORD-002\" \"Local Taproom\"] [\"ORD-003\" \"Craft Beer Specialists\"]]}} {:fact-type-id \"ORDER-has-DUE-DATE\", :arity 2, :objects [\"order\" \"due-date\"], :reference-modes [\"order-number\" \"date\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"order-number\" \"date\"], :rows [[\"ORD-001\" \"2024-03-15\"] [\"ORD-002\" \"2024-03-20\"] [\"ORD-003\" \"2024-03-25\"]]}} {:fact-type-id \"ORDER-has-SPECIAL-REQUIREMENTS\", :arity 2, :objects [\"order\" \"special-requirements\"], :reference-modes [\"order-number\" \"requirements-text\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"\" \"\"]], :examples {:column-headings [\"order-number\" \"requirements-text\"], :rows [[\"ORD-001\" \"Custom labeling for event\"] [\"ORD-002\" \"Eco-friendly packaging\"] [\"ORD-003\" \"Priority handling\"]]}} {:fact-type-id \"ORDER-has-PRIORITY-LEVEL\", :arity 2, :objects [\"order\" \"priority-level\"], :reference-modes [\"order-number\" \"level\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"\" \"\"]], :examples {:column-headings [\"order-number\" \"level\"], :rows [[\"ORD-001\" \"High\"] [\"ORD-002\" \"Medium\"] [\"ORD-003\" \"Low\"]]}}]}}]}}",
+                                     :content
+                                     "Yes, for each customer order, we track the following details:\n\n- Order number  \n- Product types (specific beers)  \n- Quantities required  \n- Due dates  \n- Customer name and contact information  \n\nAdditional details we maintain include any special packaging or labeling requirements, delivery instructions, and sometimes priority levels if multiple orders overlap."}
+                           #:message{:content
+                                     "For raw materials, do you track data such as material types (e.g., malt, hops), quantities on hand, expected delivery dates, and suppliers? Are there any additional details you record?",
+                                     :from :system,
+                                     :id 12,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:40:57.447-00:00"}
+                           #:message{:answers-question 12,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
+                                     :id 13,
+                                     :time
+                                     #inst "2025-06-20T15:40:57.463-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :data/orm, :commit-notes \"Defined objects and fact types for the 'materials' inquiry area based on provided details.\", :data-structure {:inquiry-areas [{:inquiry-area-id {:val \"materials\", :comment \"Covers data related to raw materials, including types, quantities, delivery dates, supplier information, and additional attributes.\"}, :inquiry-area-objects {:val [{:object-id \"material\", :definition \"Specific types of raw materials used in production, such as malt, hops, yeast, and packaging supplies.\"} {:object-id \"quantity\", :definition \"Amount of specific material currently on hand.\"} {:object-id \"expected-delivery-date\", :definition \"The date when a material delivery is expected.\"} {:object-id \"supplier\", :definition \"Details of the supplier providing the material.\"} {:object-id \"batch-number\", :definition \"A unique identifier assigned to a material batch for quality control purposes.\"} {:object-id \"storage-requirements\", :definition \"Conditions required for safe storage of a material, such as temperature and humidity.\"} {:object-id \"shelf-life\", :definition \"The duration a material can remain usable before expiration.\"}]}, :fact-types {:val [{:fact-type-id \"MATERIAL-has-QUANTITY\", :arity 2, :objects [\"material\" \"quantity\"], :reference-modes [\"material-name\" \"amount\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"material-name\" \"amount\"], :rows [[\"Malt\" \"2000 kg\"] [\"Hops\" \"500 kg\"] [\"Yeast\" \"1000 packets\"]]}} {:fact-type-id \"MATERIAL-has-EXPECTED-DELIVERY-DATE\", :arity 2, :objects [\"material\" \"expected-delivery-date\"], :reference-modes [\"material-name\" \"date\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"material-name\" \"date\"], :rows [[\"Malt\" \"2024-03-10\"] [\"Hops\" \"2024-03-15\"] [\"Packaging Supplies\" \"2024-03-12\"]]}} {:fact-type-id \"MATERIAL-is-provided-by-SUPPLIER\", :arity 2, :objects [\"material\" \"supplier\"], :reference-modes [\"material-name\" \"supplier-name\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"material-name\" \"supplier-name\"], :rows [[\"Malt\" \"Grain Growers Inc.\"] [\"Hops\" \"Hop Farms Ltd.\"] [\"Yeast\" \"Fermentation Experts\"]]}} {:fact-type-id \"MATERIAL-has-BATCH-NUMBER\", :arity 2, :objects [\"material\" \"batch-number\"], :reference-modes [\"material-name\" \"batch-id\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"material-name\" \"batch-id\"], :rows [[\"Malt\" \"BTCH-001\"] [\"Hops\" \"BTCH-456\"] [\"Yeast\" \"BTCH-789\"]]}} {:fact-type-id \"MATERIAL-has-STORAGE-REQUIREMENTS\", :arity 2, :objects [\"material\" \"storage-requirements\"], :reference-modes [\"material-name\" \"conditions\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"\" \"\"]], :examples {:column-headings [\"material-name\" \"conditions\"], :rows [[\"Malt\" \"Cool and dry.\"] [\"Hops\" \"Refrigerate at 4°C.\"] [\"Yeast\" \"Store in cold storage.\"]]}} {:fact-type-id \"MATERIAL-has-SHELF-LIFE\", :arity 2, :objects [\"material\" \"shelf-life\"], :reference-modes [\"material-name\" \"time-period\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"\" \"\"]], :examples {:column-headings [\"material-name\" \"time-period\"], :rows [[\"Malt\" \"12 months\"] [\"Hops\" \"6 months\"] [\"Yeast\" \"3 months\"]]}}]}}]}}",
+                                     :content
+                                     "Yes, for raw materials, we track the following data:\n\n- Material types (e.g., malt, hops, yeast, water, packaging supplies)  \n- Quantities on hand  \n- Expected delivery dates  \n- Supplier details  \n\nAdditional details include batch numbers for quality control, storage requirements (like temperature and humidity), and shelf life or expiration dates."}
+                           #:message{:content
+                                     "Could you describe the types of process plans you maintain for different beer types? Do these include task sequences, task durations, equipment needed, or any other details?",
+                                     :from :system,
+                                     :id 14,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:41:24.590-00:00"}
+                           #:message{:answers-question 14,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
+                                     :id 15,
+                                     :time
+                                     #inst "2025-06-20T15:41:24.616-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :data/orm, :commit-notes \"Defined objects and fact types for the 'process-plans' inquiry area based on the detailed response about different beer production processes.\", :data-structure {:inquiry-areas [{:inquiry-area-id {:val \"process-plans\", :comment \"Details the task sequences, durations, equipment requirements, parameters, and additional instructions for each beer type.\"}, :inquiry-area-objects {:val [{:object-id \"beer-type\", :definition \"A specific type of beer produced, such as IPA or lager.\"} {:object-id \"task\", :definition \"An individual step in the production process, such as mashing or fermenting.\"} {:object-id \"task-sequence\", :definition \"The order of tasks in beer production for a specific beer type.\"} {:object-id \"task-duration\", :definition \"The estimated or required duration of a particular task.\"} {:object-id \"equipment\", :definition \"The resources or tools required for a particular production task, such as fermentation tanks or mash tuns.\"} {:object-id \"parameters\", :definition \"Specific process parameters such as temperatures, durations, or yeast strains required for a production task.\"} {:object-id \"special-instructions\", :definition \"Additional handling or execution notes for specific tasks or beer types.\"}]}, :fact-types {:val [{:fact-type-id \"BEER-TYPE-has-TASK-SEQUENCE\", :arity 2, :objects [\"beer-type\" \"task-sequence\"], :reference-modes [\"beer-name\" \"task-list\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"beer-name\" \"task-list\"], :rows [[\"IPA\" \"Mashing → Boiling → Fermenting → Conditioning → Packaging\"] [\"Lager\" \"Mashing → Boiling → Long Fermenting → Conditioning → Packaging\"]]}} {:fact-type-id \"TASK-has-DURATION\", :arity 2, :objects [\"task\" \"task-duration\"], :reference-modes [\"task-name\" \"duration\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"task-name\" \"duration\"], :rows [[\"Mashing\" \"4-6 hours\"] [\"Boiling\" \"1-2 hours\"] [\"Fermenting\" \"7-14 days\"]]}} {:fact-type-id \"TASK-requires-EQUIPMENT\", :arity 2, :objects [\"task\" \"equipment\"], :reference-modes [\"task-name\" \"equipment-name\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"task-name\" \"equipment-name\"], :rows [[\"Mashing\" \"Mash Tun\"] [\"Boiling\" \"Boil Kettle\"] [\"Fermenting\" \"Fermentation Tank\"]]}} {:fact-type-id \"TASK-has-PARAMETERS\", :arity 2, :objects [\"task\" \"parameters\"], :reference-modes [\"task-name\" \"parameter-details\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"\" \"\"]], :examples {:column-headings [\"task-name\" \"parameter-details\"], :rows [[\"Mashing\" \"Temperature: 65°C, Duration: 4 hours\"] [\"Boiling\" \"Temperature: 100°C, Hops added every 15 mins\"] [\"Fermenting\" \"Yeast strain: Lager yeast, Temperature: 10°C\"]]}} {:fact-type-id \"TASK-has-SPECIAL-INSTRUCTIONS\", :arity 2, :objects [\"task\" \"special-instructions\"], :reference-modes [\"task-name\" \"instructions-text\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"\" \"\"]], :examples {:column-headings [\"task-name\" \"instructions-text\"], :rows [[\"Mashing\" \"Ensure pH level is between 5.2 and 5.5\"] [\"Fermenting\" \"Monitor CO2 levels twice daily\"] [\"Packaging\" \"Sterilize bottles before use\"]]}}]}}]}}",
+                                     :content
+                                     "Our process plans for different beer types include:\n\n- Task sequences (e.g., mashing → boiling → fermenting → conditioning → packaging)  \n- Task durations for each step based on the beer type  \n- Equipment required for each step (e.g., mash tun, boil kettle, fermentation tanks)  \n- Specific parameters like temperatures, durations, and yeast strains  \n- Special instructions for handling ingredients or unique beer characteristics  \n\nThese plans ensure consistency in quality and help coordinate production efficiently."}
+                           #:message{:content
+                                     "Could you provide details of your workforce data? For example, do you maintain records of employee names, roles, skills, certifications, availability, or shift schedules? Are there any additional details you track?",
+                                     :from :system,
+                                     :id 16,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:42:00.613-00:00"}
+                           #:message{:answers-question 16,
+                                     :pursuing-EADS :process/flow-shop,
+                                     :from :surrogate,
+                                     :id 17,
+                                     :time
+                                     #inst "2025-06-20T15:42:00.633-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :data/orm, :commit-notes \"Defined objects and fact types for the 'workforce' inquiry area based on the provided details about employee data.\", :data-structure {:inquiry-areas [{:inquiry-area-id {:val \"workforce\", :comment \"Covers details about employees, including roles, skills, certifications, availability, and other relevant workforce data.\"}, :inquiry-area-objects {:val [{:object-id \"employee\", :definition \"An individual working for the company, such as a brewer or packaging staff.\"} {:object-id \"role\", :definition \"A specific job function performed by an employee, such as brewing, maintenance, or packaging.\"} {:object-id \"skill\", :definition \"A capability or expertise possessed by an employee, such as brewing certification or forklift operation.\"} {:object-id \"certification\", :definition \"Official recognition of a skill or expertise through a certification program.\"} {:object-id \"availability\", :definition \"The times or shifts when an employee is available to work.\"} {:object-id \"shift-schedule\", :definition \"Planned work times for an employee based on shifts.\"} {:object-id \"contact-information\", :definition \"Employee contact details such as email or phone number.\"} {:object-id \"vacation-plan\", :definition \"Scheduled time off or leave for an employee.\"} {:object-id \"years-of-experience\", :definition \"Length of time an employee has been working in their specific role or industry.\"} {:object-id \"specialization\", :definition \"Specific beer types or machinery an employee has expertise in.\"}]}, :fact-types {:val [{:fact-type-id \"EMPLOYEE-has-ROLE\", :arity 2, :objects [\"employee\" \"role\"], :reference-modes [\"employee-name\" \"role-name\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"role-name\"], :rows [[\"John Doe\" \"Brewer\"] [\"Jane Smith\" \"Packaging Staff\"] [\"Mike Johnson\" \"Maintenance\"]]}} {:fact-type-id \"EMPLOYEE-has-SKILL\", :arity 2, :objects [\"employee\" \"skill\"], :reference-modes [\"employee-name\" \"skill-name\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"skill-name\"], :rows [[\"John Doe\" \"Brewing Certification\"] [\"Jane Smith\" \"Forklift Operation\"] [\"Mike Johnson\" \"Machine Maintenance\"]]}} {:fact-type-id \"EMPLOYEE-has-CERTIFICATION\", :arity 3, :objects [\"employee\" \"skill\" \"certification\"], :reference-modes [\"employee-name\" \"skill-name\" \"certification-id\"], :deontic-keys [\"mandatory\" \"mandatory\" \"\"], :uniqueness [[\"key1\" \"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"skill-name\" \"certification-id\"], :rows [[\"John Doe\" \"Brewing Certification\" \"CERT-123\"] [\"Jane Smith\" \"Forklift Operation\" \"CERT-456\"] [\"Mike Johnson\" \"Machine Maintenance\" \"CERT-789\"]]}} {:fact-type-id \"EMPLOYEE-has-AVAILABILITY\", :arity 2, :objects [\"employee\" \"availability\"], :reference-modes [\"employee-name\" \"timeframes\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"timeframes\"], :rows [[\"John Doe\" \"Mon-Fri 9AM-5PM\"] [\"Jane Smith\" \"Mon-Wed 1PM-9PM\"] [\"Mike Johnson\" \"Tue-Sat 8AM-4PM\"]]}} {:fact-type-id \"EMPLOYEE-has-SHIFT-SCHEDULE\", :arity 2, :objects [\"employee\" \"shift-schedule\"], :reference-modes [\"employee-name\" \"shift-info\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"shift-info\"], :rows [[\"John Doe\" \"Shift A\"] [\"Jane Smith\" \"Shift B\"] [\"Mike Johnson\" \"Shift C\"]]}} {:fact-type-id \"EMPLOYEE-has-CONTACT-INFORMATION\", :arity 2, :objects [\"employee\" \"contact-information\"], :reference-modes [\"employee-name\" \"contact-details\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"contact-details\"], :rows [[\"John Doe\" \"john.doe@example.com\"] [\"Jane Smith\" \"jane.smith@example.com\"] [\"Mike Johnson\" \"mike.johnson@example.com\"]]}} {:fact-type-id \"EMPLOYEE-has-VACATION-PLAN\", :arity 2, :objects [\"employee\" \"vacation-plan\"], :reference-modes [\"employee-name\" \"time-off\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"time-off\"], :rows [[\"John Doe\" \"2024-07-01 to 2024-07-10\"] [\"Jane Smith\" \"2024-08-15 to 2024-08-20\"] [\"Mike Johnson\" \"2024-06-05 to 2024-06-15\"]]}} {:fact-type-id \"EMPLOYEE-has-YEARS-OF-EXPERIENCE\", :arity 2, :objects [\"employee\" \"years-of-experience\"], :reference-modes [\"employee-name\" \"experience-years\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"experience-years\"], :rows [[\"John Doe\" \"10 years\"] [\"Jane Smith\" \"5 years\"] [\"Mike Johnson\" \"7 years\"]]}} {:fact-type-id \"EMPLOYEE-has-SPECIALIZATION\", :arity 2, :objects [\"employee\" \"specialization\"], :reference-modes [\"employee-name\" \"expertise\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"expertise\"], :rows [[\"John Doe\" \"IPA Brewing\"] [\"Jane Smith\" \"Packaging Operations\"] [\"Mike Johnson\" \"Equipment Maintenance\"]]}}]}}]}}",
+                                     :content
+                                     "Yes, we maintain the following workforce data:\n\n- Employee names  \n- Roles (e.g., brewer, packaging staff, maintenance)  \n- Skills and certifications (e.g., brewing certifications, forklift operation)  \n- Availability and shift schedules  \n\nAdditional details include contact information, vacation or leave plans, and for some roles, years of experience or specialization in certain beer types or machinery."}],
+                          :status :eads-exhausted}
+           #:conversation{:active-EADS-id :data/orm,
+                          :id :data,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever). Here you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and we can invent some similar data to run demonstrations. Whenever someone suggests that you upload information to them, you should be cautious. Read more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-20T15:37:00.726-00:00"}
+                           #:message{:content
+                                     "To get started, could you list the kinds of data that you use to schedule production? For example, do you have spreadsheets containing customer orders, raw material delivery details, process plans, materials on hand, task durations, worker skills, equipment availability, etc.?",
+                                     :from :system,
+                                     :id 2,
+                                     :pursuing-EADS :data/orm,
+                                     :tags [:query],
+                                     :time
+                                     #inst "2025-06-20T15:39:55.278-00:00"}
+                           #:message{:answers-question 2,
+                                     :pursuing-EADS :data/orm,
+                                     :from :surrogate,
+                                     :id 3,
+                                     :time
+                                     #inst "2025-06-20T15:39:55.297-00:00",
+                                     :tags [:response],
+                                     :EADS-data-structure
+                                     "{:message-type :DATA-STRUCTURE-REFINEMENT, :EADS-ref :data/orm, :commit-notes \"Task 1 completed: identified areas of inquiry relevant to scheduling beer production.\", :data-structure {:areas-we-intend-to-discuss {:val [\"customer-orders\" \"materials\" \"process-plans\" \"workforce\" \"equipment\" \"seasonal-factors\"], :comment \"Based on the interviewees' response, the areas of inquiry include customer orders, raw materials, process plans, worker data, equipment details, and seasonal factors affecting demand and sourcing.\"}, :inquiry-areas [{:inquiry-area-id {:val \"customer-orders\", :comment \"Covers customer orders, deadlines, and related data.\"}} {:inquiry-area-id {:val \"materials\", :comment \"Includes raw material delivery schedules, inventory levels, and materials on hand.\"}} {:inquiry-area-id {:val \"process-plans\", :comment \"Focuses on process plans specific to each beer type, including task durations and equipment requirements.\"}} {:inquiry-area-id {:val \"workforce\", :comment \"Covers worker availability, skills, and shift schedules.\"}} {:inquiry-area-id {:val \"equipment\", :comment \"Includes equipment availability and maintenance schedules.\"}} {:inquiry-area-id {:val \"seasonal-factors\", :comment \"Factors related to seasonal demand variations and ingredient sourcing challenges.\"}}]}}",
+                                     :content
+                                     "To schedule production, we use the following types of data:  \n\n- Customer orders and deadlines (usually in spreadsheets).  \n- Raw material delivery schedules and inventory levels.  \n- Process plans for each beer, including task durations and equipment requirements.  \n- Materials on hand, including malt, hops, yeast, and packaging supplies.  \n- Worker availability, skills, and shift schedules.  \n- Equipment availability and maintenance schedules.  \n- Seasonal factors like demand spikes or ingredient sourcing challenges."}],
+                          :status :in-progress}
+           #:conversation{:id :resources,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data. (By the way, you can always go back to a conversation and add to it.) You might have already mentioned the resources (people, machines) by which you make product or deliver services. Here we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-20T15:37:00.752-00:00"}],
+                          :status :not-started}
+           #:conversation{:id :optimality,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time
+                                     #inst "2025-06-20T15:37:00.771-00:00"}],
+                          :status :not-started}],
+          :active-conversation :process,
+          :active-EADS-id :data/orm,
+          :agents
+          [#:agent{:base-type :data-interview-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer-4script,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
+                   :instruction-path
+                   "/tmp/stbd-agents/data-interviewer.txt",
+                   :timestamp #inst "2025-06-03T20:46:51.756-00:00",
+                   :agent-id :data-interview-agent-openai}
+           #:agent{:base-type :data-interview-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer-4script,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/papers/object-role-modeling--an-overview.pdf"],
+                   :instruction-path
+                   "/tmp/stbd-agents/data-interviewer.txt",
+                   :assistant-id "asst_aH2xqHWSW2mTGI8oLKpWKuj1",
+                   :timestamp #inst "2025-06-17T16:30:57.694-00:00",
+                   :agent-id :data-interview-agent}
+           #:agent{:base-type :orchestrator-agent,
+                   :agent-type :shared-assistant,
+                   :tools "[{:type \"file_search\"}]",
+                   :thread-id "thread_EyXU0BC0AvzFdfLCBFoiDnGs",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer-4script,
+                   :vector-store-paths
+                   ["resources/agents/iviewrs/EADS/data/orm.json"
+                    "resources/agents/iviewrs/EADS/process/flow-shop.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop--classifiable.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop--unique.json"
+                    "resources/agents/iviewrs/EADS/process/job-shop.json"
+                    "resources/agents/iviewrs/EADS/process/scheduling-problem-type.json"
+                    "resources/agents/iviewrs/EADS/process/timetabling.json"
+                    "resources/agents/iviewrs/EADS/process/warm-up-with-challenges.json"],
+                   :instruction-path
+                   "resources/agents/orchestrator.txt",
+                   :assistant-id "asst_R8zuQHRchLs9igVFArUUvbJK",
+                   :timestamp #inst "2025-06-20T15:42:00.779-00:00",
+                   :agent-id :orchestrator-agent}
+           #:agent{:base-type :optimality-interview-agent,
+                   :agent-type :shared-assistant,
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer-4script,
+                   :instruction-path
+                   "/tmp/stbd-agents/optimality-interviewer.txt",
+                   :assistant-id "asst_akK3OGJBOiXtsFcH4CAWdsIe",
+                   :timestamp #inst "2025-06-04T12:45:21.614-00:00",
+                   :agent-id :optimality-interview-agent}
+           #:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_M2LKAlnTX4rJW3GdyNo072vj",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer-4script,
+                   :instruction-path
+                   "/tmp/stbd-agents/process-interviewer.txt",
+                   :assistant-id "asst_zkI3Wlvpucegy6lBsMeoH9la",
+                   :timestamp #inst "2025-06-20T15:37:10.771-00:00",
+                   :agent-id :process-interview-agent}
+           #:agent{:base-type :resources-interview-agent,
+                   :agent-type :shared-assistant,
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :pid :sur-craft-beer-4script,
+                   :instruction-path
+                   "/tmp/stbd-agents/resources-interviewer.txt",
+                   :assistant-id "asst_Z8OIRCCEGCPNfQOnuSGsb85V",
+                   :timestamp #inst "2025-06-04T12:45:22.720-00:00",
+                   :agent-id :resources-interview-agent}
+           #:agent{:base-type :sur-craft-beer-4script,
+                   :agent-type :project,
+                   :thread-id "thread_JyudLVRLJM9n1t1C7myq1I9t",
+                   :model-class :gpt,
+                   :instruction-string
+                   "You manage a company that makes craft beer.\nYou are an expert in production and manage your company's supply chains.\nYou help me by answering an interviewer's questions that will allow us to collaborate in building a scheduling system for your company.\nCurrently, you do not use any software in scheduling your work, except maybe spreadsheets and office software calendars.\nYour answers typically are short, just a few sentences each.\n\nTypically you answer in sentences. However, the interviewers may ask you provide a table or add information to a table that the interviewer provides.\nIn these cases, respond with an HTML table wrapped in #+begin_src HTML ... #+end_src\nAll the tables you generate / complete should have the header as the first table row.\nFor example if you were asked to generate / complete a table about process durations for process steps you might respond with:\n\"Here are my estimates of the step durations. Note that I added --Yet another step-- which I think should be included in this context:\"\n\n#+begin_src HTML\n<table>\n  <tr><th>Process Step</th>                <th>Duration</th></tr>\n  <tr><td>--Some step--</td>               <td>2 hours</td></tr>\n  <tr><td>--Some other step--</td>         <td>3 days</td></tr>\n  <tr><td>--Yet anoter step--</td>         <td>1 days</td></tr>\n</table>\n#+end_src",
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :pid :sur-craft-beer-4script,
+                   :assistant-id "asst_dmdr728VeW8Z2n2uuf1hbaZe",
+                   :expertise "craft beer",
+                   :timestamp #inst "2025-06-20T15:37:11.453-00:00",
+                   :agent-id :sur-craft-beer-openai}],
+          :claims
+          [#:claim{:string "(project-id :sur-craft-beer-4script)"}
+           #:claim{:string
+                   "(project-name :sur-craft-beer-4script \"SUR Craft Beer\")"}
+           #:claim{:conversation-id :process,
+                   :string "(surrogate :sur-craft-beer-4script)"}],
+          :name "Sur Back Ba",
+          :summary-dstructs
+          [#:dstruct{:budget-left 0.95,
+                     :id :process/warm-up-with-challenges,
+                     :str
+                     "{:product-or-service-name \"craft beers\", :scheduling-challenges [\"process-variation\" \"demand-uncertainty\" \"variation-in-demand\" \"raw-material-uncertainty\" \"bottleneck-processes\"], :one-more-thing \"Their challenges might also involve meeting strict quality timelines linked to fermentation and conditioning stages.\", :EADS-ref :process/warm-up-with-challenges}"}
+           #:dstruct{:budget-left 0.95,
+                     :id :process/scheduling-problem-type,
+                     :str
+                     "{:principal-problem-type :FLOW-SHOP-SCHEDULING-PROBLEM, :problem-components [:FLOW-SHOP-SCHEDULING-PROBLEM :JOB-SHOP-SCHEDULING-PROBLEM], :continuous? false, :cyclical? false, :EADS-ref :process/scheduling-problem-type}"}
+           #:dstruct{:budget-left 0.40000000000000013,
+                     :id :process/flow-shop,
+                     :str
+                     "{:inquiry-areas [{:inquiry-area-id {:val \"workforce\", :comment \"Covers details about employees, including roles, skills, certifications, availability, and other relevant workforce data.\"}, :inquiry-area-objects {:val [{:object-id \"employee\", :definition \"An individual working for the company, such as a brewer or packaging staff.\"} {:object-id \"role\", :definition \"A specific job function performed by an employee, such as brewing, maintenance, or packaging.\"} {:object-id \"skill\", :definition \"A capability or expertise possessed by an employee, such as brewing certification or forklift operation.\"} {:object-id \"certification\", :definition \"Official recognition of a skill or expertise through a certification program.\"} {:object-id \"availability\", :definition \"The times or shifts when an employee is available to work.\"} {:object-id \"shift-schedule\", :definition \"Planned work times for an employee based on shifts.\"} {:object-id \"contact-information\", :definition \"Employee contact details such as email or phone number.\"} {:object-id \"vacation-plan\", :definition \"Scheduled time off or leave for an employee.\"} {:object-id \"years-of-experience\", :definition \"Length of time an employee has been working in their specific role or industry.\"} {:object-id \"specialization\", :definition \"Specific beer types or machinery an employee has expertise in.\"}]}, :fact-types {:val [{:fact-type-id \"EMPLOYEE-has-ROLE\", :arity 2, :objects [\"employee\" \"role\"], :reference-modes [\"employee-name\" \"role-name\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"role-name\"], :rows [[\"John Doe\" \"Brewer\"] [\"Jane Smith\" \"Packaging Staff\"] [\"Mike Johnson\" \"Maintenance\"]]}} {:fact-type-id \"EMPLOYEE-has-SKILL\", :arity 2, :objects [\"employee\" \"skill\"], :reference-modes [\"employee-name\" \"skill-name\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"skill-name\"], :rows [[\"John Doe\" \"Brewing Certification\"] [\"Jane Smith\" \"Forklift Operation\"] [\"Mike Johnson\" \"Machine Maintenance\"]]}} {:fact-type-id \"EMPLOYEE-has-CERTIFICATION\", :arity 3, :objects [\"employee\" \"skill\" \"certification\"], :reference-modes [\"employee-name\" \"skill-name\" \"certification-id\"], :deontic-keys [\"mandatory\" \"mandatory\" \"\"], :uniqueness [[\"key1\" \"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"skill-name\" \"certification-id\"], :rows [[\"John Doe\" \"Brewing Certification\" \"CERT-123\"] [\"Jane Smith\" \"Forklift Operation\" \"CERT-456\"] [\"Mike Johnson\" \"Machine Maintenance\" \"CERT-789\"]]}} {:fact-type-id \"EMPLOYEE-has-AVAILABILITY\", :arity 2, :objects [\"employee\" \"availability\"], :reference-modes [\"employee-name\" \"timeframes\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"timeframes\"], :rows [[\"John Doe\" \"Mon-Fri 9AM-5PM\"] [\"Jane Smith\" \"Mon-Wed 1PM-9PM\"] [\"Mike Johnson\" \"Tue-Sat 8AM-4PM\"]]}} {:fact-type-id \"EMPLOYEE-has-SHIFT-SCHEDULE\", :arity 2, :objects [\"employee\" \"shift-schedule\"], :reference-modes [\"employee-name\" \"shift-info\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"shift-info\"], :rows [[\"John Doe\" \"Shift A\"] [\"Jane Smith\" \"Shift B\"] [\"Mike Johnson\" \"Shift C\"]]}} {:fact-type-id \"EMPLOYEE-has-CONTACT-INFORMATION\", :arity 2, :objects [\"employee\" \"contact-information\"], :reference-modes [\"employee-name\" \"contact-details\"], :deontic-keys [\"mandatory\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"contact-details\"], :rows [[\"John Doe\" \"john.doe@example.com\"] [\"Jane Smith\" \"jane.smith@example.com\"] [\"Mike Johnson\" \"mike.johnson@example.com\"]]}} {:fact-type-id \"EMPLOYEE-has-VACATION-PLAN\", :arity 2, :objects [\"employee\" \"vacation-plan\"], :reference-modes [\"employee-name\" \"time-off\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"time-off\"], :rows [[\"John Doe\" \"2024-07-01 to 2024-07-10\"] [\"Jane Smith\" \"2024-08-15 to 2024-08-20\"] [\"Mike Johnson\" \"2024-06-05 to 2024-06-15\"]]}} {:fact-type-id \"EMPLOYEE-has-YEARS-OF-EXPERIENCE\", :arity 2, :objects [\"employee\" \"years-of-experience\"], :reference-modes [\"employee-name\" \"experience-years\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"experience-years\"], :rows [[\"John Doe\" \"10 years\"] [\"Jane Smith\" \"5 years\"] [\"Mike Johnson\" \"7 years\"]]}} {:fact-type-id \"EMPLOYEE-has-SPECIALIZATION\", :arity 2, :objects [\"employee\" \"specialization\"], :reference-modes [\"employee-name\" \"expertise\"], :deontic-keys [\"\" \"\"], :uniqueness [[\"key1\" \"\"]], :examples {:column-headings [\"employee-name\" \"expertise\"], :rows [[\"John Doe\" \"IPA Brewing\"] [\"Jane Smith\" \"Packaging Operations\"] [\"Mike Johnson\" \"Equipment Maintenance\"]]}}]}}], :EADS-ref :process/flow-shop, :EADS-id :process/flow-shop}"}
+           #:dstruct{:budget-left 0.92,
+                     :id :data/orm,
+                     :str
+                     "{:areas-we-intend-to-discuss [\"customer-orders\" \"materials\" \"process-plans\" \"workforce\" \"equipment\" \"seasonal-factors\"], :inquiry-areas [{:inquiry-area-id \"customer-orders\"} {:inquiry-area-id \"materials\"} {:inquiry-area-id \"process-plans\"} {:inquiry-area-id \"workforce\"} {:inquiry-area-id \"equipment\"} {:inquiry-area-id \"seasonal-factors\"}], :EADS-ref :data/orm, :EADS-id :data/orm}"}],
+          :id :sur-craft-beer-4script}
+]

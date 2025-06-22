@@ -46,7 +46,7 @@
   (swap! databases-atm #(assoc % k config)))
 
 (defn deregister-db
-  "Add a DB configuration."
+  "Remove a DB configuration."
   [k]
   (log! :info (str "Deregistering DB " k))
   (swap! databases-atm #(dissoc % k)))
@@ -80,11 +80,16 @@
       (not in-mem?)   (assoc :store {:backend :file :path db-dir})
       in-mem?         (assoc :store {:backend :mem :id (name id)}))))
 
+(defn get-db-cfg
+  "Return the cfg map for the given DB."
+  [pid]
+  (get @databases-atm pid))
+
 (defn connect-atm
   "Return a connection atom for the DB.
    Throw an error if the DB does not exist and :error? is true (default)."
   [k & {:keys [error?] :or {error? true}}]
-  (if-let [db-cfg (get @databases-atm k)]
+  (if-let [db-cfg (get-db-cfg k)]
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
       (when error?
@@ -251,7 +256,7 @@
           :else response)))
 
 ;;; This became complicated once I couldn't use strict schema results.
-(defn output-struct2clj
+(defn ai-response2clj
   "Translate the OpenAI API output structure (a string) to clj object, where JSON objects are given keyword keys."
   [s-in]
   (try
@@ -310,10 +315,3 @@
     (if success?
       (keyword normal-pid)
       pid)))
-
-
-(defn get-mocked-dispatch
-  [tag _agent-id]
-  tag)
-
-(defmulti get-mocked-by-role! #'get-mocked-dispatch)

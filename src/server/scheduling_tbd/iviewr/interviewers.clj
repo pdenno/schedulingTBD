@@ -17,11 +17,11 @@
    [scheduling-tbd.iviewr.ork :as ork]
    [scheduling-tbd.iviewr.response-utils :as ru]
    [scheduling-tbd.minizinc :as mzn]
-   [scheduling-tbd.sutil :as sutil :refer [elide mocking? output-struct2clj shadow-pid]]
+   [scheduling-tbd.specs :as specs]
+   [scheduling-tbd.sutil :as sutil :refer [elide mocking? ai-response2clj shadow-pid log!]]
    [scheduling-tbd.util :as util :refer [now]]
    [scheduling-tbd.web.websockets :as ws]
-   [scheduling-tbd.ds2mermaid :as ds2m]
-   [taoensso.telemere :as tel :refer [log!]]))
+   [scheduling-tbd.ds2mermaid :as ds2m]))
 
 ;;; The usual way of interviews involves q-and-a called from resume-conversation.
 ;;; [resume-conversation] -> q-and-a -> get-an-answer -> chat-pair -> send-to-client or query-agent (sur).
@@ -110,53 +110,19 @@
                      table (assoc :table table)
                      table (assoc :table-html table-html))))))
 
-;;; To check the structure of messages to and from the interviewer:
-(s/def ::interviewer-msg (s/and (s/keys :req-un [:iviewr/message-type])
-                                (fn [msg]
-                                  (case (:message-type msg)
-                                    :SUPPLY-QUESTION (s/valid? :iviewr/supply-question msg)
-                                    :QUESTION-TO-ASK (s/valid? :iviewr/question-to-ask msg)
-                                    :INTERVIEWEES-RESPOND (s/valid? :iviewr/interviewees-respond msg)
-                                    :DATA-STRUCTURE-REFINEMENT (s/valid? :iviewr/data-structure-refinement msg)
-                                    :CONVERSATION-HISTORY (s/valid? :iviewr/conversation-history msg)
-                                    :EADS-INSTRUCTIONS (s/valid? :iviewr/eads-instructions msg)
-                                    :COURSE-CORRECTION (s/valid? :iviewr/course-correction msg)
-                                    :STATUS #(string? (get % :status))))))
-
-(s/def :iviewr/supply-question (s/keys :req-un [:iviewr/budget]))
-(s/def :iviewr/question-to-ask (s/keys :req-un [:iviewr/question]))
-(s/def :iviewr/interviewees-respond (s/keys :req-un [:iviewr/response]))
-(s/def :iviewr/response string?)
-(s/def :iviewr/data-structure-refinement (s/keys :req-un [:iviewr/commit-notes :iviewr/data-structure]))
-(s/def :iviewr/commit-notes string?)
-(s/def :iviewr/data-structure map?)
-(s/def :iviewr/conversation-history (s/keys :req-un [:iviewr/interviewee-type] :opt-un [:iviewr/activity :iviewr/budget :iviewr/data-structure :iviewr/EADS]))
-(s/def :iviewr/budget number?)
-(s/def :iviewr/interviewee-type #(#{:human :machine} %))
-(s/def :iviewr/activity (s/coll-of :iviewr/activity-map :kind vector?))
-(s/def :iviewr/activity-map (s/keys :req-un [:iviewr/question :iviewr/answer]))
-(s/def :iviewr/question string?)
-(s/def :iviewr/answer string?)
-(s/def :iviewr/data-structure map?)
-(s/def :iviewr/EADS map?) ; ToDo: Tie in the EADSs?
-(s/def :iviewr/eads-instructions (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
-(s/def :iviewr/interview-objective string?)
-(s/def :iviewr/EADS (s/or :dehydrated string? :hydrated map?))
-(s/def :iviewr/course-correction (s/keys :opt-un [:iviewr/advice :iviewr/question]))
-
 (defn tell-interviewer
   "Send a message to an interviewer agent and wait for response; translate it.
    :aid and :tid in the opts should be for the interviewer agent."
   ([msg iviewr-agent cid] (tell-interviewer msg iviewr-agent cid {}))
   ([msg iviewr-agent cid opts]
    (when @active?
-     (when-not (s/valid? ::interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
+     (when-not (s/valid? ::specs/interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
        (log! :warn (str ";;; Invalid interviewer-msg:\n" (with-out-str (pprint msg)))))
      (agent-log (cl-format nil "{:log-comment \"[interview manager] (tells ~A interviewer):~%~A\"}"
                            (name cid) (with-out-str (pprint msg))))
      (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
      (let [msg-string (ches/generate-string msg {:pretty true})
-           res (-> (adb/query-agent iviewr-agent msg-string opts) output-struct2clj)
+           res (-> (adb/query-agent iviewr-agent msg-string opts) ai-response2clj)
            res (cond-> res
                  (contains? res :message-type) (update :message-type keyword))]
        (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
@@ -449,9 +415,10 @@
           (ws/send-to-client {:dispatch-key :iviewr-says :client-id client-id :text text}))))))
 
 (defn ctx-surrogate
-  "Return context updated with surrogate info."
+  "Return context updated with surrogate info.
+   No need for mocking provisions here; adb/ensure-agent takes care of it."
   [{:keys [pid cid force-new?] :as ctx}]
-  (let [pid (if @mocking? (shadow-pid pid) pid)
+  (let [;pid (if @mocking? (shadow-pid pid) pid)
         cid (or cid (db/get-active-cid pid)) ; See chat.cljs, which suggests there might be reasons it will send cid=nil.
         iviewr-agent (adb/ensure-agent! {:base-type (-> cid name (str "-interview-agent") keyword) :pid pid})
         surrogate-agent (adb/ensure-agent! {:base-type pid :pid pid} {:force-new? force-new?})
@@ -460,6 +427,7 @@
                 (assoc :responder-type :surrogate)
                 (assoc :iviewr-agent iviewr-agent)
                 (assoc :surrogate-agent surrogate-agent))]
+    (reset! diag ctx)
     (if (s/valid? ::surrogate-ctx ctx)
       ctx
       (do (reset! diag ctx)
@@ -500,8 +468,8 @@
     (db/put-project-active-EADS-id! pid new-eads-id) ; This will be used by :message/pursuing-EADS.
     (db/put-active-EADS-id pid cid new-eads-id))) ; This will be used by :message/pursuing-EADS.
 
-(defn put-EADS-ds-on-msg!
-  "Clean-up the EADS data structure and save it on a property :message/EADS-data-structure
+(defn put-DSR-on-msg!
+  "Clean-up the DSR and save it on a property :message/EADS-data-structure
    of the interviewee response which is responsible for this update (the current response
    in the argument conversation)."
   [pid cid iviewr-response]
@@ -526,6 +494,7 @@
         msg-ids (atom [])
         EADS-id (db/get-active-EADS-id pid cid)]
     (doseq [msg msgs-vec]
+      (reset! diag msg)
       (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
                                         EADS-id (assoc :pursuing-EADS EADS-id)))))
     (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})))
@@ -557,7 +526,7 @@
   (let [pid (if @mocking? (shadow-pid pid) pid)]
     (db/reduce-questioning-budget! pid eads-id)
     (try (when (= :DATA-STRUCTURE-REFINEMENT (:message-type iviewr-response))
-           (put-EADS-ds-on-msg! pid cid iviewr-response)
+           (put-DSR-on-msg! pid cid iviewr-response)
            (when-let [eads-id (db/get-active-EADS-id pid cid)]
              (combine-ds! eads-id pid))
            (when (and (#{:process/flow-shop} eads-id)
@@ -661,7 +630,7 @@
                         expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
                         ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
                         iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
-                                                          iviewr-agent cid {:tries 2 :test-fn output-struct2clj})]
+                                                          iviewr-agent cid {:tries 2 :test-fn ai-response2clj})]
                     (update-db-conversation! pid cid conversation)
                     (resume-post-ui-actions iviewr-response pid cid ctx) ; show graphs and tables, tell humans to switch conv.
                     ;; Use question-eads-id to ensure budget is decremented against the EADS that provided the question

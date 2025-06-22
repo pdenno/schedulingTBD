@@ -1,11 +1,9 @@
 (ns scheduling-tbd.iviewr.ork-test
   (:require
-   [clojure.data.json                        :as cdjson]
    [clojure.test                             :refer [deftest is testing]]
    [scheduling-tbd.agent-db                  :as adb]
-   [scheduling-tbd.iviewr.interviewers       :as inv]
-   [scheduling-tbd.iviewr.ork                :as ork]
    [scheduling-tbd.surrogate                 :as sur]
+   [scheduling-tbd.sutil                     :refer [ai-response2clj clj2json-pretty]]
    [taoensso.telemere                        :as tel :refer [log!]]))
 
 (defonce pid nil #_(db/create-proj-db! {:project/id :orch-test :project/name "orch-test"} {} {:force-this-name? true}))
@@ -50,9 +48,6 @@
          :question  "What EADS-instructions are you aware of? Respond with a JSON list of their names."}))
       sutil/output-struct2clj))
 
-(defn tryme []
-  (let [ctx {:pid :plate-glass-ork}]))
-
 ;;; These are defined in the order they are used in exercising the orchestrator.
 (def ch-1 {:message-type "CONVERSATION-HISTORY",
            :interviewer-type "process",
@@ -79,10 +74,6 @@
 
 (def sup-eads-2 {:message-type "SUPPLY-EADS" :interviewer "process"})
 
-(defn msg2json-str [msg] (with-out-str (-> msg cdjson/pprint str)))
-
-(defn json-str2msg [json-str] (-> json-str cdjson/read-str (update-keys keyword)))
-
 (defn status-ok? [{:keys [message-type status]}]
   (or (and (= message-type "STATUS")
            (= status "OK"))
@@ -92,7 +83,7 @@
   []
   (let [ork (adb/ensure-agent! {:base-type :orchestrator-agent :pid :plate-glass-ork})]
     (doseq [msg [ch-1 sup-eads-1 ch-2 sup-eads-2]]
-      (let [resp (->> msg msg2json-str (adb/query-agent ork) json-str2msg)]
+      (let [resp (->> msg clj2json-pretty (adb/query-agent ork) ai-response2clj)]
         (log! :info (str "Response: " resp))))))
 
 
