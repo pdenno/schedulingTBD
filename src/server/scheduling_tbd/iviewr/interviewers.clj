@@ -17,6 +17,7 @@
    [scheduling-tbd.iviewr.ork :as ork]
    [scheduling-tbd.iviewr.response-utils :as ru]
    [scheduling-tbd.minizinc :as mzn]
+   [scheduling-tbd.mock  :as mock :refer [continue-mocking?]]
    [scheduling-tbd.specs :as specs]
    [scheduling-tbd.sutil :as sutil :refer [elide mocking? ai-response2clj shadow-pid log!]]
    [scheduling-tbd.util :as util :refer [now]]
@@ -68,7 +69,7 @@
     (log! :debug (str "ctx in chat-pair-aux:\n" (with-out-str (pprint ctx))))
     (let [prom (if (= :human responder-type)
                  (ws/send-to-client (-> ctx ; This cannot timeout.
-                                        (assoc :text question)
+                                        (assoc :full-text question)
                                         (assoc :table table)
                                         (assoc :promise? true)
                                         (assoc :dispatch-key :iviewr-says)))
@@ -100,7 +101,7 @@
     (agent-log (cl-format nil "{:log-comment \"[~A interviewer] (response from interviewees):~%~A\"}" (name cid) response)
                {:console? true :elide-console 130})
     (case responder-type
-      :human (if (-> response :text llm/immoderate?)
+      :human (if (-> response :full-text llm/immoderate?)
                {:msg-type :immoderate}
                response)
       ;; ToDo: Move the let up so can capture tables correctly with human too.
@@ -122,13 +123,16 @@
                            (name cid) (with-out-str (pprint msg))))
      (log! :info (-> (str "Interviewer told: " msg) (elide 150)))
      (let [msg-string (ches/generate-string msg {:pretty true})
-           res (-> (adb/query-agent iviewr-agent msg-string opts) ai-response2clj)
-           res (cond-> res
-                 (contains? res :message-type) (update :message-type keyword))]
+           res (as-> (adb/query-agent iviewr-agent msg-string opts) ?r
+                 (when ?r (ai-response2clj ?r))
+                 (when ?r  (cond-> ?r
+                             (contains? ?r :message-type) (update :message-type keyword))))]
        (log! :info (-> (str "Interviewer returns: " res) (elide 150)))
        (agent-log (cl-format nil "{:log-comment \"[interview manager] (receives from ~A interviewer)~%~A\"}"
                              (name cid) (with-out-str (pprint res))))
-       res))))
+       (if (or (nil? res) (and @mocking? (not (mock/continue-mocking?))))
+         {:message-type :mocking-complete}
+         (reset! diag res))))))
 
 (defn response-analysis
   "Return a map of booleans including
@@ -179,7 +183,7 @@
   (when-not human-starting?
     (when-not (s/valid? ::chat-pair-ctx ctx)
       (throw (ex-info "Invalid context in get-an-answer." {:ctx ctx}))))
-  (let [conversation [{:text question :from :system :tags [:query]}]
+  (let [conversation [{:full-text question :from :system :tags [:query]}]
         {:keys [full-text] :as response} (chat-pair ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
         answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
         {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when (and (not answered?) (string? full-text))
@@ -318,10 +322,16 @@
     result))
 
 (defn separate-table
-  "Arg may be (1) a string that might contain an embedded table, or (2) a context map that contains :question.
+  "Because this is called both on questions and answers, arg may be
+   (1) a string that might contain an embedded table, or
+   (2) a context map that contains :question
+   Because a surrogate can embed a table we have to call separate-table from chat-pair.
+   This is the (2) usage and the users gets special presentation of a table because of it.
    Return a map containing :full-text (a string) :text (a string) :table-html (a string)  and :table (a map).
    Where :text is a substring of :full-text (argument text)."
   [arg]
+  (assert (or (string? arg)
+              (and (map? arg) (contains? arg :question))))
   (let [text (if (string? arg) arg (:question arg))
         {:keys [table-html] :as res} (separate-table-aux text)]
     (if (not-empty table-html)
@@ -341,24 +351,30 @@
 
 (s/def ::question string?)
 
+(defn mocking-complete-msg?
+  [msg]
+  (or (not (mock/continue-mocking?))
+      (and (map? msg) (= :mocking-complete (:message-type msg)))))
+
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
 ;;; over and over and the interview will advance each time.
 (defn q-and-a
   "Call interviewer to supply a question; call get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
-   Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :text :table...).
+   Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :full-text :table...).
    The first element in the vector should be the question object, and the last the answer object."
   [iviewr-agent pid cid {:keys [client-id responder-type] :as ctx}]
   (let [pid (if @mocking? (shadow-pid pid) pid)]
     (when @active?
       (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
-      (try (let [iviewr-q (-> (make-supply-question-msg pid) ; This just makes a SUPPLY-QUESTION message-type.
-                              (tell-interviewer iviewr-agent cid) ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
-                              (separate-table))] ; Returns a {:text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
+      (try (let [iviewr-q (as-> (make-supply-question-msg pid) ?m ; This just makes a SUPPLY-QUESTION message-type.
+                            (tell-interviewer ?m iviewr-agent cid) ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
+                            (if (mocking-complete-msg? ?m) ?m (separate-table ?m)))] ; Returns a {:full-text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
              (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
              ;; This returns a VECTOR of statements from the interviewees and interviewer.
-             (get-an-answer (cond-> ctx
-                              true (assoc :question (:text iviewr-q))
-                              (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q)))))
+             (when-not (mocking-complete-msg? iviewr-q)
+               (get-an-answer (cond-> ctx
+                                true (assoc :question (:full-text iviewr-q))
+                                (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q))))))
            (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))))
 
 ;;; ToDo: This needs work. You should be able to reopen a conversation at any time.
@@ -427,7 +443,6 @@
                 (assoc :responder-type :surrogate)
                 (assoc :iviewr-agent iviewr-agent)
                 (assoc :surrogate-agent surrogate-agent))]
-    (reset! diag ctx)
     (if (s/valid? ::surrogate-ctx ctx)
       ctx
       (do (reset! diag ctx)
@@ -494,10 +509,12 @@
         msg-ids (atom [])
         EADS-id (db/get-active-EADS-id pid cid)]
     (doseq [msg msgs-vec]
-      (reset! diag msg)
       (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
                                         EADS-id (assoc :pursuing-EADS EADS-id)))))
-    (db/update-msg pid cid (last @msg-ids) {:message/answers-question (first @msg-ids)})))
+    (let [first-msg-id (first @msg-ids)
+          last-msg-id (last @msg-ids)]
+      (when-not (= first-msg-id last-msg-id)
+        (db/update-msg pid cid last-msg-id {:message/answers-question first-msg-id})))))
 
 (defn resume-post-ui-actions
   "Send client actions to perform such as loading graphs or (for humans) changing conversations."
@@ -629,8 +646,10 @@
                   (let [conversation (q-and-a iviewr-agent pid cid ctx)
                         expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
                         ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
-                        iviewr-response (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
-                                                          iviewr-agent cid {:tries 2 :test-fn ai-response2clj})]
+                        iviewr-response (if (and @mocking? (not (continue-mocking?)))
+                                          {:message-type :mocking-complete}
+                                          (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
+                                                            iviewr-agent cid {:tries 2 :test-fn ai-response2clj}))]
                     (update-db-conversation! pid cid conversation)
                     (resume-post-ui-actions iviewr-response pid cid ctx) ; show graphs and tables, tell humans to switch conv.
                     ;; Use question-eads-id to ensure budget is decremented against the EADS that provided the question

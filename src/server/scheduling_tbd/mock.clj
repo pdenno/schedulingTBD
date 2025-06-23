@@ -33,13 +33,23 @@
 
 (def mocked-type?
   "At the current level of implementation of mocking, only the following agent types are mocked."
-  #{:interviewer :interviewee :orchestrator})
+  #{:interviewer :interviewees :orchestrator})
 
 (def old-shadow-db
   "pid of the previous mocked id. This is used to clean up destroy the old db when
    last mocking session was with a different DB than this one."
   (atom nil))
 
+(defn continue-mocking?
+  "Returns true when it is okay to continue.
+   This is called in interviewers.clj too. The idea is to not set mocking? to false until
+   the code in with-mock-project has had time to clean up."
+  []
+  (not (= :done (:status @mocking-state))))
+
+(defn stop-mocking!
+  []
+  (swap! mocking-state #(assoc % :status :done)))
 
 (defn get-agent-from-wherever
   "If the agent-id is a map the agent should be found at pid-of-original,
@@ -77,10 +87,10 @@
       base-type (assoc :base-type base-type))))
 
 (defn agent-type
-  "Return one of #{:interviewer :interviewee :orchestrator :other} describing the type of agent."
+  "Return one of #{:interviewer :interviewees :orchestrator :other} describing the type of agent."
   [agent-id]
   (let [{:agent/keys [base-type surrogate?]} (get-agent-from-wherever agent-id)]
-    (cond surrogate?                                 :interviewee
+    (cond surrogate?                                 :interviewees
           (#{:process-interview-agent
              :data-interview-agent
              :resources-interview-agent
@@ -140,13 +150,27 @@
   [tag _agent-id]
   tag)
 
+(defn update-activities
+  "The vector of activities in a conversation-history message may have a summary-ds.
+   This must be as string to pass (s/valid? ::specs/interview-message)."
+  [msg]
+  (if (contains? msg :activity)
+    (update msg :activity (fn [acts] (mapv (fn [act] (cond-> act
+                                                       (contains? act :summary-DS)     (update :summary-DS str)
+                                                       (contains? act :pursuing-EADS)  (update :pursuing-EADS keyword)))
+                                           acts)))
+    msg))
+
 (defn ai-str2msg
   "Return a s/valid? interviewing message-type for the argument string."
   [s]
   (let [msg-obj (ai-response2clj s)
         msg-obj (cond-> msg-obj
                   true   (update :message-type keyword)
-                  (contains? msg-obj :interviewee-type)                 (update :interviewee-type keyword))]
+                  (contains? msg-obj :interviewee-type)                 (update :interviewee-type keyword)
+                  (contains? msg-obj :activity)                          update-activities)]
+
+    (reset! diag msg-obj)
     (if (s/valid? ::specs/interviewer-msg msg-obj)
       msg-obj
       (throw (ex-info "Invalid message:" {:msg-string s})))))
@@ -160,10 +184,12 @@
   "Return the portion of argument script vector after the entry with :message/content = after-text."
   [script after-text]
   (let [found? (atom nil)
-        result (atom [])]
+        result (atom [])
+        after-text (str/trim after-text)]
     (doseq [msg script]
       (when @found? (swap! result #(conj % msg)))
-      (when (= (:message/content msg) after-text) (reset! found? true)))
+      (when (= (-> msg :message/content str/trim) after-text) (reset! found? true)))
+    (when (empty? @result) (stop-mocking!))
     @result))
 
 (defn get-next-question
@@ -172,8 +198,10 @@
   (let [script (if (empty? last-question) script (script-from script last-question))
         question (-> (some #(when (= (:message/from %) :system) %) script) :message/content)]
     (if (empty? question)
-      (log! :warn "get-next-question: No questions left")
-      question)))
+        (do (log! :warn "get-next-question: No questions left")
+            (stop-mocking!)
+            {:message-type :mocking-complete})
+        question)))
 
 ;;; (mock/set-mocking-state-to-start! :sur-craft-beer-4script)
 ;;; (mock/next-question-to-ask!) ;...
@@ -184,7 +212,7 @@
   (let [q (get-next-question @mocking-state)
         msg {:message-type :QUESTION-TO-ASK
              :question q}]
-    (when q
+    (when-not (and (map? q) (= (:message-type q) :mocking-complete))
       (s/assert :iviewr/question-to-ask msg)
       (swap! mocking-state #(assoc % :last-question q))
       msg)))
@@ -197,69 +225,84 @@
   (let [{:keys [last-question script]} @mocking-state
         script (if (empty? last-question) script (script-from script last-question))
         dsr (some #(when (contains? % :message/EADS-data-structure)
-                     (:message/EADS-data-structure %)) script)]
-    (if (empty? dsr)
-      (log! :warn "get-refinement-msg: No DSR found.")
-      (edn/read-string dsr))))
+                     (:message/EADS-data-structure %))
+                  script)
+        msg (when dsr (edn/read-string dsr))]
+    (s/assert :iviewr/data-structure-refinement msg)
+    msg))
 
+;;; Interviewer interactions:
+;;;   conversation-history -> ok
+;;;   eads-instructions -> ok
+;;;   supply-question -> question-to-ask
+;;;   interviewees-respond -> data-structure-refinement
 (defmethod mocked-response-by-role! :interviewer
-  [tag text]
-  (log! :info (str "Mocked " (name tag) " " (elide text 130)))
-  (let [msg (ai-str2msg text)]
-    (cond  (s/valid? :iviewr/conversation-history msg)            ok-msg
-           (s/valid? :iviewr/eads-instructions msg)               ok-msg
-           (s/valid? :iviewr/supply-question msg)                 (-> (next-question-to-ask!) sutil/clj2json-pretty)
-           (s/valid? :iviewr/interviewees-respond msg)            (-> (next-refinement-msg)  sutil/clj2json-pretty)
-           :else                                                  (throw (ex-info "Invalid message to interviewer:" {:text text})))))
+  [_tag text]
+  (when (continue-mocking?)
+    (let [msg (ai-str2msg text)]
+      (cond  (s/valid? :iviewr/conversation-history msg)            ok-msg
+             (s/valid? :iviewr/eads-instructions msg)               ok-msg
+             (s/valid? :iviewr/supply-question msg)                 (-> (next-question-to-ask!) sutil/clj2json-pretty)
+             (s/valid? :iviewr/interviewees-respond msg)            (-> (next-refinement-msg)  sutil/clj2json-pretty)
+             :else                                                  (throw (ex-info "Invalid message to interviewer:" {:text text}))))))
 
-;;; ---------------------------------- Interviewee ---------------------------------------------
+;;; ---------------------------------- Interviewees ---------------------------------------------
 ;;; ToDo: This will need to be updated in the case the the interviewees are human.
 (defn get-next-response
   "Return what the interviewees' said in response to the question.
    No need to update state, I think."
   [question-text]
-  (let [{:keys [last-question script]} @mocking-state]
-    (when-not (= (str/trim question-text) (str/trim last-question))
-      (log! :error (str "Mocking out of sync at question: \n  question-text: "
+  (let [{:keys [last-question script]} @mocking-state
+        question-text (str/trim question-text)]
+    (when-not (= question-text (str/trim last-question))
+      (log! :error (str "Intervieees: Mocking out of sync at question: \n  question-text: "
                         question-text
                         "\n last-question: " last-question)))
-    (let [script (script-from script question-text)
-          a (-> (some #(when (= (:message/from %) :surrogate) %) script) :message/content)
-          msg {:message-type :INTERVIEWEES-RESPOND
-               :response a}]
-      (if a
-        (s/assert :iviewr/interviewees-respond msg)
-        msg))))
+    (let [script (script-from script question-text)]
+      (-> (some #(when (= (:message/from %) :surrogate) %) script) :message/content))))
 
-(defmethod mocked-response-by-role! :interviewee
+;;; Interviewees interactions:
+;;;   question (a string) ->  answer (a string)
+(defmethod mocked-response-by-role! :interviewees
   [_tag question-text]
-  (-> (get-next-response question-text) sutil/clj2json-pretty))
+  (when (continue-mocking?)
+    (get-next-response question-text)))
 
 ;;; ---------------------------------- orchestrator ---------------------------------------------
 ;;; Orchestrator only gets :iviewr/conversation-history and :iviewr/backchannel-communication (not implemented) messages.
 ;;; Orchestrator only generates :iviewr/pursue-eads and backchannel-coms (not implemented) messages.
+(defn next-eads-instructions
+  "Return a pursue-eads message relevant for the next message in conversation."
+  []
+  (let [{:keys [last-question script]} @mocking-state
+        script (if last-question (script-from script last-question) script)
+        eads-id (-> (some #(when (contains? % :message/pursuing-EADS) %) script)
+                    :message/pursuing-EADS)
+        msg {:message-type :PURSUE-EADS :EADS-id eads-id}]
+    (if (or (empty? script) (nil? eads-id))
+      (do (stop-mocking!) nil)
+      (do (s/valid? :iviewr/pursue-eads msg)
+          msg))))
 
+;;; Interviewees interactions:
+;;;   conversation-history -> pursue-eads
 (defmethod mocked-response-by-role! :orchestrator
-  [tag text]
-  (log! :info (str "Mocked " (name tag) " " (elide text 130)))
-  (let [msg (ai-str2msg text)]
-    (cond  (s/valid? :iviewr/conversation-history msg)
-           (if (-> msg :activty empty?)
-             ;; Then haven't started talking. mocking-state.ork-EADS was initialized to the warm-up EADS instructions.
-             (-> {:message-type "PURSUE-EADS" :EADS-id (:ork-EADS @mocking-state)} sutil/clj2json-pretty)
-             :NYI)
+  [_tag text]
+  (when (continue-mocking?)
+    (let [msg (ai-str2msg text)]
+      (cond  (s/valid? :iviewr/conversation-history msg)   (-> (next-eads-instructions) sutil/clj2json-pretty)
+             :else
+             (throw (ex-info "Invalid message to interviewer:" {:text text}))))))
 
-          (s/valid? :iviewr/backchannel-coms msg)
-          ok-msg
-
-          :else
-          (throw (ex-info "Invalid message to interviewer:" {:text text})))))
-
+;;; ---------------------------------- Initiating mocking --------------------------
 (defn get-mocked-response!
   "Return the string that the LLM would have returned at this point in the proces.
    This is the key function of the mocking capability!"
   [agent-id text]
-  (mocked-response-by-role! (agent-type agent-id) text))
+  (if (continue-mocking?)
+    (do (Thread/sleep 2000)
+        (mocked-response-by-role! (agent-type agent-id) text))
+    (sutil/clj2json-pretty {:message-type :mocking-complete})))
 
 (defn set-mocking-state-to-start!
   [pid]
@@ -268,15 +311,14 @@
                            :where [?db-id :message/pursuing-EADS]]
                          @conn-atm)
                     (dp/pull-many @conn-atm '[*])
-                    (sort-by :message/time))]
-    (reset! mocking-state {:conversation-pos 0
-                           :pid-of-original pid
+                    (sort-by :message/time)
+                    vec)]
+    (reset! mocking-state {:pid-of-original pid
                            :ork-EADS (some (fn [s-line]
                                              (when (contains? s-line :message/pursuing-EADS)
                                                (:message/pursuing-EADS s-line)))
                                            script)
-                           :script script}))
-  true)
+                           :script script})))
 
 (defn prepare-to-mock!
   "Run mocking on the argument project."
@@ -284,31 +326,16 @@
   (when @old-shadow-db
     (destroy-shadow-db! @old-shadow-db))
   (reset! old-shadow-db (make-shadow-db! pid))
+  (reset! mocking? true)
   (let [{:keys [script]} (set-mocking-state-to-start! pid)]
     (if (not-empty script)
       (do
         (log! :info (str "Setting up mocking with " (count script) " messages from project " pid))
         (reset! mocking? true)
         (log! :info "Mocking enabled"))
-      (log! :warn (str "No messages found for project " pid ", mocking not enabled")))))
-
-(defn ^:diag stop-mocking!
-  "Stop mocking and reset state."
-  []
-  (reset! mocking? false)
-  (reset! mocking-state {:conversation-pos 0
-                         :ork-EADS nil
-                         :script []})
-  (log! :info "Mocking disabled"))
-
-(defn set-mock-enabled!
-  "Enable or disable mocking."
-  [enabled?]
-  (reset! mocking? enabled?)
-  (when-not enabled?
-    (reset! mocking-state {:conversation-pos 0
-                           :ork-EADS nil
-                           :script []})))
+      (do
+        (log! :warn (str "No messages found for project " pid ", mocking not enabled"))
+        (reset! mocking? true)))))
 
 ;;; Typical usage from user namespace:
 ;;; (mock/with-mock-project :sur-craft-beer-4script (scheduling-tbd.iviewr.interviewers/resume-conversation {:client-id :console :pid :sur-craft-beer-4script :cid :process}))
@@ -316,7 +343,9 @@
 (defmacro with-mock-project
   "Execute the given function with mocking enabled for the specified project."
   [pid & body]
-  `(do
-     (prepare-to-mock! ~pid)
-     ~@body
-     (log! :info "Ran the body")))
+  `(try (do
+          (prepare-to-mock! ~pid)
+          ~@body
+          (log! :info "Ran the body")
+          (reset! mocking? false))
+        (finally (reset! mocking? false)))) ; Don't set mocking to false in development because you will to walk through calls.

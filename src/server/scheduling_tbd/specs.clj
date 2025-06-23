@@ -86,17 +86,43 @@
                                 (fn [msg]
                                   (case (:message-type msg)
                                     :BACKCHANNEL-COMMUNICATION (s/valid? :iviewr/backchannel-coms msg) ; ToDo: "BACKCHANNEL-COMS"
-                                    :SUPPLY-QUESTION (s/valid? :iviewr/supply-question msg)
-                                    :QUESTION-TO-ASK (s/valid? :iviewr/question-to-ask msg)
-                                    :INTERVIEWEES-RESPOND (s/valid? :iviewr/interviewees-respond msg)
+                                    :CONVERSATION-HISTORY      (s/valid? :iviewr/conversation-history msg)
+                                    :COURSE-CORRECTION         (s/valid? :iviewr/course-correction msg)
                                     :DATA-STRUCTURE-REFINEMENT (s/valid? :iviewr/data-structure-refinement msg)
-                                    :CONVERSATION-HISTORY (s/valid? :iviewr/conversation-history msg)
-                                    :EADS-INSTRUCTIONS (s/valid? :iviewr/eads-instructions msg)
-                                    :COURSE-CORRECTION (s/valid? :iviewr/course-correction msg)
-                                    :STATUS (s/valid? :iviewr/status msg)))))
+                                    :EADS-INSTRUCTIONS         (s/valid? :iviewr/eads-instructions msg)
+                                    :INTERVIEWEES-RESPOND      (s/valid? :iviewr/interviewees-respond msg)
+                                    :PURSUE-EADS               (s/valid? :iviewr/pursue-eads msg)
+                                    :QUESTION-TO-ASK           (s/valid? :iviewr/question-to-ask msg)
+                                    :STATUS                    (s/valid? :iviewr/status msg)
+                                    :SUPPLY-QUESTION           (s/valid? :iviewr/supply-question msg)
+                                    :mocking-complete          true))))
+
+
+;;;   | Keys                   | Usage                                                                                                                      |
+;;;   |------------------------+----------------------------------------------------------------------------------------------------------------------------|
+;;;   | pursuing-EADS          | the name of the EADS instructions being pursued in the activity entries below it.                                          |
+;;;   | question and answer    | Q/A pairs; that are the question asked by an interview and the answer to it that interviewees provided.                    |
+;;;   | summary-DS             | the data structure (DS) of the type named by the pursuing-EADS. This DS summarizes what was inferred from the questioning. |
+;;;   | minizinc               | minizinc code that was inferred from the conversation so far.                                                              |
+;;;   | minizinc-results       | output from running the minizinc.                                                                                          |
 
 (s/def :iviewr/activity (s/coll-of :iviewr/activity-map :kind vector?))
-(s/def :iviewr/activity-map (s/keys :req-un [:iviewr/question :iviewr/answer]))
+(s/def :iviewr/activity-map (s/or :pursuing          :activity/pursuing-eads-keys
+                                  :q-and-a           :activity/q-and-a-keys
+                                  :summary-ds        :activity/summary-ds-keys
+                                  :minizinc          :activity/mzn-keys
+                                  :minizinc-results  :activity/mzn-results-keys))
+
+(s/def :activity/q-and-a-keys (s/keys :req-un [:iviewr/question :iviewr/answer]))
+(s/def :activity/pursuing-eads-keys (s/keys :req-un [:activity/pursuing-EADS]))
+(s/def :activity/pursuing-EADS keyword?)
+(s/def :activity/mzn-keys (s/keys :req-un [:activity/code]))
+(s/def :activity/code string?)
+(s/def :activity/mzn-results-keys (s/keys :req-un [:activity/mzn-results]))
+(s/def :activity/mzn-results string?)
+(s/def :activity/summary-ds-keys (s/keys :req-un [:activity/summary-DS]))
+(s/def :activity/summary-DS string?)
+
 (s/def :iviewr/answer string?)
 (s/def :iviewr/backchannel-coms (s/keys :opt-un [:iviewr/question :iviewr/response :iviewr/advice]))
 (s/def :iviewr/budget number?)
@@ -106,10 +132,12 @@
 (s/def :iviewr/data-structure map?)
 (s/def :iviewr/data-structure-refinement (s/keys :req-un [:iviewr/commit-notes :iviewr/data-structure]))
 (s/def :iviewr/EADS (s/or :dehydrated string? :hydrated map?))
+(s/def :iviewr/EADS-id string?)
 (s/def :iviewr/eads-instructions (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
 (s/def :iviewr/interview-objective string?)
 (s/def :iviewr/interviewees-respond (s/keys :req-un [:iviewr/response]))
 (s/def :iviewr/interviewee-type #(#{:human :machine} %))
+(s/def :iviewr/pursue-eads (s/keys :req-un [:iviewr/EADS-id]))
 (s/def :iviewr/question string?)
 (s/def :iviewr/question-to-ask (s/keys :req-un [:iviewr/question]))
 (s/def :iviewr/response string?)

@@ -273,7 +273,14 @@
 (defn clj2json-pretty
   "Return a pprinted string for given clojure object."
   [obj]
+  (assert (not (nil? obj)))
   (ches/generate-string obj {:pretty true}))
+
+#_(defn clj2json-pretty
+  "Return a pprinted string for given clojure object."
+  [obj]
+  (if (nil? obj) nil (ches/generate-string obj {:pretty true})))
+
 
 (defn update-resources-EADS-json!
   "Update the resources/agents/iviewrs/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions.

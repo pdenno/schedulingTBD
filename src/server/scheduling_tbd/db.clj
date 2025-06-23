@@ -630,6 +630,7 @@
   (assert (keyword? cid))
   (assert (#{:system :human :surrogate :developer-injected} from))
   (assert (string? full-text))
+  (assert (not= full-text "null"))
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid cid))
           pursuing-EADS (or pursuing-EADS (get-active-EADS-id pid cid))]
