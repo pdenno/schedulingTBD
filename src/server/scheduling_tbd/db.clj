@@ -51,7 +51,8 @@
 (defn put-execution-status!
   "Returns the execution status keyword (currently just :running or :paused)."
   [pid status]
-   (let [pid (if @mocking? (shadow-pid pid) pid)]
+  (let [pid (if pid pid :blank-project) ; ToDo: Mystery as to why this is necessary.
+        pid (if @mocking? (shadow-pid pid) pid)]
      (assert (#{:running :paused} status))
      (when-let [eid (project-exists? pid true)]
        (d/transact (connect-atm pid) {:tx-data [{:db/id eid

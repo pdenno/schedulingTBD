@@ -138,7 +138,7 @@
                   :assistant-id "asst_Z8OIRCCEGCPNfQOnuSGsb85V",
                   :timestamp #inst "2025-06-04T12:45:22.720-00:00",
                   :agent-id :resources-interview-agent}],
-         :default-project-id :sur-craft-beer,
+         :default-project-id :blank-project,
          :name "SYSTEM",
          :projects
          [#:project{:dir "/opt/scheduling/projects/blank-project",

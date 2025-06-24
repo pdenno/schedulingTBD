@@ -310,10 +310,11 @@
 (defn shadow-pid
   "Return a shadow pid, if the argument is a shadow-pid, return the argument."
   [pid]
-  (let [[success? _normal-pid] (re-matches #"^(.+)\-\-temp$" (name pid))]
-    (if success?
-      pid
-      (-> pid name (str "--temp") keyword))))
+  (when pid
+    (let [[success? _normal-pid] (re-matches #"^(.+)\-\-temp$" (name pid))]
+      (if success?
+        pid
+        (-> pid name (str "--temp") keyword)))))
 
 (defn normal-pid
   "When given a shadow-pid, return the normal pid."

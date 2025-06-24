@@ -1,9 +1,9 @@
 (ns stbd-app.ws
   "Implement websocket, except for reading, which happens in the chat component, owing to React hooks."
   (:require
-   [clojure.edn       :as edn]
-   [promesa.core      :as p]
-   [stbd-app.util     :as util :refer [dispatch-table lookup-fn register-fn update-common-info!]]
+   [clojure.edn :as edn]
+   [promesa.core :as p]
+   [stbd-app.util :as util :refer [dispatch-table lookup-fn register-fn update-common-info!]]
    [taoensso.telemere :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -20,13 +20,13 @@
 (defn reset-state
   "Reset the state of websocket things. Especially useful for hot reload."
   []
-  (when-let [proc @ping-process ] (js/window.clearInterval proc)) ; clear old ping-process, if any.
+  (when-let [proc @ping-process] (js/window.clearInterval proc)) ; clear old ping-process, if any.
   (when-let [proc @check-process] (js/window.clearInterval proc))
   (reset! ping-process nil)
   (reset! check-process nil)
   (reset! check-count 0))
 
-(defn ws-url [client-id] (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
+(defn ws-url [client-id] (str "ws://localhost:" (util/server-port) "/ws?client-id=" client-id))
 
 ;;; --------------------------promise-key management ---------------------------------------
 (def pending-promise-keys "These are created by the server to track what is being responded to." (atom #{}))
@@ -36,7 +36,7 @@
    that associates to a promise on the server side and allows the server to continue the conversation,
    interpreting the :domain-expert-says response which repeat this promise-key as answer to the :iviewr-says ws message.
    This function just adds to the list, which in most cases will be empty when the argument key is added here."
-  [k]  (when k (swap! pending-promise-keys conj k)))
+  [k] (when k (swap! pending-promise-keys conj k)))
 
 (defn clear-promise-keys! [ks]
   (log! :info (str "Clear promise keys: " ks))
@@ -47,21 +47,21 @@
 
 ;;; These are some of the functions registered. Others are chat.cljs, core.cljs, db_access.cljs, graph.cljs and maybe other places.
 ;;; The ones here correspond to dispatch keys, but other might be used to break-out React hooks or avoid namespace cycles.
-(register-fn :clear-promise-keys    (fn [obj] (-> obj :promise-keys clear-promise-keys!)))
+(register-fn :clear-promise-keys (fn [obj] (-> obj :promise-keys clear-promise-keys!)))
 
-(register-fn :alive?                (fn [_]
-                                      (log! :info "alive-confirm")
-                                      (send-msg {:dispatch-key :alive-confirm})))
+(register-fn :alive? (fn [_]
+                       (log! :info "alive-confirm")
+                       (send-msg {:dispatch-key :alive-confirm})))
 
-(register-fn :ping-confirm          (fn [_] :ok))
+(register-fn :ping-confirm (fn [_] :ok))
 
 ;;; The server uses this one after the client sends it :start-surrogate (which creates the surrogate's DB).
-(register-fn :load-proj             (fn [{:keys [new-proj-map]}] ; New projects start on :process
-                                      (let [{:project/keys [id name]} new-proj-map]
-                                        (log! :info (str "load-proj: new-proj-map = " new-proj-map))
-                                        (update-common-info! (assoc new-proj-map :cid :process))
-                                        (when-let [f (lookup-fn :set-current-project)] (f new-proj-map))
-                                        (when-let [f (lookup-fn :get-conversation)]    (f id name)))))
+(register-fn :load-proj (fn [{:keys [new-proj-map]}] ; New projects start on :process
+                          (let [{:project/keys [id name]} new-proj-map]
+                            (log! :info (str "load-proj: new-proj-map = " new-proj-map))
+                            (update-common-info! (assoc new-proj-map :cid :process))
+                            (when-let [f (lookup-fn :set-current-project)] (f new-proj-map))
+                            (when-let [f (lookup-fn :get-conversation)] (f id name)))))
 
 (register-fn :domain-expert-submits-table (fn [table]
                                             (send-msg {:dispatch-key :domain-expert-says
@@ -107,7 +107,7 @@
         (reset! channel chan)
         (reset! reconnecting? false)
         (set! (.-onmessage chan)
-              (fn [event]       ;; ToDo: Consider transit rather then edn/read-string.
+              (fn [event] ;; ToDo: Consider transit rather then edn/read-string.
                 (try (let [data (.-data event)]
                        (when (not-empty data) (-> data edn/read-string dispatch-msg)))
                      (catch :default e
@@ -147,18 +147,18 @@
     (reset! reconnecting? true)))
 
 (def send-msg-type?
-  #{:alive-confirm             ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected. ToDo: Remove it? Not implemented.
-    :ask-llm                   ; User asked a "LLM:..." question at the chat prompt.
-    :close-channel             ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
-    :domain-expert-says        ; Human user wrote at the chat prompt (typically answering a question).
-    :interviewer-busy?         ; Enable/disable various UI features depending on whether interviewer is busy.
-    :set-execution-status!     ; Set :project/execution-status in the project DB. (:paused :running)
-    :ping                      ; Ping server.
-    :resume-conversation       ; Restart interviewing. Done after client receives a :load-proj, and when switches conversation.
-    :start-surrogate           ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation
-    :start-surrogate+          ; User wrote "SUR+:" <map of various info> Start a surrogate with information from the map provided.
-    :surrogate-follow-up       ; User wrote "SUR?:" <some question about dialog to date>
-    :user-returns-table})      ; User submitted table data
+  #{:alive-confirm ; Like a ping but initiated from server, and only when it seems things have inadvertently disconnected. ToDo: Remove it? Not implemented.
+    :ask-llm ; User asked a "LLM:..." question at the chat prompt.
+    :close-channel ; Close the ws. (Typically, client is ending.) ToDo: Only on dev recompile currently.
+    :domain-expert-says ; Human user wrote at the chat prompt (typically answering a question).
+    :interviewer-busy? ; Enable/disable various UI features depending on whether interviewer is busy.
+    :set-execution-status! ; Set :project/execution-status in the project DB. (:paused :running)
+    :ping ; Ping server.
+    :resume-conversation ; Restart interviewing. Done after client receives a :load-proj, and when switches conversation.
+    :start-surrogate ; User wrote "SUR: <some product type> at the chat prompt, something like :resume-conversation
+    :start-surrogate+ ; User wrote "SUR+:" <map of various info> Start a surrogate with information from the map provided.
+    :surrogate-follow-up ; User wrote "SUR?:" <some question about dialog to date>
+    :user-returns-table}) ; User submitted table data
 
 (defn send-msg
   "Add client-id and send the message to the server over the websocket.

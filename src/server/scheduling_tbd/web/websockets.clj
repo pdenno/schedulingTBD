@@ -202,11 +202,17 @@
              (seq @socket-channels))
     (reset! inactive-channels-process (future (close-inactive-channels))))
   (if-let [client-id (-> request :query-params (update-keys keyword) :client-id)]
-    (let [{:keys [in out err]} (make-ws-channels client-id)]
-      (swap! ping-dates #(assoc % client-id (now)))
-      (error-listener client-id) ; This and next are go loops,
-      (dispatching-loop client-id) ; which means they are non-blocking.
-      {:ring.websocket/listener (wsa/websocket-listener in out err)})
+    (do
+      ;; Close any existing connection for this client-id to prevent duplicates
+      (when (get @socket-channels client-id)
+        (log! :info (str "Replacing existing connection for client: " client-id))
+        (close-ws-channels client-id)
+        (Thread/sleep 100)) ; Brief pause to allow cleanup
+      (let [{:keys [in out err]} (make-ws-channels client-id)]
+        (swap! ping-dates #(assoc % client-id (now)))
+        (error-listener client-id) ; This and next are go loops,
+        (dispatching-loop client-id) ; which means they are non-blocking.
+        {:ring.websocket/listener (wsa/websocket-listener in out err)}))
     (log! :error "Websocket client did not provide id.")))
 
 ;;; ----------------------- Promise management -------------------------------
@@ -274,7 +280,7 @@
    send a message to the client to do similar."
   [client-id client-keys]
   (doseq [k client-keys] (remove-promise! k))
-  (if-let [out (->> client-id (get @socket-channels) :out)]
+  (if-let [out (get-in @socket-channels [client-id :out])]
     (let [msg {:dispatch-key :clear-promise-keys
                :promise-keys client-keys}]
       (go (>! out (str msg))))
@@ -308,14 +314,18 @@
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if (= client-id :console)
     (log! :info (str "send-to-client (console):\n" (with-out-str (pprint content))))
-    (if-let [out (->> client-id (get @socket-channels) :out)]
+    (if-let [out (get-in @socket-channels [client-id :out])]
       (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))
             msg-obj (cond-> content
                       p-key (assoc :p-key p-key)
                       true (assoc :timestamp (now)))]
         (when-not (= :alive? dispatch-key)
           (log! :debug (elide (str "send-to-client: msg-obj =" msg-obj) 130)))
-        (go (>! out (str msg-obj)))
+        ;; Use synchronous approach to ensure proper message ordering
+        ;; Create a promise to wait for the message to be sent
+        (let [sent-promise (p/deferred)]
+          (async/put! out (str msg-obj) #(p/resolve! sent-promise true))
+          @sent-promise) ; Block until message is actually sent
         prom)
       (when-not (= client-id :console)
         (log! :error (str "Could not find out async channel for client " client-id))))))

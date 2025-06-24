@@ -1,34 +1,34 @@
 (ns stbd-app.components.chat
-   "This is used pop up a model indicating the URL at which the example can be retrieved."
+  "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
-   [helix.core   :refer [defnc $]]
-   [helix.hooks  :as hooks]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default"           :as ChatContainer]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/ConversationList$default"        :as ConversationList]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Conversation$default"            :as Conversation]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default"           :as MainContainer]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default"                 :as Message]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default"   :as MessageHeader]
+   [helix.core :refer [defnc $]]
+   [helix.hooks :as hooks]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default" :as ChatContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/ConversationList$default" :as ConversationList]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Conversation$default" :as Conversation]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default" :as MainContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default" :as Message]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default" :as MessageHeader]
    ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageCustomContent$default" :as MessageCustomContent]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHtmlContent$default"   :as MessageHtmlContent]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default"            :as MessageInput]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"             :as MessageList]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default"        :as MessageSeparator]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default"                 :as Sidebar]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHtmlContent$default" :as MessageHtmlContent]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default" :as MessageInput]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default" :as MessageList]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default" :as MessageSeparator]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default" :as Sidebar]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default" :as TypingIndicator]
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/Button$default" :as Button]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core :as p]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
-   [stbd-app.components.share :as share  :refer [ShareUpDown]]
-   [stbd-app.components.graph            :refer [GraphModal]]
-   [stbd-app.components.table            :refer [TableModal]]
-   [stbd-app.db-access  :as dba]
-   [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
-   [stbd-app.ws         :as ws   :refer [remember-promise]]
-   [taoensso.telemere   :as tel  :refer-macros [log!]]))
+   [stbd-app.components.share :as share :refer [ShareUpDown]]
+   [stbd-app.components.graph :refer [GraphModal]]
+   [stbd-app.components.table :refer [TableModal]]
+   [stbd-app.db-access :as dba]
+   [stbd-app.util :as util :refer [register-fn lookup-fn common-info update-common-info!]]
+   [stbd-app.ws :as ws :refer [remember-promise]]
+   [taoensso.telemere :as tel :refer-macros [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -47,8 +47,8 @@
         now-epoch-millis (.now js/Date)
         diff (- now-epoch-millis msg-epoch-millis)]
     (cond (< diff 60000) "just now"
-          (<= 60000  diff 120000)   "1 minute ago"
-          (<= 120001 diff 3600000)  (str (quot diff 60000) " minutes ago")
+          (<= 60000 diff 120000) "1 minute ago"
+          (<= 120001 diff 3600000) (str (quot diff 60000) " minutes ago")
           (<= 3600000 diff 7200000) "1 hour ago"
           (< start-of-day-millis msg-epoch-millis) (str (quot diff 3600000) " hours ago")
           :else (-> (inst2date instant) (subs 0 15)))))
@@ -57,9 +57,9 @@
   [content from]
   (assert (#{:surrogate :system :developer-interjected :human} from))
   (case from
-      :surrogate               (str "<b>Surrogate Expert</b><br/>" content)
-      :developer-interjected   (str "<b>Developer Interjected Question</b><br/>" content)
-      content))
+    :surrogate (str "<b>Surrogate Expert</b><br/>" content)
+    :developer-interjected (str "<b>Developer Interjected Question</b><br/>" content)
+    content))
 
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
@@ -130,7 +130,7 @@
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
-                 #_(when (:active? @common-info) ; <========================================================================================================== DEMO
+                 (when (:active? @common-info) ; <========================================================================================================== DEMO, was commented.
                    (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))
                  (update-common-info! {:pid pid :cid cid}))))))
 
@@ -146,27 +146,27 @@
     (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
     ((lookup-fn :set-cs-msg-list) @msgs-atm)))
 
-(register-fn :interviewer-busy?     (fn [{:keys [value]}]
-                                      ((lookup-fn :set-busy?) value)))
+(register-fn :interviewer-busy? (fn [{:keys [value]}]
+                                  ((lookup-fn :set-busy?) value)))
 
-(register-fn :iviewr-says           (fn [{:keys [p-key text table]}]
-                                      (when p-key (remember-promise p-key))
-                                      (add-msg text :system)
-                                      (when table
-                                        ((lookup-fn :set-table) table))))
+(register-fn :iviewr-says (fn [{:keys [p-key text table]}]
+                            (when p-key (remember-promise p-key))
+                            (add-msg text :system)
+                            (when table
+                              ((lookup-fn :set-table) table))))
 
-(register-fn :sur-says              (fn [{:keys [p-key msg]}]
-                                      (when p-key (remember-promise p-key))
-                                      (log! :info (str "sur-says msg: " msg))
-                                      (add-msg msg :surrogate)))
+(register-fn :sur-says (fn [{:keys [p-key text]}]
+                         (when p-key (remember-promise p-key))
+                         (log! :info (str "sur-says text: " text))
+                         (add-msg text :surrogate)))
 
 ;;; There is just one Chat instance in our app. It is switched between different conversations.
 (defnc Chat [{:keys [chat-height]}]
-  (let [[msg-list set-msg-list]         (hooks/use-state [])
-        [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
-        [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
-        [active-conv set-active-conv]   (hooks/use-state nil) ; active-conv is a keyword
-        [busy? set-busy?]               (hooks/use-state nil) ; Have to go through common-info
+  (let [[msg-list set-msg-list] (hooks/use-state [])
+        [box-height set-box-height] (hooks/use-state (int (/ chat-height 2.0)))
+        [cs-msg-list set-cs-msg-list] (hooks/use-state nil)
+        [active-conv set-active-conv] (hooks/use-state nil) ; active-conv is a keyword
+        [busy? set-busy?] (hooks/use-state nil) ; Have to go through common-info
         resize-fns (make-resize-fns set-box-height)]
     (letfn [(change-conversation-click [to]
               (when-not busy?
@@ -175,16 +175,16 @@
                   (log! :error (str "change-conversation-click fails: common-info = " @common-info)))))
             (process-user-input [text]
               (when (not-empty text)
-                (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)
+                (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" text)
                       [surrogate? product] (re-matches #"\s*SUR:(.*)" text)
-                      [sur+ map-str]       (re-matches #"\s*SUR\+:(.*)" text)
-                      [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" text)
-                      msg (cond  ask-llm?       {:dispatch-key :ask-llm :question question}
-                                 surrogate?     {:dispatch-key :start-surrogate :product product}
-                                 sur+           {:dispatch-key :start-surrogate+ :map-str map-str} ; like :start-surrogate, but provide a map of stuff.
-                                 sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:pid @common-info) :question q}
+                      [sur+ map-str] (re-matches #"\s*SUR\+:(.*)" text)
+                      [sur-follow-up? q] (re-matches #"\s*SUR\?:(.*)" text)
+                      msg (cond ask-llm? {:dispatch-key :ask-llm :question question}
+                                surrogate? {:dispatch-key :start-surrogate :product product}
+                                sur+ {:dispatch-key :start-surrogate+ :map-str map-str} ; like :start-surrogate, but provide a map of stuff.
+                                sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:pid @common-info) :question q}
 
-                                 :else          {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
+                                :else {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
                   ;; ToDo: Human-interjected questions, though some of them are stored, don't store the human-interjected annotation.
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.
                   (when sur-follow-up?
@@ -198,26 +198,26 @@
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
-        (register-fn :clear-msgs   (fn [] (set-cs-msg-list []) (reset! msgs-atm [])))
-        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
-        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
-        (register-fn :set-active-conv set-active-conv)
-        (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (set-busy? val))) ; Yes. Need to do both.
-        (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
-        (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
-        (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs))))  ; These two used to update message time.
-        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
+                        (register-fn :clear-msgs (fn [] (set-cs-msg-list []) (reset! msgs-atm [])))
+                        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
+                        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
+                        (register-fn :set-active-conv set-active-conv)
+                        (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (set-busy? val))) ; Yes. Need to do both.
+                        (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
+                        (register-fn :get-msg-list (fn [] @msgs-atm)) ; These two used to update message time.
+                        (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs)))) ; These two used to update message time.
+                        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
       (hooks/use-effect [msg-list]
-        (reset! msgs-atm msg-list)
-        (set-cs-msg-list (msgs2cs msg-list)))
+                        (reset! msgs-atm msg-list)
+                        (set-cs-msg-list (msgs2cs msg-list)))
       ;; ----------------- component UI structure.
       ($ ShareUpDown
          {:init-height chat-height
           :up-portion 0.8
           :share-fns resize-fns
           :up ($ Box {:sx ; This work!
-                      #js {:overflowY "auto"  ; Creates a scroll bar
-                           :display "flex"    ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
+                      #js {:overflowY "auto" ; Creates a scroll bar
+                           :display "flex" ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
                            :height box-height ; When set small enough, scroll bars appear.
                            :flexDirection "column"
                            :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
@@ -241,7 +241,7 @@
                     ($ ChatContainer
                        ($ MessageList
                           {:typingIndicator (when busy? ($ TypingIndicator {:content "Interviewer is typing"}))
-                          #_#_ :style #js {:height "500px"}}
+                           #_#_:style #js {:height "500px"}}
                           cs-msg-list))))
           :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!
                  ($ Stack {:direction "row" :spacing "0px"}

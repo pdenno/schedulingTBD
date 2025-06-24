@@ -8,8 +8,7 @@
    [scheduling-tbd.agent-db       :as adb :refer [agent-log]]
    [scheduling-tbd.db             :as db]
    [scheduling-tbd.iviewr.eads] ; for mount
-   [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide mocking? ai-response2clj shadow-pid]]
-   [taoensso.telemere             :as tel :refer [log!]]))
+   [scheduling-tbd.sutil          :refer [connect-atm clj2json-pretty elide mocking? ai-response2clj shadow-pid log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -192,7 +191,8 @@
   (agent-log (cl-format nil "{:log-comment \"[ork manager] (tells ork):~%~A\"}"
                   (with-out-str (pprint msg))))
   (let [msg-string (clj2json-pretty msg)
-        res (-> (adb/query-agent ork-agent msg-string {:tries 2}) ai-response2clj)
+        res (adb/query-agent ork-agent msg-string {:tries 2})
+        res (when res (ai-response2clj res))
         res (cond-> res
               (contains? res :message-type)              (update :message-type keyword)
               (= (:message-type res) :PURSUE-EADS)       (update :EADS-id keyword))]

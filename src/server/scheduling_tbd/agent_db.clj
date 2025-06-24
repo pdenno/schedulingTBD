@@ -106,11 +106,12 @@
 ;;; ToDo: This one might be temporary! It adds tid and aid to the
 (defn agent-db2proj
   "Return a map of agent info translated to project attributes (aid, tid, base-type, expertise, surrogate?)."
-  [{:agent/keys [assistant-id thread-id base-type] :as agent}]
+  [{:agent/keys [assistant-id thread-id base-type agent-type] :as agent}]
   (cond-> agent
     assistant-id    (assoc :aid assistant-id)
     thread-id       (assoc :tid thread-id)
-    base-type       (assoc :base-type base-type)))
+    base-type       (assoc :base-type base-type)
+    agent-type      (assoc :agent-type agent-type)))
 
 ;;; (adb/make-agent-basics :foo {:agent/agent-type :project})
 ;;; (adb/make-agent-basics {:base-type :sur-foo :pid :sur-foo} {:agent/agent-type :project :agent/surrogate? true})
@@ -472,7 +473,7 @@
   ([agent-or-id text] (query-agent agent-or-id text {}))
   ([agent-or-id text opts-map]
    (let [agent-id (if (s/valid? ::agent-id agent-or-id) agent-or-id (agent2agent-id agent-or-id))]
-     (if (mock/mocked-agent? agent-id)
+     (if (and @mocking? (mock/mocked-agent? agent-id))
        (mock/get-mocked-response! agent-id text)
        (try
          (let [agent (cond (and (map? agent-or-id)

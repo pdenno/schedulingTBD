@@ -59,7 +59,6 @@
            :timestamp (now)
            :agent-id (-> pid name (str "-" (name llm-provider)) keyword)}))
 
-
 ;;; (sur/start-surrogate! {:product "craft beer" :client-id :console})
 ;;; (sur/start-surrogate! {:product "craft beer" :client-id (ws/recent-client!)})
 (defn start-surrogate!

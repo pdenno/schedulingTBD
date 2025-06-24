@@ -37,7 +37,9 @@
                              "different process plans; in the other, a process plans will need to be specified for each job.\n"
                              "The purpose of these EADS-INSTRUCTIONS is only to determine which of these two subclasses of job shop models should be pursued.\n"
                              "Once this is determined, the orchestrator will likely then choose either EADS 'process/job-shop--classifiable' or 'process/job-shop--unique-order' corresponding\n"
-                             "respectively to the two separate approaches just described.")
+                             "respectively to the two separate approaches just described.\n"
+                             "The two types are mutually exclusive: if you decide that 'classifiable-jobs?' is true, the orchestator will then pursue EADS instructions 'process/job-shop--classifiable'.\n"
+                             "This is good, because we don't have good instructions for 'process/job-shop--unique-order' currently!") ; <==================== Temporary!
    :EADS
    {:EADS-id :process/job-shop
     :classifiable-jobs? {:val true,
@@ -60,6 +62,7 @@
                {:console? true #_#_:elide-console 130})
     complete?))
 
+;;; (jshop/init-job-shop)
 (defn init-job-shop
   []
   (if (s/valid? :job-shop/EADS-message job-shop)

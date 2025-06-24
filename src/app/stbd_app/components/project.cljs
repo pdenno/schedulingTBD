@@ -86,13 +86,14 @@
                             ((lookup-fn :get-conversation) (:project/id current-project) cid)))))]
       (register-fn :set-current-project set-current) ; ToDo: make this go away.
       (hooks/use-effect :once (update-proj-info!))
-      (hooks/use-effect [play-active?]
+      #_(hooks/use-effect [play-active?]
         (update-common-info! {:active? (not play-active?)})
         (let [{:keys [active? pid cid]} @common-info] ; If the play button is active, it is because execution is paused.
-          (ws/send-msg {:dispatch-key :set-execution-status! :pid pid :status (if active? :running :paused)})
-          #_(when (and active? pid cid) <========================================================================================= DEMO
-            (log! :info (str "Resuming conversation pid = " pid " cid = " cid))
-            (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))))
+          (when (and active? pid cid) 
+            (ws/send-msg {:dispatch-key :set-execution-status! :pid pid :status (if active? :running :paused)}))
+          ;;(log! :info (str "Resuming conversation pid = " pid " cid = " cid))
+          ;; (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))
+          ))
       ;; This needed or doesn't show first time:
       ;; Note also that the order current then current-proj! Ugh!
       (reset! menu-infos (order-projects current proj-infos))

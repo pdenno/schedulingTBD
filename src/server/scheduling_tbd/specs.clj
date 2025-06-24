@@ -132,7 +132,7 @@
 (s/def :iviewr/data-structure map?)
 (s/def :iviewr/data-structure-refinement (s/keys :req-un [:iviewr/commit-notes :iviewr/data-structure]))
 (s/def :iviewr/EADS (s/or :dehydrated string? :hydrated map?))
-(s/def :iviewr/EADS-id string?)
+(s/def :iviewr/EADS-id (s/or :string string? :key keyword?))
 (s/def :iviewr/eads-instructions (s/keys :req-un [:iviewr/interview-objective :iviewr/EADS]))
 (s/def :iviewr/interview-objective string?)
 (s/def :iviewr/interviewees-respond (s/keys :req-un [:iviewr/response]))

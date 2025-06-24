@@ -9,7 +9,7 @@
    [datahike.pull-api    :as dp]
    [scheduling-tbd.schema :as schema :refer [db-schema-proj]]
    [scheduling-tbd.specs  :as specs]
-   [scheduling-tbd.sutil  :as sutil :refer [ai-response2clj connect-atm db-cfg-map elide log! mocking?
+   [scheduling-tbd.sutil  :as sutil :refer [ai-response2clj connect-atm db-cfg-map log! mocking?
                                             normal-pid register-db resolve-db-id shadow-pid]]))
 
 (def ^:diag diag (atom nil))
@@ -86,7 +86,7 @@
       thread-id (assoc :tid thread-id)
       base-type (assoc :base-type base-type))))
 
-(defn agent-type
+(defn mocking-role
   "Return one of #{:interviewer :interviewees :orchestrator :other} describing the type of agent."
   [agent-id]
   (let [{:agent/keys [base-type surrogate?]} (get-agent-from-wherever agent-id)]
@@ -113,9 +113,10 @@
   (when (connect-atm pid {:error? false})
     (let [cfg (sutil/get-db-cfg pid)]
       (if (= :mem (-> cfg :store :backend))
-        (do (d/delete-database cfg)
-            (sutil/deregister-db pid)
-            true)
+        (when (d/database-exists? cfg)
+          (d/delete-database cfg)
+          (sutil/deregister-db pid)
+          true)
         (log! :error "Mocking DB is not :mem")))))
 
 (defn make-shadow-db!
@@ -144,7 +145,7 @@
 (defn mocked-agent?
   "Return true if the agent is a type that is mocked."
   [agent-id]
-  (mocked-type? (agent-type agent-id)))
+  (mocked-type? (mocking-role agent-id)))
 
 (defn get-mocked-dispatch
   [tag _agent-id]
@@ -169,8 +170,6 @@
                   true   (update :message-type keyword)
                   (contains? msg-obj :interviewee-type)                 (update :interviewee-type keyword)
                   (contains? msg-obj :activity)                          update-activities)]
-
-    (reset! diag msg-obj)
     (if (s/valid? ::specs/interviewer-msg msg-obj)
       msg-obj
       (throw (ex-info "Invalid message:" {:msg-string s})))))
@@ -281,8 +280,7 @@
         msg {:message-type :PURSUE-EADS :EADS-id eads-id}]
     (if (or (empty? script) (nil? eads-id))
       (do (stop-mocking!) nil)
-      (do (s/valid? :iviewr/pursue-eads msg)
-          msg))))
+      (s/assert :iviewr/pursue-eads msg))))
 
 ;;; Interviewees interactions:
 ;;;   conversation-history -> pursue-eads
@@ -290,20 +288,12 @@
   [_tag text]
   (when (continue-mocking?)
     (let [msg (ai-str2msg text)]
-      (cond  (s/valid? :iviewr/conversation-history msg)   (-> (next-eads-instructions) sutil/clj2json-pretty)
-             :else
-             (throw (ex-info "Invalid message to interviewer:" {:text text}))))))
+      (when (s/valid? :iviewr/conversation-history msg)
+        (when-let [pursue-msg (next-eads-instructions)]
+          (when (s/valid? :iviewr/pursue-eads pursue-msg)
+              (sutil/clj2json-pretty pursue-msg)))))))
 
 ;;; ---------------------------------- Initiating mocking --------------------------
-(defn get-mocked-response!
-  "Return the string that the LLM would have returned at this point in the proces.
-   This is the key function of the mocking capability!"
-  [agent-id text]
-  (if (continue-mocking?)
-    (do (Thread/sleep 2000)
-        (mocked-response-by-role! (agent-type agent-id) text))
-    (sutil/clj2json-pretty {:message-type :mocking-complete})))
-
 (defn set-mocking-state-to-start!
   [pid]
   (let [conn-atm (sutil/connect-atm pid)
@@ -337,6 +327,17 @@
         (log! :warn (str "No messages found for project " pid ", mocking not enabled"))
         (reset! mocking? true)))))
 
+(defn get-mocked-response!
+  "Return the string that the LLM would have returned at this point in the proces.
+   This is the key function of the mocking capability!"
+  [agent-id text]
+  (let [role (mocking-role agent-id)]
+    (log! :info (str "Mocking an " (name role)))
+    (if (continue-mocking?)
+      (do ;(Thread/sleep 10000)
+          (mocked-response-by-role! role text))
+      (sutil/clj2json-pretty {:message-type :mocking-complete}))))
+
 ;;; Typical usage from user namespace:
 ;;; (mock/with-mock-project :sur-craft-beer-4script (scheduling-tbd.iviewr.interviewers/resume-conversation {:client-id :console :pid :sur-craft-beer-4script :cid :process}))
 ;;; (mock/with-mock-project :sur-craft-beer-4script (inv/resume-conversation {:client-id (ws/recent-client!) :pid :sur-craft-beer-4script :cid :process}))
@@ -347,5 +348,8 @@
           (prepare-to-mock! ~pid)
           ~@body
           (log! :info "Ran the body")
-          (reset! mocking? false))
-        (finally (reset! mocking? false)))) ; Don't set mocking to false in development because you will to walk through calls.
+          (reset! mocking? false)
+          (stop-mocking!))
+        (finally
+          (stop-mocking!)
+          (reset! mocking? false)))) ; Don't set mocking to false in development because you will to walk through calls.
