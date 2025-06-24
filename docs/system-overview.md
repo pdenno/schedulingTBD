@@ -154,12 +154,16 @@ The system architecture supports:
 
 ## Some Guidelines for AI MCP-based Coding Copilots
 
+**⚠️ CRITICAL LIMITATION**: AI agent sessions (MCP-based) typically crash after 10-20 minutes of work. Document progress frequently in `docs/` and commit code changes every 5-10 minutes. See `docs/agent-session-limitations.md` for complete backup strategy.
+
 1. Preserve exact formatting and whitespace when making any edits.
 2. Use the MCP Clojure editing tools for precise, surgical changes.
 3. Only modify what needs to be changed without reformatting entire sections.
 4. Allow sufficient time (30+ seconds) for LLM agent calls as noted in the documentation.
+5. **Document work frequently** - sessions end unexpectedly without warning.
+6. **Commit code regularly** - use git every 5-10 minutes to preserve progress.
 
-In order to observe system activity, you can watch for logging at the console (REPL), and also entries made in logs/agent-logs.txt."
+In order to observe system activity, you can watch for logging at the console (REPL), and also entries made in logs/agent-logs.txt.
 
 ---
 
