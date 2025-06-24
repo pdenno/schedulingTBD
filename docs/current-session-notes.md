@@ -55,6 +55,16 @@
 
 ## Current Session Work
 
+### Investigating Duplicate Chat Bubbles Issue 🔍
+- **Problem**: Messages appearing on both sides of conversation in web client
+- **Context**: Previous session found the issue and had a solution but crashed
+- **Current Investigation**: Examining `send-to-client` usage patterns in interviewers.clj
+- **Key Findings So Far**:
+  - Multiple `send-to-client` calls in `chat-pair-interviewees` function
+  - Surrogate responses calling `send-to-client` AND returning data for DB storage
+  - Potential double-sending: WebSocket + database paths
+  - Found 8 matches for `send-to-client|add-msg|db/add-msg` in interviewers.clj
+
 ### Fixed `run-demo!` Client ID Issue ✅
 - **Problem**: `run-demo!` function was failing with client-id validation error
 - **Root Cause**: No websocket clients connected, so `(ws/recent-client!)` returned `nil`
