@@ -55,15 +55,14 @@
 
 ## Current Session Work
 
-### Investigating Duplicate Chat Bubbles Issue 🔍
-- **Problem**: Messages appearing on both sides of conversation in web client
-- **Context**: Previous session found the issue and had a solution but crashed
-- **Current Investigation**: Examining `send-to-client` usage patterns in interviewers.clj
-- **Key Findings So Far**:
-  - Multiple `send-to-client` calls in `chat-pair-interviewees` function
-  - Surrogate responses calling `send-to-client` AND returning data for DB storage
-  - Potential double-sending: WebSocket + database paths
-  - Found 8 matches for `send-to-client|add-msg|db/add-msg` in interviewers.clj
+### ✅ FIXED: Duplicate Chat Bubbles Issue
+- **Problem**: Messages appearing on both sides of conversation in web client  
+- **Root Cause**: Two separate `ws/send-to-client` calls for the same surrogate responses:
+  1. `chat-pair-interviewees` function immediately sent `:sur-says` via WebSocket
+  2. `q-and-a` function later iterated through `msgs-vec` and sent each message again
+- **Solution**: Removed duplicate `ws/send-to-client` call from `chat-pair-interviewees`
+- **Result**: Messages should now appear only once, on the correct side of conversation
+- **Files Modified**: `src/server/scheduling_tbd/iviewr/interviewers.clj` (lines 109-110)
 
 ### Fixed `run-demo!` Client ID Issue ✅
 - **Problem**: `run-demo!` function was failing with client-id validation error
