@@ -95,7 +95,7 @@
         :text is text in response to the query with surrogate tables removed.
         :table is a table map completed by the expert.
    If response is immoderate returns {:msg-type :immoderate}"
-  [{:keys [responder-type cid client-id] :as ctx}]
+  [{:keys [responder-type cid] :as ctx}]
   (let [response (chat-pair-aux ctx)]
     (agent-log (cl-format nil "{:log-comment \"[~A interviewer] (response from interviewees):~%~A\"}" (name cid) response)
                {:console? true :elide-console 130})
@@ -109,8 +109,6 @@
                              text (assoc :text text)
                              table (assoc :table table)
                              table (assoc :table-html table-html))]
-                   ;; REMOVED: Duplicate ws/send-to-client call that was causing chat bubbles to appear twice
-                   ;; The q-and-a function handles all WebSocket sending for the conversation flow 
                    res))))
 
 (defn tell-interviewer
@@ -362,7 +360,7 @@
 
 (defn mocking-complete-msg?
   [msg]
-  (or ;(not (mock/continue-mocking?)) ; <=============================================================== This was an or with (not (mock/continue-mocking?)). =======================
+  (or ;(not (mock/continue-mocking?)) ; <======== This was an or with (not (mock/continue-mocking?)). =====
    (and (map? msg) (= :mocking-complete (:message-type msg)))))
 
 ;;; Hint for diagnosing problems: Once you have the ctx (stuff it in an atom) you can call q-and-a
@@ -377,17 +375,17 @@
       (ws/send-to-client {:dispatch-key :interviewer-busy? :value true :client-id client-id})
       (try (let [iviewr-q (as-> (make-supply-question-msg pid) ?m ; This just makes a SUPPLY-QUESTION message-type.
                             (tell-interviewer ?m iviewr-agent cid) ; Returns (from the interviewer) a {:message-type :QUESTION-TO-ASK, :question "...'}
-                            (if (mocking-complete-msg? ?m) ?m (separate-table ?m))) ; Returns a {:full-text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
-                 {:keys [full-text table]} iviewr-q]
+                            (if (mocking-complete-msg? ?m) ?m (separate-table ?m)))] ; Returns a {:full-text "..." :table-html "..." :table {:table-headings ... :tabel-data ...}}
              (when (= :human responder-type) (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))
-             ;;;Return a vector of maps for db/add-msg (thus pid cid from full-text table tags question-type pursuing-EADS).
+             ;; This returns a VECTOR of statements from the interviewees and interviewer.
              (when-not (mocking-complete-msg? iviewr-q)
                (let [msgs-vec (get-an-answer (cond-> ctx
-                                               true (assoc :question full-text)
-                                               table (assoc :table table)))]
+                                               true (assoc :question (:full-text iviewr-q))
+                                               (-> iviewr-q :table-html not-empty) (assoc :table-html (:table-html iviewr-q))))]
                  (when (= :surrogate responder-type)
-                   ;; ToDo: This is a mess! Different things interviewees and interviewer!
-                   (doseq [{:keys [full-text table from msg-type]} msgs-vec]
+                   ;; Skip the first message since it's the question already sent by chat-pair-aux.
+                   ;; ToDo: This is a mess! Different msgs-vec element form from interviewer and interviewees! Can it be fixed?
+                   (doseq [{:keys [full-text table from msg-type]} (rest msgs-vec)]
                      (ws/send-to-client (cond-> {:client-id client-id :text full-text}
                                           table (assoc :table table)
                                           (= from :system) (assoc :dispatch-key :iviewr-says)

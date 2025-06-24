@@ -104,7 +104,7 @@
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
 ;;; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function.
-(def msgs-atm "A vector of messages in the DB format." (atom nil))
+(def msgs-atm "A vector of messages in the DB format." (atom []))
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
 (defn update-msg-times

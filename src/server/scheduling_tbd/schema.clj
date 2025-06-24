@@ -79,6 +79,9 @@
    :project/id
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword, :unique :db.unique/identity
         :doc "a keyword matching the one in the same named property of a project database"}
+   :project/in-memory?
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/boolean
+        :doc "a boolean indicating whether the project DB is in-memory, such as when mocking."}
    :project/name
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "a string, same as the :project/name in the project's DB."}

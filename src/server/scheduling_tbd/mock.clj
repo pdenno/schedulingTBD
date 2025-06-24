@@ -108,6 +108,7 @@
    {:conversation/id :optimality
     :conversation/status :not-started}])
 
+;;; Maybe this should not be used;
 (defn destroy-shadow-db!
   [pid]
   (when (connect-atm pid {:error? false})
@@ -118,6 +119,19 @@
           (sutil/deregister-db pid)
           true)
         (log! :error "Mocking DB is not :mem")))))
+
+;;; This is like db/add-project-to-system, except that it doesn't take a third argument, the directory;
+;;; there is no directory associated with a in-memory database! Further, it is marked as :project/in-memory? true.
+(defn add-temp-project-to-system
+  "Add the argument project (a db-cfg map) to the system database."
+  [id project-name]
+  (let [conn-atm (connect-atm :system)
+        eid (d/q '[:find ?eid . :where [?eid :system/name "SYSTEM"]] @conn-atm)]
+    (d/transact conn-atm {:tx-data [{:db/id eid
+                                     :system/projects {:project/id id
+                                                       :project/in-memory? true
+                                                       :project/name project-name}}]})))
+
 
 (defn make-shadow-db!
   "Create an in-memory copy of the database at the argument pid (without using any functions from db.clj!).
@@ -140,6 +154,7 @@
                                                               {:claim/string (str `(~'project-name ~id ~pname))}
                                                               {:claim/string (str `(~'surrogate ~id))}]
                                              :project/conversations conversation-defaults}]})
+    (add-temp-project-to-system id pname)
     id))
 
 (defn mocked-agent?
@@ -334,8 +349,7 @@
   (let [role (mocking-role agent-id)]
     (log! :info (str "Mocking an " (name role)))
     (if (continue-mocking?)
-      (do ;(Thread/sleep 10000)
-          (mocked-response-by-role! role text))
+      (mocked-response-by-role! role text)
       (sutil/clj2json-pretty {:message-type :mocking-complete}))))
 
 ;;; Typical usage from user namespace:

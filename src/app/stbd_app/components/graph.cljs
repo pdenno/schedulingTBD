@@ -22,10 +22,11 @@
       ;; See https://mermaid.js.org/schemas/config.schema.json. Theme works (try "forest"); sizing does not work!
       (initialize (clj->js {:startOnLoad false, :securityLevel "loose" :theme "dark"})))
     (hooks/use-effect [graph-cmd]
-      (when-let [gdiv (j/get graph-ref :current)]
-        (-> (render "mermaid-id-" graph-cmd) ; "graph-svg-id" is the svg id, not the dom/div id. It isn't used.
-            (p/then (fn [svg] (j/assoc! gdiv :innerHTML #_this-svg (j/get svg :svg))))
-            (p/catch (fn [error] (log! :error (str "Error in Mermaid: " error)))))))
+      (try (when-let [gdiv (j/get graph-ref :current)]
+             #_(-> (render "mermaid-id-" graph-cmd) ; "graph-svg-id" is the svg id, not the dom/div id. It isn't used.
+                 (p/then (fn [svg] (j/assoc! gdiv :innerHTML #_this-svg (j/get svg :svg))))
+                 (p/catch (fn [error] (log! :error (str "Error in Mermaid: " error))))))
+           (catch :default _e nil)))
     ;; :minWidth and :minHeight matter here!
     ($ Box {:sx #js {:display "flex", :flexDirection "column" :height "100%" :width "100%" :minHeight "1400px" :minWidth "800px" :alignItems "stretch" :overflowY "auto"}}
        (dom/div {:ref graph-ref :id "graphDiv"}))))

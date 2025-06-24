@@ -324,7 +324,7 @@
         ;; Use synchronous approach to ensure proper message ordering
         ;; Create a promise to wait for the message to be sent
         (let [sent-promise (p/deferred)]
-          (async/put! out (str msg-obj) #(p/resolve! sent-promise true))
+          (async/put! out (str msg-obj) (fn [_success] (p/resolve! sent-promise true)))
           @sent-promise) ; Block until message is actually sent
         prom)
       (when-not (= client-id :console)

@@ -72,10 +72,10 @@
    (let [client-id (or (ws/recent-client!) :console) ; Use :console if no client connected
          pid (sutil/shadow-pid orig-pid)
          cfg (sutil/db-cfg-map {:type :project :id pid :in-mem? true})]
-     (when (d/database-exists? cfg) (mock/destroy-shadow-db! pid))
+     (when (d/database-exists? cfg) (mock/delete-project! pid))
      (ws/send-to-client {:dispatch-key :load-proj :client-id client-id :promise? false
                          :new-proj-map {:project/name "Craft Beer (s)" :project/id pid}}) ; <============== Won't be seen anyway!
      (Thread/sleep 1000)
      (mock/with-mock-project orig-pid
-       (inv/resume-conversation {:client-id client-id :pid orig-pid :cid :process})))))
-
+       (inv/resume-conversation {:client-id client-id :pid orig-pid :cid :process})))
+   :done))

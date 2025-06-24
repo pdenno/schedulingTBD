@@ -265,12 +265,12 @@
           (d/transact (connect-atm :system) {:tx-data (for [[k v] obj] [:db/retract s-eid k v])})))
       ;; Remove DB files
       (let [cfg (db-cfg-map {:type :project :id pid})]
-        (when (and (-> cfg :store :path io/as-file .isDirectory) (d/database-exists? cfg))
-          (d/delete-database cfg))
-        (sutil/deregister-db pid)
+          (d/delete-database cfg)
+          (sutil/deregister-db pid)
         (when-let [base-dir (-> (System/getenv) (get "SCHEDULING_TBD_DB"))]
           (let [dir (str base-dir "/projects/" (name pid) "/")]
-            (sutil/delete-directory-recursive dir)))
+            (when (.exists (io/file dir))
+              (sutil/delete-directory-recursive dir))))
         nil))
     (log! :warn (str "Delete-project: Project not found: " pid))))
 
