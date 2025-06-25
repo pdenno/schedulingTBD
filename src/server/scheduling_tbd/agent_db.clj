@@ -91,7 +91,8 @@
    (when console? (log! level
                         (if elide-console
                           (sutil/elide msg-text elide-console)
-                          msg-text)))))
+                          msg-text)))
+   nil))
 
 #_(defn agent-db2proj
   "Return a map of agent info translated to project attributes (aid, tid, base-type, expertise, surrogate?)."

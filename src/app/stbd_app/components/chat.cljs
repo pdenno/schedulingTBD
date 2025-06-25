@@ -21,6 +21,7 @@
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core :as p]
+   [scheduling-tbd.util  :refer [remove-src-markers]]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.components.graph :refer [GraphModal]]
@@ -64,7 +65,9 @@
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
 
-;(def example-graph "graph TD\nA[Client] --> B[Load Balancer]\nB --> C[Server01]\nB --> D[Server02]")
+;;(def example-graph "graph TD\nA[Client] --> B[Load Balancer]\nB --> C[Server01]\nB --> D[Server02]")
+
+
 
 (defn msgs2cs ; cs = ChatScope, https://chatscope.io/
   "Create ChatScope structures (Message, MessageHeader, MessageSeparator, etc.) for a collection of messages."
@@ -72,6 +75,7 @@
   (let [new-date (atom today)]
     (reduce (fn [r msg]
               (let [{:message/keys [content from time table graph code] :or {time (js/Date. (.now js/Date))}} msg
+                    content (remove-src-markers content)
                     content (msg-with-title content from)
                     msg-date (-> time inst2date (subs 0 15))]
                 (as-> r ?r
@@ -130,7 +134,7 @@
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
-                 (when (:active? @common-info) ; <========================================================================================================== DEMO, was commented.
+                 #_(when (:active? @common-info) ; <========================================================================================================== DEMO, was commented.
                    (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))
                  (update-common-info! {:pid pid :cid cid}))))))
 
@@ -175,10 +179,10 @@
                   (log! :error (str "change-conversation-click fails: common-info = " @common-info)))))
             (process-user-input [text]
               (when (not-empty text)
-                (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" text)
+                (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)
                       [surrogate? product] (re-matches #"\s*SUR:(.*)" text)
-                      [sur+ map-str] (re-matches #"\s*SUR\+:(.*)" text)
-                      [sur-follow-up? q] (re-matches #"\s*SUR\?:(.*)" text)
+                      [sur+ map-str]       (re-matches #"\s*SUR\+:(.*)" text)
+                      [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" text)
                       msg (cond ask-llm? {:dispatch-key :ask-llm :question question}
                                 surrogate? {:dispatch-key :start-surrogate :product product}
                                 sur+ {:dispatch-key :start-surrogate+ :map-str map-str} ; like :start-surrogate, but provide a map of stuff.
@@ -204,8 +208,9 @@
                         (register-fn :set-active-conv set-active-conv)
                         (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (set-busy? val))) ; Yes. Need to do both.
                         (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
-                        (register-fn :get-msg-list (fn [] @msgs-atm)) ; These two used to update message time.
+                        (register-fn :get-msg-list (fn [] @msgs-atm))                               ; These two used to update message time.
                         (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs)))) ; These two used to update message time.
+                       ;(register-fn :get-cs-msg-list (fn [] (msgs2cs msg-list)))                   ; This might work, were msg-list set!
                         (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
       (hooks/use-effect [msg-list]
                         (reset! msgs-atm msg-list)

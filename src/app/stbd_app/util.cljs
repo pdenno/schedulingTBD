@@ -9,7 +9,7 @@
   "Get the server port from the current page URL.
    Since the client is served from the same server, we can detect the port dynamically."
   []
-  (.-port js/location)) ; ToDo: Get this from config.
+  (.-port js/location))
 
 ;;; ToDo: Is there a react way? It looks like react doesn't have this notion.
 (def ^:diag root "The application's root 'Symbol(react.element)' element" (atom nil))

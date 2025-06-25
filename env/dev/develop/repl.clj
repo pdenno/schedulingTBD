@@ -13,7 +13,8 @@
    [scheduling-tbd.minizinc-test]
    [scheduling-tbd.iviewr.ork-test]
    [scheduling-tbd.iviewr.interviewers-test]
-   [scheduling-tbd.surrogate-test]))
+   [scheduling-tbd.surrogate-test]
+   [scheduling-tbd.sutil :refer [log!]]))
 
 (def alias? (atom (-> (ns-aliases *ns*) keys set)))
 
@@ -83,25 +84,11 @@
 (defn ^:diag undo-ns-setup!
   "Simply undo what ns-setup! does."
   []
+  (log! :info "Did you try (tools-ns/refresh)?")
   (let [user-ns (find-ns 'user)]
     (doseq [a (keys alias-map)]
       (when-not (= a 'repl)
         (ns-unalias user-ns a)))))
-
-;;; See also https://github.com/clojure/tools.namespace?tab=readme-ov-file#warnings-for-aliases
-;;; I'm not sure this one does any good.
-#_(defn ^:diag ns-fix-setup!
-    "THIS MIGHT BE MORE THAN YOU WANT! Remove all the namespace aliases from the argument namespace.
-   For example, when you get *Alias sutil already exists in namespace <messed-up-ns>, aliasing scheduling-tbd.sutil*
-   Don't: Use this on the user namespace. <======================????
-   Do:
-       1) (repl/ns-fix-setup! '<messed-up-ns>), which removes all the aliases in <messed-up-ns>, and
-       2) Reestablish aliases in the namespace: compile the file, or, in the repl's ns, do (ns-setup!)."
-    [ns-sym]
-    (when-let [tns (find-ns ns-sym)]
-      (binding [*ns* tns]
-        (doseq [a (keys alias-map)]
-          (ns-unalias *ns* a)))))
 
 (defn clean-form
   "Replace some namespaces with aliases"

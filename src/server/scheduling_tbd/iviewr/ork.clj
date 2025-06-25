@@ -193,9 +193,9 @@
   (let [msg-string (clj2json-pretty msg)
         res (adb/query-agent ork-agent msg-string {:tries 2})
         res (when res (ai-response2clj res))
-        res (cond-> res
-              (contains? res :message-type)              (update :message-type keyword)
-              (= (:message-type res) :PURSUE-EADS)       (update :EADS-id keyword))]
+        res (when res (cond-> res
+                        (contains? res :message-type)              (update :message-type keyword)
+                        (= (:message-type res) :PURSUE-EADS)       (update :EADS-id keyword)))]
     (log! :info (-> (str "Ork returns: " res) (elide 150)))
     (agent-log (cl-format nil "{:log-comment \"[ork manager] (receives response from ork):~%~A\"}"
                     (with-out-str (pprint res))))

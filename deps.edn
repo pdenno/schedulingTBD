@@ -35,7 +35,7 @@
  ;; See .dir-locals.el for some defaults on CIDER C-c M-j
  :aliases {:dev          {:extra-paths    ["src/server" "test" "env/dev" "resources"]
                           #_#_:jvm-opts   ["-XX:-OmitStackTraceInFastThrow" ; https://www.metosin.fi/blog/missing-stacktraces/
-                                           #_"-Djdk.attach.allowAttachSelf"]  ; https://github.com/clojure-goes-fast/clj-async-profiler
+                                           "-Djdk.attach.allowAttachSelf"]  ; https://nrepl.org/nrepl/installation.html#jvmti. It is so that you can use C-c to stop a thread from REPL.
                           ;; :dev includes src/server (for use with exerciser) thus much of this stuff.
                           :extra-deps     {applied-science/js-interop      {:mvn/version "0.4.2"}
                                            ;;binaryage/devtools            {:mvn/version "1.0.7"} ; ToDo: would use with telemere handler:console-raw.
