@@ -1,7 +1,7 @@
 # WebSocket Port Configuration Fix
 
-**Date**: June 24, 2025  
-**Issue**: WebSocket connection failing due to port mismatch  
+**Date**: June 24, 2025
+**Issue**: WebSocket connection failing due to port mismatch
 **Status**: ✅ RESOLVED
 
 ## Problem Description
@@ -21,7 +21,7 @@ The server port is dynamically determined based on the environment alias:
 :server/http {:port {:nrepl 3301 :dev 3300 :prod 3300 :test 3300}}
 
 ;; From src/server/scheduling_tbd/core.clj
-env-option (->> (clojure.java.basis/initial-basis) :basis-config :aliases 
+env-option (->> (clojure.java.basis/initial-basis) :basis-config :aliases
                 (some #(when (#{:dev :prod :test :nrepl} %) %)))
 port (-> config :server/http :port env-option)
 ```
@@ -53,7 +53,7 @@ Replaced hardcoded port with dynamic detection using the browser's current locat
 ;; Before
 (defn ws-url [client-id] (str "ws://localhost:" util/server-port "/ws?client-id=" client-id))
 
-;; After  
+;; After
 (defn ws-url [client-id] (str "ws://localhost:" (util/server-port) "/ws?client-id=" client-id))
 ```
 

@@ -76,8 +76,11 @@
 (defn graph-semantics-ok?
   "This is used in spec testing of :flow-shop/graph. (See flow_shop.clj)."
   [graph]
-  (and (outputs-exist-where-inputs-claim? graph)
-       (inputs-match-in-hierarchy? graph)))
+  (and
+   (= #{:EADS-ref :process-id :inputs :outputs :resources :duration :subprocesses}
+      (-> graph keys set))
+   (outputs-exist-where-inputs-claim? graph)
+   (inputs-match-in-hierarchy? graph)))
 
 ;;; --------------------------- The following are more generally applicable -----------------------------
 (defn dispatch-ds-complete?

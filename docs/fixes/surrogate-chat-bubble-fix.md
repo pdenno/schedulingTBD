@@ -1,7 +1,7 @@
 # Surrogate Chat Bubble Fix
 
-**Date:** June 24, 2025  
-**Issue:** Surrogate chat bubbles appeared empty when running `(user/run-demo!)` with a client  
+**Date:** June 24, 2025
+**Issue:** Surrogate chat bubbles appeared empty when running `(user/run-demo!)` with a client
 **Status:** ✅ FIXED
 
 ## Problem Description

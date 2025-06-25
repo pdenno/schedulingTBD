@@ -4,7 +4,7 @@
    [scheduling-tbd.iviewr.eads-util :as eu]
    [scheduling-tbd.ds2mermaid       :as ds2m]))
 
-(def bad-struct
+(def bad-input
   "Something that definitely should not be provided to ds2m/ds2mermaid."
   {:inquiry-areas
    [{:inquiry-area-id "equipment-availability",
@@ -52,17 +52,91 @@
    :EADS-ref :process/flow-shop,
    :EADS-id :process/flow-shop})
 
-(def good-struct :NYI)
+(def good-input
+  {:EADS-ref :process/flow-shop,
+   :process-id "pencil-manufacturing",
+   :inputs ["graphite" "clay" "water" "cedar wood" "metal" "eraser material" "paint"],
+   :outputs [{:item-id "finished pencils", :quantity {:units "finished pencils", :value-string "100000"}}],
+   :resources ["extruder" "kiln" "milling machine" "glue applicator" "shaping machine"],
+   :duration {:units "hours", :value-string "4"},
+   :subprocesses
+   [{:process-id "graphite-core-production",
+     :inputs ["graphite" "clay" "water"],
+     :outputs [{:item-id "finished graphite rods", :quantity {:units "graphite cores", :value-string "100000"}}],
+     :resources ["mixer" "extruder" "kiln"],
+     :subprocesses
+     [{:process-id "mix-graphite-and-clay",
+       :inputs ["graphite" "clay" "water"],
+       :outputs [{:item-id "graphite clay paste", :quantity {:units "liters", :value-string "100"}}],
+       :resources ["mixer"],
+       :duration {:units "hours", :value-string "1"},
+       :subprocesses []}
+      {:process-id "extrude-core",
+       :inputs ["graphite clay paste"],
+       :outputs [{:item-id "extruded graphite rods", :quantity {:units "extruded graphite core", :value-string "100000"}}],
+       :resources ["extruder"],
+       :duration {:units "minutes", :value-string "20"},
+       :subprocesses []}
+      {:process-id "dry-and-bake-core",
+       :inputs ["extruded graphite rods"],
+       :outputs [{:item-id "finished graphite rods", :quantity {:units "extruded graphite core", :value-string "100000"}}],
+       :resources ["kiln"],
+       :duration {:units "hours", :value-string "2"},
+       :subprocesses []}]}
+    {:process-id "wood-casing-production",
+     :inputs ["cedar wood"],
+     :outputs ["wood slats with grooves"],
+     :resources ["milling machine"],
+     :subprocess-flow "individuals-from-batch",
+     :duration {:units "hours", :value-string "2"},
+     :subprocesses
+     [{:process-id "mill-wood-slats",
+       :inputs ["cedar wood"],
+       :outputs ["milled wood slats"],
+       :resources ["milling machine"],
+       :duration {:units "hours", :value-string "2"},
+       :subprocess-flow :individuals-from-batch,
+       :subprocesses []}
+      {:process-id "cut-grooves-in-slats",
+       :inputs ["milled wood slats"],
+       :outputs ["wood slats with grooves"],
+       :resources ["groove cutter"],
+       :duration {:units "hours", :value-string "2"},
+       :subprocesses []}]}
+    {:process-id "assemble",
+     :inputs
+     [{:item-id "finished graphite rods", :from "graphite-core-production"}
+      {:item-id "wood slats with grooves", :from "wood-casing-production"}
+      "metal"
+      "erasers"
+      "paint"],
+     :outputs ["finished pencil"],
+     :resources ["glue applicator" "shaping machine"],
+     :subprocesses
+     [{:process-id "insert-core-into-slats",
+       :inputs ["graphite core" "wood slats with grooves"],
+       :outputs ["pencil blanks"],
+       :resources ["glue applicator"],
+       :subprocesses []}
+      {:process-id "shape-and-paint-pencil",
+       :inputs ["pencil blanks" "paint"],
+       :outputs ["shaped and painted pencils"],
+       :resources ["shaping machine" "painting station"],
+       :subprocesses []}
+      {:process-id "attach-eraser",
+       :optional? true,
+       :inputs ["shaped and painted pencils" "metal" "erasers"],
+       :outputs ["finished pencils"],
+       :resources ["crimping tool"],
+       :subprocesses []}]}]})
 
-(defn good-mermaid?
-  [m]
-  (throw (ex-info "NYI" {})))
+(def good-output "flowchart TD\nsubgraph pencil-manufacturing\nsubgraph graphite-core-production\nsubgraph mix-graphite-and-clay\nend\nsubgraph extrude-core\nend\nsubgraph dry-and-bake-core\nend\nend\nsubgraph wood-casing-production\nsubgraph mill-wood-slats\nend\nsubgraph cut-grooves-in-slats\nend\nend\nsubgraph assemble\nsubgraph insert-core-into-slats\nend\nsubgraph shape-and-paint-pencil\nend\nsubgraph attach-eraser\nend\nend\nend\nstart@{shape: sm-circ} -- erasers,metal --> attach-eraser\nstart@{shape: sm-circ} -- cedar wood --> mill-wood-slats\nstart@{shape: sm-circ} -- water,clay,graphite --> mix-graphite-and-clay\nextrude-core -- extruded graphite rods --> dry-and-bake-core\nmill-wood-slats -- milled wood slats --> cut-grooves-in-slats\nshape-and-paint-pencil -- shaped and painted pencils --> attach-eraser\ninsert-core-into-slats -- pencil blanks --> shape-and-paint-pencil\nstart@{shape: sm-circ} -- graphite core --> insert-core-into-slats\nstart@{shape: sm-circ} -- paint --> shape-and-paint-pencil\nmix-graphite-and-clay -- graphite clay paste --> extrude-core\ndry-and-bake-core -- finished graphite rods --> stop@{shape: framed-circle}\nattach-eraser -- finished pencils --> stop@{shape: framed-circle}\ncut-grooves-in-slats -- wood slats with grooves --> insert-core-into-slats\n")
 
-(deftest false-positive-semantics
+(deftest generates-mermaid-ffbd-ok
+  (testing "That a moderately complex graph gets the correct output."
+    (is (= good-output (ds2m/ds2mermaid good-input)))))
+
+(deftest graph-semantics-tests
   (testing "Testing for false positives; things that aren't flow charts."
-    (is (not (eu/graph-semantics-ok? bad-struct)))))
-
-(deftest making-ffbd
-  (testing "Testing that a mermaid graph can be made from good :process/flow-shop summary data structures."
-    (is (not (good-mermaid? (ds2m/ds2mermaid bad-struct))))
-    (is (good-mermaid? (ds2m/ds2mermaid good-struct)))))
+    (is (not (eu/graph-semantics-ok? bad-input)))
+    (is (eu/graph-semantics-ok? good-input))))
