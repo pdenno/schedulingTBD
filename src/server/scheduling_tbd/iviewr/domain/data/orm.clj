@@ -202,7 +202,7 @@
           "Setting 'exhuasted?' to true should cause us to stop sending you SUPPLY-QUESTION messages.\n"
           "\n"
           "You have choices as to how you communicate back to us in DATA-STRUCTURE-REFINEMENT (DSR) messages. You can\n"
-          "   (1) accummulate results from several inquiry areas into one ever-growing DSR message, as is shown in the EADS below,\n"
+          "   (1) accumulate results from several inquiry areas into one ever-growing DSR message, as is shown in the EADS below,\n"
           "   (2) limit what is in a DSR message to just one or a few inquiry areas (thus one or a few elements in the :areas-we-intend-to-discuss), or\n"
           "   (3) limit what is in a DSR message to just one or more fact-types in an inquiry area.\n"
           "In order for us to index DSR message of type (3) into our database, it is essential that you provide the 'inquiry-area-id' to which you are committing a fact type.\n"

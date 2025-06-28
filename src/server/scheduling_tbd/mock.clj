@@ -1,6 +1,8 @@
 (ns scheduling-tbd.mock
   "LLM response mocking system for testing.
-   Provides project-based mock responses using pre-recorded conversation data."
+   Provides project-based mock responses using pre-recorded conversation data.
+   Typical responses are CLJ message translated to a JSON string to look like they are from the LLM, and, of course,
+   translated back to CLJ later for processes!"
   (:require
    [clojure.edn          :as edn]
    [clojure.spec.alpha   :as s]
@@ -313,15 +315,20 @@
       (log! :error (str "Intervieees: Mocking out of sync at question: \n  question-text: "
                         question-text
                         "\n last-question: " last-question)))
-    (let [script (script-from script question-text)]
-      (-> (some #(when (= (:message/from %) :surrogate) %) script) :message/content))))
+    (let [script (script-from script question-text)
+          response (-> (some #(when (= (:message/from %) :surrogate) %) script) :message/content)]
+      ;; Surrogates return a string. So we could return a string here. But the return is to inv/chat-pair-interviewees-aux,
+      ;; which will turn it into a message like this if it isn't one already.
+      ;; I suppose to exactly mock, we'd return a string here, but I think it is better to nail down what
+      ;; the string is about right here, and let the translation back to clj happen (in is translated to JSON below).
+      {:dispatch-key :domain-expert-says :msg-text response})))
 
 ;;; Interviewees interactions:
 ;;;   question (a string) ->  answer (a string)
 (defmethod mocked-response-by-role! :interviewees
   [_tag question-text]
   (when (continue-mocking?)
-    (get-next-response question-text)))
+    (-> question-text get-next-response msg2json)))
 
 ;;; ---------------------------------- orchestrator ---------------------------------------------
 ;;; Orchestrator only gets :iviewr/conversation-history and :iviewr/backchannel-communication (not implemented) messages.
@@ -401,8 +408,9 @@
     (when (<= (:messages-remaining-cnt @mocking-state) 0)
       (swap! mocking-state #(assoc % :status :done)))
     (if (continue-mocking?)
-      (do (mocked-response-by-role! role text)
-          (decrement-messages-remaining!))
+      (let [res (mocked-response-by-role! role text)]
+        (decrement-messages-remaining!)
+        res)
       (msg2json {:message-type :mocking-complete}))))
 
 ;;; Typical usage from user namespace:

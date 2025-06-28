@@ -257,18 +257,24 @@
 
 ;;; This became complicated once I couldn't use strict schema results.
 (defn ai-response2clj
-  "Translate the OpenAI API output structure (a string) to clj object, where JSON objects are given keyword keys."
-  [s-in]
-  (try
-    (let [s (remove-preamble s-in)
-          m (ches/parse-string s)]
-      (letfn [(upk [obj]
-                (cond (map? obj)    (reduce-kv (fn [m k v] (assoc m (keyword k) (upk v))) {} obj)
-                      (vector? obj) (mapv upk obj)
-                      :else         obj))]
-        (upk m)))
-    (catch Exception _e
-      (throw (ex-info  "Could not read object returned from OpenAI (should be a string):" {:s-in s-in })))))
+  "Translate content to a clj object. The content is a string that contains a JSON object, and may wrap the object in unhelpful language
+   markup indicating the language in which the object should be interpreted. The function takes an optional second argument which defaults to true.
+   If instead, false (not just nil, but false, the boolean)  is provided as second argument, the original string is returned, rather
+   than throwing on an error."
+  ([s-in] (ai-response2clj s-in true))
+  ([s-in throw-error?]
+   (try
+     (let [s (remove-preamble s-in)
+           m (ches/parse-string s)]
+       (letfn [(upk [obj]
+                 (cond (map? obj)    (reduce-kv (fn [m k v] (assoc m (keyword k) (upk v))) {} obj)
+                       (vector? obj) (mapv upk obj)
+                       :else         obj))]
+         (upk m)))
+     (catch Exception _e
+       (if (false? throw-error?)
+         s-in
+         (throw (ex-info  "Could not read object returned (should be a string containing JSON):" {:s-in s-in })))))))
 
 (defn clj2json-pretty
   "Return a pprinted string for given clojure object."
@@ -280,7 +286,6 @@
   "Return a pprinted string for given clojure object."
   [obj]
   (if (nil? obj) nil (ches/generate-string obj {:pretty true})))
-
 
 (defn update-resources-EADS-json!
   "Update the resources/agents/iviewrs/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions.

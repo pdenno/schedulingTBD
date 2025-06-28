@@ -187,7 +187,6 @@
                                 surrogate? {:dispatch-key :start-surrogate :product product}
                                 sur+ {:dispatch-key :start-surrogate+ :map-str map-str} ; like :start-surrogate, but provide a map of stuff.
                                 sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:pid @common-info) :question q}
-
                                 :else {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
                   ;; ToDo: Human-interjected questions, though some of them are stored, don't store the human-interjected annotation.
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.
