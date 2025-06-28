@@ -39,7 +39,7 @@
 (s/def ::chat-pair-ctx (s/and ::common-ctx
                               (s/or :surrogate ::surrogate-ctx :human ::human-ctx)))
 
-(s/def ::common-ctx (s/keys :req-un [::client-id ::question ::cid]))
+(s/def ::common-ctx (s/keys :req-un [::client-id ::cid]))
 (s/def ::surrogate-ctx (s/keys :req-un [:sur/responder-type ::surrogate-agent ::iviewr-agent]))
 (s/def ::human-ctx (s/keys :req-un [:hum/responder-type ::iviewr-agent]))
 (s/def ::basic-agent (s/keys :req-un [::aid ::tid ::base-type]))
@@ -51,7 +51,6 @@
 (s/def :sur/responder-type #(= % :surrogate))
 (s/def :hum/responder-type #(= % :human))
 (s/def ::client-id (s/or :typical string? :debug #(= % :console)))
-(s/def ::question string?)
 
 (defn uniform-response-msg
   "Whether human, surrogate, or mocking, always return the message structure that humans return from chat.
@@ -63,12 +62,12 @@
       clj?
       {:dispatch-key :domain-expert-says :msg-text clj?})))
 
-(defn message-text
+(defn msg-text
   "Return the text in various kinds of messages."
   [{:keys [dispatch-key message-type question msg-text] :as msg}]
   (cond (= message-type :QUESTION-TO-ASK) question
         (= dispatch-key :domain-expert-says) msg-text
-        :else (throw (ex-info "message-text: Invalid message." {:msg msg}))))
+        :else (throw (ex-info "msg-text: Invalid message." {:msg msg}))))
 
 ;;; This is messed up! clients should be getting separated :text, :table and :graph
 (defn chat-pair-interviewees-aux
@@ -77,7 +76,7 @@
    Note that because everywhere else query-agent is used it returns a string that parses to a JSON object,
    this deals with the complexity that
    This copes with complexity of query-agent returning what might not be a not be a "
-  [{:keys [client-id question table surrogate-agent responder-type preprocess-fn tries pid] :as ctx
+  [{:keys [table text] :as _q-msg} {:keys [client-id question table surrogate-agent responder-type preprocess-fn tries pid] :as ctx
     :or {tries 1 preprocess-fn identity}}]
   (let [pid (if @mocking? (shadow-pid pid) pid)]
     (log! :debug (str "ctx in chat-pair-aux:\n" (with-out-str (pprint ctx))))
@@ -98,8 +97,8 @@
                                  (catch Exception e {:error e})))))]
       (-> prom
           p/await
-          (p/catch (fn [e] (log! :error (str "Error in interviewing chat pair: " e))))
-          (p/then (fn [r] (uniform-response-msg r)))))))
+          #_(p/catch (fn [e] (log! :error (str "Error in interviewing chat pair: " e))))
+          #_(p/then (fn [r] (uniform-response-msg r)))))))
 
 (declare separate-table)
 
@@ -107,8 +106,8 @@
 (s/def :dispatch-key/des #(= % :domain-expert-says))
 (s/def ::msg-text string?)
 
-(s/def ::question-to-ask (s/keys :req-un [:q2ask/message-to-ask ::question]))
-(s/def :q2ask/message-to-ask #(= % :MESSAGE-TO-ASK))
+(s/def ::question-to-ask (s/keys :req-un [:q2ask/message-type ::question]))
+(s/def :q2ask/message-to-ask #(= % :QUESTION-TO-ASK))
 (s/def ::question string?)
 
 (defn chat-pair-interviewees
@@ -119,9 +118,9 @@
         :text is text in response to the query with surrogate tables removed.
         :table is a table map completed by the expert.
    If response is immoderate returns {:msg-type :immoderate}"
-  [msg {:keys [responder-type cid] :as ctx}]
-  (s/assert ::question-to-ask msg)
-  (let [{:keys [msg-text] :as resp} (chat-pair-interviewees-aux ctx)]
+  [q-msg {:keys [responder-type cid] :as chat-pair-ctx}]
+  (s/assert ::chat-pair-cxt chat-pair-ctx)
+  (let [{:keys [msg-text] :as resp} (chat-pair-interviewees-aux q-msg chat-pair-ctx)]
     (s/assert ::expert-responds resp)
     (agent-log (cl-format nil "{:log-comment \"[~A interviewer] (response from interviewees):~%~A\"}" (name cid) resp)
                {:console? true :elide-console 130})
@@ -168,10 +167,10 @@
     - :answers-the-question? : which is true (some text) if the answer to the Q/A pair appears to answer the question.
     - :raises-a-question? : which is true (some text) if the response raises a question.
     - :wants-a-break?  : which is true (some text) if the user explicitly asks for a break?"
-  [q-txt a-txt ctx]
-  (assert (string? q-txt))
-  (assert (string? a-txt))
-  (let [res (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt) ctx)
+  [q-msg a-msg ctx]
+  (let [q-txt (msg-text q-msg)
+        a-txt (msg-text a-msg)
+        res (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt) ctx)
                 ches/parse-string
                 (update-keys str/lower-case)
                 (update-keys keyword)
@@ -198,12 +197,18 @@
   [])
 
 (defn ask-again
-  [question]
-  (let [repeat-blurb "Okay, but we are still interested in this: "]
-    (if (str/starts-with? question repeat-blurb) question (str repeat-blurb question))))
+  [q-msg]
+  (assert (= :QUESTION-TO-ASK (:message-type q-msg)))
+  (let [repeat-blurb "Okay, but we are still interested in this: "
+        question (msg-text q-msg)]
+    (if (str/starts-with? question repeat-blurb)
+      q-msg
+      (assoc q-msg :question (str repeat-blurb question)))))
 
 (defn get-an-answer
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
+   The ctx argument is ::chat-pair-ctx, is about agents being used.
+   the q-msg argument has been through separate-table and may have :table set.
    Return a vector of maps for db/add-msg (thus pid cid from full-text table tags question-type pursuing-EADS).
    It terminates in an answer to the question.
    Note that the first element of the conversation should be the question, and the last the answer.
@@ -211,26 +216,26 @@
   [q-msg {:keys [responder-type human-starting?] :as ctx}]
   (when-not human-starting?
     (when-not (s/valid? ::chat-pair-ctx ctx)
-      (throw (ex-info "Invalid context in get-an-answer." {:ctx ctx}))))
-  (let [conversation [{:full-text (message-text q-msg) :from :system :tags [:query]}]
-        a-msg (chat-pair-interviewees q-msg ctx) ; response here is text or a table (user either talking though chat or hits 'submit' on a table.
+        (throw (ex-info "Invalid context in get-an-answer." {:ctx ctx}))))
+  (let [conversation [{:full-text (msg-text q-msg) :from :system :tags [:query]}]
+        a-msg (chat-pair-interviewees ctx) ; response here is a map with :dispatch-key = :domain-expert-says and sometimes a table.
         answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
-        {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when (and (not answered?) (string? full-text)) ; <---- go find out what that was! (on q-msg or a-msg)
+        {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when (and (not answered?) (msg-text q-msg))
                                                                             (response-analysis q-msg a-msg ctx))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
-      (let [same-question (ask-again question)]
-        (into conversation (get-an-answer (-> ctx (assoc :question same-question))))) ; <================================================================================================================
-      (cond-> conversation
-        answered? (conj (-> response
-                            (assoc :from responder-type)
-                            (assoc :tags [:response])))
-        wants-a-break? (into (handle-wants-a-break question response ctx))
-        raises-a-question? (into (handle-raises-a-question question response ctx))
-        (not
-         (or answered?
-             wants-a-break?
-             raises-a-question?)) (into (handle-other-non-responsive question response ctx))))))
+      (let [q-msg-with-still (ask-again q-msg)]
+        (into conversation (get-an-answer q-msg-with-still ctx)))
+        (cond-> conversation
+          answered? (conj (-> {:full-text (msg-text a-msg)}
+                              (assoc :from responder-type)
+                              (assoc :tags [:response])))
+          wants-a-break? (into (handle-wants-a-break q-msg a-msg ctx))
+          raises-a-question? (into (handle-raises-a-question q-msg a-msg ctx))
+          (not
+           (or answered?
+               wants-a-break?
+               raises-a-question?)) (into (handle-other-non-responsive q-msg a-msg ctx))))))
 
 (defn surrogate? [pid]
   (let [pid (if @mocking? (shadow-pid pid) pid)]
@@ -297,6 +302,8 @@
 
 (def table-error-text (atom nil))
 
+;;; ToDo: Should put a marker in the :text to indicate where the table was found ???
+;;; ToDo: What this code should be doing is still up in the air!
 (defn separate-table-aux
   "The argument is a text string which may contain a single block of HTML (a table, it turns out) between the markers '#+begin_src HTML ... #+end_src'.
    (In this function we don't care what is between the markers, but in usage it is typically a single HTML table.)
@@ -305,12 +312,12 @@
       :text is the argument string minus the content between the marker, and
       :table-html is the substring between the markers. If no markers were found an empty string will be returned."
   [msg]
-  (let [text (message-text msg)
+  (let [text (msg-text msg)
         in-table? (atom false)
         diag-found-table? (atom false)
         first-table-line? (atom true)
         result (loop [lines (str/split-lines text)
-                      res {:text "" :table-html ""}]
+                      res {:text "" :table-html "" :full-text text}]
                  (let [l (first lines)]
                    (if (empty? lines)
                      res
@@ -358,9 +365,11 @@
    (2) a context map that contains :question
    Because a surrogate can embed a table we have to call separate-table from chat-pair.
    This is the (2) usage and the users gets special presentation of a table because of it.
-   Return a map containing :full-text (a string) :text (a string) :table-html (a string)  and :table (a map).
-   Where :text is a substring of :full-text (argument text)."
-  [{:keys [text] :as msg}]
+   Return a map containing
+      :text,  a string which is all the text of the message, inclusive of tables etc.
+      :table-html (a string)  and,
+      :table (a map providing what the client needs to present the table."
+  [msg]
   (let [{:keys [table-html]} (separate-table-aux msg)]
     (if (not-empty table-html)
       (try
