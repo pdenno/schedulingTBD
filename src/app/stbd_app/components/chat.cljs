@@ -23,6 +23,7 @@
    ["@mui/icons-material/Polyline$default" :as Polyline]
    [promesa.core    :as p]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
+   [stbd-app.components.graph-modal :refer [GraphModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.db-access  :as dba]
    [cljs.core.async :refer [<! go]]
@@ -79,15 +80,16 @@
                     (do (reset! new-date msg-date)
                         (conj ?r ($ MessageSeparator {:key (new-key)} msg-date))))
                   (conj ?r ($ Stack {:direction "row"}
-                              ($ Box 
+                              ($ Box {:direction "column"}
                                  ($ Message
                                     {:key (new-key)
                                      :model #js {:position "single" ; "single" "normal", "first" and "last"
                                                  :direction (if (#{:system :developer-interjected} from) "incoming" "outgoing") ; From perspective of user.
                                                  :type "html"
                                                  :payload content}}
-                                    ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))})
-                                    ($ IconButton {:onClick (log! :info "graph artifact")} ($ Polyline))) ;  They only appear for Interviewer, which is probably good!
+                                    ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))}))
+                                 ($ ButtonGroup ($ GraphModal {:post-attach-fn #(log! :info (str "attach-fn: args = " %))})) 
+                                 ;($ IconButton {:onClick ($ AttachmentModal {:post-attach-fn #(log! :info (str "attach-fn: args = " %))})} ($ Polyline)) ;  They only appear for Interviewer, which is probably good!
                                    ;"table" ($ IconButton {:onClick (log! :info "table artifact")} ($ TableChart))
                                   ) 
                              )))))            

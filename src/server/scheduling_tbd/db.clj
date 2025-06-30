@@ -714,6 +714,17 @@
          [?e :conversation/active-EADS ?eads-id]]
        @(connect-atm pid) cid))
 
+(defn get-EADS-by-message-id
+  "Return an EADS from a specific message id (and a conversation and project id, as usual)"
+  [pid cid mid]
+  (d/q '[:find ?eads-id .
+         :in $ ?cid
+         :where
+         []
+         [?e :conversation/id ?cid]
+         [?e :conversation/id ]]
+       @(connect-atm pid) cid))
+
 (defn put-active-EADS-id
   "Set :conversation/active-EADS."
   [pid cid eads-id]
