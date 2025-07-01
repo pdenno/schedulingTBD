@@ -67,8 +67,6 @@
 
 ;;(def example-graph "graph TD\nA[Client] --> B[Load Balancer]\nB --> C[Server01]\nB --> D[Server02]")
 
-
-
 (defn msgs2cs ; cs = ChatScope, https://chatscope.io/
   "Create ChatScope structures (Message, MessageHeader, MessageSeparator, etc.) for a collection of messages."
   [msgs]
@@ -130,11 +128,11 @@
        (p/catch (fn [e] (log! :error (str "get-conversation failed: " e))))
        (p/then (fn [{:keys [conv cid code]}]
                  (log! :info (str "chat/get-conversation (return from promise): cid = " cid " count = " (count conv)))
-                 (reset! msgs-atm conv)
+                 (reset! msgs-atm (vec conv))
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
-                 #_(when (:active? @common-info) ; <========================================================================================================== DEMO, was commented.
+                 (when (:active? @common-info)
                    (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))
                  (update-common-info! {:pid pid :cid cid}))))))
 
@@ -212,7 +210,7 @@
                        ;(register-fn :get-cs-msg-list (fn [] (msgs2cs msg-list)))                   ; This might work, were msg-list set!
                         (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
       (hooks/use-effect [msg-list]
-                        (reset! msgs-atm msg-list)
+                        (reset! msgs-atm (vec msg-list))
                         (set-cs-msg-list (msgs2cs msg-list)))
       ;; ----------------- component UI structure.
       ($ ShareUpDown

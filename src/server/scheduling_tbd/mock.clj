@@ -58,10 +58,9 @@
   ([] (stop-mocking! "default reason"))
   ([reason]
    (log! :warn (str "stop-mocking! [" reason "] (Mocking status set to :done and messages-remaining to 0.)"))
-   (throw (ex-info "too early?" {}))
-  (swap! mocking-state
-         #(-> % (assoc :status :done)
-                (assoc :messages-remaining-cnt 0)))))
+   (swap! mocking-state
+          #(-> % (assoc :status :done)
+               (assoc :messages-remaining-cnt 0)))))
 
 (defn get-agent-from-wherever
   "If the agent-id is a map the agent should be found at pid-of-original,

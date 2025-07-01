@@ -59,7 +59,7 @@
   [mystery-string]
   (let [clj? (sutil/ai-response2clj mystery-string false)]
     (if (map? clj?)
-      clj?
+      (update clj? :dispatch-key keyword)
       {:dispatch-key :domain-expert-says :msg-text clj?})))
 
 (defn msg-text
@@ -69,15 +69,19 @@
         (= dispatch-key :domain-expert-says) msg-text
         :else (throw (ex-info "msg-text: Invalid message." {:msg msg}))))
 
-;;; This is messed up! clients should be getting separated :text, :table and :graph
+(s/def ::question-to-ask (s/keys :req-un [:q2a/message-type :q2a/question]))
+(s/def :q2a/message-type #(= % :QUESTION-TO-ASK))
+(s/def :q2a/question string?)
+
 (defn chat-pair-interviewees-aux
   "Run one query/response pair of chat elements with a human or a surrogate. This executes blocking.
    For human interactions, the response is based on :dispatch-key :domain-experts-says (See websockets/domain-expert-says).
    Note that because everywhere else query-agent is used it returns a string that parses to a JSON object,
    this deals with the complexity that
    This copes with complexity of query-agent returning what might not be a not be a "
-  [{:keys [table text] :as _q-msg} {:keys [client-id question table surrogate-agent responder-type preprocess-fn tries pid] :as ctx
-    :or {tries 1 preprocess-fn identity}}]
+  [{:keys [table question] :as q-msg} {:keys [client-id surrogate-agent responder-type preprocess-fn tries pid] :as ctx
+                                       :or {tries 1 preprocess-fn identity}}]
+  (s/assert ::question-to-ask q-msg)
   (let [pid (if @mocking? (shadow-pid pid) pid)]
     (log! :debug (str "ctx in chat-pair-aux:\n" (with-out-str (pprint ctx))))
     (let [prom (if (= :human responder-type)
@@ -95,15 +99,13 @@
                                                    :base-type pid
                                                    :preprocess-fn preprocess-fn})
                                  (catch Exception e {:error e})))))]
-      (-> prom
-          p/await
-          #_(p/catch (fn [e] (log! :error (str "Error in interviewing chat pair: " e))))
-          #_(p/then (fn [r] (uniform-response-msg r)))))))
+      ;; Anything more here (e.g. p/catch, p/then) and it returns a promise, not the resolved object.
+      (p/await prom))))
 
 (declare separate-table)
 
-(s/def ::expert-responds (s/keys :req-un [:dispatch-key/des ::msg-text]))
-(s/def :dispatch-key/des #(= % :domain-expert-says))
+(s/def ::expert-responds (s/keys :req-un [:expert/dispatch-key ::msg-text]))
+(s/def :expert/dispatch-key #(= % :domain-expert-says))
 (s/def ::msg-text string?)
 
 (s/def ::question-to-ask (s/keys :req-un [:q2ask/message-type ::question]))
@@ -119,22 +121,16 @@
         :table is a table map completed by the expert.
    If response is immoderate returns {:msg-type :immoderate}"
   [q-msg {:keys [responder-type cid] :as chat-pair-ctx}]
-  (s/assert ::chat-pair-cxt chat-pair-ctx)
-  (let [{:keys [msg-text] :as resp} (chat-pair-interviewees-aux q-msg chat-pair-ctx)]
-    (s/assert ::expert-responds resp)
-    (agent-log (cl-format nil "{:log-comment \"[~A interviewer] (response from interviewees):~%~A\"}" (name cid) resp)
+  (s/assert ::chat-pair-ctx chat-pair-ctx)
+  (let [{:keys [msg-text] :as a-msg} (-> (chat-pair-interviewees-aux q-msg chat-pair-ctx) uniform-response-msg)]
+    (s/assert ::expert-responds a-msg)
+    (agent-log (cl-format nil "{:log-comment \"[~A interviewer] (response from interviewees):~%~A\"}" (name cid) (with-out-str (pprint a-msg)))
                {:console? true :elide-console 130})
     (case responder-type
       :human (if (llm/immoderate? msg-text)
                {:msg-type :immoderate}
-               resp)
-      ;; ToDo: Move the let up so can capture tables correctly with human too.
-      :surrogate (let [{:keys [text table-html table]} (separate-table msg-text)
-                       res (cond-> {:msg-type :expert-response :full-text msg-text}
-                             text (assoc :text text)
-                             table (assoc :table table)
-                             table (assoc :table-html table-html))]
-                   res))))
+               (separate-table a-msg))
+      :surrogate (separate-table a-msg))))
 
 (defn tell-interviewer
   "Send a message to an interviewer agent and wait for response; translate it.
@@ -171,9 +167,7 @@
   (let [q-txt (msg-text q-msg)
         a-txt (msg-text a-msg)
         res (-> (adb/query-agent :response-analysis-agent (format "QUESTION: %s \nRESPONSE: %s" q-txt a-txt) ctx)
-                ches/parse-string
-                (update-keys str/lower-case)
-                (update-keys keyword)
+                ai-response2clj
                 (update-vals #(if (empty? %) false %)))]
     (agent-log (cl-format nil "{:log-comment \"[response analysis agent] (concludes):~%~A\"}" (with-out-str (pprint res))))
     res))
@@ -209,7 +203,7 @@
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    The ctx argument is ::chat-pair-ctx, is about agents being used.
    the q-msg argument has been through separate-table and may have :table set.
-   Return a vector of maps for db/add-msg (thus pid cid from full-text table tags question-type pursuing-EADS).
+   Return a vector of maps for db/add-msg (thus contains pid, cid, from, full-text, table, tags, question-type, pursuing-EADS).
    It terminates in an answer to the question.
    Note that the first element of the conversation should be the question, and the last the answer.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
@@ -218,24 +212,25 @@
     (when-not (s/valid? ::chat-pair-ctx ctx)
         (throw (ex-info "Invalid context in get-an-answer." {:ctx ctx}))))
   (let [conversation [{:full-text (msg-text q-msg) :from :system :tags [:query]}]
-        a-msg (chat-pair-interviewees ctx) ; response here is a map with :dispatch-key = :domain-expert-says and sometimes a table.
-        answered? (= :surrogate responder-type) ; Surrogate doesn't beat around the bush, I think!
+        a-msg (chat-pair-interviewees q-msg ctx) ; Response here is a map with :dispatch-key = :domain-expert-says and sometimes a table.
+        answered? (= :surrogate responder-type)  ; Surrogate doesn't beat around the bush, I think!
         {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when (and (not answered?) (msg-text q-msg))
                                                                             (response-analysis q-msg a-msg ctx))
         answered? (or answered? answers-the-question?)]
     (if (not (or answered? wants-a-break? raises-a-question?))
-      (let [q-msg-with-still (ask-again q-msg)]
-        (into conversation (get-an-answer q-msg-with-still ctx)))
-        (cond-> conversation
-          answered? (conj (-> {:full-text (msg-text a-msg)}
-                              (assoc :from responder-type)
-                              (assoc :tags [:response])))
-          wants-a-break? (into (handle-wants-a-break q-msg a-msg ctx))
-          raises-a-question? (into (handle-raises-a-question q-msg a-msg ctx))
-          (not
-           (or answered?
-               wants-a-break?
-               raises-a-question?)) (into (handle-other-non-responsive q-msg a-msg ctx))))))
+      (into conversation (get-an-answer (ask-again q-msg) ctx))
+      ;; It was answered
+      (cond-> conversation
+        wants-a-break?            (into (handle-wants-a-break q-msg a-msg ctx))
+        raises-a-question?        (into (handle-raises-a-question q-msg a-msg ctx))
+        (not
+         (or answered?
+             wants-a-break?
+             raises-a-question?)) (into (handle-other-non-responsive q-msg a-msg ctx))
+        answered?                 (conj (cond-> {:full-text (msg-text a-msg)}
+                                          true              (assoc :from responder-type)
+                                          true              (assoc :tags [:response])
+                                          (:table a-msg)    (assoc :table (:table a-msg))))))))
 
 (defn surrogate? [pid]
   (let [pid (if @mocking? (shadow-pid pid) pid)]
@@ -314,7 +309,6 @@
   [msg]
   (let [text (msg-text msg)
         in-table? (atom false)
-        diag-found-table? (atom false)
         first-table-line? (atom true)
         result (loop [lines (str/split-lines text)
                       res {:text "" :table-html "" :full-text text}]
@@ -325,8 +319,7 @@
                             (cond
                               ;; Table begin marker - skip this line and enter table mode
                               (and l (not @in-table?) (re-matches #"(?i)^\s*\#\+begin_src\s+HTML\s*" l))
-                              (do (reset! diag-found-table? true)
-                                  (reset! in-table? true)
+                              (do (reset! in-table? true)
                                   (reset! first-table-line? true)
                                   res)
 
@@ -352,12 +345,8 @@
                               ;; Empty line case
                               :else res)))))]
     ;; Check if we found table markers but no actual content (just whitespace/newlines)
-    (when (and @diag-found-table? (-> result :table-html str/trim empty?))
-      (reset! table-error-text text)
-      (throw (ex-info "Table markers; no table." {:text text})))
-    (cond-> result
-      (-> result :table-html empty?) (dissoc :table-html)
-      (-> result :table empty?) (dissoc :table))))
+    (cond-> (update result :table-html str/trim)
+      (-> result :table-html empty?) (dissoc :table-html))))
 
 (defn separate-table
   "Because this is called both on questions and answers, arg may be
@@ -366,8 +355,7 @@
    Because a surrogate can embed a table we have to call separate-table from chat-pair.
    This is the (2) usage and the users gets special presentation of a table because of it.
    Return a map containing
-      :text,  a string which is all the text of the message, inclusive of tables etc.
-      :table-html (a string)  and,
+      :msg-text,  a string which is all the text of the message, inclusive of tables etc.
       :table (a map providing what the client needs to present the table."
   [msg]
   (let [{:keys [table-html]} (separate-table-aux msg)]
@@ -380,7 +368,9 @@
                              (str/replace "&amp;lt;" "&lt;")
                              (str/replace "&amp;gt;" "&gt;"))
               parsed-table (-> clean-html java.io.StringReader. xml/parse table-xml2clj table2obj)]
-          (assoc msg :table parsed-table))
+          (-> msg
+              (assoc :table parsed-table)
+              (dissoc :table-html)))
         (catch Throwable _e
           (log! :error (str "Error processing table. HTML = " table-html))
           msg))
@@ -413,12 +403,11 @@
                (let [msgs-vec (get-an-answer iviewr-q ctx)]
                  (when (= :surrogate responder-type)
                    ;; Don't send the first message since it's the question already sent by chat-pair-aux.
-                   ;; ToDo: This is a mess! Different msgs-vec element form from interviewer and interviewees! Can it be fixed?
-                   (doseq [{:keys [full-text table from msg-type]} (rest msgs-vec)]
+                   (doseq [{:keys [full-text table from]} (rest msgs-vec)]
                      (ws/send-to-client (cond-> {:client-id client-id :text full-text}
-                                          table (assoc :table table)
-                                          (= from :system) (assoc :dispatch-key :iviewr-says)
-                                          (= msg-type :expert-response) (assoc :dispatch-key :sur-says)))))
+                                          table               (assoc :table table)
+                                          (= from :system)    (assoc :dispatch-key :iviewr-says)
+                                          (= from :surrogate) (assoc :dispatch-key :sur-says)))))
                  msgs-vec)))
            (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id}))))))
 
@@ -681,27 +670,28 @@
             (tell-interviewer (db/get-EADS-instructions eads-id) iviewr-agent cid))
 
           (loop [ctx ctx] ; ToDo: currently not used!
-            (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?] :as state-change} (ork-review pid cid)]
-              (if (or exhausted? force-stop?)
-                (resume-exit state-change ctx)
-                (let [eads-id (or new-eads-id (db/get-active-EADS-id pid cid))]
-                  (when new-cid? (resume-update-db-cid pid cid old-cid))
-                  (when change-eads?
-                    (resume-update-db-eads pid cid new-eads-id)
-                    (tell-interviewer (db/get-EADS-instructions new-eads-id) iviewr-agent cid))
-                  ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
-                  (let [conversation (q-and-a iviewr-agent pid cid ctx)
-                        expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
-                        ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
-                        iviewr-response (if (and @mocking? (not (continue-mocking?)))
-                                          {:message-type :mocking-complete}
-                                          (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
-                                                            iviewr-agent cid {:tries 2 :test-fn ai-response2clj}))]
-                    (update-db-conversation! pid cid conversation)
-                    (resume-post-ui-actions iviewr-response pid cid ctx) ; show graphs and tables, tell humans to switch conv.
-                    ;; Use question-eads-id to ensure budget is decremented against the EADS that provided the question
-                    (resume-post-db-actions! iviewr-response pid cid eads-id)) ; associate DS refinement with msg.
-                  (recur (clear-ctx-ephemeral ctx)))))))
+            (when (or (not @mocking?) (and @mocking? (mock/continue-mocking?)))
+              (let [{:keys [force-stop? exhausted? change-eads? new-eads-id cid old-cid new-cid?] :as state-change} (ork-review pid cid)]
+                (if (or exhausted? force-stop?)
+                  (resume-exit state-change ctx)
+                  (let [eads-id (or new-eads-id (db/get-active-EADS-id pid cid))]
+                    (when new-cid? (resume-update-db-cid pid cid old-cid))
+                    (when change-eads?
+                      (resume-update-db-eads pid cid new-eads-id)
+                      (tell-interviewer (db/get-EADS-instructions new-eads-id) iviewr-agent cid))
+                    ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
+                    (let [conversation (q-and-a iviewr-agent pid cid ctx)
+                          expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
+                          ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
+                          iviewr-response (if (and @mocking? (not (continue-mocking?)))
+                                            {:message-type :mocking-complete}
+                                            (tell-interviewer {:message-type :INTERVIEWEES-RESPOND :response expert-response}
+                                                              iviewr-agent cid {:tries 2 :test-fn ai-response2clj}))]
+                      (update-db-conversation! pid cid conversation)
+                      (resume-post-ui-actions iviewr-response pid cid ctx) ; show graphs and tables, tell humans to switch conv.
+                      ;; Use question-eads-id to ensure budget is decremented against the EADS that provided the question
+                      (resume-post-db-actions! iviewr-response pid cid eads-id)) ; associate DS refinement with msg.
+                    (recur (clear-ctx-ephemeral ctx))))))))
         (finally (ws/send-to-client {:dispatch-key :interviewer-busy? :value false :client-id client-id})))
       (find-appropriate-conv-and-redirect ctx))))
 
