@@ -30,12 +30,14 @@
            :ork-EADS nil ; set in run-mocking and updated as we work.
            :script []}))
 
-(add-watch mocking-state :watcher
+#_(add-watch mocking-state :watcher
            (fn [_key _atom old-state new-state]
              (log! :info (str " old m-r: "
                               (:messages-remaining-cnt old-state)
                               " new new m-r: "
                               (:messages-remaining-cnt new-state)))))
+
+#_(remove-watch mocking-state :watcher)
 
 (def mocked-type?
   "At the current level of implementation of mocking, only the following agent types are mocked."

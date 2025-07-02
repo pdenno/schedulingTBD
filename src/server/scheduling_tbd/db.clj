@@ -558,7 +558,7 @@
   "Add an intro describing the topic and rationale of the conversation."
   [pid]
   (doseq [cid [:process :data :resources :optimality]]
-    (add-msg {:pid pid :cid cid :from :system :full-text (get conversation-intros cid) :tags [:conversation-intro]})))
+    (add-msg {:pid pid :cid cid :from :system :content (get conversation-intros cid) :tags [:conversation-intro]})))
 
 (defn conversation-exists?
   "Return the eid of the conversation if it exists."
@@ -627,19 +627,20 @@
   "Create a message object and add it to current conversation of the database with :project/id = id.
    Return the :message/id.
    Note that this doesn't handle :message/answers-question. That is typically done with update-msg."
-  [{:keys [pid cid from full-text table tags question-type pursuing-EADS]}]
+  [{:keys [pid cid from content table code tags question-type pursuing-EADS]}]
   (assert (keyword? cid))
   (assert (#{:system :human :surrogate :developer-injected} from))
-  (assert (string? full-text))
-  (assert (not= full-text "null"))
+  (assert (string? content))
+  (assert (not= content "null"))
   (if-let [conn (connect-atm pid)]
     (let [msg-id (inc (max-msg-id pid cid))
           pursuing-EADS (or pursuing-EADS (get-active-EADS-id pid cid))]
       (d/transact conn {:tx-data [{:db/id (conversation-exists? pid cid)
-                                   :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content full-text}
+                                   :conversation/messages (cond-> #:message{:id msg-id :from from :time (now) :content content}
                                                             table (assoc :message/table (str table))
                                                             (not-empty tags) (assoc :message/tags tags)
                                                             question-type (assoc :message/question-type question-type)
+                                                            code          (assoc :message/code code)
                                                             pursuing-EADS (assoc :message/pursuing-EADS pursuing-EADS))}]})
       msg-id)
     (throw (ex-info "Could not connect to DB." {:pid pid}))))

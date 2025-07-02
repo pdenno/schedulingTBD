@@ -309,14 +309,14 @@
    The only keys of the argument map that are required are :client-id. and :dispatch-key.
    :promise? defaults to true only when the dispatch key is :iviewr-says.
    If client-id = :console, it simply print to terminal."
-  [{:keys [client-id promise? dispatch-key] :as content}]
-  (s/assert ::specs/chat-msg-obj content)
+  [{:keys [client-id promise? dispatch-key] :as msg}]
+  (s/assert ::specs/chat-msg-obj msg)
   (when-not client-id (throw (ex-info "ws/send: No client-id." {})))
   (if (= client-id :console)
-    (log! :info (str "send-to-client (console):\n" (with-out-str (pprint content))))
+    (log! :info (str "send-to-client (console):\n" (with-out-str (pprint msg))))
     (if-let [out (get-in @socket-channels [client-id :out])]
       (let [{:keys [prom p-key]} (when promise? (new-promise! client-id))
-            msg-obj (cond-> content
+            msg-obj (cond-> msg
                       p-key (assoc :p-key p-key)
                       true (assoc :timestamp (now)))]
         (when-not (= :alive? dispatch-key)

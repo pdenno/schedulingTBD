@@ -156,7 +156,7 @@
     {:stage "Distribution", :duration "Varies by destination, typically 1 to 2 days locally"}]})
 
 ;;; https://mui.com/material-ui/react-modal/
-(defnc TableModal [{:keys [table]}]
+(defnc TableModal [{:message/keys [table]}]
   (let [modal           (hooks/use-ref nil)
         table     (when (not-empty table) (edn/read-string table))
         [open set-open] (hooks/use-state false)]

@@ -105,10 +105,10 @@
     (db/create-proj-db! {:project/id pid :project/name pname} {} {:force-this-name? true})
     (db/add-claim! pid {:string (str `(~'surrogate ~pid)) :cid :process})
     (let [q-id (db/add-msg {:pid pid :cid :process :from :system :tags [:query :warm-up]
-                         :text (str "We understand that you have a special request to us:\n"
-                                    "You'd like to create a scheduling system, but you aren't a manufacturer.\n"
-                                    "Okay, I think we can still help. What's the scheduling problem you are trying to solve?")})
-          a-id (db/add-msg {:pid pid :cid :process :from :surrogate :tags [:response :warm-up] :text warm-up-response})]
+                            :content (str "We understand that you have a special request to us:\n"
+                                          "You'd like to create a scheduling system, but you aren't a manufacturer.\n"
+                                          "Okay, I think we can still help. What's the scheduling problem you are trying to solve?")})
+          a-id (db/add-msg {:pid pid :cid :process :from :surrogate :tags [:response :warm-up] :content warm-up-response})]
       (db/update-msg pid :process a-id  {:message/answers-question q-id})
       (agent-log (str ";;; ============= Start surrogate+ " pid " :process  ========================="))
       (db/put-agent! {:base-type pid :pid pid} (blank-surrogate pid))
@@ -127,8 +127,8 @@
            (log! :info (str "SUR's answer:" answer))
            (when (string? answer)
              (ws/send-to-client (assoc chat-args :text answer))
-             (db/add-msg {:pid pid :cid cid :from :system :full-text question})
-             (db/add-msg {:pid pid :cid cid :from :surrogate :full-text answer})))
+             (db/add-msg {:pid pid :cid cid :from :system :content question})
+             (db/add-msg {:pid pid :cid cid :from :surrogate :content answer})))
          (catch Exception e
            (log! :error (str "Failure in surrogate-follow-up:" (-> e Throwable->map :via first :message)))
            (ws/send-to-client (assoc chat-args :text "We had a problem answering this questions."))))))

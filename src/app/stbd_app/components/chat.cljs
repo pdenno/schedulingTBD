@@ -142,25 +142,40 @@
   "Add messages to the msgs-atm.
    This is typically used for individual messages that come through :iviewr-says or :sur-says,
    as opposed to bulk update through get-conversation."
-  [text from]
+  [msg from]
   (assert (#{:system :surrogate :human :developer-interjected} from))
-  (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))]
-    (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
+  ;; ToDo: I think maybe the whole ID thing needs to be fixed at the server. :message/id should be unique across conversations.
+  ;;       For the time being, I'll let this assign them, and time sometimes.
+  (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))
+        {:message/keys [time]} msg
+        msg (cond-> (dissoc msg :message/id)
+              true        (assoc :message/id msg-id)
+              true        (assoc :message/from from)
+              (not time)  (assoc :message/time (js/Date. (.now js/Date))))]
+    (swap! msgs-atm conj msg)
     ((lookup-fn :set-cs-msg-list) @msgs-atm)))
+
+(defn dispatch-msg2db-msg
+  "Translate the message to DB format, which is used in chat."
+  [{:keys [table graph text] :as msg}]
+  (cond-> msg
+    true  (assoc :message/content text)
+    table (assoc :message/table table)
+    graph (assoc :message/graph graph)
+    true  (dissoc :dispatch-key :client-id :timestamp :text :table :graph :message/EADS-data-structure)))
 
 (register-fn :interviewer-busy? (fn [{:keys [value]}]
                                   ((lookup-fn :set-busy?) value)))
 
-(register-fn :iviewr-says (fn [{:keys [p-key text table]}]
+;;; These come in through :dispatch-key :iviewer-says. Keys are NOT like in the DB, so we translate here.
+(register-fn :iviewr-says (fn [{:keys [p-key] :as msg}]
                             (when p-key (remember-promise p-key))
-                            (add-msg text :system)
-                            (when table
-                              ((lookup-fn :set-table) table))))
+                            (-> msg dispatch-msg2db-msg (add-msg :system))))
 
-(register-fn :sur-says (fn [{:keys [p-key text]}]
+;;; These come in through :dispatch-key :sur-says. Keys are NOT like in the DB, so we translate here.
+(register-fn :sur-says (fn [{:keys [p-key] :as msg}]
                          (when p-key (remember-promise p-key))
-                         (log! :info (str "sur-says text: " text))
-                         (add-msg text :surrogate)))
+                         (-> msg dispatch-msg2db-msg (add-msg :surrogate))))
 
 ;;; There is just one Chat instance in our app. It is switched between different conversations.
 (defnc Chat [{:keys [chat-height]}]

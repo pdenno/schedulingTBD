@@ -114,9 +114,9 @@
 
 (defn chat-pair-interviewees
   "Call to run ask and wait for an answer.
-   It returns a map {:msg-type :expert-response :full-text <string> :text <string> :table <table-map>} where
+   It returns a map {:msg-type :expert-response :content <string> :table <table-map>} where
         :msg-type is either :expert-response or :immoderate.
-          :full-text is text in response to the query (:question ctx), especially useful for use with surrogates.
+          :content is text in response to the query (:question ctx), especially useful for use with surrogates.
         :text is text in response to the query with surrogate tables removed.
         :table is a table map completed by the expert.
    If response is immoderate returns {:msg-type :immoderate}"
@@ -137,6 +137,7 @@
    :aid and :tid in the opts should be for the interviewer agent."
   ([msg iviewr-agent cid] (tell-interviewer msg iviewr-agent cid {}))
   ([msg iviewr-agent cid opts]
+   (reset! diag msg)
    (when @active?
      (when @mocking? (Thread/sleep 1000))
      (when-not (s/valid? ::specs/interviewer-msg msg) ; We don't s/assert here because old project might not be up-to-date.
@@ -203,7 +204,7 @@
   "Get a response to the argument question, looping through non-responsive side conversation, if necessary.
    The ctx argument is ::chat-pair-ctx, is about agents being used.
    the q-msg argument has been through separate-table and may have :table set.
-   Return a vector of maps for db/add-msg (thus contains pid, cid, from, full-text, table, tags, question-type, pursuing-EADS).
+   Return a vector of maps for db/add-msg (thus contains pid, cid, from, content, table, tags, question-type, pursuing-EADS).
    It terminates in an answer to the question.
    Note that the first element of the conversation should be the question, and the last the answer.
    Might talk to the client to keep things moving if necessary. Importantly, this requires neither PID nor CID."
@@ -211,7 +212,7 @@
   (when-not human-starting?
     (when-not (s/valid? ::chat-pair-ctx ctx)
         (throw (ex-info "Invalid context in get-an-answer." {:ctx ctx}))))
-  (let [conversation [{:full-text (msg-text q-msg) :from :system :tags [:query]}]
+  (let [conversation [{:question (msg-text q-msg) :from :system :tags [:query]}]
         a-msg (chat-pair-interviewees q-msg ctx) ; Response here is a map with :dispatch-key = :domain-expert-says and sometimes a table.
         answered? (= :surrogate responder-type)  ; Surrogate doesn't beat around the bush, I think!
         {:keys [answers-the-question? raises-a-question? wants-a-break?]} (when (and (not answered?) (msg-text q-msg))
@@ -227,7 +228,7 @@
          (or answered?
              wants-a-break?
              raises-a-question?)) (into (handle-other-non-responsive q-msg a-msg ctx))
-        answered?                 (conj (cond-> {:full-text (msg-text a-msg)}
+        answered?                 (conj (cond-> {:answer (msg-text a-msg)}
                                           true              (assoc :from responder-type)
                                           true              (assoc :tags [:response])
                                           (:table a-msg)    (assoc :table (:table a-msg))))))))
@@ -303,7 +304,7 @@
   "The argument is a text string which may contain a single block of HTML (a table, it turns out) between the markers '#+begin_src HTML ... #+end_src'.
    (In this function we don't care what is between the markers, but in usage it is typically a single HTML table.)
    Return a map where
-      :full-text is the argument text,
+      :content is the argument text,
       :text is the argument string minus the content between the marker, and
       :table-html is the substring between the markers. If no markers were found an empty string will be returned."
   [msg]
@@ -311,7 +312,7 @@
         in-table? (atom false)
         first-table-line? (atom true)
         result (loop [lines (str/split-lines text)
-                      res {:text "" :table-html "" :full-text text}]
+                      res {:text "" :table-html "" :content text}]
                  (let [l (first lines)]
                    (if (empty? lines)
                      res
@@ -386,7 +387,7 @@
 ;;; over and over and the interview will advance each time.
 (defn q-and-a
   "Call interviewer to supply a question; call get-an-answer for an answer prefaced by zero or more messages non-responsive to the question.
-   Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :full-text :table...).
+   Returns a vector of message objects suitable for db/add-msg (contains :pid :cid :from, :content :table...).
    The first element in the vector should be the question object, and the last the answer object."
   [iviewr-agent pid cid {:keys [client-id responder-type] :as ctx}]
   (let [pid (if @mocking? (shadow-pid pid) pid)]
@@ -403,8 +404,8 @@
                (let [msgs-vec (get-an-answer iviewr-q ctx)]
                  (when (= :surrogate responder-type)
                    ;; Don't send the first message since it's the question already sent by chat-pair-aux.
-                   (doseq [{:keys [full-text table from]} (rest msgs-vec)]
-                     (ws/send-to-client (cond-> {:client-id client-id :text full-text}
+                   (doseq [{:keys [answer table from]} (rest msgs-vec)]
+                     (ws/send-to-client (cond-> {:client-id client-id :text answer}
                                           table               (assoc :table table)
                                           (= from :system)    (assoc :dispatch-key :iviewr-says)
                                           (= from :surrogate) (assoc :dispatch-key :sur-says)))))
@@ -531,6 +532,15 @@
                     (update :EADS-ref keyword))]
         (db/put-EADS-ds! pid cid obj)))))
 
+(defn msg2db-msg
+  "Things from q-and-a are in forms unlike what goes in the DB."
+  [{:keys [question answer text] :as msg}]
+  (cond-> msg
+    question (assoc :content question)
+    answer   (assoc :content answer)
+    text     (assoc :content text)
+    true     (dissoc :question :answer :text)))
+
 (defn update-db-conversation!
   "Write to the project DB messages that occurred inclusive of a q/a pair.
    If there is a EADS being pursued, set the pursuing-EADS.
@@ -541,12 +551,13 @@
         msg-ids (atom [])
         EADS-id (db/get-active-EADS-id pid cid)]
     (doseq [msg msgs-vec]
-      (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
-                                        EADS-id (assoc :pursuing-EADS EADS-id)))))
-    (let [first-msg-id (first @msg-ids)
-          last-msg-id (last @msg-ids)]
-      (when-not (= first-msg-id last-msg-id)
-        (db/update-msg pid cid last-msg-id {:message/answers-question first-msg-id})))))
+      (let [msg (msg2db-msg msg)]
+        (swap! msg-ids conj (db/add-msg (cond-> (merge {:pid pid :cid cid} msg)
+                                          EADS-id (assoc :pursuing-EADS EADS-id)))))
+      (let [first-msg-id (first @msg-ids)
+            last-msg-id (last @msg-ids)]
+        (when-not (= first-msg-id last-msg-id)
+          (db/update-msg pid cid last-msg-id {:message/answers-question first-msg-id}))))))
 
 (defn resume-post-ui-actions
   "Send client actions to perform such as loading graphs or (for humans) changing conversations."
@@ -572,6 +583,8 @@
                                      "but we'd like to continue on the " (-> cid name str/capitalize) "conversation. "
                                      "Would you mind switching over there? (Use menu on the right.)")}))))
 
+;;; ToDo: The things in here could be methods associated with the EADS.
+;;;   [{:keys [pid cid from content table code tags question-type pursuing-EADS]}]
 (defn resume-post-db-actions!
   "If the interviewer responded with a DATA-STRUCTURE-REFINEMENT (which is typical), associate the
    whole message as a string to the message which is an answer to the question."
@@ -585,8 +598,11 @@
            (when (and (#{:process/flow-shop} eads-id)
                       (eu/ds-complete? eads-id pid))
              (when-let [minizinc (mzn/get-best-minizinc (db/get-summary-ds pid eads-id))]
-               (let [mid (db/max-msg-id pid cid)]
-                 (db/update-msg pid cid mid {:message/code minizinc})))))
+               (db/add-msg
+                {:pid pid :cid cid :code minizinc :tags [:code] :from :system
+                 :content
+                 (str "We have enough information now to define a very simple MiniZinc solution.\n"
+                      "The code here doesn't really schedule anything, just runs through the production process once.")}))))
          (catch Exception _e
            (log! :error "Error in post-db-action!. Continuing.")
            (reset! diag {:iviewr-response iviewr-response :pid pid :cid cid})))))
@@ -681,7 +697,7 @@
                       (tell-interviewer (db/get-EADS-instructions new-eads-id) iviewr-agent cid))
                     ;; q-and-a does a SUPPLY-QUESTION and returns a vec of msg objects suitable for db/add-msg.
                     (let [conversation (q-and-a iviewr-agent pid cid ctx)
-                          expert-response (-> conversation last :full-text) ; ToDo: This assumes the last is meaningful.
+                          expert-response (-> conversation last :answer) ; ToDo: This assumes the last is an answer.
                           ;; Expect a DATA-STRUCTURE-REFINEMENT message to be returned from this call.
                           iviewr-response (if (and @mocking? (not (continue-mocking?)))
                                             {:message-type :mocking-complete}
