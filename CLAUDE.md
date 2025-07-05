@@ -5,13 +5,12 @@ Essential operating instructions for any LLM agent (Claude, GPT, etc.) working o
 ## Quick Start
 
 ### System Operations
-- **Start system**: `(start)` in REPL (user namespace)
-- **Restart system**: `(restart)` in REPL
+- **LLM agents join a system that is already running**: Check this with
 - **Setup namespace**: Use `ns-setup!` for namespace initialization
 - **View logs**: Check `./logs/agents-logs.edn` for system activity
 
 The REPL starts in the user namespace where `(start)` and `(restart)` are available.
-Use the clojure-MCP tool `clojure_eval` to interact with the system.
+Use the clojure-MCP tool `clj-mcp.repl-tools/clojure_eval` to interact with the system.
 
 ## Standard Terminology
 

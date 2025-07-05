@@ -2,6 +2,8 @@
 
 ## Introduction
 
+**EADS** stands for **Example Annotated Data Structure** - this is our term for the structured templates that guide the interview process and data collection.
+
 SchedulingTBD is an experimental software platform designed to study **human/machine teaming (HMT)** in long-running cognitive tasks, specifically focusing on collaborative formulation and refinement of manufacturing production scheduling systems. The project explores how humans and AI can work together to create solutions using domain-specific languages (DSLs), particularly [MiniZinc](https://www.minizinc.org/) for constraint programming. The system is a  multi-agent AI framework designed to automatically understand scheduling problems and generate MiniZinc-based solutions. The system uses a structured interview process with AI agents to elicit requirements, classify problems, and model data relationships. It serves as a web-based application running on Jetty at port 3300 with real-time WebSocket communication and comprehensive logging.
 
 ## How the System Works

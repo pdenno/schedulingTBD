@@ -91,7 +91,9 @@
                                  ($ MessageHtmlContent {:html content})
                                  (when (or table graph)
                                    ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
-                                      (when table ($ TableModal {:table table}))
+                                      (when table
+                                        (reset! diag table)
+                                        ($ TableModal {:table table}))
                                       (when graph ($ GraphModal {:graph graph}))
                                       (when code
                                         ((lookup-fn :set-code) code)

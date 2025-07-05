@@ -60,6 +60,9 @@
       (into [{:project/id :NEW-PROJECT :menu-text "NEW PROJECT"}] others)
       (into [current] others))))
 
+
+(def debug-project? true)
+
 ;;; current-project and content of the others vector are keywords.
 
 ;;; ToDo: This is currently causing a warning:
@@ -80,10 +83,14 @@
     (letfn [(update-proj-info! [] ; ToDo: Make this so that is usable both in :once and the Select :onChange.
               (-> (dba/get-project-list) ;  Resolves to map with client's :current-project :others, and cid the first two are maps of :projec/id :project/name.
                   (p/then (fn [{:keys [current-project others cid] :as p-list}]
-                            (update-common-info! p-list)
-                            (set-current current-project)
-                            (set-proj-infos (conj others current-project))
-                            ((lookup-fn :get-conversation) (:project/id current-project) cid)))))]
+                            (let [current-project (if debug-project?
+                                                    {:project/id :sur-craft-beer--temp,
+                                                     :project/name "Craft beer (temp)"},
+                                                    current-project)]
+                              (update-common-info! p-list)
+                              (set-current current-project)
+                              (set-proj-infos (conj others current-project))
+                              ((lookup-fn :get-conversation) (:project/id current-project) cid))))))]
       (register-fn :set-current-project set-current) ; ToDo: make this go away.
       (hooks/use-effect :once (update-proj-info!))
       #_(hooks/use-effect [play-active?]
