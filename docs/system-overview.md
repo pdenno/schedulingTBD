@@ -4,21 +4,10 @@
 
 SchedulingTBD is an experimental software platform designed to study **human/machine teaming (HMT)** in long-running cognitive tasks, specifically focusing on collaborative formulation and refinement of manufacturing production scheduling systems. The project explores how humans and AI can work together to create solutions using domain-specific languages (DSLs), particularly [MiniZinc](https://www.minizinc.org/) for constraint programming. The system is a  multi-agent AI framework designed to automatically understand scheduling problems and generate MiniZinc-based solutions. The system uses a structured interview process with AI agents to elicit requirements, classify problems, and model data relationships. It serves as a web-based application running on Jetty at port 3300 with real-time WebSocket communication and comprehensive logging.
 
-## Project Goals
-
-This research aims to establish consensus and eventual standardization on best practices for:
-
-- **AI-mediated systems integration**
-- **Human/AI teaming on long-running and complex endeavors.**
-- **Designing DSLs fit for human/AI teaming**
-- **Running AI agent-based interviews** to elicit requirements
-- **Plan recognition** in collaborative tasks
-- **Constructionist learning** for adults
-- **Scientific explanation** in HMT
-
 ## How the System Works
 
-An orchestrator agent assesses the current level of discussion that has occurred through messages that pull data from the project database.
+An orchestrator agent assesses the current level of discussion that has occurred on a project using functions accessing the project's database.
+(See for example src/server/scheduling_tbd/iviewr/ork.clj function conversation-history.)
 It then chooses an EADS instruction accordingly for use by a corresponding interview agent.
 (Four kinds of interview agents exist: proccess, data, resources, and optimality).
 The selected interview agent uses the EADS instructions to formulate questions for human experts or surrogate (LLM-based) expert.

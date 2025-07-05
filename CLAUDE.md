@@ -39,7 +39,7 @@ Use the clojure-MCP tool `clojure_eval` to interact with the system.
 ### Data Structures
 - Use maps, vectors, sets, and primitives to store data
 - **Do NOT use lists** (sequences) for data storage
-- Recursive code should check with `map?` and `vector?`
+- Recursive navigation of structures uses `map?` and `vector?`
 
 ## Editing Etiquette
 
@@ -50,7 +50,7 @@ Use the clojure-MCP tool `clojure_eval` to interact with the system.
   ```clojure
   ;; Preserve this spacing pattern
   (cond
-      (test-1)                      1
+      (test-1)                     1
       (much-longer-test)           2)
 
   ;; Don't collapse to single spaces
@@ -88,6 +88,7 @@ Use the clojure-MCP tool `clojure_eval` to interact with the system.
 (start)
 
 ;; Check system status and explore
+develop.repl/alias-map                          ; Map of namespaces keyed by consistently used aliases.
 (clj-mcp.repl-tools/list-ns)                    ; List namespaces
 (clj-mcp.repl-tools/list-vars 'some.namespace)  ; List functions
 (clj-mcp.repl-tools/doc-symbol 'function-name)  ; Get documentation
