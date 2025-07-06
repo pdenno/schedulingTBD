@@ -24,6 +24,7 @@
     "@lezer/lr": "1.4.2",
     "@mui/icons-material": "^6.4.5",
     "@mui/material": "^6.4.5",
+    "@mui/x-data-grid": "^8.7.0",
     "codemirror": "^6.0.1",
     "lezer-clojure": "1.0.0-rc.2",
     "mermaid": "^11.5.0",

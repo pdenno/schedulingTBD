@@ -21,11 +21,11 @@
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
    [promesa.core :as p]
-   [scheduling-tbd.util  :refer [remove-src-markers]]
+   [scheduling-tbd.util :refer [remove-src-markers]]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.components.graph :refer [GraphModal]]
-   [stbd-app.components.table :refer [TableModal]]
+   [stbd-app.components.table2 :refer [Table2Modal]]
    [stbd-app.db-access :as dba]
    [stbd-app.util :as util :refer [register-fn lookup-fn common-info update-common-info!]]
    [stbd-app.ws :as ws :refer [remember-promise]]
@@ -91,9 +91,7 @@
                                  ($ MessageHtmlContent {:html content})
                                  (when (or table graph)
                                    ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
-                                      (when table
-                                        (reset! diag table)
-                                        ($ TableModal {:table table}))
+                                      (when table ($ Table2Modal {:table table}))
                                       (when graph ($ GraphModal {:graph graph}))
                                       (when code
                                         ((lookup-fn :set-code) code)
@@ -151,9 +149,9 @@
   (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))
         {:message/keys [time]} msg
         msg (cond-> (dissoc msg :message/id)
-              true        (assoc :message/id msg-id)
-              true        (assoc :message/from from)
-              (not time)  (assoc :message/time (js/Date. (.now js/Date))))]
+              true (assoc :message/id msg-id)
+              true (assoc :message/from from)
+              (not time) (assoc :message/time (js/Date. (.now js/Date))))]
     (swap! msgs-atm conj msg)
     ((lookup-fn :set-cs-msg-list) @msgs-atm)))
 
@@ -161,10 +159,10 @@
   "Translate the message to DB format, which is used in chat."
   [{:keys [table graph text] :as msg}]
   (cond-> msg
-    true  (assoc :message/content text)
+    true (assoc :message/content text)
     table (assoc :message/table table)
     graph (assoc :message/graph graph)
-    true  (dissoc :dispatch-key :client-id :timestamp :text :table :graph :message/EADS-data-structure)))
+    true (dissoc :dispatch-key :client-id :timestamp :text :table :graph :message/EADS-data-structure)))
 
 (register-fn :interviewer-busy? (fn [{:keys [value]}]
                                   ((lookup-fn :set-busy?) value)))
@@ -194,10 +192,10 @@
                   (log! :error (str "change-conversation-click fails: common-info = " @common-info)))))
             (process-user-input [text]
               (when (not-empty text)
-                (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)
+                (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" text)
                       [surrogate? product] (re-matches #"\s*SUR:(.*)" text)
-                      [sur+ map-str]       (re-matches #"\s*SUR\+:(.*)" text)
-                      [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" text)
+                      [sur+ map-str] (re-matches #"\s*SUR\+:(.*)" text)
+                      [sur-follow-up? q] (re-matches #"\s*SUR\?:(.*)" text)
                       msg (cond ask-llm? {:dispatch-key :ask-llm :question question}
                                 surrogate? {:dispatch-key :start-surrogate :product product}
                                 sur+ {:dispatch-key :start-surrogate+ :map-str map-str} ; like :start-surrogate, but provide a map of stuff.
@@ -222,7 +220,7 @@
                         (register-fn :set-active-conv set-active-conv)
                         (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (set-busy? val))) ; Yes. Need to do both.
                         (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
-                        (register-fn :get-msg-list (fn [] @msgs-atm))                               ; These two used to update message time.
+                        (register-fn :get-msg-list (fn [] @msgs-atm)) ; These two used to update message time.
                         (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs)))) ; These two used to update message time.
                        ;(register-fn :get-cs-msg-list (fn [] (msgs2cs msg-list)))                   ; This might work, were msg-list set!
                         (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))

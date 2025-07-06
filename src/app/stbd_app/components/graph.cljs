@@ -23,7 +23,7 @@
       (initialize (clj->js {:startOnLoad false, :securityLevel "loose" :theme "dark"})))
     (hooks/use-effect [graph-cmd]
       (try (when-let [gdiv (j/get graph-ref :current)]
-             #_(-> (render "mermaid-id-" graph-cmd) ; "graph-svg-id" is the svg id, not the dom/div id. It isn't used.
+             (-> (render "mermaid-id-" graph-cmd) ; "graph-svg-id" is the svg id, not the dom/div id. It isn't used.
                  (p/then (fn [svg] (j/assoc! gdiv :innerHTML #_this-svg (j/get svg :svg))))
                  (p/catch (fn [error] (log! :error (str "Error in Mermaid: " error))))))
            (catch :default _e nil)))
@@ -40,5 +40,5 @@
             (handle-close [] (set-open false))]
       (dom/div {:ref modal}
                ($ Button {:color "warning" :onClick handle-open} "Graph")
-               ($ Dialog  {:open open :onClose handle-close}
+               ($ Dialog  {:open open :onClose handle-close :fullScreen true :maxWidth "lg"}
                   ($ GraphPane {:init-graph graph}))))))
