@@ -31,6 +31,10 @@
 (def ^:diag diag (atom nil))
 (s/def ::cid #(#{:process :data :resources :optimality} %))
 
+(def ^:diag can-you-see-this?
+  "This is a variable that can be used to demonstrate that you (an AI programming agent, presumably) can do an eval from the REPL."
+  "Yes, you can!")
+
 ;;; From the REPL you can change the active? atom to false anytime you want things to stop
 ;;; (like when it is burning OpenAI asking the same question over and over ;^)).
 ;;; If it doesn't stop, it is probably the case that you need to test for it in more places.

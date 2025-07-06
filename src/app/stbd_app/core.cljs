@@ -14,10 +14,10 @@
    [scheduling-tbd.util         :refer [config-log!]]
    [stbd-app.components.chat    :as chat]
    [stbd-app.components.editor  :as editor :refer [Editor]]
-   [stbd-app.components.graph   :refer [GraphPane]]
+;;;   [stbd-app.components.graph   :refer [GraphPane]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareLeftRight ShareUpDown]]
-   [stbd-app.components.table   :as table :refer [TablePane]]
+;;;   [stbd-app.components.table   :as table :refer [TablePane]]
    [stbd-app.util      :as util :refer [register-fn]]
    [stbd-app.ws        :as ws]
    [taoensso.telemere  :refer [log!]]))
@@ -125,10 +125,10 @@
                       :up ($ Editor {:text code
                                      :name "code-editor"
                                      :height code-side-height})
-                      :dn (case rhs-pane
-                            :graph ($ GraphPane {:init-graph graph})
-                            :table ($ TablePane {:init-table table})
-                                   ($ Box {}))
+                      :dn ;;(case rhs-pane
+                           ;; :graph ($ GraphPane {:init-graph graph})
+                           ;; :table ($ TablePane {:init-table table})
+                                   ($ Box {})
                       :share-fns (:right-share top-share-fns)})
            :lf-pct 0.50
            :init-width width})))))

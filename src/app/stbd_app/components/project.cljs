@@ -84,8 +84,8 @@
               (-> (dba/get-project-list) ;  Resolves to map with client's :current-project :others, and cid the first two are maps of :projec/id :project/name.
                   (p/then (fn [{:keys [current-project others cid] :as p-list}]
                             (let [current-project (if debug-project?
-                                                    {:project/id :sur-craft-beer--temp,
-                                                     :project/name "Craft beer (temp)"},
+                                                    {:project/id :sur-craft-beer,
+                                                     :project/name "Craft Beer"},
                                                     current-project)]
                               (update-common-info! p-list)
                               (set-current current-project)

@@ -251,22 +251,29 @@
 (when-not (s/valid? :flow-shop/EADS-message flow-shop)
   (throw (ex-info "Invalid EADS (flow-shop)" {})))
 
+(defn elaborated-obj?
+  "Returns true if the process contains :duration, and (inputs or outputs)."
+  [obj]
+  (and (contains? obj :duration)
+       (or (contains? obj :inputs)
+           (contains? obj :outputs))))
+
 (defn completeness-test
   "Check that every subprocess contains a duration or exhausted? = true."
   [{:keys [exhausted?] :as ds}]
-  (let [has-dur? (atom true)]
-    (letfn [(ck-dur [obj]
-              (when @has-dur?
+  (let [elaborated? (atom true)]
+    (letfn [(ck-elab [obj]
+              (when @elaborated?
                 (cond (map? obj) (if (contains? obj :process-id)
-                                   (if (contains? obj :duration)
-                                     (doseq [[_ v] obj] (ck-dur v))
-                                     (reset! has-dur? false))
-                                   (doseq [[_ v] obj] (ck-dur v)))
-                      (vector? obj) (doseq [v obj] (ck-dur v)))))]
+                                   (if (elaborated-obj? obj)
+                                     (doseq [[_ v] obj] (ck-elab v))
+                                     (reset! elaborated? false))
+                                   (doseq [[_ v] obj] (ck-elab v)))
+                      (vector? obj) (doseq [v obj] (ck-elab v)))))]
       (or exhausted?
           (if (and  (contains? ds :subprocesses)
                     (> (-> ds :subprocesses count) 0))
-            (do (ck-dur (:subprocesses ds)) @has-dur?) ; We don't require the toplevel process to have a duration.
+            (do (ck-elab (:subprocesses ds)) @elaborated?) ; We don't require the toplevel process to have a duration.
             false)))))
 
 ;;; ------------------------------- checking for completeness ---------------
