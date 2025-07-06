@@ -87,65 +87,78 @@
       #js {:nodeDataArray (into-array node-data)
            :linkDataArray (into-array link-data)})))
 
+(def ^:diag diag (atom :init-val))
+
 ;;; React Components
 
 (defnc FFBDPane
-  "GoJS diagram component for displaying FFBD."
+  "Simple FFBD display component with basic GoJS diagram."
   [{:keys [init-graph]}]
   (let [diagram-ref (hooks/use-ref nil)
         [diagram set-diagram] (hooks/use-state nil)]
 
-    ;; Initialize diagram when component mounts or graph data changes
+    ;; Initialize diagram when component mounts
+    (hooks/use-effect
+     :once
+     (fn []
+       (when-let [div-element (j/get diagram-ref :current)]
+         (try
+           (log! :info "Initializing GoJS diagram...")
+
+           ;; Create a basic diagram
+           (let [$ (.-GraphObject.make go) ; GoJS builder function
+                 new-diagram ($ "Diagram" div-element)] ; Create diagram
+
+             ;; Set up a simple node template
+             (j/assoc! new-diagram :nodeTemplate
+                       ($ "Node" "Auto"
+                          ($ "Shape" "RoundedRectangle"
+                             #js {:fill "lightblue" :stroke "blue"})
+                          ($ "TextBlock"
+                             #js {:margin 4}
+                             (new go/Binding "text" "text"))))
+
+             ;; Create simple model with test data
+             (j/assoc! new-diagram :model
+                       (new go/GraphLinksModel
+                            #js [{:key "A" :text "Process A"}
+                                 {:key "B" :text "Process B"}
+                                 {:key "C" :text "Process C"}]
+                            #js [{:from "A" :to "B"}
+                                 {:from "B" :to "C"}]))
+
+             (set-diagram new-diagram)
+             (log! :info "GoJS diagram created successfully"))
+
+           (catch :default e
+             (log! :error (str "Error initializing GoJS diagram: " e))
+             (when-let [div (j/get diagram-ref :current)]
+               (j/assoc! div :innerHTML
+                         (str "<div style='padding: 20px; color: red;'>GoJS Error: " e "</div>"))))))
+
+       ;; Cleanup function
+       (fn []
+         (when diagram
+           (.dispose diagram)))))
+
+    ;; Update diagram when graph data changes
     (hooks/use-effect
      [init-graph]
-     (when-let [div-element (j/get diagram-ref :current)]
+     (when (and diagram init-graph)
        (try
-         (log! :info "Checking GoJS availability...")
-
-         ;; First check if GoJS is available
-         (if (and js/window.go (.-Diagram js/window.go))
-           (do
-             (log! :info "GoJS found, creating diagram...")
-             ;; Create diagram using global go object
-             (let [new-diagram (js/window.go.Diagram. div-element)]
-
-               ;; Try to set a very basic node template
-               (set! (.-nodeTemplate new-diagram)
-                     (js/window.go.GraphObject.make "Node"
-                                                    (js/window.go.GraphObject.make "TextBlock"
-                                                                                   (js-obj "text" "Hello"))))
-
-               ;; Set simple model
-               (set! (.-model new-diagram)
-                     (js/window.go.Model. #js [#js {:text "Test Node"}]))
-
-               (set-diagram new-diagram)
-               (log! :info "Basic GoJS diagram created")))
-
-           ;; GoJS not found, try alternative access methods
-           (do
-             (log! :info "GoJS not found at window.go, trying alternative...")
-             (if (exists? go)
-               (do
-                 (log! :info "Found 'go' namespace, creating diagram...")
-                 (let [new-diagram (go/Diagram. div-element)]
-                   (set-diagram new-diagram)
-                   (log! :info "Created diagram using 'go' namespace")))
-               (do
-                 (log! :error "GoJS not available - neither window.go nor 'go' namespace found")
-                 (set! (.-innerHTML div-element) "<div style='padding: 20px; color: red;'>GoJS library not found</div>")))))
-
+         (log! :info "Updating diagram with EADS data...")
+         (let [model-data (eads->gojs-model init-graph)]
+           (when model-data
+             (j/assoc! diagram :model model-data)))
          (catch :default e
-           (log! :error (str "Error in GoJS initialization: " e))
-           (when-let [div (j/get diagram-ref :current)]
-             (set! (.-innerHTML div) (str "<div style='padding: 20px; color: red;'>GoJS Error: " e "</div>")))))))
+           (log! :error (str "Error updating diagram: " e))))))
 
     ;; Render the diagram container
     (dom/div {:ref diagram-ref
               :style {:width "100%"
                       :height "400px"
                       :border "1px solid #ccc"
-                      :background-color "#f0f0f0"}})))
+                      :background-color "#f9f9f9"}})))
 
 (defnc FFBDModal
   "Modal dialog containing the FFBD diagram."

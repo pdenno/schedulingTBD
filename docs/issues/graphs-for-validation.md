@@ -113,3 +113,17 @@ I wrote something that looks about right but doesn't work at all; it is in ffbd.
 I think we both are getting confused about how to write this as a React component with Helix.
 I *think* you could write a simple example of using GoJS in Javascript and shadow-cljs will pick it up.
 I don't know whether that's helpful. Hard to say where to go with this.
+
+## Third Update
+
+We got disconnected yet again! You cleaned up the mess from the last disconnect, but didn't make much progress.
+Your work is in src/app/stbd_app/components/ffbd-orign.cljs and my more recent work is in src/app/stbd_app/components/ffbd.cljs
+
+I think we might be failing because the simple GoJS examples we have both seen don't handle some nuanced aspects of React.
+I am looking at https://github.com/NorthwoodsSoftware/gojs-react-basic/tree/master and see some things that we probably should be doing.
+Can you take a look at that?
+
+## Fourth Update
+
+We got disconnected...
+You were asking me whether I can see the simple text "FFBD Diagram will be displayed here..." Yes, I can.
