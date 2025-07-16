@@ -47,7 +47,3 @@
                     {:role "Simon"    :content "You still aren't getting it."}
                     {:role "Peter"    :content "..."}]
                    :llm-provider :real-world)))
-
-
-
-

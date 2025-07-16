@@ -188,7 +188,10 @@
    :message/from
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/keyword
         :doc "The agent issuing the message, #{:human :surrogate :system}."}
-   :message/graph
+   :message/graph--ffbd
+   #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
+        :doc "An optional graph that is the response, or part of the response of a user."}
+   :message/graph--orm
    #:db{:cardinality :db.cardinality/one, :valueType :db.type/string
         :doc "An optional graph that is the response, or part of the response of a user."}
    :message/id
