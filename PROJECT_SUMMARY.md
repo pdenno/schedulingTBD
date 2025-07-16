@@ -6,10 +6,12 @@ SchedulingTBD is an experimental software platform designed to study **human/mac
 
 ## For AI programming agents
 
-The code is implemented in Clojure and you (AI programming agent) joint the action with a REPL already running. No need to start anything!
+The code is implemented in Clojure and you (AI programming agent) join the action with a REPL already running.
 We run clojure-mcp (an MCP server) in which you can check that everything is running by accessing a variable scheduling-tbd.iviewr.interviewers/can-you-see-this? using the MCP server's clojure_eval tool.
-If you also run (ns-setup!) in the user namespace, you can access that variable as inv/can-you-see-this? .
-The value returned is the string "Yes, you can!".
+If clojure_eval fails on this, you might try (restart) and then (ns-setup!).
+The ns-setup! function (see .env/dev/develop/repl.clj) sets namespace aliases as described by the variable alias-map in that file.
+scheduling-tbd.iviewr.interviewers is mapped to inv thus, after running (ns-setup!) you should e able to clojure_eval inv/can-you-see-this? .
+The value returned should be the string "Yes, you can!".
 
 ## How the System Works (Orchestrator and Interviewers)
 
@@ -46,7 +48,7 @@ Structured interview conversations with four main topics:
 - **Mount** for component lifecycle management
 - **Jetty** web server for HTTP/WebSocket services
 - **Telemere** for comprehensive logging and telemetry
-- **Helix** a means of creating React component in javascript.
+- **Helix** a lightweight means of creating React component in clojurescript.
 
 ### Agent Communication
 - Message-based communication between agents

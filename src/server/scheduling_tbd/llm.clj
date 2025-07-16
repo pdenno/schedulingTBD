@@ -23,10 +23,11 @@
   (atom {}))
 
 (def preferred-llms
-  "These names (keywords) are the models we use, and the models we've been using lately."
+  "The outer map keys are llm-provider values, The values of inner map keys (:gpt :analysis, :planning, etc.) are the models we use."
   {:openai {:gpt         "gpt-4o-2024-11-20" ; "gpt-4o-2024-08-06"
             :analysis    "o1-preview"
             :mini        "o3-mini-2025-01-31"}
+   :meta   {:gpt         "Llama-4-Maverick-17B-128E-Instruct-FP8"}
    :azure  {:gpt         "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
 
 (defn pick-llm
@@ -124,11 +125,18 @@
   []
   (swap! llms-used #(assoc % :azure {:gpt-3.5 "mygpt-35" :gpt "mygpt-4"})))
 
+;;; ToDo: I need to review the rationale for this vs. llm/preferred-llms.
+(defn select-llm-models-meta
+  "Since in Azure you have to create the model, this is just hard-coded."
+  []
+  (swap! llms-used #(assoc % :meta {:gpt "Llama-4-Maverick-17B-128E-Instruct-FP8"})))
+
 (defn select-llm-models!
   "Set the open-ai-models atom to models in each class"
   []
   (select-llm-models-openai)
-  (select-llm-models-azure))
+  (select-llm-models-azure)
+  (select-llm-models-meta))
 
 ;;;------------------------------------- assistants and threads  -------------------------------------------
 (s/def ::name string?)

@@ -24,7 +24,8 @@
    [scheduling-tbd.util :refer [remove-src-markers]]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
-   [stbd-app.components.ffbd :refer [FFBDModal]]
+   ;[stbd-app.components.ffbd :refer [FFBDModal]]
+   [stbd-app.components.cytoscape-demo :refer [CytoscapeDemoModal]]
    [stbd-app.components.table2 :refer [Table2Modal]]
    [stbd-app.db-access :as dba]
    [stbd-app.util :as util :refer [register-fn lookup-fn common-info update-common-info!]]
@@ -92,7 +93,8 @@
                                  (when (or table graph)
                                    ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
                                       (when table ($ Table2Modal {:table table}))
-                                      (when graph ($ FFBDModal {:graph graph}))
+                                      ;(when graph ($ FFBDModal {:graph graph}))
+                                      (when graph ($ CytoscapeDemoModal {:graph graph}))
                                       (when code
                                         ((lookup-fn :set-code) code)
                                         ($ Button {:color "warning"} "Code"))))))))))

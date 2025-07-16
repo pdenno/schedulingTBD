@@ -28,11 +28,11 @@
                 :openai {:api-key (System/getenv "OPENAI_API_KEY")}
                 :azure  {:api-key (System/getenv "AZURE_OPENAI_API_KEY")
                          :api-endpoint "https://myopenairesourcepod.openai.azure.com"
-                         :impl :azure})]
+                         :impl :azure}
+                :meta   {:api-key (System/getenv "NIST_RCHAT")
+                         :api-endpoint "https://rchat.nist.gov/api"})]
     (when-not (:api-key res)
-      (if (= provider :openai)
-        (log! :error "Specify an API key in the environment variable OPENAI_API_KEY")
-        (log! :error "Specify an API key in the environment variable AZURE_OPENAI_API_KEY")))
+      (log! :error (str "Specify an API key for use of models from " (name provider))))
     res))
 
 (defonce databases-atm (atom {}))
