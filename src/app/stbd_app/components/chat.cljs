@@ -25,6 +25,7 @@
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
    [stbd-app.components.ffbd :refer [FFBDModal]]
+   [stbd-app.components.orm :refer [ORMModal]]
    ;[stbd-app.components.cytoscape-demo :refer [CytoscapeDemoModal]]
    [stbd-app.components.table2 :refer [Table2Modal]]
    [stbd-app.db-access :as dba]
@@ -73,7 +74,7 @@
   [msgs]
   (let [new-date (atom today)]
     (reduce (fn [r msg]
-              (let [{:message/keys [content from time table graph code] :or {time (js/Date. (.now js/Date))}} msg
+              (let [{:message/keys [content from time table graph--ffbd graph--orm code] :or {time (js/Date. (.now js/Date))}} msg
                     content (remove-src-markers content)
                     content (msg-with-title content from)
                     msg-date (-> time inst2date (subs 0 15))]
@@ -90,11 +91,12 @@
                               ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))}) ;  They only appear for Interviewer, which is probably good!
                               ($ MessageCustomContent {}
                                  ($ MessageHtmlContent {:html content})
-                                 (when (or table graph)
+                                 (when (or table graph--ffbd graph--orm)
                                    ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
                                       (when table ($ Table2Modal {:table table}))
-                                      (when graph ($ FFBDModal {:graph graph}))
-                                      ;(when graph ($ CytoscapeDemoModal {:graph graph}))
+                                      (when graph--ffbd ($ FFBDModal {:graph graph--ffbd}))
+                                      (when graph--orm ($ ORMModal {:graph graph--orm}))
+                                      ;(when graph--ffbd ($ CytoscapeDemoModal {:graph graph--ffbd}))
                                       (when code
                                         ((lookup-fn :set-code) code)
                                         ($ Button {:color "warning"} "Code"))))))))))
