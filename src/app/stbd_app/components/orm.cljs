@@ -9,7 +9,6 @@
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/Button$default" :as Button]
    ["@mui/material/Dialog$default" :as Dialog]
-   [stbd-app.util :as util :refer [register-fn]]
    [taoensso.telemere :refer [log!]]))
 
 (def ^:diag diag (atom nil))
@@ -23,38 +22,93 @@
     (map (fn [obj]
            {:data {:id (:object-id obj)
                    :label (:object-id obj)
-                   :definition (:definition obj)}
+                   :definition (:definition obj)
+                   :type "entity"}
             :classes "entity-node"})
          objects)))
 
-(defn relationship-nodes
-  "Extract relationship nodes from ORM data structure."
+(defn generate-role-box-svg
+  "Generate SVG for role box with specified arity and uniqueness bars"
+  [arity uniqueness-pattern]
+  (let [compartment-width 30
+        compartment-height 25
+        total-width (* arity compartment-width)
+        bar-height 3
+
+        ;; Generate compartment rectangles
+        compartments (for [i (range arity)]
+                       (str "<rect x='" (* i compartment-width) "' y='0' "
+                            "width='" compartment-width "' height='" compartment-height "' "
+                            "fill='none' stroke='black' stroke-width='1'/>"))
+
+        ;; Generate uniqueness bars
+        uniqueness-bars (for [i (range arity)
+                              :when (get uniqueness-pattern i)]
+                          (str "<rect x='" (+ (* i compartment-width) 2) "' y='-" bar-height "' "
+                               "width='" (- compartment-width 4) "' height='" bar-height "' "
+                               "fill='black'/>"))
+
+        svg-content (str "<svg xmlns='http://www.w3.org/2000/svg' "
+                         "width='" total-width "' height='" (+ compartment-height bar-height) "'>"
+                         (apply str compartments)
+                         (apply str uniqueness-bars)
+                         "</svg>")]
+
+    {:svg svg-content
+     :width total-width
+     :height (+ compartment-height bar-height)
+     :compartment-positions (for [i (range arity)]
+                              {:x (+ (* i compartment-width) (/ compartment-width 2))
+                               :y (/ compartment-height 2)})}))
+
+(defn role-box-nodes
+  "Generate role box nodes with custom SVG rendering"
   [orm-data]
   (let [fact-types (:fact-types orm-data)]
-    (map (fn [fact-type]
-           {:data {:id (:fact-type-id fact-type)
-                   :label (:fact-type-id fact-type)
-                   :arity (:arity fact-type)}
-            :classes "relationship-node"})
-         fact-types)))
+    (mapcat (fn [fact-type]
+              (let [rel-id (:fact-type-id fact-type)
+                    arity (:arity fact-type)
+                    _objects (:objects fact-type)
+                    uniqueness (:uniqueness fact-type []) ; Default to no uniqueness
 
-(defn relationship-edges
-  "Create edges connecting entities to relationships."
+                    ;; Generate SVG for this role box
+                    svg-data (generate-role-box-svg arity uniqueness)
+                    svg-url (str "data:image/svg+xml;charset=utf-8,"
+                                 (js/encodeURIComponent (:svg svg-data)))
+
+                    ;; Main role box node
+                    main-node {:data {:id rel-id
+                                      :label ""
+                                      :arity arity
+                                      :type "role-box"
+                                      :svg-url svg-url
+                                      :width (:width svg-data)
+                                      :height (:height svg-data)}
+                               :classes "role-box-svg"}
+
+                    ;; Invisible anchor nodes for precise edge targeting
+                    ;; Temporarily disabled for debugging
+                    anchor-nodes []]
+
+                (cons main-node anchor-nodes)))
+            fact-types)))
+
+(defn role-edges
+  "Create edges connecting entities to role boxes (temporarily simplified)"
   [orm-data]
   (let [fact-types (:fact-types orm-data)]
     (mapcat (fn [fact-type]
               (let [rel-id (:fact-type-id fact-type)
                     objects (:objects fact-type)]
-                (map-indexed (fn [idx obj]
-                               {:data {:source obj
-                                       :target rel-id
-                                       :label (str "role-" (inc idx))}
-                                :classes "role-edge"})
-                             objects)))
+                (map (fn [obj]
+                       {:data {:id (str rel-id "-edge-" obj)
+                               :source obj
+                               :target rel-id}})
+                     objects)))
             fact-types)))
 
 (defn orm->cytoscape-elements
-  "Transform ORM data structure to Cytoscape elements format."
+  "Transform ORM data structure to Cytoscape elements format with role boxes."
   [orm-data]
   (when orm-data
     (let [parsed-data (if (string? orm-data)
@@ -62,57 +116,58 @@
                         orm-data)
           inquiry-area (first (:inquiry-areas parsed-data))
           entities (entity-nodes inquiry-area)
-          relationships (relationship-nodes inquiry-area)
-          edges (relationship-edges inquiry-area)]
-      (concat entities relationships edges))))
+          role-boxes (role-box-nodes inquiry-area)
+          edges (role-edges inquiry-area)]
+      (concat entities role-boxes edges))))
 
 (defn orm-stylesheet
-  "Cytoscape stylesheet for ORM diagrams."
+  "Cytoscape stylesheet for ORM diagrams with custom SVG role boxes"
   []
-  [{:selector "node.entity-node"
-    :style {:background-color "#e8f4fd"
+  [{:selector "node[type='entity']"
+    :style {:background-color "#4A90E2"
+            :color "white"
             :label "data(label)"
-            :width 120
-            :height 60
-            :shape "round-rectangle"
             :text-valign "center"
             :text-halign "center"
-            :color "#2c3e50"
+            :width "80px"
+            :height "40px"
+            :shape "rectangle"
             :font-size "12px"
-            :font-weight "bold"
-            :border-width 2
-            :border-color "#3498db"
-            :text-wrap "wrap"
-            :text-max-width "100px"}}
-   {:selector "node.relationship-node"
-    :style {:background-color "#fff2cc"
-            :label "data(label)"
-            :width 100
-            :height 40
-            :shape "diamond"
-            :text-valign "center"
-            :text-halign "center"
-            :color "#2c3e50"
-            :font-size "10px"
-            :font-weight "bold"
-            :border-width 2
-            :border-color "#f39c12"
-            :text-wrap "wrap"
-            :text-max-width "80px"}}
-   {:selector "edge.role-edge"
-    :style {:width 2
-            :line-color "#7f8c8d"
-            :target-arrow-shape "none"
-            :curve-style "bezier"
-            :label "data(label)"
-            :font-size "8px"
-            :color "#7f8c8d"
-            :text-rotation "autorotate"}}
-   {:selector "node:selected"
-    :style {:border-width 4
-            :border-color "#e74c3c"}}
-   {:selector "edge:selected"
-    :style {:line-color "#e74c3c"}}])
+            :border-width "2px"
+            :border-color "#2E5C8A"}}
+
+   {:selector "node[type='role-box']"
+    :style {:background-color "#FFD700" ; Fallback yellow background
+            :background-image (fn [node]
+                                (let [node-id (.id node)
+                                      svg-url (.data node "svg-url")]
+                                  (println "Node ID:" node-id "SVG URL:" (if svg-url (subs svg-url 0 50) "nil"))
+                                  svg-url)) ; Fallback yellow background
+            ; :background-image "data(svg-url)"  ; Temporarily disabled
+            :background-fit "contain"
+            :background-clip "none"
+            :background-opacity 1
+            :width "data(width)"
+            :height "data(height)"
+            :shape "rectangle"
+            :label ""
+            :border-width "1px"
+            :border-color "#DAA520"}}
+
+   ;; Invisible anchor nodes for precise edge targeting
+   {:selector "node.role-anchor"
+    :style {:width "2px"
+            :height "2px"
+            :background-opacity 0
+            :border-opacity 0
+            :label ""}}
+
+   {:selector "edge"
+    :style {:width "2px"
+            :line-color "#888"
+            :target-arrow-color "#888"
+            :target-arrow-shape "triangle"
+            :curve-style "bezier"}}])
 
 (defnc ORMModal
   "Modal dialog containing the ORM diagram using Cytoscape.js."
@@ -142,17 +197,31 @@
                                       {:container (j/get cy-ref :current)
                                        :elements elements
                                        :style (orm-stylesheet)
-                                       :layout {:name "breadthfirst" :directed false :padding 30 :spacingFactor 2.0}
+                                       :layout {:name "breadthfirst" :directed false :padding 50 :spacingFactor 2.5}
                                        :userZoomingEnabled true
                                        :userPanningEnabled true}))]
                     (log! :info (str "ORM Cytoscape instance created with " (count elements) " elements"))
                     ;; Force fit and center the view
                     (js/setTimeout
                      (fn []
+                       ;; Position role compartments properly after layout
+                       (let [role-parents (.nodes cy-instance ".role-box-parent")]
+                         (doseq [parent-node (.toArray role-parents)]
+                           (let [parent-id (.id (.data parent-node))
+                                 children (.nodes cy-instance (str "[parent = '" parent-id "']"))
+                                 child-count (.length children)
+                                 parent-pos (.position parent-node)
+                                 start-x (- (.-x parent-pos) (* child-count 10))
+                                 y (.-y parent-pos)]
+                             ;; Position compartments in a horizontal line
+                             (doseq [i (range child-count)]
+                               (let [child (.eq children i)
+                                     x (+ start-x (* i 20))]
+                                 (.position child #js {:x x :y y}))))))
                        (.fit cy-instance)
                        (.center cy-instance)
                        (log! :info "ORM diagram fitted to viewport"))
-                     100)
+                     200)
                     (reset! diag {:cy-instance cy-instance :elements elements}))))
               (catch js/Error e
                 (log! :info (str "Error creating ORM diagram: " e))))))
