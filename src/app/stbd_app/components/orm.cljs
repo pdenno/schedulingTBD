@@ -34,29 +34,37 @@
         compartment-height 25
         total-width (* arity compartment-width)
         bar-height 3
+        total-height (+ compartment-height bar-height)
+
+        ;; Generate white background rectangle
+        background (str "<rect x='0' y='-" bar-height "' "
+                        "width='" total-width "' height='" total-height "' "
+                        "fill='white'/>")
 
         ;; Generate compartment rectangles
         compartments (for [i (range arity)]
                        (str "<rect x='" (* i compartment-width) "' y='0' "
                             "width='" compartment-width "' height='" compartment-height "' "
-                            "fill='none' stroke='black' stroke-width='1'/>"))
+                            "fill='white' stroke='black' stroke-width='1'/>"))
 
-        ;; Generate uniqueness bars
-        uniqueness-bars (for [i (range arity)
-                              :when (get uniqueness-pattern i)]
-                          (str "<rect x='" (+ (* i compartment-width) 2) "' y='-" bar-height "' "
+        ;; Generate uniqueness bars - check if uniqueness pattern contains this index
+        uniqueness-bars (for [[idx _] (map-indexed vector uniqueness-pattern)
+                              :when (some #(= (str idx) %) (flatten uniqueness-pattern))]
+                          (str "<rect x='" (+ (* idx compartment-width) 2) "' y='-" bar-height "' "
                                "width='" (- compartment-width 4) "' height='" bar-height "' "
                                "fill='black'/>"))
 
         svg-content (str "<svg xmlns='http://www.w3.org/2000/svg' "
-                         "width='" total-width "' height='" (+ compartment-height bar-height) "'>"
+                         "width='" total-width "' height='" total-height "' "
+                         "viewBox='0 -" bar-height " " total-width " " total-height "'>"
+                         background
                          (apply str compartments)
                          (apply str uniqueness-bars)
                          "</svg>")]
 
     {:svg svg-content
      :width total-width
-     :height (+ compartment-height bar-height)
+     :height total-height
      :compartment-positions (for [i (range arity)]
                               {:x (+ (* i compartment-width) (/ compartment-width 2))
                                :y (/ compartment-height 2)})}))
@@ -70,6 +78,8 @@
                     arity (:arity fact-type)
                     objects (:objects fact-type)
                     uniqueness (:uniqueness fact-type []) ; Default to no uniqueness
+                    deontic-keys (:deontic-keys fact-type []) ; Get mandatory information
+                    label (or (:label fact-type) rel-id) ; Use label if available
 
                     ;; Generate SVG for this role box
                     svg-data (generate-role-box-svg arity uniqueness)
@@ -78,7 +88,7 @@
 
                     ;; Main role box node
                     main-node {:data {:id rel-id
-                                      :label ""
+                                      :label label ; Now shows the role box label
                                       :arity arity
                                       :type "role-box"
                                       :svg-url svg-url
@@ -89,12 +99,14 @@
                     ;; Create anchor nodes for each compartment for precise edge targeting
                     ;; Remove parent-child relationship and use absolute positioning instead
                     anchor-nodes (for [i (range arity)]
-                                   (let [anchor-id (str rel-id "-compartment-" i)]
+                                   (let [anchor-id (str rel-id "-compartment-" i)
+                                         is-mandatory (= "mandatory" (nth deontic-keys i ""))]
                                      {:data {:id anchor-id
                                              :type "role-anchor"
                                              :compartment-index i
                                              :object-id (nth objects i) ; Store which object this compartment represents
-                                             :parent-role-box rel-id} ; Reference to parent for positioning
+                                             :parent-role-box rel-id ; Reference to parent for positioning
+                                             :mandatory is-mandatory} ; Add mandatory flag
                                       :classes "role-anchor"}))]
 
                 (cons main-node anchor-nodes)))
@@ -106,13 +118,16 @@
   (let [fact-types (:fact-types orm-data)]
     (mapcat (fn [fact-type]
               (let [rel-id (:fact-type-id fact-type)
-                    objects (:objects fact-type)]
+                    objects (:objects fact-type)
+                    deontic-keys (:deontic-keys fact-type [])]
                 ;; Create edges from each entity to its corresponding compartment
                 (map-indexed (fn [idx obj]
-                               (let [compartment-anchor-id (str rel-id "-compartment-" idx)]
+                               (let [compartment-anchor-id (str rel-id "-compartment-" idx)
+                                     is-mandatory (= "mandatory" (nth deontic-keys idx ""))]
                                  {:data {:id (str rel-id "-edge-" obj "-" idx)
                                          :source obj
                                          :target compartment-anchor-id
+                                         :mandatory is-mandatory ; Add mandatory flag for styling
                                          :label (str obj "-connects-to-" rel-id "-compartment-" idx)}}))
                              objects)))
             fact-types)))
@@ -139,27 +154,29 @@
             :label "data(label)"
             :text-valign "center"
             :text-halign "center"
-            :width "80px"
-            :height "40px"
+            :width "60px" ; Reduced from 80px
+            :height "30px" ; Reduced from 40px
             :shape "rectangle"
-            :font-size "12px"
+            :font-size "10px" ; Reduced from 12px
             :border-width "2px"
             :border-color "#2E5C8A"
             :z-index 1}}
 
    {:selector "node[type='role-box']"
     :style {:background-color "#FFD700" ; Fallback yellow background
-            :background-image (fn [node] (.data node "svg-url")) ; Fallback yellow background
-            ; :background-image "data(svg-url)"  ; Temporarily disabled
+            :background-image (fn [node] (.data node "svg-url"))
             :background-fit "contain"
             :background-clip "none"
             :background-opacity 1
             :width "data(width)"
             :height "data(height)"
             :shape "rectangle"
-            :label ""
-            :border-width "1px"
-            :border-color "#DAA520"
+            :label "data(label)" ; Show role box label
+            :text-valign "top" ; Position label above box
+            :text-margin-y -5 ; Move label above the box
+            :font-size "9px" ; Small font for labels
+            :color "#333" ; Dark gray for labels
+            :border-width "0px" ; Remove border since SVG has its own
             :z-index 2}}
 
    ;; Invisible anchor nodes for precise edge targeting
@@ -179,7 +196,14 @@
             :curve-style "straight" ; Straight lines for ORM
             :z-index 3 ; Edges above nodes
             :source-endpoint "outside-to-node"
-            :target-endpoint "outside-to-node"}}])
+            :target-endpoint "outside-to-node"}}
+
+   ;; Style for mandatory edges - show dot at source end
+   {:selector "edge[mandatory='true']"
+    :style {:source-arrow-shape "circle"
+            :source-arrow-color "#333"
+            :source-distance-from-node 5
+            :source-arrow-scale 0.5}}])
 
 (defnc ORMModal
   "Modal dialog containing the ORM diagram using Cytoscape.js."
@@ -211,9 +235,9 @@
                                        :style (orm-stylesheet)
                                        ;; Change to cose layout for better Y distribution
                                        :layout {:name "cose"
-                                                :nodeRepulsion 8000
-                                                :nodeOverlap 20
-                                                :idealEdgeLength 100
+                                                :nodeRepulsion 4000 ; Reduced from 8000
+                                                :nodeOverlap 10 ; Reduced from 20
+                                                :idealEdgeLength 60 ; Reduced from 100
                                                 :edgeElasticity 100
                                                 :nestingFactor 5
                                                 :gravity 80
@@ -221,7 +245,7 @@
                                                 :initialTemp 200
                                                 :coolingFactor 0.95
                                                 :minTemp 1.0
-                                                :padding 50}
+                                                :padding 30} ; Reduced from 50
                                        :userZoomingEnabled true
                                        :userPanningEnabled true}))]
                     (log! :info (str "ORM Cytoscape instance created with " (count elements) " elements"))
@@ -292,7 +316,16 @@
          ($ Dialog {:open open
                     :onClose handle-close
                     :fullScreen true
-                    :maxWidth false}
-            ($ "div" {:style {:width "1600px" :height "1000px" :margin "10px auto" :position "relative"}}
-               ($ "div" {:ref cy-ref
-                         :style {:width "1600px" :height "1000px" :background-color "#f8f9fa"}})))))))
+                    :maxWidth false
+                    :disableEscapeKeyDown true ; Prevent ESC key from closing
+                    :disableBackdropClick true} ; Prevent backdrop click from closing
+            ($ Box {:style {:position "relative" :width "100%" :height "100%"}}
+               ;; Add close button in top-right corner
+               ($ Button {:onClick handle-close
+                          :style {:position "absolute" :top "10px" :right "10px" :zIndex 1000}
+                          :variant "contained"
+                          :color "primary"}
+                  "Close Diagram")
+               ($ "div" {:style {:width "100%" :height "100%" :position "relative"}}
+                  ($ "div" {:ref cy-ref
+                            :style {:width "100%" :height "100%" :background-color "#f8f9fa"}}))))))))
