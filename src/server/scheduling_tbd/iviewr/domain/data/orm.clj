@@ -41,7 +41,7 @@
 (s/def ::annotated-inquiry-areas (s/keys :req-un [::comment :inquiry-areas/val]))
 (s/def ::fact-types (s/or :normal :fact-types/val :annotated ::annotated-fact-types))
 (s/def :fact-types/val (s/coll-of ::fact-type :kind vector?))
-(s/def ::fact-type (s/keys :req-un [::fact-type-id ::objects ::reference-modes ::uniqueness ::examples ::arity] :opt-un [::deontic-keys]))
+(s/def ::fact-type (s/keys :req-un [::fact-type-id ::objects ::reference-modes ::uniqueness ::examples] :opt-un [::mandatory?]))
 (s/def ::annotated-fact-types (s/keys :req-un [::comment :fact-types/val]))
 (s/def ::inquiry-area-objects (s/or :normal :inquiry-area-objects/val :annotated ::annotated-inquiry-area-objects))
 (s/def :inquiry-area-objects/val (s/coll-of ::inquiry-area-object :kind vector?))
@@ -50,13 +50,10 @@
 (s/def ::inquiry-area-id (s/or :normal :inquiry-area-id/val :annotated ::annotated-inquiry-area-id))
 (s/def :inquiry-area-id/val string?)
 (s/def ::annotated-inquiry-area-id (s/keys :req-un [::comment :inquiry-area-id/val]))
-(s/def ::arity (s/or :normal :arity/val :annotated ::annotated-arity))
-(s/def :arity/val number?)
-(s/def ::annotated-arity (s/keys :req-un [::comment :arity/val]))
-(s/def ::deontic-keys (s/or :normal :deontic-keys/val :annotated ::annotated-deontic-keys))
-(s/def :deontic-keys/val (s/coll-of ::deontic-key :kind vector?))
-(s/def ::deontic-key string?)
-(s/def ::annotated-deontic-keys (s/keys :req-un [::comment :deontic-keys/val]))
+(s/def ::mandatory? (s/or :normal :mandatory?/val :annotated ::annotated-mandatory?))
+(s/def :mandatory?/val (s/coll-of ::mandatory?-key :kind vector?))
+(s/def ::mandatory?-key string?)
+(s/def ::annotated-mandatory? (s/keys :req-un [::comment :mandatory?/val]))
 (s/def ::examples (s/or :normal :examples/val :annotated ::annotated-examples))
 (s/def :examples/val (s/keys :req-un [::column-headings ::rows]))
 (s/def ::annotated-examples (s/keys :req-un [::comment :examples/val]))
@@ -144,13 +141,12 @@
           "\n"
           (clj2json-pretty
            {:fact-type-id "ACADEMIC-obtains-DEGREE-from-UNIVERSITY"
-            :arity 3
             :objects ["academic" "degree" "university"]
             :reference-modes  ["empNr" "code" "code"]
-            :deontic-keys ["mandatory" "" ""]
+            :mandatory? ["must" "" ""]
             :uniqueness [["key1" "key1" ""]]})
           "\n"
-          "Here the object properties 'objects', 'reference-modes', and 'deontic' must each contain three elements because that is the arity (role count) of "
+          "Here the object properties 'objects', 'reference-modes', and 'mandatory?' must each contain three elements because that is the arity (role count) of "
           "sentences of the sort '[Academic] obtains [degree] from [university]'.\n"
           "The three ordered values of the 'objects' property represents three corresponding compartments of a 'role box' in a visual representation.\n"
           "The ordering facilitiates a verbalization of the fact type, in this case, 'Academic obtains degree from university'.\n"
@@ -210,10 +206,9 @@
           (clj2json-pretty
            {:inquiry-area-id "customer-orders"
             :fact-types [{:fact-type-id "ORDER-is-for-CUSTOMER"
-                          :arity 2,
                           :objects ["order" "customer"]
                           :reference-modes ["order-number" "customer-id"]
-                          :deontic-keys ["mandatory" ""]
+                          :mandatory? ["must" ""]
                           :uniqueness [["key1" ""]]
                           :examples {:column-headings ["order-number" "customer-id"]
                                      :rows [["CO-865204" "CID-8811"]
@@ -281,10 +276,15 @@
         :fact-types
         {:comment "This property provides a list of ORM fact type objects involving the inquiry-area-objects. Thus this captures actual Task 2 ORM modeling."
          :val [{:fact-type-id "ORDER-has-PROMISE-DATE"
-                :arity 2,
                 :objects ["order" "promise-date"]
                 :reference-modes ["order-number" "timepoint"]
-                :deontic-keys ["mandatory" ""]
+                :mandatory? {:val ["must" ""]
+                             :comment (str "Because there is a non-null string in the first position, every order (the first entity type) must participate in this relationship.\n"
+                                           "All orders must have a promise date. The three values possible in a mandatory? property are:\n"
+                                           "  1) empty string - not mandatory.\n"
+                                           "  2) 'must' - an alethic constraint (necessity), and\n"
+                                           "  3) 'should' - a deontic constraint (obligation)." )}
+
                 :uniqueness {:val [["key1" ""]]
                              :comment (str "Since every order participates in this relationship (mandatory), and order, through the order-number, uniquely identifies a promise date (uniqueness),\n"
                                            "we can infer that every order is associated with exactly one promise date.")}
@@ -296,20 +296,18 @@
                                         ["CO-863393" "2025-11-13"]
                                         ["CO-865534" "2025-03-28"]]}}}
                {:fact-type-id "ORDER-has-PRODUCT-QUANTITY"
-                :arity 3,
                 :objects ["order" "product" "quantity"]
                 :reference-modes ["order-number" "product-code" "quantity"]
-                :deontic-keys ["mandatory" "" ""]
+                :mandatory? ["must" "" ""]
                 :uniqueness [["key1" "key1" ""]]
                 :examples {:column-headings ["order-number" "product-code" "quantity"]
                            :rows [["CO-865204" "PN-38553" "1 unit"]
                                   ["CO-863393" "PN-37454" "7 unit"]
                                   ["CO-865534" "PN-73853" "2 family pack"]]}}
                {:fact-type-id "ORDER-is-for-CUSTOMER"
-                :arity 2,
                 :objects ["order" "customer"]
                 :reference-modes ["order-number" "customer-id"]
-                :deontic-keys ["mandatory" ""]
+                :mandatory? ["must" ""]
                 :uniqueness [["key1" ""]]
                 :examples {:column-headings ["order-number" "customer-id"]
                            :rows [["CO-865204" "CID-8811"]
@@ -324,7 +322,6 @@
                                {:object-id "certification"
                                 :definition "the passing of a test about ones ability at a specific task."}]
         :fact-types [{:fact-type-id "EMPLOYEE-certifies-SKILL-at-DATE"
-                      :arity 3,
                       :objects ["employee" "skill" "certification"]
                       :reference-modes {:val ["employee-number" "skill-code" "timepoint"]
                                         :comment (str "Regarding the 'timepoint' reference mode,  the interviewees use 'certification' and 'certification-date' interchangeably.\n"

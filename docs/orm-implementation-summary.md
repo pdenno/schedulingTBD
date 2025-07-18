@@ -22,7 +22,7 @@ Correctly handles ORM's consistent array ordering:
 ### Architecture
 ```
 Entity "order" → Edge → Anchor "ORDER-has-PRODUCT-QUANTITY-compartment-0" → Role Box Compartment 0
-Entity "product" → Edge → Anchor "ORDER-has-PRODUCT-QUANTITY-compartment-1" → Role Box Compartment 1  
+Entity "product" → Edge → Anchor "ORDER-has-PRODUCT-QUANTITY-compartment-1" → Role Box Compartment 1
 Entity "quantity" → Edge → Anchor "ORDER-has-PRODUCT-QUANTITY-compartment-2" → Role Box Compartment 2
 ```
 

@@ -5,14 +5,14 @@ This directory contains documentation for various fixes applied to the Schedulin
 ## Table Component Fixes
 
 ### [Table EditCell Cursor Position Fix](table-editcell-cursor-fix.md)
-**Date**: 2025-07-05  
-**Component**: `src/app/stbd_app/components/table.cljs`  
-**Issue**: EditCell cursor positioning problem during text editing  
+**Date**: 2025-07-05
+**Component**: `src/app/stbd_app/components/table.cljs`
+**Issue**: EditCell cursor positioning problem during text editing
 **Status**: ✅ **Fixed**
 
 **Problem**: When editing table cells, the first character typed correctly, but subsequent characters jumped to the end of the text field, making mid-text editing impossible.
 
-**Solution**: 
+**Solution**:
 - Changed from content-dependent key (`:key text`) to stable position-based key
 - Implemented controlled component pattern with local state management
 - Added dual state updates for responsive UI and data persistence
@@ -22,15 +22,15 @@ This directory contains documentation for various fixes applied to the Schedulin
 ## WebSocket Fixes
 
 ### [WebSocket Port Configuration Fix](websocket-port-configuration-fix.md)
-**Status**: ✅ **Fixed**  
+**Status**: ✅ **Fixed**
 **Component**: WebSocket configuration system
 
 ---
 
-## UI Component Fixes  
+## UI Component Fixes
 
 ### [Surrogate Chat Bubble Fix](surrogate-chat-bubble-fix.md)
-**Status**: ✅ **Fixed**  
+**Status**: ✅ **Fixed**
 **Component**: Chat interface components
 
 ---
@@ -42,7 +42,7 @@ When documenting a new fix:
 1. **Create detailed documentation** in this directory using the pattern: `[component]-[issue-description]-fix.md`
 2. **Include**:
    - Date of fix
-   - Component/file affected  
+   - Component/file affected
    - Clear problem description
    - Root cause analysis
    - Solution implemented
@@ -59,14 +59,14 @@ Use this template for new fix documentation:
 ```markdown
 # [Component] [Issue Description] Fix
 
-**Date**: YYYY-MM-DD  
-**Component**: `path/to/component.cljs`  
+**Date**: YYYY-MM-DD
+**Component**: `path/to/component.cljs`
 **Issue**: Brief description
 
 ## Problem Description
 [Detailed description of the issue]
 
-## Root Cause Analysis  
+## Root Cause Analysis
 [Technical analysis of why the issue occurred]
 
 ## Solution Implemented

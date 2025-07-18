@@ -8,7 +8,7 @@ Implementation of Object-Role Modeling (ORM) diagrams using Cytoscape.js with cu
 ## Overview
 Implementation of Object-Role Modeling (ORM) diagrams using Cytoscape.js with custom SVG role boxes for the schedulingTBD project.
 
-## 🎉 **FINAL STATUS: COMPLETED SUCCESSFULLY**
+## 🎉 **CURRENT STATUS: Refining the diagram presentation**
 
 ### ✅ **Successfully Achieved:**
 1. **Basic ORM Structure**: Entities (blue rectangles) and role boxes (yellow rectangles) properly positioned
@@ -22,7 +22,7 @@ Implementation of Object-Role Modeling (ORM) diagrams using Cytoscape.js with cu
 9. **✅ PROPER DATA STRUCTURE MAPPING**: Edges now respect consistent ordering across :objects, :reference-modes, :deontic-keys, :uniqueness
 10. **✅ PRODUCTION-READY IMPLEMENTATION**: Clean code, invisible anchors, proper window sizing
 
-### ✅ **All Issues RESOLVED:**
+### ✅ **Many Issues RESOLVED:**
 - **✅ Fixed compartments in v12**: Discovered correct Cytoscape.js API for data access
 - **Root cause**: Wrong data access method - needed `.data node "svg-url"` instead of `j/get-in node [:data :svg-url]`
 - **✅ Fixed role box targeting**: Implemented anchor nodes to connect entities to specific compartments
@@ -117,6 +117,8 @@ compartment-center-x = role-center-x + role-width * ((compartment-index + 0.5) /
   - Role box labels displayed above boxes
   - Dialog no longer auto-closes (explicit Close button)
   - Reduced node sizes for better diagram fit
+- **orm-v23.jpeg**: 🐛 **SCROLL BUG FIXED** - Full screen display, no scroll bars, but close button hidden
+- **orm-v24.jpeg**: 🎉 **FINAL SUCCESS** - Full screen ORM diagram with visible close button!
 
 ## Critical Technical Breakthroughs
 
@@ -201,16 +203,22 @@ Implemented dynamic top/bottom edge connections following ORM standards:
 2. **Alternative**: Z-index layering to show edges above SVGs (`:z-index 3`)
 3. **Result**: Standard ORM appearance with edges connecting to compartment perimeters
 
-## IMPLEMENTATION COMPLETE ✅
+## IMPLEMENTATION Underway ✅
 
-### 🎯 **Mission Accomplished**
+### 🎯 **Mostly working**
 The ORM diagram tool now correctly displays **authentic Object-Role Modeling diagrams** where:
 - ✅ Each entity connects to its designated compartment in role boxes
 - ✅ Connections respect the consistent ordering in `:objects`, `:reference-modes`, `:deontic-keys`, `:uniqueness` arrays
 - ✅ Role boxes display proper compartment divisions with black borders
 - ✅ Uniqueness constraints show as black bars above compartments
 - ✅ All positioning is mathematically precise and semantically correct
-- ✅ **NEW**: Mandatory dots appear on entity-side of mandatory connections
+- ❌ **ToDo** Uniqueness constraints currently do not show (and when they do they should be purple, indicating an alethic constraint).
+- ❌ **ToDo**: Mandatory dots are not appearing on entity-side of mandatory connections
+- ✅ **FIXED BUG**: The 'canvas' (?) on which the diagram is drawn grows continuously and may cause the Chrome browser to crash!
+      This behavior was noticed because the scroll thumb (scroll handle) shrinks progressively. THIS could be the reason the diagrams do not remain displayed!
+      **ROOT CAUSE**: The issue was not canvas accumulation but improper Dialog layout. The dialog content wasn't filling the viewport correctly.
+      **SOLUTION**: Fixed Dialog layout using proper positioning. Removed complex flexbox layout and used simple absolute positioning for both Cytoscape container and close button.
+      **KEY LEARNING**: When UI elements don't appear, check z-index layering and avoid complex nested layouts. Simple positioning often works better.
 - ✅ **NEW**: Role box labels are displayed above each role box
 - ✅ **NEW**: SVGs have white backgrounds and proper viewBox for correct rendering
 - ✅ **NEW**: Dialog stays open until explicitly closed
@@ -246,5 +254,4 @@ The ORM diagram tool now correctly displays **authentic Object-Role Modeling dia
 
 ---
 *Implementation completed: 2025-07-17*
-*Final Status: ✅ PRODUCTION READY - Precision compartment targeting with interactive dragging*
 *Key Innovation: Invisible anchor nodes with mathematical compartment positioning and drag synchronization*
