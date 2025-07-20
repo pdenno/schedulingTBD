@@ -126,13 +126,14 @@
                     ;; Create anchor nodes for each compartment for precise edge targeting
                     ;; Remove parent-child relationship and use absolute positioning instead
                     anchor-nodes (for [i (range arity)]
-                                   (let [anchor-id (str rel-id "-compartment-" i)]
+                                   (let [anchor-id (str rel-id "-compartment-" i)
+                                         mandatory-value (nth mandatory? i nil)]
                                      {:data {:id anchor-id
                                              :type "role-anchor"
                                              :compartment-index i
                                              :object-id (nth objects i) ; Store which object this compartment represents
                                              :parent-role-box rel-id ; Reference to parent for positioning
-                                             :mandatory? (#{"must" "should"} (nth mandatory? i nil))}
+                                             :mandatory mandatory-value}
                                       :classes "role-anchor"}))]
 
                 (cons main-node anchor-nodes)))
@@ -148,11 +149,12 @@
                     mandatory? (:mandatory? fact-type [])]
                 ;; Create edges from each entity to its corresponding compartment
                 (map-indexed (fn [idx obj]
-                               (let [compartment-anchor-id (str rel-id "-compartment-" idx)]
+                               (let [compartment-anchor-id (str rel-id "-compartment-" idx)
+                                     mandatory-value (nth mandatory? idx nil)]
                                  {:data {:id (str rel-id "-edge-" obj "-" idx)
                                          :source obj
                                          :target compartment-anchor-id
-                                         :mandatory? (#{"must" "should"} (nth mandatory? idx nil))
+                                         :mandatory mandatory-value
                                          :label (str obj "-connects-to-" rel-id "-compartment-" idx)}}))
                              objects)))
             fact-types)))
@@ -224,11 +226,23 @@
             :target-endpoint "outside-to-node"}}
 
    ;; Style for mandatory edges - show dot at source end
-   {:selector "edge[mandatory='true']"
+   ;; Style for alethic constraint (must) - purple dot at source end
+   {:selector "edge[mandatory='must']"
     :style {:source-arrow-shape "circle"
-            :source-arrow-color "#333"
-            :source-distance-from-node 5
-            :arrow-scale 0.5}}])
+            :source-arrow-color "#9b59b6" ; Purple color for alethic
+            :source-arrow-fill "filled"
+            :source-distance-from-node 3
+            :arrow-scale 1.2
+            :source-arrow-background-fill "filled"}}
+
+   ;; Style for deontic constraint (should) - blue dot at source end
+   {:selector "edge[mandatory='should']"
+    :style {:source-arrow-shape "circle"
+            :source-arrow-color "#3498db" ; Blue color for deontic
+            :source-arrow-fill "filled"
+            :source-distance-from-node 3
+            :arrow-scale 1.2
+            :source-arrow-background-fill "filled"}}])
 
 (defnc ORMModal
   "Modal dialog containing the ORM diagram using Cytoscape.js."
@@ -273,8 +287,14 @@
               (let [parsed-graph (if (string? graph)
                                    (edn/read-string graph)
                                    graph)]
-                (log! :info (str "Creating ORM diagram for: " (:EADS-id parsed-graph)))
+                (log! :info (str "Creating ORM diagram for: " (:EADS-id parsed-graph)
+                                 "\nMandatory values in data: "
+                                 (pr-str (map :mandatory? (:fact-types parsed-graph)))))
                 (swap! diag update :instance-count inc)
+                (doseq [ft (:fact-types parsed-graph)]
+                  (when (some #(= "must" %) (:mandatory? ft))
+                    (log! :info (str "Fact type with mandatory: " (:fact-type-id ft)
+                                     " mandatory?: " (:mandatory? ft)))))
                 (let [elements (orm->cytoscape-elements parsed-graph)
                       cy-instance (cytoscape-lib
                                    (clj->js
