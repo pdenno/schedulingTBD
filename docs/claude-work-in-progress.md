@@ -9,14 +9,14 @@
 ### 1. Layout Persistence Issues
 **Problem**: While the server correctly saves layout data, the client doesn't update its local copy after saving.
 - Layout is saved to server via websocket on close
-- Server stores layout in the inquiry area's `:layout` field  
+- Server stores layout in the inquiry area's `:layout` field
 - Client doesn't refresh the graph data after save, so reopening shows old positions
 - **Fix needed**: Update client-side graph data after successful save, or refetch from server
 
-### 2. UI Button Confusion  
+### 2. UI Button Confusion
 **Problem**: The "CLOSE" button both saves and closes, which is unclear to users.
 - Current behavior: Single "CLOSE" button triggers layout save and closes dialog
-- **Proposed solution**: 
+- **Proposed solution**:
   - Replace "CLOSE" with "SAVE" button that saves layout and closes
   - Add "DISMISS" button that closes without saving changes
   - This gives users explicit control over whether changes are persisted
@@ -26,7 +26,7 @@
 
 **Root Cause**: The MUI Box component was interfering with Cytoscape's rendering system, causing:
 - Re-rendering cycles from Box prop changes or context updates
-- CSS property conflicts affecting canvas sizing calculations  
+- CSS property conflicts affecting canvas sizing calculations
 - Flexbox/Grid layout recalculations triggering resize observers
 - MUI's dynamic styling system causing layout thrashing
 - Event bubbling interference with Cytoscape's internal state
@@ -39,7 +39,7 @@
 
 ### ORM Diagram Implementation ✅
 1. **Basic structure**: Entities and role boxes with proper connections
-2. **Mandatory constraints**: Purple dots for "must", blue dots for "should"  
+2. **Mandatory constraints**: Purple dots for "must", blue dots for "should"
 3. **Uniqueness constraints**: Purple bars above constrained compartments
 4. **Dynamic compartments**: Role boxes resize based on relationship arity
 5. **Precise edge targeting**: Edges connect to specific compartments

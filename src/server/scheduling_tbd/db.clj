@@ -660,13 +660,15 @@
 
 (defn update-msg
   "Update the message with given info (a merge)."
-  [pid cid mid {:message/keys [answers-question] :as info}]
-  (let [eid (message-exists? pid cid mid)]
-    (if (= mid answers-question)
-      (throw (ex-info "Attempting to mark a message as answer the question it raises." {:pid pid :cid cid :mid mid}))
-      (if eid
-        (d/transact (connect-atm pid) {:tx-data [(merge {:db/id eid} info)]})
-        (log! :warn (str "Could not find msg for update-msg: pid = " pid " cid = " cid " mid = " mid))))))
+  [pid cid mid {:message/keys [answers-question graph--orm] :as info}]
+  (if-let [eid (message-exists? pid cid mid)]
+    (do (when answers-question
+          (if (= mid answers-question)
+            (throw (ex-info "Attempting to mark a message as answer the question it raises." {:pid pid :cid cid :mid mid}))
+            (d/transact (connect-atm pid) {:tx-data [(merge {:db/id eid} info)]})))
+        (when graph--orm
+          (d/transact (connect-atm pid) {:tx-data [(merge {:db/id eid} info)]})))
+    (log! :warn (str "Could not find msg for update-msg: pid = " pid " cid = " cid " mid = " mid))))
 
 ;;; ----------------------------------------- EADS ---------------------------------------------
 (defn system-EADS?
@@ -866,6 +868,31 @@
                                                          :dstruct/str (str dstruct)}}]})
       (throw (ex-info "No eid" {:pid pid :eid eid})))))
 
+
+(defn key-xy
+  [obj]
+  (cond (map? obj)       (reduce-kv (fn [m k v] (if (#{"x" "y"} k)
+                                                  (assoc m (keyword k) v)
+                                                  (assoc m k (key-xy v))))
+                                    {}
+                                    obj)
+        (vector? obj)    (mapv key-xy obj)
+        :else            obj))
+
+(defn set-orm-layout!
+  "Called when a user changes the layout of an ORM diagram on the UI, this makes that data persistent
+   in the stringified EADS object. Note that four coordinates are needed to place it correctly!"
+  [{:keys [pid cid message-id inquiry-area-id layout-data] :as msg}]
+  (log! :info (str "save-orm-layout!:\n " (with-out-str (pprint msg))))
+  (if-let [orm-eads (-> (get-msg pid cid message-id) :message/graph--orm edn/read-string)]
+    (let [orm-eads (update orm-eads :inquiry-areas (fn [ias] (mapv #(if (= (:inquiry-area-id %) inquiry-area-id)
+                                                                      (assoc % :layout (key-xy layout-data))
+                                                                      %)
+                                                                   ias)))]
+      (update-msg pid cid message-id {:message/graph--orm (str orm-eads)}))
+    (log! :error (str "Could not find ORM diagram for " msg))))
+
+
 ;;; -------------------- Starting and stopping -------------------------
 (defn register-project-dbs
   "Make a config for each project and register it."
@@ -879,6 +906,7 @@
   (register-project-dbs)
   (register-db :system (db-cfg-map {:type :system}))
   (ws/register-ws-dispatch :set-execution-status! set-execution-status!)
+    (ws/register-ws-dispatch :save-orm-layout set-orm-layout!)
   {:sys-cfg (db-cfg-map {:type :system})})
 
 (defstate sys&proj-database-cfgs

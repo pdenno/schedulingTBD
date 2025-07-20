@@ -95,8 +95,7 @@
                                    ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
                                       (when table ($ Table2Modal {:table table}))
                                       (when graph--ffbd ($ FFBDModal {:graph graph--ffbd}))
-                                      (when graph--orm ($ ORMModal {:graph graph--orm}))
-                                      ;(when graph--ffbd ($ CytoscapeDemoModal {:graph graph--ffbd}))
+                                      (when graph--orm ($ ORMModal {:graph graph--orm :message-id (:message/id msg)}))
                                       (when code
                                         ((lookup-fn :set-code) code)
                                         ($ Button {:color "warning"} "Code"))))))))))
@@ -226,6 +225,14 @@
                         (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
                         (register-fn :get-msg-list (fn [] @msgs-atm)) ; These two used to update message time.
                         (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs)))) ; These two used to update message time.
+                        (register-fn :update-msg-orm (fn [message-id orm-data]
+                                                       (let [updated-msgs (mapv (fn [msg]
+                                                                                  (if (= (:message/id msg) message-id)
+                                                                                    (assoc msg :message/graph--orm orm-data)
+                                                                                    msg))
+                                                                                @msgs-atm)]
+                                                         (reset! msgs-atm updated-msgs)
+                                                         (set-cs-msg-list (msgs2cs updated-msgs)))))
                        ;(register-fn :get-cs-msg-list (fn [] (msgs2cs msg-list)))                   ; This might work, were msg-list set!
                         (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
       (hooks/use-effect [msg-list]

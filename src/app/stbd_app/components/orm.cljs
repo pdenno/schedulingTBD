@@ -9,6 +9,8 @@
    ["@mui/material/Box$default" :as Box]
    ["@mui/material/Button$default" :as Button]
    ["@mui/material/Dialog$default" :as Dialog]
+   [stbd-app.util :refer [common-info lookup-fn]]
+   [stbd-app.ws :as ws]
    [taoensso.telemere :refer [log!]]))
 
 (def ^:diag diag (atom {:instance-count 0 :total-opens 0})) ; Reserved for debugging - do not use in production code
@@ -22,11 +24,13 @@
   (when cy-instance
     (let [nodes (.nodes cy-instance)
           positions (reduce (fn [acc node]
-                              (assoc acc (.id node) (.position node)))
+                              (let [pos (.position node)]
+                                (assoc acc (.id node) {:x (.-x pos) :y (.-y pos)})))
                             {}
                             (.toArray nodes))
           zoom (.zoom cy-instance)
-          pan (.pan cy-instance)]
+          pan-obj (.pan cy-instance)
+          pan {:x (.-x pan-obj) :y (.-y pan-obj)}]
       {:node-positions positions
        :zoom zoom
        :pan pan})))
@@ -34,16 +38,18 @@
 (defn apply-layout
   "Apply saved layout to Cytoscape instance"
   [cy-instance layout-data]
-  (when (and cy-instance layout-data)
-    ;; Apply node positions
-    (doseq [[node-id position] (:node-positions layout-data)]
-      (when-let [node (.getElementById cy-instance node-id)]
-        (.position node position)))
-    ;; Apply zoom and pan
-    (when-let [zoom (:zoom layout-data)]
-      (.zoom cy-instance zoom))
-    (when-let [pan (:pan layout-data)]
-      (.pan cy-instance pan))))
+  (let [layout-data (edn/read-string layout-data)]
+    (log! :info (str "layout-data = " layout-data))
+    (when (and cy-instance layout-data)
+      ;; Apply node positions
+      (doseq [[node-id position] (:node-positions layout-data)]
+        (when-let [node (.getElementById cy-instance node-id)]
+          (.position node position)))
+      ;; Apply zoom and pan
+      (when-let [zoom (:zoom layout-data)]
+        (.zoom cy-instance zoom))
+      (when-let [pan (:pan layout-data)]
+        (.pan cy-instance pan)))))
 
 (defn entity-nodes
   "Extract entity nodes from ORM data structure."
@@ -251,7 +257,7 @@
 
 (defnc ORMModal
   "Modal dialog containing the ORM diagram using Cytoscape.js."
-  [{:keys [graph]}]
+  [{:keys [graph message-id]}]
   (let [cy-ref (hooks/use-ref nil)
         modal (hooks/use-ref nil)
         [open set-open] (hooks/use-state false)]
@@ -304,19 +310,38 @@
                     (log! :info (str "Fact type with uniqueness: " (:fact-type-id ft)
                                      " uniqueness: " (:uniqueness ft)))))
                 (let [elements (orm->cytoscape-elements parsed-graph)
+                      saved-layout (get-in parsed-graph [:inquiry-areas 0 :layout])
+                      ;; If we have saved layout, apply positions to elements before creating cy instance
+                      ;; If we have saved layout, apply positions to elements before creating cy instance
+                      elements-with-positions (if saved-layout
+                                                (let [positions (:node-positions saved-layout)]
+                                                  (log! :info (str "Layout data keys: " (keys saved-layout)))
+                                                  (log! :info (str "Number of positions: " (count positions)))
+                                                  (mapv (fn [el]
+                                                          (let [node-id (get-in el [:data :id])
+                                                                pos (get positions node-id)]
+                                                            (if pos
+                                                              (assoc el :position pos)
+                                                              el)))
+                                                        elements))
+                                                elements)
+                      ;; Use preset layout if we have saved positions, otherwise breadthfirst
+                      layout-config (if saved-layout
+                                      {:name "preset"
+                                       :animate false}
+                                      {:name "breadthfirst"
+                                       :animate false
+                                       :animationDuration 0
+                                       :fit true
+                                       :directed false
+                                       :padding 50
+                                       :spacingFactor 1.5})
                       cy-instance (cytoscape-lib
                                    (clj->js
                                     {:container (j/get cy-ref :current)
-                                     :elements elements
+                                     :elements elements-with-positions
                                      :style (orm-stylesheet)
-                                     ;; Use breadthfirst layout with no animation
-                                     :layout {:name "breadthfirst"
-                                              :animate false ; Disable animation
-                                              :animationDuration 0 ; Ensure no animation
-                                              :fit true
-                                              :directed false
-                                              :padding 50
-                                              :spacingFactor 1.5}
+                                     :layout layout-config
                                      :userZoomingEnabled true
                                      :userPanningEnabled true
                                      :minZoom 0.1
@@ -346,6 +371,28 @@
                                                  (+ role-y (/ role-height 2)))] ; Bottom edge
                                   (.position anchor #js {:x compartment-center-x :y anchor-y})))))]
 
+                      ;; Check if we have saved layout data
+                      ;; Layout is stored with the inquiry-area (one for each)
+                    ;; Check if we have saved layout data
+                      ;; If using preset layout, apply positions immediately
+                    ;; If we have saved layout, apply zoom/pan and update anchors
+                    ;; If we have saved layout, apply zoom/pan and update anchors
+                    (when saved-layout
+                      (log! :info (str "Applying saved layout for inquiry area: "
+                                       (get-in parsed-graph [:inquiry-areas 0 :inquiry-area-id])))
+                      ;; Apply zoom and pan
+                      (when-let [zoom (:zoom saved-layout)]
+                        (.zoom cy-instance zoom))
+                      (when-let [pan (:pan saved-layout)]
+                        (.pan cy-instance (clj->js pan)))
+                      ;; Update anchors after positions are set
+                      (js/setTimeout
+                       (fn []
+                         (let [role-boxes (.nodes cy-instance "[type='role-box']")]
+                           (doseq [role-box (.toArray role-boxes)]
+                             (update-anchors-for-role-box role-box))))
+                       50))
+
                       ;; Wait for layout to complete, then set up anchors
                     (.on cy-instance "layoutstop"
                          (fn []
@@ -370,7 +417,77 @@
                              (doseq [role-box (.toArray role-boxes)]
                                (update-anchors-for-role-box role-box)))))
 
-                    (reset! graph-state {:cy-instance cy-instance :elements elements}))))
+                    (reset! graph-state {:cy-instance cy-instance
+                                         :elements elements
+                                         :parsed-graph parsed-graph})
+
+                    ;; Log any ongoing animations or rendering
+                    (js/setTimeout
+                     (fn []
+                       (log! :info "=== Diagnostics starting ===")
+                       ;; Check container dimensions
+                       (let [container (j/get cy-ref :current)
+                             rect (.getBoundingClientRect container)]
+                         (log! :info (str "Container dimensions - width: " (.-width rect) " height: " (.-height rect))))
+
+                       ;; Check if container or its parents are changing size
+                       (let [initial-sizes (atom {})
+                             size-changes (atom [])]
+                         ;; Record initial sizes
+                         (loop [el (j/get cy-ref :current)
+                                level 0]
+                           (when (and el (< level 5))
+                             (let [rect (.getBoundingClientRect el)]
+                               (swap! initial-sizes assoc level {:width (.-width rect) :height (.-height rect)})
+                               (recur (.-parentElement el) (inc level)))))
+
+                         ;; Monitor for size changes
+                         (let [check-interval (js/setInterval
+                                               (fn []
+                                                 (loop [el (j/get cy-ref :current)
+                                                        level 0]
+                                                   (when (and el (< level 5))
+                                                     (let [rect (.getBoundingClientRect el)
+                                                           initial (get @initial-sizes level)
+                                                           current {:width (.-width rect) :height (.-height rect)}]
+                                                       (when (or (not= (:width initial) (:width current))
+                                                                 (not= (:height initial) (:height current)))
+                                                         (swap! size-changes conj {:level level
+                                                                                   :from initial
+                                                                                   :to current
+                                                                                   :element (.-tagName el)}))
+                                                       (recur (.-parentElement el) (inc level))))))
+                                               100)]
+
+                           ;; Check render counts
+                           (let [render-count (atom 0)]
+                             (.on cy-instance "render"
+                                  (fn []
+                                    (swap! render-count inc)))
+
+                             ;; After 2 seconds, report findings
+                             (js/setTimeout
+                              (fn []
+                                (js/clearInterval check-interval)
+                                (log! :info (str "Render count in 2 seconds: " @render-count))
+                                (log! :info (str "Size changes detected: " (count @size-changes)))
+                                (when (pos? (count @size-changes))
+                                  (doseq [change (take 5 @size-changes)]
+                                    (log! :info (str "Size change at level " (:level change)
+                                                     " (" (:element change) "): "
+                                                     "from " (:from change) " to " (:to change)))))
+
+                                ;; Check if there's a ResizeObserver or MutationObserver
+                                (log! :info (str "Window ResizeObserver: " (exists? js/ResizeObserver)))
+
+                                ;; Check Cytoscape autoungrabify or other settings
+                                (log! :info (str "Cytoscape autoungrabify: " (.autoungrabify cy-instance)))
+                                (log! :info (str "Cytoscape autolock: " (.autolock cy-instance)))
+                                (log! :info (str "Cytoscape zoom: " (.zoom cy-instance)))
+
+                                (.off cy-instance "render"))
+                              2000)))))
+                     100))))
               (catch js/Error e
                 (log! :info (str "Error creating ORM diagram: " e))))))
         500))
@@ -399,8 +516,32 @@
               (set-open true))
             (handle-close []
               (log! :info "handle-close called")
-              ;; Immediately destroy the instance before setting open to false
+              ;; Capture layout before destroying
               (when-let [cy-instance (:cy-instance @graph-state)]
+                (let [layout-data (capture-layout cy-instance)]
+                  (log! :info (str "Captured layout data: " (pr-str layout-data)))
+                  ;; Send layout data to server
+                  (when (and message-id layout-data)
+                    (let [{:keys [pid cid]} @common-info
+                          parsed-graph (:parsed-graph @graph-state)
+                          ;; Get the first inquiry-area-id from the ORM data
+                          inquiry-area-id (get-in parsed-graph [:inquiry-areas 0 :inquiry-area-id])
+                          ;; Update the parsed graph with the new layout (no double stringification)
+                          updated-graph (update-in parsed-graph [:inquiry-areas 0]
+                                                   assoc :layout layout-data)]
+                      (log! :info (str "Sending ORM layout for message " message-id
+                                       " in project " pid " conversation " cid
+                                       " inquiry-area: " inquiry-area-id))
+                      (ws/send-msg {:dispatch-key :save-orm-layout
+                                    :pid pid
+                                    :cid cid
+                                    :message-id message-id
+                                    :inquiry-area-id inquiry-area-id
+                                    :layout-data layout-data})
+                      ;; Update the local message data
+                      (when-let [update-fn (lookup-fn :update-msg-orm)]
+                        (log! :info "Updating local message with new layout")
+                        (update-fn message-id (str updated-graph))))))
                 (log! :info "Destroying Cytoscape instance on modal close")
                 (try
                   ;; Destroy the instance
@@ -432,24 +573,20 @@
            ($ Dialog {:open true
                       :onClose handle-close
                       :fullScreen true
-                      :maxWidth false
-                      ;; Prevent MUI Dialog from managing scroll
-                      :disableScrollLock true
-                      :PaperProps {:style {:overflow "hidden"}}}
-              ;; Remove the outer Box wrapper - render Cytoscape directly in Dialog
+                      :maxWidth false}
+              ;; Cytoscape container fills entire viewport
               ($ "div" {:ref cy-ref
-                        :style {:width "100vw"
-                                :height "100vh"
-                                :position "relative"
-                                :overflow "hidden" ; Prevent scrollbars
+                        :style {:width "100%"
+                                :height "100%"
+                                :position "absolute"
+                                :top 0
+                                :left 0
                                 :backgroundColor "#f8f9fa"}})
               ;; Close button overlaid on top
               ($ Box {:style {:position "absolute"
                               :top "20px"
                               :right "20px"
-                              :zIndex 9999
-                              ;; Ensure button doesn't affect layout
-                              :pointerEvents "auto"}}
+                              :zIndex 9999}}
                  ($ Button {:onClick handle-close
                             :variant "contained"
                             :color "error"
