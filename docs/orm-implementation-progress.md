@@ -210,15 +210,13 @@ The ORM diagram tool now correctly displays **authentic Object-Role Modeling dia
 - ✅ Each entity connects to its designated compartment in role boxes
 - ✅ Connections respect the consistent ordering in `:objects`, `:reference-modes`, `:deontic-keys`, `:uniqueness` arrays
 - ✅ Role boxes display proper compartment divisions with black borders
-- ✅ Uniqueness constraints show as black bars above compartments
+- ✅ Uniqueness constraints show as purple bars (purple denoting an alethic constraint) above compartments
 - ✅ All positioning is mathematically precise and semantically correct
-- ❌ **ToDo** Uniqueness constraints currently do not show (and when they do they should be purple, indicating an alethic constraint).
-- ❌ **ToDo**: Mandatory dots are not appearing on entity-side of mandatory connections
 - ✅ **FIXED BUG**: The 'canvas' on which the diagram is drawn grows continuously and may cause the Chrome browser to crash!
       This behavior was noticed because the scroll thumb (scroll handle) shrinks progressively. THIS could be the reason the diagrams do not remain displayed!
-      **ROOT CAUSE**: The issue was not canvas accumulation but improper Dialog layout. The dialog content wasn't filling the viewport correctly.
-      **SOLUTION**: Fixed Dialog layout using proper positioning. Removed complex flexbox layout and used simple absolute positioning for both Cytoscape container and close button.
-      **KEY LEARNING**: When UI elements don't appear, check z-index layering and avoid complex nested layouts. Simple positioning often works better.
+      **ROOT CAUSE**: Do not wrap the Cytoscape component in a MUI Box.
+      **SOLUTION**: Unnested the Cytoscape component from the Box (removed the Box).
+      **KEY LEARNING**: Be careful how you include a Cytoscape component in an MUI parent.
 - ✅ **NEW**: Role box labels are displayed above each role box
 - ✅ **NEW**: SVGs have white backgrounds and proper viewBox for correct rendering
 - ✅ **NEW**: Dialog stays open until explicitly closed
