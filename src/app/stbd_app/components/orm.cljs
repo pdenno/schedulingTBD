@@ -77,12 +77,17 @@
                             "width='" compartment-width "' height='" compartment-height "' "
                             "fill='white' stroke='black' stroke-width='1'/>"))
 
-        ;; Generate uniqueness bars - check if uniqueness pattern contains this index
-        uniqueness-bars (for [[idx _] (map-indexed vector uniqueness-pattern)
-                              :when (some #(= (str idx) %) (flatten uniqueness-pattern))]
+        ;; Generate uniqueness bars - purple bars for alethic constraints
+        ;; uniqueness-pattern is typically like [["u1" "u1" ""] ["" "u2" "u2"]]
+        ;; A bar appears over a compartment if any uniqueness constraint includes that position
+        uniqueness-bars (for [idx (range arity)
+                              :let [has-uniqueness (some (fn [constraint-row]
+                                                           (not (empty? (nth constraint-row idx ""))))
+                                                         uniqueness-pattern)]
+                              :when has-uniqueness]
                           (str "<rect x='" (+ (* idx compartment-width) 2) "' y='-" bar-height "' "
                                "width='" (- compartment-width 4) "' height='" bar-height "' "
-                               "fill='black'/>"))
+                               "fill='#9b59b6'/>")) ; Purple for alethic
 
         svg-content (str "<svg xmlns='http://www.w3.org/2000/svg' "
                          "width='" total-width "' height='" total-height "' "
@@ -294,7 +299,10 @@
                 (doseq [ft (:fact-types parsed-graph)]
                   (when (some #(= "must" %) (:mandatory? ft))
                     (log! :info (str "Fact type with mandatory: " (:fact-type-id ft)
-                                     " mandatory?: " (:mandatory? ft)))))
+                                     " mandatory?: " (:mandatory? ft))))
+                  (when (:uniqueness ft)
+                    (log! :info (str "Fact type with uniqueness: " (:fact-type-id ft)
+                                     " uniqueness: " (:uniqueness ft)))))
                 (let [elements (orm->cytoscape-elements parsed-graph)
                       cy-instance (cytoscape-lib
                                    (clj->js
