@@ -241,15 +241,12 @@
     (hooks/use-effect
      [open]
      (when (not open)
-       ;;(log! :info "Dialog closed (open = false)")
        ;; Ensure cleanup when dialog closes by any means
        (when-let [cy-instance (:cy-instance @graph-state)]
-         ;;(log! :info "Cleaning up after dialog close")
          (try
            (.destroy cy-instance)
            ;; Remove registration
            (when (.-removeRegistrationForInstance cytoscape-lib)
-             ;;(log! :info "Using removeRegistrationForInstance")
              (.removeRegistrationForInstance cytoscape-lib cy-instance))
            (catch js/Error e
              (log! :error (str "Error during effect cleanup:" e))))
@@ -257,221 +254,95 @@
            (set! (.-innerHTML container) ""))
          (reset! graph-state nil))
        ;; Check dimensions after close
-       (js/setTimeout
-        (fn []
-          #_(log! :info (str "After dialog close - Body scrollHeight: " (.-scrollHeight js/document.body)
-                           " scrollWidth: " (.-scrollWidth js/document.body)))
-          #_(log! :info (str "HTML element - scrollHeight: " (.-scrollHeight js/document.documentElement)
-                           " scrollWidth: " (.-scrollWidth js/document.documentElement)))
-          #_(log! :info (str "Window innerHeight: " js/window.innerHeight
-                           " innerWidth: " js/window.innerWidth))
-          #_(log! :info (str "Total canvases: "
-                           (.-length (.querySelectorAll js/document "canvas"))))
-          ;; Check if any MUI elements remain
-          #_(log! :info (str "MUI elements remaining: "
-                           "Dialogs: " (.-length (.querySelectorAll js/document ".MuiDialog-root"))
-                           " Backdrops: " (.-length (.querySelectorAll js/document ".MuiBackdrop-root"))
-                           " Modals: " (.-length (.querySelectorAll js/document ".MuiModal-root")))))
-        100)))
+       (js/setTimeout (fn []) 100)))
 
     (hooks/use-effect
      [open graph]
-     (log! :info (str "ORM useEffect: open=" open " graph=" (type graph) " ref=" (j/get cy-ref :current)))
      (when open
        (js/setTimeout
         (fn []
-          #_(log! :info (str "ORM setTimeout: ref=" (j/get cy-ref :current) " graph keys=" (when graph (keys (edn/read-string graph)))))
-          ;; Log viewport info BEFORE creating Cytoscape
-          #_(log! :info (str "BEFORE Cytoscape - Window innerHeight: " js/window.innerHeight
-                           " innerWidth: " js/window.innerWidth))
-          #_(log! :info (str "BEFORE - Body scrollHeight: " (.-scrollHeight js/document.body)
-                           " offsetHeight: " (.-offsetHeight js/document.body)))
           (when (and (j/get cy-ref :current) graph)
             (try
               ;; Destroy any existing Cytoscape instance before creating a new one
               (when-let [existing-cy (:cy-instance @graph-state)]
-                #_(log! :info "Destroying existing Cytoscape instance before creating new one")
                 (.destroy existing-cy)
                 (reset! graph-state nil))
-
               ;; Clear the container element to ensure no remnants
               (let [container (j/get cy-ref :current)]
-                (set! (.-innerHTML container) "")
-                ;; Log the number of canvas elements before creation
-                #_(log! :info (str "Canvas elements in container before creation: "
-                                 (.-length (.querySelectorAll container "canvas")))))
-
+                (set! (.-innerHTML container) ""))
               (let [parsed-graph (if (string? graph)
                                    (edn/read-string graph)
                                    graph)]
                 (log! :info (str "Creating ORM diagram for: " (:EADS-id parsed-graph)))
                 (swap! diag update :instance-count inc)
-                (log! :info (str "Instance count: " (:instance-count @diag)))
-                (let [elements (orm->cytoscape-elements parsed-graph)]
-                  (log! :info (str "ORM elements count: " (count elements)))
-                  (log! :info (str "ORM elements sample: " (take 2 elements)))
-                  (let [cy-instance (cytoscape-lib
-                                     (clj->js
-                                      {:container (j/get cy-ref :current)
-                                       :elements elements
-                                       :style (orm-stylesheet)
-                                       ;; Change to cose layout for better Y distribution
-                                       :layout {:name "cose"
-                                                :nodeRepulsion 4000 ; Reduced from 8000
-                                                :nodeOverlap 10 ; Reduced from 20
-                                                :idealEdgeLength 60 ; Reduced from 100
-                                                :edgeElasticity 100
-                                                :nestingFactor 5
-                                                :gravity 80
-                                                :numIter 1000
-                                                :initialTemp 200
-                                                :coolingFactor 0.95
-                                                :minTemp 1.0
-                                                :padding 30} ; Reduced from 50
-                                       :userZoomingEnabled true
-                                       :userPanningEnabled true
-                                       :minZoom 0.1
-                                       :maxZoom 10}))
-                        container (j/get cy-ref :current)]
-                    (log! :info (str "ORM Cytoscape instance created with " (count elements) " elements"))
-
-                    ;; Set viewport constraints
-                    (.on cy-instance "render"
-                         (fn []
-                           (let [extent (.extent cy-instance)
-                                 viewport-width (.-offsetWidth container)
-                                 viewport-height (.-offsetHeight container)]
-                             (when (or (> (.-w extent) (* viewport-width 10))
-                                       (> (.-h extent) (* viewport-height 10)))
-                               (.fit cy-instance)))))
+                (let [elements (orm->cytoscape-elements parsed-graph)
+                      cy-instance (cytoscape-lib
+                                   (clj->js
+                                    {:container (j/get cy-ref :current)
+                                     :elements elements
+                                     :style (orm-stylesheet)
+                                     ;; Use breadthfirst layout with no animation
+                                     :layout {:name "breadthfirst"
+                                              :animate false ; Disable animation
+                                              :animationDuration 0 ; Ensure no animation
+                                              :fit true
+                                              :directed false
+                                              :padding 50
+                                              :spacingFactor 1.5}
+                                     :userZoomingEnabled true
+                                     :userPanningEnabled true
+                                     :minZoom 0.1
+                                     :maxZoom 10}))
+                      container (j/get cy-ref :current)]
 
                     ;; Helper function to update anchor positions
-                    (letfn [(update-anchors-for-role-box [role-box]
-                              (let [role-id (.id role-box)
-                                    role-pos (.position role-box)
-                                    role-width (.data role-box "width")
-                                    role-height (.data role-box "height")
-                                    arity (.data role-box "arity")
-                                    anchor-nodes (.nodes cy-instance (str "[parent-role-box='" role-id "']"))]
-                                (doseq [anchor (.toArray anchor-nodes)]
-                                  (let [compartment-idx (.data anchor "compartment-index")
-                                        compartment-center-x (+ (.-x role-pos)
-                                                                (* role-width (- (/ (+ compartment-idx 0.5) arity) 0.5)))
-                                        object-id (.data anchor "object-id")
+                  (letfn [(update-anchors-for-role-box [role-box]
+                            (let [role-id (.id role-box)
+                                  role-pos (.position role-box)
+                                  role-width (.data role-box "width")
+                                  role-height (.data role-box "height")
+                                  arity (.data role-box "arity")
+                                  anchor-nodes (.nodes cy-instance (str "[parent-role-box='" role-id "']"))]
+                              (doseq [anchor (.toArray anchor-nodes)]
+                                (let [compartment-idx (.data anchor "compartment-index")
+                                      compartment-center-x (+ (.-x role-pos)
+                                                              (* role-width (- (/ (+ compartment-idx 0.5) arity) 0.5)))
+                                      object-id (.data anchor "object-id")
                                         ; Find the entity node to determine relative position
-                                        entity-node (.getElementById cy-instance object-id)
-                                        entity-y (when entity-node (.-y (.position entity-node)))
-                                        role-y (.-y role-pos)
+                                      entity-node (.getElementById cy-instance object-id)
+                                      entity-y (when entity-node (.-y (.position entity-node)))
+                                      role-y (.-y role-pos)
                                         ; Position at top edge if entity is above, bottom edge if below
-                                        anchor-y (if (and entity-y (< entity-y role-y))
-                                                   (- role-y (/ role-height 2)) ; Top edge
-                                                   (+ role-y (/ role-height 2)))] ; Bottom edge
-                                    (.position anchor #js {:x compartment-center-x :y anchor-y})))))]
+                                      anchor-y (if (and entity-y (< entity-y role-y))
+                                                 (- role-y (/ role-height 2)) ; Top edge
+                                                 (+ role-y (/ role-height 2)))] ; Bottom edge
+                                  (.position anchor #js {:x compartment-center-x :y anchor-y})))))]
 
-                      ;; Force fit and center the view after layout
-                      (js/setTimeout
-                       (fn []
-                         ;; Initial positioning of anchors
-                         (let [role-boxes (.nodes cy-instance "[type='role-box']")]
-                           (doseq [role-box (.toArray role-boxes)]
-                             (update-anchors-for-role-box role-box)))
+                      ;; Wait for layout to complete, then set up anchors
+                    (.on cy-instance "layoutstop"
+                         (fn []
+                             ;; Initial positioning of anchors
+                           (let [role-boxes (.nodes cy-instance "[type='role-box']")]
+                             (doseq [role-box (.toArray role-boxes)]
+                               (update-anchors-for-role-box role-box)))
+                           (log! :info "Initial anchor positioning complete")))
 
-                         ;; Bind drag event to role boxes to keep anchors synchronized
-                         (.on (.nodes cy-instance "[type='role-box']") "drag"
-                              (fn [evt]
-                                (let [dragged-node (.-target evt)]
-                                  (update-anchors-for-role-box dragged-node))))
+                      ;; Set up drag handlers immediately (not inside layoutstop)
+                      ;; Bind drag event to role boxes to keep anchors synchronized
+                    (.on (.nodes cy-instance "[type='role-box']") "drag"
+                         (fn [evt]
+                           (let [dragged-node (.-target evt)]
+                             (update-anchors-for-role-box dragged-node))))
 
-                         ;; Also update anchors when entities are dragged (to adjust top/bottom connection)
-                         (.on (.nodes cy-instance "[type='entity']") "drag"
-                              (fn [evt]
-                                ;; Update all role boxes since entity position affects anchor placement
-                                (let [role-boxes (.nodes cy-instance "[type='role-box']")]
-                                  (doseq [role-box (.toArray role-boxes)]
-                                    (update-anchors-for-role-box role-box)))))
+                      ;; Also update anchors when entities are dragged
+                    (.on (.nodes cy-instance "[type='entity']") "drag"
+                         (fn [evt]
+                             ;; Update all role boxes since entity position affects anchor placement
+                           (let [role-boxes (.nodes cy-instance "[type='role-box']")]
+                             (doseq [role-box (.toArray role-boxes)]
+                               (update-anchors-for-role-box role-box)))))
 
-                         (.fit cy-instance)
-                         (.center cy-instance)
-                         (log! :info "ORM diagram fitted to viewport"))
-                       200))
-                    (reset! graph-state {:cy-instance cy-instance :elements elements})
-                    ;; Debug: Check document body scroll dimensions
-                    (log! :info (str "After creation - Body scrollHeight: " (.-scrollHeight js/document.body)
-                                     " scrollWidth: " (.-scrollWidth js/document.body)))
-                    ;; Debug: Check what's causing the scroll
-                    (js/setTimeout
-                     (fn []
-                       (log! :info "=== Scroll Debug ===")
-                       (log! :info (str "document.body scrollHeight: " (.-scrollHeight js/document.body)
-                                        " offsetHeight: " (.-offsetHeight js/document.body)))
-                       (log! :info (str "document.documentElement scrollHeight: " (.-scrollHeight js/document.documentElement)
-                                        " offsetHeight: " (.-offsetHeight js/document.documentElement)))
-                       ;; Check scroll position
-                       (log! :info (str "Window scrollY: " js/window.scrollY " scrollX: " js/window.scrollX))
-                       ;; Check if body has any padding/margin
-                       (let [body-style (js/window.getComputedStyle js/document.body)]
-                         (log! :info (str "Body margin: " (.-margin body-style) " padding: " (.-padding body-style))))
-                       ;; Find the actual scrolling element
-                       (log! :info (str "document.scrollingElement: " js/document.scrollingElement))
-                       ;; Check if MUI Dialog is affecting things
-                       (when-let [dialog-container (.querySelector js/document ".MuiDialog-container")]
-                         (let [rect (.getBoundingClientRect dialog-container)]
-                           (log! :info (str "Dialog container dimensions: "))))
-                       ;; Check actual vs visual viewport
-                       (log! :info (str "visualViewport width: " (.-width js/visualViewport)
-                                        " height: " (.-height js/visualViewport)))
-                       ;; Check if there's a scale applied
-                       (log! :info (str "visualViewport scale: " (.-scale js/visualViewport)))
-                       ;; Check root element
-                       (let [root (.getElementById js/document "root")]
-                         (when root
-                           (let [root-rect (.getBoundingClientRect root)]
-                             (log! :info (str "Root element dimensions: "
-                                              "width: " (.-width root-rect) " height: " (.-height root-rect))))))
-                       ;; Check if dialog is visible
-                       (when-let [dialog (.querySelector js/document ".MuiDialog-root")]
-                         (let [dialog-paper (.querySelector dialog ".MuiDialog-paper")]
-                           (when dialog-paper
-                             (let [paper-style (js/window.getComputedStyle dialog-paper)]
-                               (log! :info (str "Dialog paper - height: " (.-height paper-style)
-                                                " max-height: " (.-maxHeight paper-style)
-                                                " overflow: " (.-overflow paper-style)))))))
-                       ;; Check if something is setting a min-height
-                       (log! :info (str "Body computed min-height: "
-                                        (.-minHeight (js/window.getComputedStyle js/document.body))))
-                       (log! :info (str "HTML computed min-height: "))
-                       ;; Check parent containers
-                       (let [current-el (j/get cy-ref :current)]
-                         (when current-el
-                           (log! :info "=== Parent chain dimensions ===")
-                           (loop [el current-el
-                                  level 0]
-                             (when (and el (< level 5))
-                               (let [rect (.getBoundingClientRect el)
-                                     computed (js/window.getComputedStyle el)]
-                                 (log! :info (str "Level " level " - " (.-tagName el)
-                                                  " class: " (.-className el)
-                                                  " height: " (.-height rect)
-                                                  " computed height: " (.-height computed)
-                                                  " overflow: " (.-overflow computed)))
-                                 (recur (.-parentElement el) (inc level)))))))
-                       ;; Check if any parent has a max-height
-                       (log! :info "=== Checking for height constraints ===")
-                       (let [all-parents (atom [])]
-                         (loop [el (j/get cy-ref :current)]
-                           (when el
-                             (swap! all-parents conj el)
-                             (recur (.-parentElement el))))
-                         (doseq [el @all-parents]
-                           (let [computed (js/window.getComputedStyle el)]
-                             (when (or (not= (.-maxHeight computed) "none")
-                                       (and (not= (.-height computed) "auto")
-                                            (not (.includes (.-height computed) "%"))))
-                               (log! :info (str "Height constraint found - " (.-tagName el)
-                                                " class: " (.-className el)
-                                                " height: " (.-height computed)
-                                                " max-height: " (.-maxHeight computed))))))))
-                     300)))) ; Wait a bit for layout to settle)))
+                    (reset! graph-state {:cy-instance cy-instance :elements elements}))))
               (catch js/Error e
                 (log! :info (str "Error creating ORM diagram: " e))))))
         500))
@@ -524,15 +395,6 @@
                   (set! (.-position (.-style container)) "")
                   (set! (.-overflow (.-style container)) ""))
                 (reset! graph-state nil))
-              ;; Debug: Check body dimensions after cleanup
-              (log! :info (str "After close - Body scrollHeight: " (.-scrollHeight js/document.body)
-                               " scrollWidth: " (.-scrollWidth js/document.body)))
-              ;; Check DOM elements
-              (log! :info (str "Total canvases: "
-                               (.-length (.querySelectorAll js/document "canvas"))))
-              (log! :info (str "MUI Dialogs: "
-                               (.-length (.querySelectorAll js/document ".MuiDialog-root"))))
-              ;; Only set open to false after cleanup is complete
               (set-open false)
               (log! :info "set-open false completed"))]
       ($ Box {:ref modal}
@@ -542,29 +404,30 @@
            ($ Dialog {:open true
                       :onClose handle-close
                       :fullScreen true
-                      :maxWidth false}
-              ($ Box {:style {:position "relative"
-                              :width "100%"
-                              :height "100vh"}} ; Outer container
-                 ;; Cytoscape container fills entire viewport
-                 ($ "div" {:ref cy-ref
-                           :style {:width "100%"
-                                   :height "100%"
-                                   :position "absolute"
-                                   :top 0
-                                   :left 0
-                                   :backgroundColor "#f8f9fa"}})
-                 ;; Close button overlaid on top
-                 ($ Box {:style {:position "absolute"
-                                 :top "20px"
-                                 :right "20px"
-                                 :zIndex 9999}}
-                    ($ Button {:onClick handle-close
-                               :variant "contained"
-                               :color "error"
-                               :size "large"
-                               :style {:backgroundColor "#f44336" ; Explicit red
-                                       :color "white"
-                                       :fontWeight "bold"
-                                       :boxShadow "0 4px 6px rgba(0,0,0,0.3)"}}
-                       "✕ CLOSE")))))))))
+                      :maxWidth false
+                      ;; Prevent MUI Dialog from managing scroll
+                      :disableScrollLock true
+                      :PaperProps {:style {:overflow "hidden"}}}
+              ;; Remove the outer Box wrapper - render Cytoscape directly in Dialog
+              ($ "div" {:ref cy-ref
+                        :style {:width "100vw"
+                                :height "100vh"
+                                :position "relative"
+                                :overflow "hidden" ; Prevent scrollbars
+                                :backgroundColor "#f8f9fa"}})
+              ;; Close button overlaid on top
+              ($ Box {:style {:position "absolute"
+                              :top "20px"
+                              :right "20px"
+                              :zIndex 9999
+                              ;; Ensure button doesn't affect layout
+                              :pointerEvents "auto"}}
+                 ($ Button {:onClick handle-close
+                            :variant "contained"
+                            :color "error"
+                            :size "large"
+                            :style {:backgroundColor "#f44336" ; Explicit red
+                                    :color "white"
+                                    :fontWeight "bold"
+                                    :boxShadow "0 4px 6px rgba(0,0,0,0.3)"}}
+                    "✕ CLOSE"))))))))

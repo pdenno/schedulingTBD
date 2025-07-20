@@ -214,7 +214,7 @@ The ORM diagram tool now correctly displays **authentic Object-Role Modeling dia
 - ✅ All positioning is mathematically precise and semantically correct
 - ❌ **ToDo** Uniqueness constraints currently do not show (and when they do they should be purple, indicating an alethic constraint).
 - ❌ **ToDo**: Mandatory dots are not appearing on entity-side of mandatory connections
-- ✅ **FIXED BUG**: The 'canvas' (?) on which the diagram is drawn grows continuously and may cause the Chrome browser to crash!
+- ✅ **FIXED BUG**: The 'canvas' on which the diagram is drawn grows continuously and may cause the Chrome browser to crash!
       This behavior was noticed because the scroll thumb (scroll handle) shrinks progressively. THIS could be the reason the diagrams do not remain displayed!
       **ROOT CAUSE**: The issue was not canvas accumulation but improper Dialog layout. The dialog content wasn't filling the viewport correctly.
       **SOLUTION**: Fixed Dialog layout using proper positioning. Removed complex flexbox layout and used simple absolute positioning for both Cytoscape container and close button.
