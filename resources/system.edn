@@ -1,5 +1,6 @@
-{:dev {:server/http {:port 3300 :host "0.0.0.0"}
-       :handler/ring {:api-path "/api"
+{:server/http {:port {:nrepl 3301 :dev 3300 :prod 3300 :test 3300} ; The keys I am using here correspond to -M. (For example, you started with 'clojure -M:dev'...)
+               :host "0.0.0.0"} ; These are used in core/start-server, at least.
+ :dev {:handler/ring {:api-path "/api" ; This is used in web/handler.clj at least.
                       :cookie-secret "FQVUNCJMVERCFICT" ; Exactly 16 bytes
                       ;; from ring.middleware.defaults. anti-forgery `false` by default because services may not require it
                       :site-defaults-config {:params {:urlencoded true

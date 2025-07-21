@@ -1,0 +1,23 @@
+{
+  "message-type" : "EADS-INSTRUCTIONS",
+  "interview-objective" : "This is typically the EADS to use directly after 'process/warm-up-with-challenges';\nit continues to discover the basic characteristics of the interviewees' scheduling problem.\nMore specifically, the objective of this interview segment is to \n   1) classify the principal method of scheduling that is most appropriate for the work they do, and\n   2) make some basic observations about ancillary aspects of scheduling.\n",
+  "EADS" : {
+    "EADS-id" : "process/scheduling-problem-type",
+    "principal-problem-type" : {
+      "val" : "FLOW-SHOP-SCHEDULING-PROBLEM",
+      "comment" : "The value here should be the problem-type that best characterizes the problem and production system architecture.\nIf the industrial domain is well-known, use your background knowledge to help make this choice.\nThe  value you provide here must be one of the following:\n\n   1) FLOW-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where all jobs execute the same tasks in the same order, excepting possibly skipping some tasks in that order for certain product types.\n      Choose flow shop whenever the process suggests that production resources are laid out to facilitate movement to the next resource.\n      This is a very common arrangment in production.\n   2) TIMETABLING-PROBLEM: the problem of assigning collections of resources to event time slots, ensuring that all the resources required for each event are available in its time slot.\n   3) PROJECT-SCHEDULING-PROBLEM:  the problem of defining start and finish dates to all activities, deliverables, and milestones within an undertaking.\n   4) JOB-SHOP-SCHEDULING-PROBLEM: the problem of scheduling jobs where the order in which the jobs visit machines or workstations may vary as determined by the job type.\n   5) SINGLE-MACHINE-SCHEDULING-PROBLEM: the problem of choosing the sequence by which each of several jobs use the same resource or set of resources."
+    },
+    "problem-components" : {
+      "val" : [ "FLOW-SHOP-SCHEDULING-PROBLEM", "JOB-SHOP-SCHEDULING-PROBLEM" ],
+      "comment" : "This should be a list of problem-type values that include all the problem types that seem relevant given your conversation so far.\nFor example, whereas in this example the principal-problem-type is a flow-shop, conversation suggests that work might queue for a task the presents a timetabling problem."
+    },
+    "continuous?" : {
+      "val" : false,
+      "comment" : "continuous? refers to whether or not, in the principle-problem-type, product flows continuously from one process to the next, as it does in, for example, production of many petroleum products.\nThis might be apparent from the answers that determined the value of problem-type. If not, then you can ask."
+    },
+    "cyclical?" : {
+      "val" : false,
+      "comment" : "cyclical? refers to whether or not they seek a system that creates schedules that can be repeated in a pattern.\nFor example, if the made the same collection of products in the same order each week, cylical? would be true."
+    }
+  }
+}

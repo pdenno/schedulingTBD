@@ -22,6 +22,12 @@ We plan to test hundreds of such domain expert surrogates before enabling simila
 The software is being developed as part of the NIST project [Human/AI Teaming for Manufacturing Digital Twins](https://www.nist.gov/programs-projects/humanmachine-teaming-manufacturing-digital-twins).
 Feel free to contact us if this work interests you!
 
+## Orientation Files
+For developers and contributors, we provide several orientation documents:
+* [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) - High-level project overview and key concepts
+* [CLAUDE.md](CLAUDE.md) - Instructions and context for AI assistance with this project
+* [LLM_CODE_STYLE.md](LLM_CODE_STYLE.md) - Coding standards and style guidelines for LLM-assisted development
+
 ## Building/Running (development mode)
    These instructions have not been thoroughly tested and are likely not complete. If you have problems, write an issue or email us (see the NIST project page above).
 

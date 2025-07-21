@@ -12,7 +12,6 @@
    [hickory.core            :as hick] ; There might be easier ways, but I'd like to learn this tool.
    [mount.core              :as mount :refer [defstate]]
    [promesa.core            :as p]
-   [scheduling-tbd.db       :as proj-db]
    [scheduling-tbd.llm      :as llm]
    [scheduling-tbd.sutil    :as sutil :refer [connect-atm db-cfg-map]]
    [taoensso.telemere.timbre       :as log]))

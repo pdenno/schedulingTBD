@@ -1,0 +1,175 @@
+{
+  "message-type" : "EADS-INSTRUCTIONS",
+  "budget-decrement" : 0.15,
+  "interviewer-agent" : "process",
+  "interview-objective" : "Whereas most other EADS-INSTRUCTIONS in the process interview focus on characterizing the processes by which the interviewees' enterprise produces product or delivers a service,\nprocess/timetabling does not. Timetabling is about assigning limited resources, such as classrooms, teachers, or machinery, to events types that will occur in timeslots.\nTimetabling interviews are about characterizing the constituents (role players), event types, and timeslots (ts), not how enterprise makes product or delivers a service.\nA timetabling discussion mediated by these EADS-INSTRUCTIONS might be tackling the interviewees principal scheduling problem, or the problem of some subprocess of it.\nFor example, you might have pursued the process/flow-shop EADS, and learned that a particular subprocess in the flow uses timetabling.\n\nThe specifics of timetablings problems can vary widely depending on the enterprises's goals and circumstances.\nFor example, in some cases, the time at which the event occurs can be chosen in light of opportunity.\nFor example, one could timetable the use of a heat-treat oven based on having available a sufficient number of parts needing the same heat treat process.\nLikewise one might timetable equipment maintenance opportunistically.\nAnother opportunistic timetabling problem might involve perishable raw materials, such as food ingredients.\nMany timetabling problems are not opportunistic, scheduling classes in a university, for example.\n\nThere are three kinds of event types in our formulation of timetabling:\n    (1) regularly scheduled: they have property named 'periodicity',\n    (2) one-time: their 'occurrence-assignment' property defines when they occur using a date, and,\n    (3) opportunistic: their 'occurrence-assignment' property defines 'opportunistic? = true' and conditions (possibly including periodicity) in which they occur.\n\nYou can think of the information you are trying to capture in the interview as including descriptions of\n   (1) a Cartesian product of constituents needed for the event type to occur,\n   (2) rules for what constituents can, must, or must not occur together in instances of the Cartesian product, and\n   (3) how instances of the Cartesian product can be assigned to timeslots.\n\nBe careful in how you define the quantity properties of event-constituent (event-consituent.quantity). These are not about how many of the constituant-type the inteviewees have.\nThe Resource Interviewer is responsible for making that determination, not you.\nInstead, event-constituent.quantity is about how many of the constituent-type might take part in the event. That quantity might signify the capacity of another constituent of the event type.\nFor example, if a lecture room has capacity for 30 students. The event-constituent.quantity of students could be up to 30, but there is only one lecture room involved in the event type.\n\nYou have a choice as to how you communicate back to us in DATA-STRUCTURE-REFINEMENT (DSR) messages: you can accummulate information from interviewing about 'event-types' and 'timeslots'\ninto a single structure, such as shown in the EADS example below.\nAlternatively -- because we have code to combine the several DSRs you return in response to INTERVIEWEES-RESPOND -- you can send back just what you learned from the last few questions.\nIn this arrangement you would minimally be returning an object for which we can navigate event-types.event-type-id or timeslots.ts-type-id and what you provide will overwrite any\nexisting event-type object or timeslot-type object with that identifier.The challenge remains, however, that most event-type's occurrence-assignments refer to a timeslot's ts-type-id.\n",
+  "EADS" : {
+    "EADS-id" : "process/timetabling",
+    "event-types" : {
+      "comment" : "The event-types property is a list of objects that capture\n   *  'event-constituents'        : a Cartesian product of constituents in the sense described in the interview objectives, and\n   *  'periodicity'            : (optional) the interval and number of instances in which periodic events of this event type occur.\n   *  'occurrence-assignment'  : a reference to the timeslots in which this event type are allowed to occur. These are typically references to timeslots by means of 'ts-type-id'.\n                                 but they can also be specific dates, e.g. '2025-03-06'.This example is about timetabling classes at a community college for one semester.",
+      "val" : [ {
+        "event-type-id" : {
+          "val" : "lecture-class-30-90min-type",
+          "comment" : "Note that we used the suffix '-type' in the name to emphasize that this defines the general form for instances of this class, not an instance occurrence.\nExample lecture-class-types include chemistry lectures and physics lectures.\nYou, the interviewer, decided on this naming convention in light of the conversation you had with interviewees."
+        },
+        "event-constituents" : {
+          "comment" : "These are the elements of the Cartesian product. When no quantity is specified, we assume exactly one is required.",
+          "val" : [ {
+            "constituent-type" : {
+              "val" : "room-type-30",
+              "comment" : "Note the -30 suffix here is because (as shown below) the room should have capacity for 30 people and the event is '-30-90min-type'.\nSimilar to 'event-type-id', you devised this naming convention.\nThe meaning of room-type-30 will be made clear in the constituents interview, not here."
+            },
+            "base-type" : {
+              "val" : "place",
+              "comment" : "Possible values for this property are 'human', 'place', and 'equipment'."
+            }
+          }, {
+            "constituent-type" : "student-type",
+            "base-type" : "human",
+            "quantity" : {
+              "units" : "person",
+              "value-string" : "30",
+              "modifier" : "up to"
+            }
+          }, {
+            "constituent-type" : "chalk-board",
+            "base-type" : "equipment"
+          }, {
+            "constituent-type" : "instructor-type",
+            "base-type" : "human"
+          } ]
+        },
+        "periodicity" : {
+          "val" : {
+            "interval" : {
+              "units" : "week",
+              "value-string" : "1"
+            },
+            "occurrences" : {
+              "value-string" : "2"
+            }
+          },
+          "comment" : "This periodicity object describes the event type as (being periodic and) having two occurrence per week.\nFor example, in this case, the interviewees suggested that many courses are taught as two 90-minute lectures per week."
+        },
+        "occurrence-assignment" : {
+          "val" : [ "Tu-Th-90min" ],
+          "comment" : "The values here are typically references to timeslots by means of their 'ts-type-id'."
+        }
+      }, {
+        "event-type-id" : "lecture-class-30-60min-type",
+        "event-constituents" : [ {
+          "constituent-type" : "room-type-30",
+          "base-type" : "place"
+        }, {
+          "constituent-type" : "student-type",
+          "base-type" : "human"
+        }, {
+          "constituent-type" : "instructor-type",
+          "base-type" : "human"
+        } ],
+        "periodicity" : {
+          "interval" : {
+            "units" : "week",
+            "value-string" : "1"
+          },
+          "occurrences" : {
+            "value-string" : "3"
+          }
+        },
+        "occurrence-assignment" : [ "Mon-Wed-Fri-60min" ]
+      }, {
+        "event-type-id" : "chem-lab-class",
+        "event-constituents" : {
+          "val" : [ {
+            "constituent-type" : "room-type-chem-lab",
+            "base-type" : "place"
+          }, {
+            "constituent-type" : "fume hood",
+            "base-type" : "equipment",
+            "quantity" : {
+              "value-string" : "10",
+              "units" : "instances"
+            }
+          }, {
+            "constituent-type" : "student-type",
+            "base-type" : "human"
+          }, {
+            "constituent-type" : "student-type",
+            "base-type" : "human"
+          }, {
+            "constituent-type" : "lab-assistant-type",
+            "base-type" : "human",
+            "quantity" : {
+              "units" : "person",
+              "value-string" : "2"
+            }
+          } ],
+          "comment" : "There is certainly more equipment required in a chemistry lab than just 'fume hood', but that constituent alone should be sufficient\nto distinguish chemistry lab events from other kinds of other class events."
+        },
+        "periodicity" : {
+          "interval" : {
+            "units" : "week",
+            "value-string" : "1"
+          },
+          "occurrences" : {
+            "value-string" : "1"
+          }
+        },
+        "occurrence-assignment" : [ "Three-hour-lab" ]
+      }, {
+        "event-type-id" : {
+          "val" : "instructor-break",
+          "comment" : "This is an example of an opportunistic event with periodicity."
+        },
+        "opportunistic?" : true,
+        "event-constituents" : [ {
+          "constituent-type" : "instructor-type",
+          "base-type" : "human"
+        } ],
+        "periodicity" : {
+          "interval" : {
+            "units" : "day",
+            "value-string" : "1"
+          },
+          "occurrences" : {
+            "value-string" : "1"
+          }
+        },
+        "occurrence-assignment" : [ "Mon-Wed-Fri-60min", "Tu-Th-90min", "Three-hour-lab" ]
+      }, {
+        "event-type-id" : {
+          "val" : "spring-break",
+          "comment" : "This is an example of a one-time event. It has no 'event-constituents'; in this sense, it is a non-event!"
+        },
+        "event-constituents" : {
+          "val" : "none",
+          "comment" : "By the end of your interview, all event type objects should have 'event-type-id', 'event-constituents', 'periodicity', and\n'occurrence-assignment'. Spring break does not require any constituents, so we'll just say 'none' here."
+        },
+        "occurrence-assignment" : {
+          "val" : [ "2025-03-17", "2025-03-18", "2025-03-19", "2025-03-20", "2025-03-21" ],
+          "comment" : "Instead of reference to a timeslot.ts-type-id, we put dates here."
+        },
+        "periodicity" : {
+          "val" : "none",
+          "comment" : "By the end of your interview, all event type objects should have 'event-type-id', 'event-constituents', 'periodicity', and\n'occurrence-assignment'. Since in the context of one semester, spring break only occurs once, we'll just say 'none' here.\nBy the way, we make things mandatory and allow 'none' so that we can check the data structure for completeness more thoroughly."
+        }
+      } ]
+    },
+    "timeslots" : [ {
+      "ts-type-id" : "Mon-Wed-Fri-60min",
+      "availability" : [ "Monday", "Wednesday", "Friday" ],
+      "periods" : [ "9:00-9:50", "10:00-10:50", "11:00-11:50", "13:00-13:50", "14:00-14:50", "15:00-15:50", "16:00-16:50" ]
+    }, {
+      "ts-type-id" : "Tu-Th-90min",
+      "availability" : [ "Tuesday", "Thursday" ],
+      "periods" : {
+        "val" : [ "9:00-10:20", "10:30-11:50", "13:00-14:20", "14:30-15:50", "16:00-17:20" ],
+        "comment" : "We asked the interviewees about the regularity of class events and came up with this formulation.\nNote that our '90 minute' periods actually run 80 minutes to give people time to get to their next class, etc.\n"
+      }
+    }, {
+      "ts-type-id" : "Three-hour-lab",
+      "availability" : [ "Monday", "Tuesday", "Wednesday", "Thursday", "Friday" ],
+      "periods" : [ "9:00-11:50", "13:00-15:50" ]
+    } ]
+  }
+}

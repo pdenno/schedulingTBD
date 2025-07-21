@@ -3,18 +3,22 @@
   (:require
    [ajax.core :refer [GET]] ; for testing
    [clojure.edn     :as edn]
+   [clojure.java.basis]
    [clojure.java.io :as io]
    [clojure.string]
    [mount.core :as mount :refer [defstate]]
    [ring.adapter.jetty :as jetty]
    [scheduling-tbd.db   :refer [sys&proj-database-cfgs]]              ; for mount
    [scheduling-tbd.how-made :refer [him-cfg]]                         ; for mount
-   [scheduling-tbd.interviewing.interviewers]                         ; for mount
+   [scheduling-tbd.iviewr.interviewers :refer [iviewrs]]        ; for mount
    [scheduling-tbd.surrogate :refer [surrogates]]                     ; for mount
+   [scheduling-tbd.system-agents :refer [system-agents]]              ; for mount
    [scheduling-tbd.web.handler :refer [app]]                          ; for mount
    [scheduling-tbd.web.websockets :refer [wsock]]                     ; for mount
    [taoensso.telemere  :refer [log!]])
   #_(:gen-class))
+
+[sys&proj-database-cfgs him-cfg iviewrs surrogates system-agents app wsock] ; for mount
 
 ;;; Here are some naming conventions we try to use throughout the server and app code.
 ;;;   pid - a project id (keyword)
@@ -50,10 +54,11 @@
       (log! :error (str "server failed to start on port: " port)))))
 
 ;;; There's a lot to learn here about the server abstraction; it is explained here: https://github.com/ring-clojure/ring/wiki
-(defn start-server [& {:keys [profile] :or {profile :dev}}]
-  (let [base-config (-> "system.edn" io/resource slurp edn/read-string profile)
-        port (-> base-config :server/http :port)
-        host (-> base-config :server/http :host)]
+(defn start-server []
+  (let [env-option (->> (clojure.java.basis/initial-basis) :basis-config :aliases (some #(when (#{:dev :prod :test :nrepl} %) %)))
+        config (-> "system.edn" io/resource slurp edn/read-string)
+        port (-> config :server/http :port env-option)
+        host (-> config :server/http :host)]
     (try (let [server (jetty/run-jetty #'scheduling-tbd.web.handler/app {:port port, :join? false})]
            (reset! system server)
            ;(test-server port)

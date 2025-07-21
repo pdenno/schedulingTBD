@@ -1,0 +1,184 @@
+{
+  "message-type" : "EADS-INSTRUCTIONS",
+  "budget-decrement" : 0.1,
+  "interviewer-agent" : "process",
+  "interview-objective" : "This EADS assumes the interviewees' production processes are organized as a flow shop.\nUse this EADS to learn about the interviewees' production processes, their interrelation, inputs, outputs, and duration.\nWe use the information you gather to create functional flow block (FFB) diagrams of their processes that interviewees can review.\nWe might learn through further discussion that they actually don't want to develop a scheduling system to schedule the flow-shop\nFor example, they might have in mind scheduling machine maintenance, not production.\nThis fact would not prevent us from pursuing knowledge of how the make product or deliver the service that is revealed through this interview.\nKnowledge of the processes might prove useful later.\nUnlike many EADS where we accumulate results from your DATA-STRUCTURE-REFINEMENT messages, we'd like you to do that; grow the DSR with each question.",
+  "EADS" : {
+    "EADS-id" : "process/flow-shop",
+    "exhausted?" : {
+      "val" : true,
+      "comment" : "When you think you have all the key processes documented, including their 'inputs' 'outputs' 'resources' and 'durations', set this to true.\nThe EADS example here is complete in that sense, so we set it to true.\nYou don't need to include this until you are ready to set it to true."
+    },
+    "process-id" : {
+      "val" : "pencil-manufacturing",
+      "comment" : "This is the top-level process. You can name it as you see fit; don't ask the interviewees."
+    },
+    "inputs" : {
+      "val" : [ "graphite", "clay", "water", "cedar wood", "metal", "eraser material", "paint" ],
+      "comment" : "These are all the raw materials used to make the product. It is a collection of all the raw materials in subprocesses."
+    },
+    "outputs" : {
+      "val" : [ {
+        "item-id" : "finished pencils",
+        "quantity" : {
+          "units" : "finished pencils",
+          "value-string" : "100000"
+        }
+      } ],
+      "comment" : "inputs and outputs can either be simple strings like we used above, 'graphite', clay..., or objects like this, with an 'item-id' and 'quantity'.\nUse disgression (mindful of the questioning budget) about where you ask for quantities. Start simple and pursue details were the budget allows."
+    },
+    "resources" : {
+      "val" : [ "extruder", "kiln", "milling machine", "glue applicator", "shaping machine" ],
+      "comment" : "Resources, unlike inputs, are durable and reusable. Do not ask about quantities of resources; that's a conversation for another interviewer."
+    },
+    "duration" : {
+      "val" : {
+        "units" : "hours",
+        "value-string" : "4"
+      },
+      "comment" : "We use a string for 'value-string' in case interviewees answer it something like 'it varies'"
+    },
+    "subprocesses" : [ {
+      "process-id" : "graphite-core-production",
+      "inputs" : [ "graphite", "clay", "water" ],
+      "outputs" : [ {
+        "item-id" : "finished graphite rods",
+        "quantity" : {
+          "units" : "graphite cores",
+          "value-string" : "100000"
+        }
+      } ],
+      "resources" : [ "mixer", "extruder", "kiln" ],
+      "subprocesses" : [ {
+        "process-id" : "mix-graphite-and-clay",
+        "inputs" : [ "graphite", "clay", "water" ],
+        "outputs" : [ {
+          "item-id" : "graphite clay paste",
+          "quantity" : {
+            "units" : "liters",
+            "value-string" : "100"
+          }
+        } ],
+        "resources" : [ "mixer" ],
+        "duration" : {
+          "units" : "hours",
+          "value-string" : "1"
+        },
+        "subprocesses" : {
+          "val" : [ ],
+          "comment" : "We use empty array val values to signify that we don't think there are any interesting subprocess from the standpoint of scheduling.\nOf course, this could be updated later if subsequent discussion suggests we are wrong."
+        }
+      }, {
+        "process-id" : "extrude-core",
+        "inputs" : [ "graphite clay paste" ],
+        "outputs" : [ {
+          "item-id" : "extruded graphite rods",
+          "quantity" : {
+            "units" : "extruded graphite core",
+            "value-string" : "100000"
+          }
+        } ],
+        "resources" : [ "extruder" ],
+        "duration" : {
+          "units" : "minutes",
+          "value-string" : "20"
+        },
+        "subprocesses" : [ ]
+      }, {
+        "process-id" : "dry-and-bake-core",
+        "inputs" : [ "extruded graphite rods" ],
+        "outputs" : [ {
+          "item-id" : "finished graphite rods",
+          "quantity" : {
+            "units" : "extruded graphite core",
+            "value-string" : "100000"
+          }
+        } ],
+        "resources" : [ "kiln" ],
+        "duration" : {
+          "units" : "hours",
+          "value-string" : "2"
+        },
+        "subprocesses" : [ ]
+      } ]
+    }, {
+      "process-id" : "wood-casing-production",
+      "inputs" : [ "cedar wood" ],
+      "outputs" : [ "wood slats with grooves" ],
+      "resources" : [ "milling machine" ],
+      "subprocess-flow" : {
+        "val" : "individuals-from-batch",
+        "comment" : "The string 'individuals-from-batch' means that it isn't necessary to wait for all the slats to be created;\nyou can start 'cut-grooves-in-slats' as soon as the first slat is available."
+      },
+      "duration" : {
+        "val" : {
+          "units" : "hours",
+          "value-string" : "2"
+        },
+        "comment" : "Because 'individuals-from-batch', this process's duration is (roughly speaking) the same as maximum of the two subprocesses."
+      },
+      "subprocesses" : [ {
+        "process-id" : "mill-wood-slats",
+        "inputs" : [ "cedar wood" ],
+        "outputs" : [ "milled wood slats" ],
+        "resources" : [ "milling machine" ],
+        "duration" : {
+          "units" : "hours",
+          "value-string" : "2"
+        },
+        "subprocess-flow" : {
+          "val" : "individuals-from-batch",
+          "comment" : "'subprocess-flow' is about whether a batch must move through production steps as a batch or, alternatively, individuals from the batch can move.\nThe string value 'individuals-from-batch' here means that it isn't necessary to wait for all the slats to be created, the process 'cut-grooves-in-slats'\ncan start as soon as the first slat is available."
+        },
+        "subprocesses" : [ ]
+      }, {
+        "process-id" : "cut-grooves-in-slats",
+        "inputs" : [ "milled wood slats" ],
+        "outputs" : [ "wood slats with grooves" ],
+        "resources" : [ "groove cutter" ],
+        "duration" : {
+          "units" : "hours",
+          "value-string" : "2"
+        },
+        "subprocesses" : [ ]
+      } ]
+    }, {
+      "process-id" : "assemble",
+      "inputs" : {
+        "val" : [ {
+          "item-id" : "finished graphite rods",
+          "from" : "graphite-core-production"
+        }, {
+          "item-id" : "wood slats with grooves",
+          "from" : "wood-casing-production"
+        }, "metal", "erasers", "paint" ],
+        "comment" : "The 'from' property names a process that must occur before a process that uses it as an input (e.g. this 'assembly' process).\nThe 'from' property is essential to understanding process ordering and potential for concurrency."
+      },
+      "outputs" : [ "finished pencil" ],
+      "resources" : [ "glue applicator", "shaping machine" ],
+      "subprocesses" : [ {
+        "process-id" : "insert-core-into-slats",
+        "inputs" : [ "graphite core", "wood slats with grooves" ],
+        "outputs" : [ "pencil blanks" ],
+        "resources" : [ "glue applicator" ],
+        "subprocesses" : [ ]
+      }, {
+        "process-id" : "shape-and-paint-pencil",
+        "inputs" : [ "pencil blanks", "paint" ],
+        "outputs" : [ "shaped and painted pencils" ],
+        "resources" : [ "shaping machine", "painting station" ],
+        "subprocesses" : [ ]
+      }, {
+        "process-id" : "attach-eraser",
+        "optional?" : {
+          "val" : true,
+          "comment" : "'optional?' means that the process does not occur for every product. Not every pencil has an eraser."
+        },
+        "inputs" : [ "shaped and painted pencils", "metal", "erasers" ],
+        "outputs" : [ "finished pencils" ],
+        "resources" : [ "crimping tool" ],
+        "subprocesses" : [ ]
+      } ]
+    } ]
+  }
+}

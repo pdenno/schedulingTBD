@@ -2,8 +2,9 @@
   (:require
    [clojure.edn              :as edn]
    [clojure.java.io          :as io]
-   [ring.util.http-response  :as http]
+   [datahike.api             :as d]
    [mount.core               :as mount :refer [defstate]]
+   [ring.util.http-response  :as http]
    [scheduling-tbd.db        :as db]
    [scheduling-tbd.sutil     :as sutil :refer [connect-atm resolve-db-id]]
    [taoensso.telemere        :refer[log!]])
@@ -13,34 +14,41 @@
 (def ^:diag diag (atom {}))
 
 ;;; (resp/get-conversation {:query-params {:project-id "sur-craft-beer"}})
-
 (defn get-conversation
   "Return a sorted vector of the messages of the argument project or current project if not specified.
-   get-conversation always returns the conversation corresponding to :project/current-converation in the project's DB.
+   get-conversation always returns the conversation corresponding to :project/active-conversation in the project's DB.
    Example usage (get-conversation {:query-params {:project-id :craft-beer-brewery-scheduling}}).
-   Note that this can CHANGE :project/current-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
+   Note that this can CHANGE :project/active-conversation. Note also that we don't send the CID." ; Is not sending the CID okay?
   [request]
-  (let [{:keys [project-id cid client-id]}  (-> request :query-params (update-keys keyword))
-        pid (keyword project-id)
-        cid (if cid (keyword cid) (db/get-current-cid pid))]
-    (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
-    (let [eid (db/project-exists? pid)
-          pname (db/get-project-name pid)
-          msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) []) ; ToDo: Trim some of conversation?
-          code (if eid (db/get-code pid) "")]
-      (http/ok {:project-id pid :project-name pname :conv msgs :cid cid :code code}))))
+  (try
+    (let [{:keys [project-id cid client-id]}  (-> request :query-params (update-keys keyword))
+          pid (keyword project-id)
+          cid (if cid (keyword cid) (db/get-active-cid pid))
+          eid (d/q '[:find ?eid . :where [?eid :project/id]] @(connect-atm pid))]
+      (assert (#{:process :data :resources :optimality} cid))
+      (d/transact (connect-atm pid) {:tx-data [{:db/id eid :project/active-conversation cid}]})
+      (log! :debug (str "get-conversation (1): pid = " pid " cid = " cid " client-id = " client-id))
+      (let [eid (db/project-exists? pid)
+            pname (db/get-project-name pid)
+            msgs (if eid (-> (db/get-conversation pid cid) :conversation/messages) [])] ; ToDo: Trim some of conversation?
+        (http/ok {:project-id pid :project-name pname :conv msgs :cid cid})))
+    (catch Exception e
+      (log! (str "Get conversation:" e)))))
 
 (defn list-projects
     "Return a map containing :current-project, :cid, and :others, which is a sorted list of every other project in the system DB.
      Note that the server doesn't have a notion of current-project. (How could it?) Thus current conversation is out the window too."
   [_request]
   (letfn [(resolve-proj-info [pid]
-            (resolve-db-id {:db/id (db/project-exists? pid)}
-                           (connect-atm pid)
-                           :keep-set #{:project/name :project/id :project/surrogate?}))]
-    (let [proj-infos (mapv resolve-proj-info (db/list-projects))
+            (when-let [eid (db/project-exists? pid)]
+              (resolve-db-id {:db/id eid}
+                             (connect-atm pid)
+                             :keep-set #{:project/name :project/id :project/surrogate?})))]
+    (let [proj-infos (->> (db/list-projects)
+                          (mapv resolve-proj-info)
+                          (remove nil?))
           {:project/keys [id] :as current} (db/default-project)
-          cid (or (db/get-current-cid id) :process)
+          cid (or (db/get-active-cid id) :process)
           others (filterv #(not= % current) proj-infos)]
       (http/ok
        (cond-> {:current-project current, :cid cid}

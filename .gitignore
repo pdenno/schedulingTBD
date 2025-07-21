@@ -27,6 +27,8 @@ pom.xml.asc
 .lsp/.cache
 resources/js
 public/js
+js
+clj
 
 node_modules/
 .shadow-cljs/

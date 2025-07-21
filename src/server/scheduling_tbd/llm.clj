@@ -10,6 +10,7 @@
    [clojure.spec.alpha           :as s]
    [scheduling-tbd.sutil         :as sutil :refer [api-credentials default-llm-provider markdown2html]]
    [scheduling-tbd.util          :refer [now]]
+   [scheduling-tbd.specs         :as specs]
    [scheduling-tbd.web.websockets :as ws]
    [mount.core                   :as mount :refer [defstate]]
    [taoensso.telemere            :as tel :refer [log!]]
@@ -22,10 +23,11 @@
   (atom {}))
 
 (def preferred-llms
-  "These names (keywords) are the models we use, and the models we've been using lately."
+  "The outer map keys are llm-provider values, The values of inner map keys (:gpt :analysis, :planning, etc.) are the models we use."
   {:openai {:gpt         "gpt-4o-2024-11-20" ; "gpt-4o-2024-08-06"
             :analysis    "o1-preview"
             :mini        "o3-mini-2025-01-31"}
+   :meta   {:gpt         "Llama-4-Maverick-17B-128E-Instruct-FP8"}
    :azure  {:gpt         "mygpt-4"}}) ; "mygpt-4o" "mygpt4-32k"
 
 (defn pick-llm
@@ -65,7 +67,7 @@
   "User can ask anything outside of session by starting the text with 'LLM:.
    This is a blocking call since the caller is a websocket thread and it responds with ws/send-to-client."
   [{:keys [client-id question]}]
-  (assert (string? client-id))
+  (s/assert ::specs/client-id client-id)
   (assert (string? question))
   (log! :info (str "llm-directly: " question))
   (let [chat-args {:client-id client-id :dispatch-key :iviewr-says :promise? false}]
@@ -123,11 +125,18 @@
   []
   (swap! llms-used #(assoc % :azure {:gpt-3.5 "mygpt-35" :gpt "mygpt-4"})))
 
+;;; ToDo: I need to review the rationale for this vs. llm/preferred-llms.
+(defn select-llm-models-meta
+  "Since in Azure you have to create the model, this is just hard-coded."
+  []
+  (swap! llms-used #(assoc % :meta {:gpt "Llama-4-Maverick-17B-128E-Instruct-FP8"})))
+
 (defn select-llm-models!
   "Set the open-ai-models atom to models in each class"
   []
   (select-llm-models-openai)
-  (select-llm-models-azure))
+  (select-llm-models-azure)
+  (select-llm-models-meta))
 
 ;;;------------------------------------- assistants and threads  -------------------------------------------
 (s/def ::name string?)
@@ -264,19 +273,6 @@
     (log! :info (str "Deleting assistant " (:name a) (:id a)))
     (delete-assistant! (:id a) {:llm-provider llm-provider})))
 
-;;; (ws/register-ws-dispatch  :run-long llm/run-long)
-(defn ^:diag run-long
-  "Diagnostic for exploring threading/blocking with websocket."
-  [& _]
-  (loop [cnt 0]
-    (log! :info (str "Run-long: cnt = " cnt))
-    (Thread/sleep 5000) ; 5000 * 30, about 4 minutes.
-    (when (< cnt 20) (recur (inc cnt)))))
-
-(defn ^:diag throw-it
-  [& _]
-  (throw (ex-info "Just because I felt like it." {})))
-
 (def moderation-checking?
   "Set to true if you want to filter immoderate user text."
   (atom false))
@@ -354,8 +350,6 @@
 (defn llm-start []
   (select-llm-models!)
   (ws/register-ws-dispatch :ask-llm llm-directly) ; User types 'LLM:'
-  (ws/register-ws-dispatch :run-long run-long)    ; Diag
-  (ws/register-ws-dispatch :throw-it throw-it)    ; Diag
   (reset! assistant-memo {})
   (reset! thread-memo {})
   [:llm-fns-registered-for-ws-dispatch])

@@ -1,0 +1,147 @@
+[
+#:project{:agents
+          [#:agent{:base-type :process-interview-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_c9YOQ81VXXkZjh1aLawIo44x",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_Pl17tnUkLXzg5299867RnOrw",
+                   :id :process-interview-agent-openai,
+                   :timestamp #inst "2025-04-28T18:19:45.753-00:00"}
+           #:agent{:base-type :sur-plate-glass,
+                   :agent-type :project,
+                   :thread-id "thread_WJlieqcmQCiois9mr58SqM5r",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_H2WCcMxVIcqJzo8JvHbwnMGS",
+                   :id :sur-plate-glass-openai,
+                   :expertise "plate glass",
+                   :timestamp #inst "2025-03-05T15:06:39.496-00:00"}
+           #:agent{:base-type :orchestrator-agent,
+                   :agent-type :shared-assistant,
+                   :thread-id "thread_GKtLw9DrTm9VV67s8imgFh8o",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :assistant-id "asst_6VQhN6C2nf4rFQlZEIciqTJY",
+                   :id :orchestrator-agent-openai,
+                   :timestamp #inst "2025-04-28T18:13:02.195-00:00"}
+           #:agent{:base-type :plate-glass-ork,
+                   :agent-type :project,
+                   :thread-id "thread_FBtGuMH6Mmew5ZSG0cyxKyFq",
+                   :model-class :gpt,
+                   :llm-provider :openai,
+                   :surrogate? true,
+                   :assistant-id "asst_PxGr2JLa6C7B2RFzi9cCrggX",
+                   :id :plate-glass-ork-openai,
+                   :expertise "plate glass",
+                   :timestamp #inst "2025-04-28T18:01:45.057-00:00"}],
+          :claims
+          [#:claim{:string "(project-id :sur-plate-glass)"}
+           #:claim{:string "(project-name :sur-plate-glass \"SUR Plate Glass\")"}
+           #:claim{:conversation-id :process, :string "(surrogate :sur-plate-glass)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string "(scheduling-challenge :sur-plate-glass :delivery-schedules)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string "(scheduling-challenge :sur-plate-glass :product-variation)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string "(scheduling-challenge :sur-plate-glass :raw-material-uncertainty)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string "(principal-expertise  :sur-plate-glass \"Plate Glass\")"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string "(scheduling-challenge :sur-plate-glass :equipment-availability)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string "(scheduling-challenge :sur-plate-glass :variation-in-demand)"}
+           #:claim{:conversation-id :process,
+                   :question-type :process/warm-up,
+                   :string "(scheduling-challenge :sur-plate-glass :process-variation)"}],
+          :conversations
+          [#:conversation{:id :process,
+                          :interviewer-budget 0.8999999999999999,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss how product gets made, or in the cases of services, how the service gets delivered.\nIt is also where we introduce MiniZinc, the <a href=\"terms/dsl\">domain specific language</a> (DSL)\nthrough which together we design a solution to your scheduling problem.\nYou can read more about <a href=\"about/process-conversation\">how this works</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time #inst "2025-03-05T15:06:37.184-00:00"}
+                           #:message{:content
+                                     "What are the products you make or the services you provide, and what is the scheduling challenge involving them? Please describe in a few sentences.",
+                                     :from :system,
+                                     :id 2,
+                                     :tags [:query :warm-up],
+                                     :time #inst "2025-03-05T15:06:51.378-00:00"}
+                           #:message{:answers-question 2,
+                                     :content
+                                     "\nWe produce plate glass, which includes standard, tempered, laminated, and specialty glass products. The scheduling challenge lies in coordinating production processes like glass melting, shaping, annealing, and finishing while ensuring supply chain alignment for raw materials and accommodating varying customer lead times. Demand variability and equipment availability add additional complexity to the process.",
+                                     :from :surrogate,
+                                     :id 3,
+                                     :tags [:response :warm-up],
+                                     :time #inst "2025-03-05T15:06:51.397-00:00"}
+                           #:message{:code
+                                     "int : nProducts = 1;\nset of int: Product = 1..nProducts;\nenum Task = {millGrains, mashing, lautering, boiling, fermentation, conditioning, filtering, carbonation, bottlingCanning, packaging};\n% Durations are in units of hours and may be rounded.\n% If any of the durations are negative values, we had problems understanding; you should fix these by hand.\narray [Product, Task] of float: taskDuration = [|1.000, 1.500, 1.000, 1.000, 252.000, 60.000, 3.000, 24.000, 3.000, 3.000|];\n\nfloat : minTime = 0;\n% It shouldn't take longer than doing only one thing at a time.\nfloat : maxTime = sum (p in Product, t in Task) (taskDuration[p, t]);\n\n% We assume a task uses one major resource; resources are synonymous with tasks.\narray [Product, Task] of var minTime..maxTime: taskStarts; % 'var' means it is a decision variable.\narray [Product, Task] of var minTime..maxTime: taskEnds;\n\n% This is used in the constraint below.\npredicate no_overlap(var float:s1, float:d1, var float:s2, float:d2) = s1 + d1 <= s2 \\/ s2 + d2 <= s1;\n\n% Ensure that no two Products aren't using the same resource (task) at the same time.\nconstraint forall (t in Task)\n             (forall  (i,k in Product where i < k)\n                (no_overlap (taskStarts[i,t], taskDuration[i,t], taskStarts[k,t], taskDuration[k,t])));\n\n% We assume no tasks are running now, so the first task of some product can start now.\nconstraint exists (p in Product) (taskStarts[p, millGrains] = 0);\n\n% Starting some time in the past is not allowed.\nconstraint forall (p in Product where p > 1) (taskStarts[p, millGrains] > 0);\n\n% Every other task can start after the previous task ends.\nconstraint forall (p in Product) (taskEnds[p, millGrains] == taskStarts[p, mashing]);\nconstraint forall (p in Product) (taskEnds[p, mashing] == taskStarts[p, lautering]);\nconstraint forall (p in Product) (taskEnds[p, lautering] == taskStarts[p, boiling]);\nconstraint forall (p in Product) (taskEnds[p, boiling] == taskStarts[p, fermentation]);\nconstraint forall (p in Product) (taskEnds[p, fermentation] == taskStarts[p, conditioning]);\nconstraint forall (p in Product) (taskEnds[p, conditioning] == taskStarts[p, filtering]);\nconstraint forall (p in Product) (taskEnds[p, filtering] == taskStarts[p, carbonation]);\nconstraint forall (p in Product) (taskEnds[p, carbonation] == taskStarts[p, bottlingCanning]);\nconstraint forall (p in Product) (taskEnds[p, bottlingCanning] == taskStarts[p, packaging]);\n\n% A task ends taskDuration time units after it starts.\nconstraint forall (p in Product, t in Task) (taskEnds[p, t] == taskStarts[p, t] + taskDuration[p, t]);\n\n% Minimize time elapsed when the final task ends (maxspan).\nsolve minimize max (p in Product) (taskEnds[p, packaging]);",
+                                     :content
+                                     "Okay, we now know enough to get started on a MiniZinc solution. In the code pane (upper right of the app) we created a simplistic scheduling system.It only illustrates the idea of running one job through each of the tasks you mentioned(excepting any tasks that weren't part of making the product, those we'll deal with later.",
+                                     :from :system,
+                                     :id 4,
+                                     :tags [:info-to-user :minizinc],
+                                     :time #inst "2025-03-05T15:06:53.397-00:00"}
+                           #:message{:content
+                                     "\nDo all the types of plate glass you produce (standard, tempered, laminated, and specialty) follow the same general production process from melting to finishing, or do the steps vary significantly between types?",
+                                     :from :system,
+                                     :id 5,
+                                     :tags [:query],
+                                     :time #inst "2025-04-28T18:04:31.681-00:00"}
+                           #:message{:answers-question 6,
+                                     :content
+                                     "\nDo all of your glass products, such as standard, tempered, laminated, and specialty glass, follow the same production process? If not, what differences exist in their production processes?",
+                                     :from :system,
+                                     :id 6,
+                                     :tags [:query],
+                                     :time #inst "2025-04-28T18:18:35.435-00:00"}
+                           #:message{:EADS-data-structure
+                                     "{:EADS-ref :process/scheduling-problem-type, :message-type :DATA-STRUCTURE-REFINEMENT, :data-structure {\"continuous?\" {\"comment\" \"Product flows are not continuous but progress in batches with varying duration depending on quality or additional processing.\", \"val\" false}, \"cyclical?\" {\"comment\" \"Not cyclical due to demand variability and customization of specialty products.\", \"val\" false}, \"problem-type\" {\"comment\" \"Processes for the products follow shared early steps but diverge based on product requirements, fitting the job-shop scheduling paradigm.\", \"val\" \"JOB-SHOP-SCHEDULING-PROBLEM\"}}, :commit-notes \"Refined the problem-type as JOB-SHOP-SCHEDULING-PROBLEM. Processes include shared early stages (melting, shaping, and annealing) and diverging later steps for different glass products. Production processes are not continuous and not cyclical based on interviewee inputs.\"}",
+                                     :answers-question 6,
+                                     :content
+                                     "\nNo, not all of our glass products—standard, tempered, laminated, and specialty glass—follow the exact same production process. While there are common steps in the early stages of production, the processes diverge after the initial stages to meet the unique properties and performance standards of each product. Here's how they differ:\n\n---\n\n### <b>1. Standard Glass</b>:\n<b>Process</b>:\n- <b>Melting</b>: Raw materials (silica sand, soda ash, limestone, etc.) are melted at high temperatures to form molten glass.\n- <b>Shaping</b>: The molten glass is shaped into sheets using the float glass process, where it is floated on a bed of molten tin to create a flat, smooth surface.\n- <b>Annealing</b>: The glass is cooled slowly in a controlled manner to relieve internal stresses.\n- <b>Finishing</b>: The glass sheets are cut, polished, and inspected for defects.\n \n<b>Key Property</b>: Standard glass is relatively fragile and shatters into large, dangerous shards when broken.\n\n---\n\n### <b>2. Tempered Glass</b>:\n<b>Process</b>:\n- Tempered glass starts as <b>standard annealed glass</b>, which undergoes additional processing:\n  - <b>Reheating</b>: The annealed glass is reheated to a high temperature near its softening point (around 620°C/1,148°F).\n  - <b>Quenching</b>: The glass is rapidly cooled using high-pressure air jets. This creates compressive stress on the surface and tensile stress within the core, making it much stronger than standard glass.\n- <b>Finishing</b>: Because tempered glass cannot be cut or altered after tempering, it must be cut and shaped to its final size *before* tempering.\n\n<b>Key Properties</b>: Tempered glass is about 4-5 times stronger than standard glass and, when broken, shatters into small, rounded pieces, making it safer for applications like car windows, safety doors, and shower enclosures.\n\n---\n\n### <b>3. Laminated Glass</b>:\n<b>Process</b>:\n- Laminated glass is made by combining multiple layers of glass sheets with a plastic interlayer, typically polyvinyl butyral (PVB):\n  - <b>Melting and Shaping</b>: Glass is formed into sheets (using the float process) and annealed to create standard glass.\n  - <b>Layering with Interlayer</b>: Two or more sheets of glass are bonded with one or more interlayers. The materials are assembled and heated to adhere the layers together.\n  - <b>Pressing</b>: Pressure and heat are applied in an autoclave, a high-pressure oven, to seal the glass and interlayer into a single composite product.\n \n<b>Key Properties</b>: Laminated glass is extremely durable and resists shattering. If broken, the interlayer holds the fragments together, making it ideal for safety applications, soundproofing, and UV protection (e.g., car windshields and skylights).\n\n---\n\n### <b>4. Specialty Glass</b> (e.g., Tinted, Coated, Frosted, Insulated):\n<b>Process</b>:\n- The production process for specialty glass varies depending on its type and purpose. \n    - <b>Tinted Glass</b>: Color additives (metal oxides) are introduced into the molten glass during the melting stage to create a permanent color.\n    - <b>Coated Glass</b>: Thin coatings (e.g., reflective, low-emissivity, or mirror finishes) are applied to the surface of the glass after shaping and annealing.\n    - <b>Frosted Glass</b>: Acid etching or sandblasting is applied to the surface of annealed glass to diffuse light and create a frosted appearance.\n    - <b>Insulated Glass Units (IGUs)</b>: Two or more sheets of glass are separated by a spacer and sealed to create air or gas-filled insulating layers.\n\n<b>Key Properties</b>: Specialty glass can include features like thermal insulation, light control, aesthetic finishes, or UV resistance. Each type requires unique modifications in production.\n\n---\n\n### <b>Summary of Differences</b>:\n| **Step**               | **Standard Glass**   | **Tempered Glass**         | **Laminated Glass**      | <b>Specialty Glass</b>         |\n|-------------------------|----------------------|-----------------------------|---------------------------|-----------------------------|\n| <b>Base Glass</b>          | Produced directly   | Starts as standard glass    | Starts as standard glass  | Varies (usually standard)   |\n| <b>Annealing</b>           | Yes                 | Yes (before tempering)      | Yes                      | Optional                    |\n| <b>Thermal Treatment</b>   | No                  | Heating and quenching       | No                       | Optional (depending on type)|\n| <b>Layering</b>            | No                  | No                          | Bonded with interlayer    | No or Optional (e.g., IGUs) |\n| <b>Surface Treatment</b>   | No                  | No                          | No                       | Yes (e.g., coatings, etching)|\n\n---\n\n### <b>Conclusion</b>:\nWhile the production of standard glass involves the basic steps of melting, shaping, annealing, and finishing, tempered, laminated, and specialty glass include additional or altered steps to deliver enhanced properties such as strength, safety, durability, or aesthetic appeal. These differences make each type of glass suited to its specific application.",
+                                     :from :surrogate,
+                                     :id 7,
+                                     :tags [:response],
+                                     :time #inst "2025-04-28T18:18:35.504-00:00"}]}
+           #:conversation{:id :data,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we ask you to talk about the data that drives your decisions (customer orders, due dates, worker schedules,... whatever).\nHere you can either upload actual data as spreadsheets, or we can talk about the kinds of information you use in general terms and\nwe can invent some similar data to run demonstrations.\nWhenever someone suggests that you upload information to them, you should be cautious.\nRead more about the intent of this conversation and the risks of uploading data <a href=\"about/uploading-data\">here</a>.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time #inst "2025-03-05T15:06:37.184-00:00"}]}
+           #:conversation{:id :resources,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is typically the third conversation we'll have, after discussing process and data.\n(By the way, you can always go back to a conversation and add to it.)\nYou might have already mentioned the resources (people, machines) by which you make product or deliver services.\nHere we try to integrate this into the MiniZinc solution. Until we do that, we won't be able to generate realistic schedules.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time #inst "2025-03-05T15:06:37.184-00:00"}]}
+           #:conversation{:id :optimality,
+                          :interviewer-budget 1.0,
+                          :messages
+                          [#:message{:content
+                                     "This is where we discuss what you intend by 'good' and 'ideal' schedules. With these we formulate an objective and model it in MiniZinc. The MiniZinc solution can change substantially owing to this discussion, but owing to all the work we did to define requirements, we think it will be successful.",
+                                     :from :system,
+                                     :id 1,
+                                     :tags [:conversation-intro],
+                                     :time #inst "2025-03-05T15:06:37.184-00:00"}]}],
+          :current-conversation :process,
+          :id :plate-glass-ork-test-1,
+          :name "Plate Glass Ork"}
+]

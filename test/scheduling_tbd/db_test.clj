@@ -24,10 +24,44 @@
   []
   (sort (set/difference db/project-schema-key? (used-db-attrs))))
 
+
 (deftest unused-db-attrs
   (testing "that there isn't any junk in the DB schema."
     (let [used-attrs (used-db-attrs)]
       (is (empty? (unused-db-attrs))))))
+
+(defn fix-project-agent-ids
+  [pid]
+  (letfn [(fix-agent [a]
+            (if (contains? a :agent/agent-id)
+              a
+              (assoc a :agent/agent-id (-> a :agent/base-type name (str "-openai") keyword))))]
+    (let [proj-data (db/get-project pid)
+          agents (:project/agents proj-data)]
+      (assoc proj-data :project/agents (mapv fix-agent agents)))))
+
+(defn ^:debug fix-all-project-agent-ids!
+  "I deleted :agent/id but I should have replaced it with :agent/agent-id."
+  []
+  (doseq [pid (db/list-projects)]
+    (let [updated (fix-project-agent-ids pid)]
+      (db/recreate-project-db! pid updated))))
+
+(defn add-agent-pid
+  [pid]
+  (letfn [(fix-agent [a] (assoc a :agent/pid pid))]
+    (let [proj-data (db/get-project pid)
+          agents (:project/agents proj-data)]
+      (assoc proj-data :project/agents (mapv fix-agent agents)))))
+
+(defn ^:debug add-all-project-agent-pid!
+  "I deleted :agent/id but I should have replaced it with :agent/agent-id."
+  []
+  (doseq [pid (db/list-projects)]
+    (let [updated (add-agent-pid pid)]
+      (db/recreate-project-db! pid updated))))
+
+
 
 (def craft-brewing-desc
   "In medium-scale craft beer brewing, a significant challenge arises in the form of production scheduling. Craft breweries often produce a diverse range of beer styles with varying ingredients, fermentation times, and packaging requirements. Coordinating the brewing process to meet customer demands while optimizing resources can be complex. The production scheduling problem entails determining the most efficient sequence and timing of brewing batches, taking into account factors like ingredient availability, tank capacities, yeast propagation, and production deadlines. Balancing these variables is crucial to ensure optimal utilization of equipment, minimize idle time, reduce inventory holding costs, and meet customer expectations. Effective production scheduling plays a vital role in maintaining consistent beer quality, managing production costs, and maximizing overall brewery efficiency.")

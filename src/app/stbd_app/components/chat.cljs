@@ -1,29 +1,37 @@
 (ns stbd-app.components.chat
-   "This is used pop up a model indicating the URL at which the example can be retrieved."
+  "This is used pop up a model indicating the URL at which the example can be retrieved."
   (:require
-   [helix.core                 :refer [defnc $]]
-   [helix.hooks                :as hooks]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default"           :as ChatContainer]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/ConversationList$default"        :as ConversationList]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Conversation$default"            :as Conversation]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default"           :as MainContainer]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default"                 :as Message]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default"   :as MessageHeader]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default"            :as MessageInput]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default"             :as MessageList]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default"        :as MessageSeparator]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default"                 :as Sidebar]
-   ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default"         :as TypingIndicator]
+   [helix.core :refer [defnc $]]
+   [helix.hooks :as hooks]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/ChatContainer$default" :as ChatContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/ConversationList$default" :as ConversationList]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Conversation$default" :as Conversation]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MainContainer$default" :as MainContainer]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message$default" :as Message]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHeader$default" :as MessageHeader]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageCustomContent$default" :as MessageCustomContent]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Message/MessageHtmlContent$default" :as MessageHtmlContent]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageInput$default" :as MessageInput]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageList$default" :as MessageList]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/MessageSeparator$default" :as MessageSeparator]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/Sidebar$default" :as Sidebar]
+   ["@chatscope/chat-ui-kit-react/dist/cjs/TypingIndicator$default" :as TypingIndicator]
    ["@mui/material/Box$default" :as Box]
+   ["@mui/material/Button$default" :as Button]
    ["@mui/material/ButtonGroup$default" :as ButtonGroup]
    ["@mui/material/Stack$default" :as Stack]
-   [promesa.core    :as p]
+   [promesa.core :as p]
+   [scheduling-tbd.util :refer [remove-src-markers]]
    [stbd-app.components.attachment-modal :refer [AttachmentModal]]
    [stbd-app.components.share :as share :refer [ShareUpDown]]
-   [stbd-app.db-access  :as dba]
-   [stbd-app.util       :as util :refer [register-fn lookup-fn common-info update-common-info!]]
-   [stbd-app.ws         :as ws :refer [remember-promise]]
-   [taoensso.telemere          :as tel :refer-macros [log!]]))
+   [stbd-app.components.ffbd :refer [FFBDModal]]
+   [stbd-app.components.orm :refer [ORMModal]]
+   ;[stbd-app.components.cytoscape-demo :refer [CytoscapeDemoModal]]
+   [stbd-app.components.table2 :refer [Table2Modal]]
+   [stbd-app.db-access :as dba]
+   [stbd-app.util :as util :refer [register-fn lookup-fn common-info update-common-info!]]
+   [stbd-app.ws :as ws :refer [remember-promise]]
+   [taoensso.telemere :as tel :refer-macros [log!]]))
 
 (def ^:diag diag (atom nil))
 
@@ -42,8 +50,8 @@
         now-epoch-millis (.now js/Date)
         diff (- now-epoch-millis msg-epoch-millis)]
     (cond (< diff 60000) "just now"
-          (<= 60000  diff 120000)   "1 minute ago"
-          (<= 120001 diff 3600000)  (str (quot diff 60000) " minutes ago")
+          (<= 60000 diff 120000) "1 minute ago"
+          (<= 120001 diff 3600000) (str (quot diff 60000) " minutes ago")
           (<= 3600000 diff 7200000) "1 hour ago"
           (< start-of-day-millis msg-epoch-millis) (str (quot diff 3600000) " hours ago")
           :else (-> (inst2date instant) (subs 0 15)))))
@@ -52,19 +60,22 @@
   [content from]
   (assert (#{:surrogate :system :developer-interjected :human} from))
   (case from
-      :surrogate               (str "<b>Surrogate Expert</b><br/>" content)
-      :developer-interjected   (str "<b>Developer Interjected Question</b><br/>" content)
-      content))
+    :surrogate (str "<b>Surrogate Expert</b><br/>" content)
+    :developer-interjected (str "<b>Developer Interjected Question</b><br/>" content)
+    content))
 
 (def key-atm (atom 0))
 (defn new-key [] (swap! key-atm inc) (str "msg-" @key-atm))
+
+;;(def example-graph "graph TD\nA[Client] --> B[Load Balancer]\nB --> C[Server01]\nB --> D[Server02]")
 
 (defn msgs2cs ; cs = ChatScope, https://chatscope.io/
   "Create ChatScope structures (Message, MessageHeader, MessageSeparator, etc.) for a collection of messages."
   [msgs]
   (let [new-date (atom today)]
     (reduce (fn [r msg]
-              (let [{:message/keys [content from time] :or {time (js/Date. (.now js/Date))}} msg
+              (let [{:message/keys [content from time table graph--ffbd graph--orm code] :or {time (js/Date. (.now js/Date))}} msg
+                    content (remove-src-markers content)
                     content (msg-with-title content from)
                     msg-date (-> time inst2date (subs 0 15))]
                 (as-> r ?r
@@ -76,9 +87,18 @@
                               {:key (new-key)
                                :model #js {:position "single" ; "single" "normal", "first" and "last"
                                            :direction (if (#{:system :developer-interjected} from) "incoming" "outgoing") ; From perspective of user.
-                                           :type "html"
-                                           :payload content}}
-                              ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))})))))) ;  They only appear for Interviewer, which is probably good!
+                                           :type "custom"}}
+                              ($ MessageHeader {:sender (str "Interviewer, " (dyn-msg-date time))}) ;  They only appear for Interviewer, which is probably good!
+                              ($ MessageCustomContent {}
+                                 ($ MessageHtmlContent {:html content})
+                                 (when (or table graph--ffbd graph--orm)
+                                   ($ ButtonGroup {:variant "contained" :size "small" :align "center"}
+                                      (when table ($ Table2Modal {:table table}))
+                                      (when graph--ffbd ($ FFBDModal {:graph graph--ffbd}))
+                                      (when graph--orm ($ ORMModal {:graph graph--orm :message-id (:message/id msg)}))
+                                      (when code
+                                        ((lookup-fn :set-code) code)
+                                        ($ Button {:color "warning"} "Code"))))))))))
             []
             msgs)))
 
@@ -88,7 +108,8 @@
   [set-height-fn]
   {:on-resize-up (fn [_parent _width height] (when height (set-height-fn height)))})
 
-(def msgs-atm "A vector of messages in the DB format." (atom nil)) ; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function. <========================
+;;; ToDo: Revisit keeping this out here. I was accidentally calling the get as a function.
+(def msgs-atm "A vector of messages in the DB format." (atom []))
 (def update-msg-dates-process "A process run by js/window.setInterval" (atom nil))
 
 (defn update-msg-times
@@ -98,21 +119,24 @@
     (log! :debug (str "update-msg-times: msg-count = " (count @msgs-atm)))
     ((lookup-fn :set-cs-msg-list) @msgs-atm))) ; Consider use of ((lookup-fn :get-msg-list)) here???
 
-;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid. <======================== So why not put it in db_access.cljs? Answer: msgs-atm but see above!
+;;; ToDo So why not put it in db_access.cljs? Answer: msgs-atm but see above!
+;;; This is called by project.cljs, core.cljs/top, and below. It is only in chat below that it would specify cid.
 ;;; In the other cases, it takes whatever the DB says is current.
 (defn get-conversation
   "Using an HTTP GET, get the conversation, and also the code, if any."
   ([pid] (get-conversation pid nil)) ; nil -> You start based on what the DB says was most recent.
   ([pid cid]
+   (log! :info (str "chat/get-conversation: pid = " pid " cid = " cid))
    (-> (dba/get-conversation-http pid cid)
        (p/catch (fn [e] (log! :error (str "get-conversation failed: " e))))
        (p/then (fn [{:keys [conv cid code]}]
                  (log! :info (str "chat/get-conversation (return from promise): cid = " cid " count = " (count conv)))
-                 (reset! msgs-atm conv)
+                 (reset! msgs-atm (vec conv))
                  (when (not-empty code) ((lookup-fn :set-code) code))
                  ((lookup-fn :set-cs-msg-list) conv)
                  ((lookup-fn :set-active-conv) cid)
-                 (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid})
+                 (when (:active? @common-info)
+                   (ws/send-msg {:dispatch-key :resume-conversation :pid pid :cid cid}))
                  (update-common-info! {:pid pid :cid cid}))))))
 
 (register-fn :get-conversation get-conversation)
@@ -121,33 +145,48 @@
   "Add messages to the msgs-atm.
    This is typically used for individual messages that come through :iviewr-says or :sur-says,
    as opposed to bulk update through get-conversation."
-  [text from]
+  [msg from]
   (assert (#{:system :surrogate :human :developer-interjected} from))
-  (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))]
-    (swap! msgs-atm conj {:message/content text :message/from from :id msg-id :time (js/Date. (.now js/Date))})
+  ;; ToDo: I think maybe the whole ID thing needs to be fixed at the server. :message/id should be unique across conversations.
+  ;;       For the time being, I'll let this assign them, and time sometimes.
+  (let [msg-id (inc (or (apply max (->> @msgs-atm (map :message/id) (filter identity))) 0))
+        {:message/keys [time]} msg
+        msg (cond-> (dissoc msg :message/id)
+              true (assoc :message/id msg-id)
+              true (assoc :message/from from)
+              (not time) (assoc :message/time (js/Date. (.now js/Date))))]
+    (swap! msgs-atm conj msg)
     ((lookup-fn :set-cs-msg-list) @msgs-atm)))
 
-(register-fn :interviewer-busy?     (fn [{:keys [value]}]
-                                      ((lookup-fn :set-busy?) value)))
+(defn dispatch-msg2db-msg
+  "Translate the message to DB format, which is used in chat."
+  [{:keys [table graph text] :as msg}]
+  (cond-> msg
+    true (assoc :message/content text)
+    table (assoc :message/table table)
+    graph (assoc :message/graph graph)
+    true (dissoc :dispatch-key :client-id :timestamp :text :table :graph :message/EADS-data-structure)))
 
-(register-fn :iviewr-says           (fn [{:keys [p-key text table]}]
-                                      (when p-key (remember-promise p-key))
-                                      (add-msg text :system)
-                                      (when table
-                                        ((lookup-fn :set-table) table))))
+(register-fn :interviewer-busy? (fn [{:keys [value]}]
+                                  ((lookup-fn :set-busy?) value)))
 
-(register-fn :sur-says              (fn [{:keys [p-key msg]}]
-                                      (when p-key (remember-promise p-key))
-                                      (log! :info (str "sur-says msg: " msg))
-                                      (add-msg msg :surrogate)))
+;;; These come in through :dispatch-key :iviewer-says. Keys are NOT like in the DB, so we translate here.
+(register-fn :iviewr-says (fn [{:keys [p-key] :as msg}]
+                            (when p-key (remember-promise p-key))
+                            (-> msg dispatch-msg2db-msg (add-msg :system))))
+
+;;; These come in through :dispatch-key :sur-says. Keys are NOT like in the DB, so we translate here.
+(register-fn :sur-says (fn [{:keys [p-key] :as msg}]
+                         (when p-key (remember-promise p-key))
+                         (-> msg dispatch-msg2db-msg (add-msg :surrogate))))
 
 ;;; There is just one Chat instance in our app. It is switched between different conversations.
 (defnc Chat [{:keys [chat-height]}]
-  (let [[msg-list set-msg-list]         (hooks/use-state [])
-        [box-height set-box-height]     (hooks/use-state (int (/ chat-height 2.0)))
-        [cs-msg-list set-cs-msg-list]   (hooks/use-state nil)
-        [active-conv set-active-conv]   (hooks/use-state nil) ; active-conv is a keyword
-        [busy? set-busy?]               (hooks/use-state nil) ; Have to go through common-info
+  (let [[msg-list set-msg-list] (hooks/use-state [])
+        [box-height set-box-height] (hooks/use-state (int (/ chat-height 2.0)))
+        [cs-msg-list set-cs-msg-list] (hooks/use-state nil)
+        [active-conv set-active-conv] (hooks/use-state nil) ; active-conv is a keyword
+        [busy? set-busy?] (hooks/use-state nil) ; Have to go through common-info
         resize-fns (make-resize-fns set-box-height)]
     (letfn [(change-conversation-click [to]
               (when-not busy?
@@ -156,13 +195,15 @@
                   (log! :error (str "change-conversation-click fails: common-info = " @common-info)))))
             (process-user-input [text]
               (when (not-empty text)
-                (let [[ask-llm? question]  (re-matches #"\s*LLM:(.*)" text)
+                (let [[ask-llm? question] (re-matches #"\s*LLM:(.*)" text)
                       [surrogate? product] (re-matches #"\s*SUR:(.*)" text)
-                      [sur-follow-up? q]   (re-matches #"\s*SUR\?:(.*)" text)
-                      msg (cond  ask-llm?       {:dispatch-key :ask-llm :question question}
-                                 surrogate?     {:dispatch-key :start-surrogate :product product}
-                                 sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:pid @common-info) :question q}
-                                 :else          {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
+                      [sur+ map-str] (re-matches #"\s*SUR\+:(.*)" text)
+                      [sur-follow-up? q] (re-matches #"\s*SUR\?:(.*)" text)
+                      msg (cond ask-llm? {:dispatch-key :ask-llm :question question}
+                                surrogate? {:dispatch-key :start-surrogate :product product}
+                                sur+ {:dispatch-key :start-surrogate+ :map-str map-str} ; like :start-surrogate, but provide a map of stuff.
+                                sur-follow-up? {:dispatch-key :surrogate-follow-up :pid (:pid @common-info) :question q}
+                                :else {:dispatch-key :domain-expert-says :msg-text text :promise-keys @ws/pending-promise-keys})]
                   ;; ToDo: Human-interjected questions, though some of them are stored, don't store the human-interjected annotation.
                   ;;       In fixing this, keep the annotation separate from the question because if a surrogate sees it, it will be confused.
                   (when sur-follow-up?
@@ -176,26 +217,35 @@
                   (ws/send-msg msg))))]
       ;; ------------- Talk through web socket, initiated below.
       (hooks/use-effect :once ; These are used outside the component scope.
-        (register-fn :clear-msgs   (fn [] (set-cs-msg-list []) (reset! msgs-atm [])))
-        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
-        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
-        (register-fn :set-active-conv set-active-conv)
-        (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (do (set-busy? val)))) ; Yes. Need to do both.
-        (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
-        (register-fn :get-msg-list  (fn [] @msgs-atm))                               ; These two used to update message time.
-        (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs))))  ; These two used to update message time.
-        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
+                        (register-fn :clear-msgs (fn [] (set-cs-msg-list []) (reset! msgs-atm [])))
+                        (register-fn :add-tbd-text (fn [text] (set-msg-list (add-msg text :system))))
+                        (register-fn :add-sur-text (fn [text] (set-msg-list (add-msg text :surrogate))))
+                        (register-fn :set-active-conv set-active-conv)
+                        (register-fn :set-busy? (fn [val] (swap! common-info #(assoc % :busy? val)) (set-busy? val))) ; Yes. Need to do both.
+                        (register-fn :get-busy? (fn [] (:busy? @common-info))) ; This is why need it in common-info. (fn [] busy?) is a clojure; not useful.
+                        (register-fn :get-msg-list (fn [] @msgs-atm)) ; These two used to update message time.
+                        (register-fn :set-cs-msg-list (fn [msgs] (set-cs-msg-list (msgs2cs msgs)))) ; These two used to update message time.
+                        (register-fn :update-msg-orm (fn [message-id orm-data]
+                                                       (let [updated-msgs (mapv (fn [msg]
+                                                                                  (if (= (:message/id msg) message-id)
+                                                                                    (assoc msg :message/graph--orm orm-data)
+                                                                                    msg))
+                                                                                @msgs-atm)]
+                                                         (reset! msgs-atm updated-msgs)
+                                                         (set-cs-msg-list (msgs2cs updated-msgs)))))
+                       ;(register-fn :get-cs-msg-list (fn [] (msgs2cs msg-list)))                   ; This might work, were msg-list set!
+                        (reset! update-msg-dates-process (js/window.setInterval (fn [] (update-msg-times)) 60000)))
       (hooks/use-effect [msg-list]
-        (reset! msgs-atm msg-list)
-        (set-cs-msg-list (msgs2cs msg-list)))
+                        (reset! msgs-atm (vec msg-list))
+                        (set-cs-msg-list (msgs2cs msg-list)))
       ;; ----------------- component UI structure.
       ($ ShareUpDown
          {:init-height chat-height
           :up-portion 0.8
           :share-fns resize-fns
           :up ($ Box {:sx ; This work!
-                      #js {:overflowY "auto"  ; Creates a scroll bar
-                           :display "flex"    ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
+                      #js {:overflowY "auto" ; Creates a scroll bar
+                           :display "flex" ; So that child can be 100% of height. See https://www.geeksforgeeks.org/how-to-make-flexbox-children-100-height-of-their-parent-using-css/
                            :height box-height ; When set small enough, scroll bars appear.
                            :flexDirection "column"
                            :bgcolor "#f0e699"}} ; "#f0e699" is the yellow color used in MessageList. (see style in home.html).
@@ -219,16 +269,16 @@
                     ($ ChatContainer
                        ($ MessageList
                           {:typingIndicator (when busy? ($ TypingIndicator {:content "Interviewer is typing"}))
-                          #_#_ :style #js {:height "500px"}}
+                           #_#_:style #js {:height "500px"}}
                           cs-msg-list))))
           :dn ($ Box {:sx #js {:width "95%"}} ; This fixes a sizing bug!
                  ($ Stack {:direction "row" :spacing "0px"}
                     ($ ButtonGroup
                        ($ AttachmentModal {:post-attach-fn #(log! :info (str "attach-fn: args = " %))})) ; This has the attachment modal
-                    ($ MessageInput {:placeholder "Type message here...."
+                    ($ MessageInput {:placeholder "Type message here..."
                                      :onSend #(do (log! :info (str "onSend: " %))
                                                   (process-user-input %))
                                      :attachButton false
                                      :fancyScroll false
                                      ;; It sets height to whatever you'd like with px, but doesn't expand scroll bars. It doesn't respond to :height <percent> either.
-                                     :style #js {#_#_:height "200px" :width "90%"}})))}))))
+                                     :style #js {:width "90%"}})))}))))

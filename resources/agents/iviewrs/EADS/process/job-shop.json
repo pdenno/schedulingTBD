@@ -1,0 +1,12 @@
+{
+  "message-type" : "EADS-INSTRUCTIONS",
+  "interviewer-agent" : "process",
+  "interview-objective" : "These EADS-INSTRUCTIONS assumes the interviewees' production processes are organized as a job shop.\nWe have two separate approaches to model job shop scheduling problems: in one of these, the jobs are classified to match a small (less than a dozen or so)\ndifferent process plans; in the other, a process plans will need to be specified for each job.\nThe purpose of these EADS-INSTRUCTIONS is only to determine which of these two subclasses of job shop models should be pursued.\nOnce this is determined, the orchestrator will likely then choose either EADS 'process/job-shop--classifiable' or 'process/job-shop--unique-order' corresponding\nrespectively to the two separate approaches just described.\nThe two types are mutually exclusive: if you decide that 'classifiable-jobs?' is true, the orchestator will then pursue EADS instructions 'process/job-shop--classifiable'.\nThis is good, because we don't have good instructions for 'process/job-shop--unique-order' currently!",
+  "EADS" : {
+    "EADS-id" : "process/job-shop",
+    "classifiable-jobs?" : {
+      "val" : true,
+      "comment" : "This property is true only in the case that it seems reasonable to pre-classify jobs as corresponding to a small collection (a dozen or so) process plans.\nIf, in contrast, it seems more reasonable for the the firm to define a (possibly unique) production process for each job, classifiable-jobs? should be false.\nIt is reasonable to ask whether defining a process plan for each job is part of their workflow."
+    }
+  }
+}

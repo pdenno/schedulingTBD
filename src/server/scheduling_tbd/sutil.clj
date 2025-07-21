@@ -2,12 +2,23 @@
   "Server utilities."
   (:require
    [cheshire.core            :as ches]
+   [clojure.java.io          :as io]
+   [clojure.pprint           :refer [cl-format]]
    [clojure.string           :as str]
    [datahike.api             :as d]
    [datahike.pull-api        :as dp]
-   [taoensso.telemere        :refer [log!]]))
+   [taoensso.telemere        :as tel])
+  (:import ; ToDo: Why does clj-kondo complain?
+   java.net.URI
+   java.nio.file.StandardCopyOption
+   java.nio.file.Paths))
 
 (def ^:diag diag (atom nil))
+
+(defn log!
+  "This is to keep cider stepping from stumbling over the telemere log! macro."
+  [log-key s]
+  (tel/log! log-key s))
 
 ;(def llm-provider "Default provider to use. Choices are #{:openai :azure}." :openai) ; Values are azure and :openai
 (def default-llm-provider "Default provider to use. Choices are #{:openai :azure}." (atom :openai)) ; Values are azure and :openai
@@ -17,11 +28,11 @@
                 :openai {:api-key (System/getenv "OPENAI_API_KEY")}
                 :azure  {:api-key (System/getenv "AZURE_OPENAI_API_KEY")
                          :api-endpoint "https://myopenairesourcepod.openai.azure.com"
-                         :impl :azure})]
+                         :impl :azure}
+                :meta   {:api-key (System/getenv "NIST_RCHAT")
+                         :api-endpoint "https://rchat.nist.gov/api"})]
     (when-not (:api-key res)
-      (if (= provider :openai)
-        (log! :error "Specify an API key in the environment variable OPENAI_API_KEY")
-        (log! :error "Specify an API key in the environment variable AZURE_OPENAI_API_KEY")))
+      (log! :error (str "Specify an API key for use of models from " (name provider))))
     res))
 
 (defonce databases-atm (atom {}))
@@ -35,7 +46,7 @@
   (swap! databases-atm #(assoc % k config)))
 
 (defn deregister-db
-  "Add a DB configuration."
+  "Remove a DB configuration."
   [k]
   (log! :info (str "Deregistering DB " k))
   (swap! databases-atm #(dissoc % k)))
@@ -69,17 +80,22 @@
       (not in-mem?)   (assoc :store {:backend :file :path db-dir})
       in-mem?         (assoc :store {:backend :mem :id (name id)}))))
 
+(defn get-db-cfg
+  "Return the cfg map for the given DB."
+  [pid]
+  (get @databases-atm pid))
+
 (defn connect-atm
   "Return a connection atom for the DB.
    Throw an error if the DB does not exist and :error? is true (default)."
   [k & {:keys [error?] :or {error? true}}]
-  (if-let [db-cfg (get @databases-atm k)]
+  (if-let [db-cfg (get-db-cfg k)]
     (if (d/database-exists? db-cfg)
       (d/connect db-cfg)
       (when error?
-        (throw (ex-info "No such DB" {:key k}))))
+        (throw (ex-info (str "Could not connect to DB: " k) {:key k}))))
     (when error?
-      (throw (ex-info "No such DB" {:key k})))))
+      (throw (ex-info (str "No such DB: " k) {:key k})))))
 
 (defn datahike-schema
   "Create a Datahike-compatible schema from map-type schema with notes such as :mm/info."
@@ -117,21 +133,32 @@
   [form conn-atm & {:keys [keep-set drop-set]
                     :or {drop-set #{:db/id}
                          keep-set #{}}}]
-  (letfn [(resolve-aux [obj]
-            (cond
-              (db-ref? obj) (let [res (dp/pull @conn-atm '[*] (:db/id obj))]
-                              (if (= res obj) nil (resolve-aux res)))
-              (map? obj) (reduce-kv (fn [m k v]
-                                      (cond (drop-set k)                                    m
-                                            (and (not-empty keep-set) (not (keep-set k)))   m
-                                            :else                                           (assoc m k (resolve-aux v))))
-                                    {}
-                                    obj)
-              (vector? obj)      (mapv resolve-aux obj)
-              (set? obj)    (set (mapv resolve-aux obj))
-              (coll? obj)        (map  resolve-aux obj)
-              :else  obj))]
-    (resolve-aux form)))
+  (let [cyclical? (atom false)
+        visited? (atom #{})]
+    (letfn [(rem-nil [obj]
+              (cond (map? obj)      (reduce-kv (fn [m k v] (if (nil? v) m (assoc m k (rem-nil v)))) {} obj)
+                    (vector? obj)   (reduce (fn [res v] (if (nil? v) res (conj res (rem-nil v)))) [] obj)
+                    :else           obj))
+            (resolve-aux [obj]
+              (cond
+                (db-ref? obj) (if (@visited? (:db/id obj))
+                                (do (log! :warn (str "id " (:db/id obj) " has been visted already."))
+                                    (reset! cyclical? true))
+                                (let [res (dp/pull @conn-atm '[*] (:db/id obj))]
+                                  (swap! visited? conj (:db/id obj))
+                                  (if (= res obj) nil (resolve-aux res))))
+                (map? obj) (reduce-kv (fn [m k v]
+                                        (cond (drop-set k)                                    m
+                                              (and (not-empty keep-set) (not (keep-set k)))   m
+                                              :else                                           (assoc m k (resolve-aux v))))
+                                      {}
+                                      obj)
+                (vector? obj)      (mapv resolve-aux obj)
+                (set? obj)    (set (mapv resolve-aux obj))
+                (coll? obj)        (map  resolve-aux obj)
+                :else  obj))]
+      (let [res (resolve-aux form)]
+        (if @cyclical? (rem-nil res) res)))))
 
 (defn root-entities
   "Return a sorted vector of root entities (natural numbers) for all root entities of the DB."
@@ -174,15 +201,6 @@
                               (into-array java.nio.file.CopyOption
                                           [(java.nio.file.StandardCopyOption/ATOMIC_MOVE)
                                            (java.nio.file.StandardCopyOption/REPLACE_EXISTING)]))))
-
-;;; Keep this around for a while; it might get used eventually!
-#_(defmacro report-long-running
-  "Return the string from writing to *out* after this runs in a future."
-  [[timeout] & body]
-  `(-> (p/future (with-out-str ~@body))
-       (p/await ~timeout)
-       (p/then #(log! :info (str "Long-running: " %)))
-       (p/catch #(log! :warn (str "Long-running (exception): " %)))))
 
 (defn chat-status
   "Create a string to explain in the chat the error we experienced."
@@ -238,16 +256,75 @@
           :else response)))
 
 ;;; This became complicated once I couldn't use strict schema results.
-(defn output-struct2clj
-  "Translate the OpenAI API output structure (a string) to a map with keyword keys."
-  [s-in]
-  (try
-    (let [s (remove-preamble s-in)]
-      (update-keys (ches/parse-string s) keyword))
-    (catch Exception _e
-      (throw (ex-info  "Could not read object returned from OpenAI (should be a string):" {:s-in s-in })))))
+(defn ai-response2clj
+  "Translate content to a clj object. The content is a string that contains a JSON object, and may wrap the object in unhelpful language
+   markup indicating the language in which the object should be interpreted. The function takes an optional second argument which defaults to true.
+   If instead, false (not just nil, but false, the boolean)  is provided as second argument, the original string is returned, rather
+   than throwing on an error."
+  ([s-in] (ai-response2clj s-in true))
+  ([s-in throw-error?]
+   (try
+     (let [s (remove-preamble s-in)
+           m (ches/parse-string s)]
+       (letfn [(upk [obj]
+                 (cond (map? obj)    (reduce-kv (fn [m k v] (assoc m (keyword k) (upk v))) {} obj)
+                       (vector? obj) (mapv upk obj)
+                       :else         obj))]
+         (upk m)))
+     (catch Exception _e
+       (if (false? throw-error?)
+         s-in
+         (throw (ex-info  "Could not read object returned (should be a string containing JSON):" {:s-in s-in })))))))
 
 (defn clj2json-pretty
   "Return a pprinted string for given clojure object."
   [obj]
+  (assert (not (nil? obj)))
   (ches/generate-string obj {:pretty true}))
+
+#_(defn clj2json-pretty
+  "Return a pprinted string for given clojure object."
+  [obj]
+  (if (nil? obj) nil (ches/generate-string obj {:pretty true})))
+
+(defn update-resources-EADS-json!
+  "Update the resources/agents/iviewrs/EADS directory with a (presumably) new JSON pprint of the argument EADS instructions.
+   These are needed by the orchestrator; they are put in its vector store."
+  [eads-instructions]
+  (let [id (-> eads-instructions :EADS :EADS-id)
+        [nam ns] ((juxt name namespace) id)
+        eads-json-fname (cl-format nil "resources/agents/iviewrs/EADS/~A/~A.json" ns nam)]
+    (spit eads-json-fname (clj2json-pretty eads-instructions))))
+
+;;;https://gist.github.com/olieidel/c551a911a4798312e4ef42a584677397
+(defn delete-directory-recursive
+  "Recursively delete a directory."
+  [path]
+  (letfn [(ddr [file]
+            (when (.isDirectory file)
+              (run! ddr (.listFiles file)))
+            (io/delete-file file))]
+    (-> path java.io.File. ddr)))
+
+;;;--------------------------------------- Shared stuff for mocking ----------------
+
+(def mocking?
+  "This is set to true when we start mocking a project execution."
+  (atom false))
+
+(defn shadow-pid
+  "Return a shadow pid, if the argument is a shadow-pid, return the argument."
+  [pid]
+  (when pid
+    (let [[success? _normal-pid] (re-matches #"^(.+)\-\-temp$" (name pid))]
+      (if success?
+        pid
+        (-> pid name (str "--temp") keyword)))))
+
+(defn normal-pid
+  "When given a shadow-pid, return the normal pid."
+  [pid]
+  (let [[success? normal-pid] (re-matches #"^(.+)\-\-temp$" (name pid))]
+    (if success?
+      (keyword normal-pid)
+      pid)))

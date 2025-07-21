@@ -14,16 +14,15 @@
    [scheduling-tbd.util         :refer [config-log!]]
    [stbd-app.components.chat    :as chat]
    [stbd-app.components.editor  :as editor :refer [Editor]]
-   [stbd-app.components.graph   :refer [GraphPane]]
+;;;   [stbd-app.components.graph   :refer [GraphPane]]
    [stbd-app.components.project :as proj :refer [SelectProject]]
    [stbd-app.components.share   :as share :refer [ShareLeftRight ShareUpDown]]
-   [stbd-app.components.table   :as table :refer [TablePane]]
-   [stbd-app.util      :as util :refer [register-fn lookup-fn common-info]]
+;;;   [stbd-app.components.table   :as table :refer [TablePane]]
+   [stbd-app.util      :as util :refer [register-fn]]
    [stbd-app.ws        :as ws]
    [taoensso.telemere  :refer [log!]]))
 
 (def ^:diag diag (atom {}))
-
 
 ;;; ToDo: So many problems with this. (Does ANY of it work?).
 ;;; Example of using style in helix (a gist): https://gist.github.com/geraldodev/a9b60dd611d1628f9413dd6de6c3c974#file-material_ui_helix-cljs-L14
@@ -117,6 +116,7 @@
              "schedulingTBD"
              ($ Box
                 ($ SelectProject))))
+       (reset! diag
        ($ ShareLeftRight
           {:left  ($ Stack {:direction "column"} ; I used to put the SelectProject in this Stack. Change :chat-height if you put it back.
                      ($ chat/Chat {:chat-height chat-side-height :proj-info proj}))
@@ -125,13 +125,13 @@
                       :up ($ Editor {:text code
                                      :name "code-editor"
                                      :height code-side-height})
-                      :dn (case rhs-pane
-                            :graph ($ GraphPane {:init-graph graph})
-                            :table ($ TablePane {:init-table table})
-                                   ($ Box {}))
+                      :dn ;;(case rhs-pane
+                           ;; :graph ($ GraphPane {:init-graph graph})
+                           ;; :table ($ TablePane {:init-table table})
+                                   ($ Box {})
                       :share-fns (:right-share top-share-fns)})
            :lf-pct 0.50
-           :init-width width}))))
+           :init-width width})))))
 
 (defnc app []
   {:helix/features {:check-invalid-hooks-usage true}}
